@@ -1,0 +1,7 @@
+{
+  "name": "AccounTech ERP",
+  "description": "A world-class, multi-tenant, GAAP-compliant accounting system featuring double-entry bookkeeping, hierarchical chart of accounts, automated financial reporting, and audit-ready transaction tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

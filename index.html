@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AccounTech - ERP Accounting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Global Font Override for Century Gothic */
+        @font-face {
+            font-family: 'Century Gothic';
+            src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic');
+        }
+
+        html, body, #root, * {
+            font-family: 'Century Gothic', CenturyGothic, AppleGothic, Futura, 'URW Gothic L', sans-serif !important;
+        }
+
+        /* Minor adjustments for Century Gothic's geometry */
+        input, select, textarea, button {
+            letter-spacing: -0.01em;
+        }
+        
+        .font-mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+        }
+
+        /* Print Optimization */
+        @media print {
+            aside, header, .no-print, button, input[type="date"], select {
+                display: none !important;
+            }
+            main {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            #root, body, html {
+                background: white !important;
+                color: black !important;
+            }
+            .bg-slate-50, .bg-slate-100, .bg-indigo-50 {
+                background-color: transparent !important;
+            }
+            .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+                box-shadow: none !important;
+            }
+            .border, .border-slate-200 {
+                border: none !important;
+            }
+            .rounded-[2rem], .rounded-[2.5rem] {
+                border-radius: 0 !important;
+            }
+            .p-16 {
+                padding: 2rem !important;
+            }
+            .max-w-5xl {
+                max-width: 100% !important;
+            }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900 h-full">
+    <div id="root"></div>
+</body>
+</html>
