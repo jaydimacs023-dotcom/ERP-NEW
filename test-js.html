@@ -1,0 +1,10 @@
+// Add this to index.html to test if React is loading
+// Open index.html and add this before the main script
+
+<div id="test-div">Loading test...</div>
+<script>
+  console.log('JavaScript is working');
+  setTimeout(() => {
+    document.getElementById('test-div').innerHTML = 'JavaScript loaded successfully!';
+  }, 1000);
+</script>
