@@ -294,7 +294,7 @@ const App: React.FC = () => {
             toast.type === 'error' ? 'bg-rose-600/90 border-rose-400 text-white' : 
             'bg-brand/90 border-brand text-white'
           }`}>
-            <div className="mt-0.5">
+            <div className="mt-0.5 text-white">
               {toast.type === 'success' && <CheckCircle2 size={20} />}
               {toast.type === 'error' && <AlertTriangle size={20} />}
               {toast.type === 'info' && <Info size={20} />}
@@ -303,7 +303,7 @@ const App: React.FC = () => {
                <p className="text-xs font-black uppercase tracking-widest opacity-70 mb-1">{toast.type}</p>
                <p className="text-sm font-bold leading-relaxed">{toast.message}</p>
             </div>
-            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} className="opacity-50 hover:opacity-100 transition-opacity">
+            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} className="opacity-50 hover:opacity-100 transition-opacity text-white">
               <X size={16} />
             </button>
           </div>
