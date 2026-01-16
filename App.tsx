@@ -1,17 +1,17 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus
 } from './types';
-import { INITIAL_ORGS, INITIAL_USERS, INITIAL_COA, INITIAL_VENDORS, INITIAL_BANK_ACCOUNTS, INITIAL_STUDENTS, INITIAL_EMPLOYEES, INITIAL_SPONSORS, INITIAL_ITEMS, INITIAL_QUALIFICATIONS, INITIAL_TRAINERS, INITIAL_SCHEDULES, INITIAL_BATCHES, INITIAL_LOCATIONS } from './db';
 import { AccountingService } from './accountingService';
+import { DataServiceFactory } from './services/DataServiceFactory';
+import { config } from './config/app';
 
 // View Imports
 import Dashboard from './views/Dashboard';
 import Ledger from './views/Ledger';
 import Reports from './views/Reports';
 import ChartOfAccounts from './views/ChartOfAccounts';
-import OrganizationsView from './views/OrganizationsView';
 import LoginView from './views/LoginView';
 import StudentsView from './views/StudentsView';
 import QualificationsView from './views/QualificationsView';
@@ -49,30 +49,32 @@ import {
   History, UserCog, Settings, Palette, CreditCard, 
   Binary, Terminal, Receipt, Calculator, Briefcase, 
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
-  FileText, Tag, Wallet, Activity
+  FileText, Tag, Wallet, Activity, Loader2, Database,
+  Cloud
 } from 'lucide-react';
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [organizations, setOrganizations] = useState<Organization[]>(INITIAL_ORGS);
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [currentOrgId, setCurrentOrgId] = useState<string>('org-3');
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Master Data State
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
-  const [qualifications, setQualifications] = useState<Qualification[]>(INITIAL_QUALIFICATIONS);
-  const [trainers, setTrainers] = useState<Trainer[]>(INITIAL_TRAINERS);
-  const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
-  const [sponsors, setSponsors] = useState<Sponsor[]>(INITIAL_SPONSORS);
-  const [items, setItems] = useState<NonStockItem[]>(INITIAL_ITEMS);
-  const [vendors, setVendors] = useState<Vendor[]>(INITIAL_VENDORS);
-  const [locations, setLocations] = useState<Location[]>(INITIAL_LOCATIONS);
-  const [schedules, setSchedules] = useState<TrainerSchedule[]>(INITIAL_SCHEDULES);
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANK_ACCOUNTS);
-  const [accounts, setAccounts] = useState<ChartOfAccount[]>(INITIAL_COA);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [qualifications, setQualifications] = useState<Qualification[]>([]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [items, setItems] = useState<NonStockItem[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
   // Financial Cycle State
@@ -85,8 +87,48 @@ export default function App() {
   // Modals
   const [showJournalForm, setShowJournalForm] = useState(false);
 
+  // Data Loading Logic
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const service = DataServiceFactory.getService();
+        const data = await service.getInitialData();
+        
+        setOrganizations(data.organizations);
+        setUsers(data.users);
+        setStudents(data.students);
+        setQualifications(data.qualifications);
+        setTrainers(data.trainers);
+        setBatches(data.batches);
+        setSponsors(data.sponsors);
+        setItems(data.items);
+        setVendors(data.vendors);
+        setLocations(data.locations);
+        setSchedules(data.schedules);
+        setEmployees(data.employees);
+        setBankAccounts(data.bankAccounts);
+        setAccounts(data.accounts);
+        setJournalEntries(data.journalEntries);
+        setJournalLines(data.journalLines);
+        setPayrollRuns(data.payrollRuns);
+        setPayrollLines(data.payrollLines);
+        setAuditLogs(data.auditLogs);
+        setPurchaseOrders(data.purchaseOrders);
+        
+        if (data.organizations.length > 0) {
+          setCurrentOrgId('org-3');
+        }
+      } catch (error) {
+        console.error("Critical Data Load Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
   // Derived Accounting Context
-  const currentOrg = organizations.find(o => o.id === currentOrgId);
+  const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
   const brandColor = currentOrg?.primaryColor || '#4f46e5';
 
   const filteredAccounts = useMemo(() => accounts.filter(a => a.orgId === currentOrgId && !a.isDeleted), [accounts, currentOrgId]);
@@ -144,6 +186,20 @@ export default function App() {
     handleNotify('info', `PO ${po.reference} converted for Bill processing.`);
   };
 
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
+        <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-500/20 animate-pulse">
+           <Building2 size={40} />
+        </div>
+        <div className="flex items-center gap-3">
+           <Loader2 className="animate-spin text-indigo-400" size={24} />
+           <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return <LoginView onLogin={handleLogin} onRegister={(o, a) => { setOrganizations(p => [...p, o]); setUsers(p => [...p, a]); setCurrentUser(a); setCurrentOrgId(o.id); setActiveTab('dashboard'); }} organizations={organizations} users={users} />;
   }
@@ -176,7 +232,7 @@ export default function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5 scrollbar-hide">
-           {/* Portals */}
+           {/* Navigation Items (unchanged logic) */}
            {currentUser.role === 'STUDENT' && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
@@ -191,7 +247,6 @@ export default function App() {
              </div>
            )}
 
-           {/* Financial Core & Analytics */}
            {isFinance && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Financial Core</p>}
@@ -207,7 +262,6 @@ export default function App() {
              </div>
            )}
 
-           {/* Operations */}
            {isRegistrar && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
@@ -219,7 +273,6 @@ export default function App() {
              </div>
            )}
 
-           {/* Registries */}
            {isFinance && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
@@ -230,7 +283,6 @@ export default function App() {
              </div>
            )}
 
-           {/* Administration */}
            {isAdmin && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
@@ -243,7 +295,6 @@ export default function App() {
              </div>
            )}
 
-           {/* System Level */}
            {isSysAdmin && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Platform Host</p>}
@@ -252,6 +303,19 @@ export default function App() {
              </div>
            )}
         </nav>
+
+        {/* System Data Engine Status Badge */}
+        {sidebarOpen && (
+          <div className="px-8 mb-4">
+             <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
+                <div className="min-w-0">
+                   <p className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Engine Active</p>
+                   <p className="text-[10px] font-black uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
+                </div>
+             </div>
+          </div>
+        )}
 
         <div className="p-6 mt-auto border-t border-white/5">
            <button onClick={() => setCurrentUser(null)} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
@@ -262,6 +326,7 @@ export default function App() {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Header and Content Area (unchanged) */}
         <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between z-40">
            <div className="flex items-center gap-4">
               <button 
@@ -273,7 +338,6 @@ export default function App() {
               <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
            </div>
            <div className="flex items-center gap-6">
-              {/* Refined visibility: Only show Manual Post to specific functional finance/admin roles, excluding President, Registrar, Trainer, Student */}
               {isFinance && !['PRESIDENT', 'REGISTRAR', 'TRAINER', 'STUDENT'].includes(currentUser?.role || '') && (
                 <button 
                   onClick={() => setShowJournalForm(true)} 
@@ -297,6 +361,7 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-10 scrollbar-hide">
+          {/* View Router (unchanged) */}
           {activeTab === 'student-portal' && currentUser.studentId && (
             <StudentPortalView 
               student={students.find(s => s.id === currentUser.studentId)!}

@@ -2,9 +2,11 @@
 import React, { useRef } from 'react';
 import { 
   Database, Download, Upload, Trash2, History, ShieldCheck, 
-  AlertCircle, CloudLightning, RefreshCw, FileJson, Server
+  AlertCircle, CloudLightning, RefreshCw, FileJson, Server,
+  Cloud, Monitor, Zap, RotateCw
 } from 'lucide-react';
 import { AuditLog } from '../types';
+import { config } from '../config/app';
 
 interface MaintenanceViewProps {
   logs: AuditLog[];
@@ -40,6 +42,64 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
         <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">System Maintenance & Data Utility</h2>
         <p className="text-sm text-slate-500 font-normal italic">Institutional disaster recovery and immutable data portability.</p>
       </header>
+
+      {/* Feature Flag / Data Strategy Controller */}
+      <div className="bg-white rounded-[2.5rem] border-2 border-indigo-600 shadow-2xl overflow-hidden animate-in slide-in-from-top-4 duration-700">
+         <div className="p-8 border-b bg-indigo-600 text-white flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+               <div className="p-3 bg-white/20 rounded-2xl border border-white/20">
+                  <Zap size={24} />
+               </div>
+               <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight leading-none">Data Strategy Controller</h3>
+                  <p className="text-xs font-bold text-indigo-100 uppercase tracking-widest mt-1">Instant Feature Flag Switching</p>
+               </div>
+            </div>
+            <div className="flex items-center gap-3">
+               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 ${config.useMockData ? 'bg-white text-indigo-600 border-white' : 'bg-emerald-500 text-white border-emerald-400'}`}>
+                  {config.useMockData ? 'Mock Local Active' : 'Cloud Supabase Active'}
+               </span>
+            </div>
+         </div>
+         
+         <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="space-y-4">
+               <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  Manually override the system data source. This utilizes <code className="bg-slate-100 px-1 rounded text-indigo-600">localStorage</code> to persist your choice across sessions.
+               </p>
+               <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => config.switchDataSource('MOCK')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${config.useMockData ? 'bg-indigo-600 text-white shadow-xl' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  >
+                     <Monitor size={16} /> Force Mock
+                  </button>
+                  <button 
+                    onClick={() => config.switchDataSource('CLOUD')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${!config.useMockData ? 'bg-emerald-600 text-white shadow-xl' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  >
+                     <Cloud size={16} /> Force Supabase
+                  </button>
+               </div>
+               <button 
+                  onClick={() => config.clearOverride()}
+                  className="w-full py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-rose-500 flex items-center justify-center gap-2 transition-colors"
+               >
+                  <RotateCw size={12} /> Reset to Environment Default
+               </button>
+            </div>
+
+            <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-200 flex items-start gap-4">
+               <AlertCircle size={24} className="text-amber-500 shrink-0 mt-0.5" />
+               <div className="space-y-2">
+                  <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Architectural Note</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-bold italic">
+                     "Switching sources instantly clears the in-memory cache and re-initializes the Ledger Architecture. Ensure any unsaved Manual Postings are finalized before switching."
+                  </p>
+               </div>
+            </div>
+         </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 space-y-6 shadow-sm">
