@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
+import { AccountingService } from '../accountingService';
 import { 
   Truck, Plus, Filter, Search, FileText, ChevronRight, Clock, 
   X, Save, Trash2, AlertCircle, Calculator, Percent, History,
@@ -32,7 +33,7 @@ const APView: React.FC<APViewProps> = ({
 
   // Bill Form State
   const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
-  const [billRef, setBillRef] = useState(`BILL-${Date.now().toString().slice(-6)}`);
+  const [billRef, setBillRef] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [billLines, setBillLines] = useState<{ itemId: string, qty: number, price: number }[]>([
     { itemId: '', qty: 1, price: 0 }
@@ -40,11 +41,24 @@ const APView: React.FC<APViewProps> = ({
 
   // Payment Form State
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
-  const [payRef, setPayRef] = useState(`PYMT-${Date.now().toString().slice(-6)}`);
+  const [payRef, setPayRef] = useState('');
   const [payVendorId, setPayVendorId] = useState('');
   const [payBankId, setPayBankId] = useState('');
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMemo, setPayMemo] = useState('');
+
+  // Load next sequential references
+  useEffect(() => {
+    if (showModal) {
+      setBillRef(AccountingService.getNextReference(entries, 'BILL'));
+    }
+  }, [showModal, entries]);
+
+  useEffect(() => {
+    if (showPaymentModal) {
+      setPayRef(AccountingService.getNextReference(entries, 'PV'));
+    }
+  }, [showPaymentModal, entries]);
 
   const apEntries = entries.filter(e => e.sourceType === 'BILL' && e.status !== 'REVERSED');
   const paymentEntries = entries.filter(e => e.sourceType === 'PAYMENT' && e.status !== 'REVERSED');
@@ -226,10 +240,11 @@ const APView: React.FC<APViewProps> = ({
 
   const resetForm = () => {
     setBillDate(new Date().toISOString().split('T')[0]);
-    setBillRef(`BILL-${Date.now().toString().slice(-6)}`);
     setVendorId('');
     setBillLines([{ itemId: '', qty: 1, price: 0 }]);
   };
+
+  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-6">
@@ -268,7 +283,7 @@ const APView: React.FC<APViewProps> = ({
       {activeTab === 'bills' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <SummaryBox label="Total Payables" value={totalPayables.toLocaleString(undefined, { minimumFractionDigits: 2 })} color="indigo" />
+            <SummaryBox label="Total Payables" value={formatCurrency(totalPayables)} color="indigo" />
             <SummaryBox label="Pending Approval" value="0.00" color="slate" />
             <SummaryBox label="Due within 7 Days" value="0.00" color="rose" />
             <SummaryBox label="Active Vendors" value={vendors.length.toString()} color="amber" />
@@ -308,7 +323,7 @@ const APView: React.FC<APViewProps> = ({
                       </td>
                       <td className="px-6 py-5 text-xs font-mono font-semibold text-indigo-600">{bill.reference}</td>
                       <td className="px-6 py-5 text-xs text-slate-600">{bill.date}</td>
-                      <td className="px-6 py-5 text-right font-mono font-bold text-slate-800">{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-5 text-right font-mono font-bold text-slate-800">{formatCurrency(amount)}</td>
                       <td className="px-6 py-5 text-center">
                         <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-bold uppercase rounded-full border border-amber-100">Unpaid</span>
                       </td>
@@ -356,7 +371,7 @@ const APView: React.FC<APViewProps> = ({
                     </td>
                     <td className="px-6 py-5 text-xs font-mono font-semibold text-indigo-600">{pymt.reference}</td>
                     <td className="px-6 py-5 text-xs text-slate-600">{pymt.date}</td>
-                    <td className="px-6 py-5 text-right font-mono font-bold text-rose-600">{bankLine?.credit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-5 text-right font-mono font-bold text-rose-600">{formatCurrency(bankLine?.credit || 0)}</td>
                     <td className="px-6 py-5 text-center">
                        <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase">
                         <Landmark size={10} /> {bankAcc?.bankName || 'Unknown'}
@@ -403,11 +418,11 @@ const APView: React.FC<APViewProps> = ({
                        <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[9px] uppercase">V</div>
                        <div className="text-sm font-bold text-slate-800">{row.name}</div>
                     </td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-emerald-600 font-bold">{row.current.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-amber-600 font-bold">{row.thirty.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-orange-600 font-bold">{row.sixty.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-black bg-rose-50/30">{row.ninety.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-5 text-right font-mono text-sm text-slate-900 font-black">{row.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-emerald-600 font-bold">{formatCurrency(row.current)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-amber-600 font-bold">{formatCurrency(row.thirty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-orange-600 font-bold">{formatCurrency(row.sixty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-black bg-rose-50/30">{formatCurrency(row.ninety)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-sm text-slate-900 font-black">{formatCurrency(row.total)}</td>
                   </tr>
                 )) : (
                   <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">No outstanding payables found.</td></tr>
@@ -437,8 +452,8 @@ const APView: React.FC<APViewProps> = ({
                   <input type="date" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={payDate} onChange={e => setPayDate(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Reference #</label>
-                  <input required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold" value={payRef} onChange={e => setPayRef(e.target.value)} />
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Voucher (PV) #</label>
+                  <input readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-black text-rose-600 font-mono" value={payRef} />
                 </div>
               </div>
 
@@ -447,7 +462,7 @@ const APView: React.FC<APViewProps> = ({
                 <select required className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm font-semibold text-indigo-700 appearance-none" value={payVendorId} onChange={e => setPayVendorId(e.target.value)}>
                   <option value="">Choose Supplier...</option>
                   {vendors.map(v => (
-                    <option key={v.id} value={v.id}>{v.name} (Outstanding: {vendorBalances[v.id]?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'})</option>
+                    <option key={v.id} value={v.id}>{v.name} (Outstanding: {formatCurrency(vendorBalances[v.id] || 0)})</option>
                   ))}
                 </select>
               </div>
@@ -504,7 +519,7 @@ const APView: React.FC<APViewProps> = ({
             <form onSubmit={handlePost} className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bill Date</label><input type="date" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={billDate} onChange={e => setBillDate(e.target.value)} /></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bill/Invoice Ref #</label><input required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold" value={billRef} onChange={e => setBillRef(e.target.value)} /></div>
+                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bill Reference (Sequential)</label><input readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono font-black text-indigo-600" value={billRef} /></div>
                 <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Select Vendor</label><select required className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm font-semibold text-indigo-600 appearance-none" value={vendorId} onChange={e => setVendorId(e.target.value)}><option value="">Choose Supplier...</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></div>
               </div>
 
@@ -527,7 +542,7 @@ const APView: React.FC<APViewProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8 bg-slate-50 rounded-3xl border border-slate-200">
                 <div className="space-y-2"><SummaryRow label="Input VAT (12%)" value={totalInputVat} isHighlighted /><SummaryRow label="Non-VAT / Exempt" value={nonVatPurchases} /></div>
-                <div className="space-y-2"><div className="flex justify-between items-center text-xs font-bold text-rose-600"><span>Less: Withheld Tax (EWT)</span><span>({totalEwt.toLocaleString(undefined, { minimumFractionDigits: 2 })})</span></div><div className="pt-2 border-t border-slate-200 mt-2"><SummaryRow label="Net Amount to Vendor" value={netPayableToVendor} isBig /></div></div>
+                <div className="space-y-2"><div className="flex justify-between items-center text-xs font-bold text-rose-600"><span>Less: Withheld Tax (EWT)</span><span>({formatCurrency(totalEwt)})</span></div><div className="pt-2 border-t border-slate-200 mt-2"><SummaryRow label="Net Amount to Vendor" value={netPayableToVendor} isBig /></div></div>
                 <div className="flex flex-col justify-end gap-3"><button type="button" onClick={() => setShowModal(false)} className="py-3.5 text-sm font-bold text-slate-500 hover:bg-white rounded-2xl border border-transparent hover:border-slate-200 transition-all">Discard</button><button type="submit" disabled={netPayableToVendor <= 0 || !vendorId} className="py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"><Save size={18} /> Post to Payables</button></div>
               </div>
             </form>

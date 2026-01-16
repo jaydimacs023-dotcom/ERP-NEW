@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { 
@@ -15,8 +16,7 @@ interface UsersManagementViewProps {
 const ROLES = [
   { id: 'ADMIN', label: 'Administrator', desc: 'Full access to Financials & Operations' },
   { id: 'ACCOUNTANT', label: 'Accountant', desc: 'Financial reporting & General Ledger only' },
-  { id: 'REGISTRAR', label: 'Registrar', desc: 'Student, Trainer & Batch Management only' },
-  { id: 'VIEWER', label: 'Viewer', desc: 'Read-only access to specific operational data' }
+  { id: 'REGISTRAR', label: 'Registrar', desc: 'Student, Trainer & Batch Management only' }
 ];
 
 const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddUser, onDeleteUser }) => {

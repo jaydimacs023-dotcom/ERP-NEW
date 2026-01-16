@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Location } from '../types';
 import { 
@@ -26,9 +27,11 @@ const LocationsView: React.FC<LocationsViewProps> = ({
   });
 
   const filteredLocations = locations.filter(l => 
+    !l.isDeleted && (
     l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     l.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     l.address.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const resetForm = () => {

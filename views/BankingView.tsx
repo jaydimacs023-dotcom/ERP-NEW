@@ -5,7 +5,9 @@ import {
   Landmark, CreditCard, Wallet, ArrowRightLeft, History, Plus, 
   X, Save, ShieldCheck, AlertCircle, ChevronRight, 
   ArrowUpRight, ArrowDownLeft, BookOpen, Receipt, ExternalLink,
-  ArrowDownToLine, ArrowUpFromLine, Calendar, MoreHorizontal
+  ArrowDownToLine, ArrowUpFromLine, Calendar, MoreHorizontal,
+  CheckCircle2, Scale, ListChecks, CheckSquare, Clock, Check,
+  Activity, Zap, ShieldAlert, CheckCircle
 } from 'lucide-react';
 
 interface BankingViewProps {
@@ -16,16 +18,24 @@ interface BankingViewProps {
   lines: JournalEntryLine[];
   onAddBankAccount: (bank: Partial<BankAccount>) => void;
   onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onToggleClearLine: (lineId: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
+type BankingTab = 'ledger' | 'reconcile';
+
 const BankingView: React.FC<BankingViewProps> = ({ 
-  bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onPostTransfer, onNotify 
+  bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onPostTransfer, onToggleClearLine, onNotify 
 }) => {
+  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
+  const [activeTab, setActiveTab] = useState<BankingTab>('ledger');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState<'IN' | 'OUT' | null>(null);
-  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
+
+  // Reconciliation State
+  const [statementBalance, setStatementBalance] = useState<number>(0);
+  const [reconcileAsOf, setReconcileAsOf] = useState(new Date().toISOString().split('T')[0]);
 
   // Form States
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
@@ -61,11 +71,11 @@ const BankingView: React.FC<BankingViewProps> = ({
     const finalizedLines: JournalEntryLine[] = [];
 
     if (showEntryModal === 'IN') {
-      finalizedLines.push({ id: `l1-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo });
-      finalizedLines.push({ id: `l2-${entryId}`, journalEntryId: entryId, accountId: entryAccountId, debit: 0, credit: entryAmount, memo: entryMemo });
+      finalizedLines.push({ id: `l1-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo, isCleared: false });
+      finalizedLines.push({ id: `l2-${entryId}`, journalEntryId: entryId, accountId: entryAccountId, debit: 0, credit: entryAmount, memo: entryMemo, isCleared: false });
     } else {
-      finalizedLines.push({ id: `l1-${entryId}`, journalEntryId: entryId, accountId: entryAccountId, debit: entryAmount, credit: 0, memo: entryMemo });
-      finalizedLines.push({ id: `l2-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: 0, credit: entryAmount, memo: entryMemo });
+      finalizedLines.push({ id: `l1-${entryId}`, journalEntryId: entryId, accountId: entryAccountId, debit: entryAmount, credit: 0, memo: entryMemo, isCleared: false });
+      finalizedLines.push({ id: `l2-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: 0, credit: entryAmount, memo: entryMemo, isCleared: false });
     }
 
     onPostTransfer({
@@ -91,8 +101,8 @@ const BankingView: React.FC<BankingViewProps> = ({
 
     const entryId = `je-trf-${Date.now()}`;
     const finalizedLines: JournalEntryLine[] = [
-      { id: `l1-${entryId}`, journalEntryId: entryId, accountId: fromBank.glAccountId, debit: 0, credit: entryAmount, memo: entryMemo || `Internal Transfer` },
-      { id: `l2-${entryId}`, journalEntryId: entryId, accountId: toBank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo || `Internal Transfer` }
+      { id: `l1-${entryId}`, journalEntryId: entryId, accountId: fromBank.glAccountId, debit: 0, credit: entryAmount, memo: entryMemo || `Internal Transfer`, isCleared: false },
+      { id: `l2-${entryId}`, journalEntryId: entryId, accountId: toBank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo || `Internal Transfer`, isCleared: false }
     ];
 
     onPostTransfer({
@@ -116,14 +126,36 @@ const BankingView: React.FC<BankingViewProps> = ({
     setEntryDate(new Date().toISOString().split('T')[0]);
   };
 
+  // Reconciliation Logic
+  const reconciliationData = useMemo(() => {
+    if (!selectedBank) return null;
+    const bankLines = lines.filter(l => l.accountId === selectedBank.glAccountId);
+    const clearedLines = bankLines.filter(l => l.isCleared);
+    const unclearedLines = bankLines.filter(l => !l.isCleared);
+
+    const bookBalance = bankLines.reduce((sum, l) => sum + (l.debit - l.credit), 0);
+    const clearedBalance = clearedLines.reduce((sum, l) => sum + (l.debit - l.credit), 0);
+    const difference = statementBalance - clearedBalance;
+
+    return { bankLines, clearedLines, unclearedLines, bookBalance, clearedBalance, difference };
+  }, [selectedBank, lines, statementBalance]);
+
+  const handleBulkClear = () => {
+    if (!reconciliationData) return;
+    reconciliationData.unclearedLines.forEach(l => onToggleClearLine(l.id));
+    onNotify('success', `Cleared ${reconciliationData.unclearedLines.length} transactions.`);
+  };
+
+  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Banking & Treasury</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Institutional liquidity management and bank-to-ledger synchronization.</p>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Banking & Treasury</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Institutional liquidity management and bank-to-ledger reconciliation.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 no-print">
           <button 
             onClick={() => { resetEntryForm(); setShowEntryModal('IN'); }}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-all font-bold text-xs"
@@ -156,19 +188,34 @@ const BankingView: React.FC<BankingViewProps> = ({
           {bankAccounts.map(bank => {
             const summary = summaries.find(s => s.accountId === bank.glAccountId);
             const balance = summary?.balance || 0;
+            // Reconciliation check
+            const bankLines = lines.filter(l => l.accountId === bank.glAccountId);
+            const unclearedCount = bankLines.filter(l => !l.isCleared).length;
+            
             return (
               <div 
                 key={bank.id} 
                 onClick={() => setSelectedBank(bank)}
-                className="bg-white rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all overflow-hidden cursor-pointer group flex flex-col"
+                className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all overflow-hidden cursor-pointer group flex flex-col"
               >
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-8">
                     <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center border border-slate-100 transition-all shadow-sm">
                       {bank.type === 'CASH' ? <Wallet size={28} /> : <Landmark size={28} />}
                     </div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                      {bank.type}
+                    <div className="flex flex-col items-end gap-2">
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                        {bank.type}
+                       </div>
+                       {unclearedCount > 0 ? (
+                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                           <Clock size={10} /> {unclearedCount} Outstanding
+                         </span>
+                       ) : (
+                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                           <CheckCircle size={10} /> Reconciled
+                         </span>
+                       )}
                     </div>
                   </div>
 
@@ -179,7 +226,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
                   <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-end">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Book Balance</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current Ledger</p>
                       <p className={`text-3xl font-mono font-black tracking-tighter ${balance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
                         {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
@@ -192,7 +239,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
                 <div className="bg-slate-50/80 px-8 py-5 flex items-center justify-between border-t border-slate-100">
                   <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">
-                    <History size={16} /> View Sub-Ledger
+                    <History size={16} /> Open Treasury Console
                   </div>
                   <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
                 </div>
@@ -202,130 +249,246 @@ const BankingView: React.FC<BankingViewProps> = ({
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
             <button 
-              onClick={() => setSelectedBank(null)}
+              onClick={() => { setSelectedBank(null); setActiveTab('ledger'); }}
               className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors group"
             >
               <div className="p-1.5 rounded-lg border border-slate-200 group-hover:border-indigo-200 transition-all">
                 <ChevronRight size={14} className="rotate-180" />
               </div>
-              Back to Treasury
+              Exit Console
             </button>
-            <div className="flex gap-2">
-              <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200"><Receipt size={18}/></button>
-              <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200"><ExternalLink size={18}/></button>
+            <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 w-full sm:w-auto">
+               <button 
+                onClick={() => setActiveTab('ledger')}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+               >
+                 <History size={14} /> Account History
+               </button>
+               <button 
+                onClick={() => setActiveTab('reconcile')}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+               >
+                 <Scale size={14} /> Reconciliation
+               </button>
             </div>
           </div>
           
           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-             <div className="p-10 border-b bg-slate-50/30 flex flex-col lg:flex-row justify-between items-center gap-8">
-                <div className="flex items-center gap-6">
-                   <div className="w-20 h-20 rounded-[2rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-200 border-4 border-white">
-                     {selectedBank.type === 'CASH' ? <Wallet size={36} /> : <Landmark size={36} />}
-                   </div>
-                   <div>
-                      <h3 className="text-3xl font-black text-slate-800 tracking-tighter">{selectedBank.bankName}</h3>
-                      <div className="flex items-center gap-3 mt-2">
-                         <span className="text-sm font-mono text-slate-400 font-medium">{selectedBank.accountNumber}</span>
-                         <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-                         <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">{selectedBank.type} TRUST ACCOUNT</span>
-                      </div>
-                   </div>
-                </div>
-                <div className="text-center lg:text-right">
-                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Total Available Liquidity</p>
-                   <div className="flex items-baseline justify-center lg:justify-end gap-2">
-                     <span className="text-lg font-black text-indigo-600">{selectedBank.currency}</span>
-                     <span className="text-5xl font-mono font-black text-slate-900 tracking-tighter">
-                       {(summaries.find(s => s.accountId === selectedBank.glAccountId)?.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                     </span>
-                   </div>
-                </div>
-             </div>
-
-             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100">
-                  <thead className="bg-slate-50/80">
-                    <tr>
-                      <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction Date</th>
-                      <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Type / Memo</th>
-                      <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Inflow</th>
-                      <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Outflow</th>
-                      <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Cumulative Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {(() => {
-                      const bankLines = lines.filter(l => l.accountId === selectedBank.glAccountId);
-                      let currentRunBal = 0;
-                      const sortedLines = [...bankLines].sort((a, b) => {
-                        const entryA = entries.find(e => e.id === a.journalEntryId);
-                        const entryB = entries.find(e => e.id === b.journalEntryId);
-                        return (entryA?.date || '').localeCompare(entryB?.date || '');
-                      });
-
-                      const history = sortedLines.map(line => {
-                        const entry = entries.find(e => e.id === line.journalEntryId);
-                        currentRunBal += (line.debit - line.credit);
-                        return { line, entry, runBal: currentRunBal };
-                      });
-
-                      return history.reverse().map(({ line, entry, runBal }) => (
-                        <tr key={line.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-10 py-6 whitespace-nowrap">
-                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-slate-100 rounded-lg text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                   <Calendar size={14} />
-                                </div>
-                                <div>
-                                   <div className="text-sm font-bold text-slate-700">{entry?.date}</div>
-                                   <div className="text-[10px] font-mono text-slate-400 font-semibold uppercase mt-0.5">{entry?.reference}</div>
-                                </div>
-                             </div>
-                          </td>
-                          <td className="px-10 py-6">
-                             <div className="text-sm font-bold text-slate-800 line-clamp-1">{entry?.description}</div>
-                             <div className="text-[10px] text-slate-400 uppercase tracking-tight mt-1 font-medium">{line.memo || 'General Transaction'}</div>
-                          </td>
-                          <td className="px-10 py-6 text-right">
-                             {line.debit > 0 && (
-                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 font-mono text-xs font-black">
-                                  <ArrowDownLeft size={12} strokeWidth={3} /> {line.debit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                               </div>
-                             )}
-                          </td>
-                          <td className="px-10 py-6 text-right">
-                             {line.credit > 0 && (
-                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-50 text-rose-700 rounded-full border border-rose-100 font-mono text-xs font-black">
-                                  <ArrowUpRight size={12} strokeWidth={3} /> {line.credit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </div>
-                             )}
-                          </td>
-                          <td className="px-10 py-6 text-right font-mono text-sm font-black text-slate-900 bg-slate-50/20 group-hover:bg-slate-50/40 transition-colors">
-                             {runBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      ));
-                    })()}
-                    {lines.filter(l => l.accountId === selectedBank.glAccountId).length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="py-32 text-center">
-                          <div className="flex flex-col items-center gap-4 text-slate-300">
-                             <Receipt size={48} strokeWidth={1} />
-                             <p className="text-sm font-medium italic">No ledger activity recorded for this account.</p>
+             {activeTab === 'ledger' ? (
+               <>
+                 <div className="p-10 border-b bg-slate-50/30 flex flex-col lg:flex-row justify-between items-center gap-8">
+                    <div className="flex items-center gap-6">
+                       <div className="w-20 h-20 rounded-[2rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-200 border-4 border-white">
+                         {selectedBank.type === 'CASH' ? <Wallet size={36} /> : <Landmark size={36} />}
+                       </div>
+                       <div>
+                          <h3 className="text-3xl font-black text-slate-800 tracking-tighter">{selectedBank.bankName}</h3>
+                          <div className="flex items-center gap-3 mt-2">
+                             <span className="text-sm font-mono text-slate-400 font-medium">{selectedBank.accountNumber}</span>
+                             <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
+                             <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">{selectedBank.type} TRUST ACCOUNT</span>
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-             </div>
+                       </div>
+                    </div>
+                    <div className="text-center lg:text-right">
+                       <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Ledger Snapshot</p>
+                       <div className="flex items-baseline justify-center lg:justify-end gap-2">
+                         <span className="text-lg font-black text-indigo-600">{selectedBank.currency}</span>
+                         <span className="text-5xl font-mono font-black text-slate-900 tracking-tighter">
+                           {reconciliationData?.bookBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                         </span>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100">
+                      <thead className="bg-slate-50/80">
+                        <tr>
+                          <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction Date</th>
+                          <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Description / Memo</th>
+                          <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Debit (In)</th>
+                          <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit (Out)</th>
+                          <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {reconciliationData?.bankLines.length === 0 ? (
+                           <tr>
+                              <td colSpan={5} className="py-20 text-center text-slate-300 italic font-medium">No ledger activity found for this account.</td>
+                           </tr>
+                        ) : reconciliationData?.bankLines.slice().reverse().map(line => {
+                          const entry = entries.find(e => e.id === line.journalEntryId);
+                          return (
+                            <tr key={line.id} className="hover:bg-slate-50/50 transition-colors group">
+                              <td className="px-10 py-6 whitespace-nowrap">
+                                 <div className="text-sm font-bold text-slate-700">{entry?.date}</div>
+                                 <div className="text-[10px] font-mono text-slate-400 font-semibold uppercase mt-0.5">{entry?.reference}</div>
+                              </td>
+                              <td className="px-10 py-6">
+                                 <div className="text-sm font-bold text-slate-800 line-clamp-1">{entry?.description}</div>
+                                 <div className="text-[10px] text-slate-400 uppercase tracking-tight mt-1 font-medium italic">{line.memo || 'Institutional Disbursement'}</div>
+                              </td>
+                              <td className="px-10 py-6 text-right">
+                                 {line.debit > 0 && <span className="font-mono text-sm text-emerald-600 font-bold">{formatCurrency(line.debit)}</span>}
+                              </td>
+                              <td className="px-10 py-6 text-right">
+                                 {line.credit > 0 && <span className="font-mono text-sm text-rose-600 font-bold">({formatCurrency(line.credit)})</span>}
+                              </td>
+                              <td className="px-10 py-6 text-right">
+                                 {line.isCleared ? (
+                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
+                                      <CheckCircle2 size={12} /> Reconciled
+                                   </span>
+                                 ) : (
+                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 text-[9px] font-black uppercase tracking-widest">
+                                      <Clock size={12} /> Outstanding
+                                   </span>
+                                 )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                 </div>
+               </>
+             ) : (
+               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                  <div className="p-10 border-b bg-slate-50 flex flex-col lg:flex-row justify-between items-center gap-10">
+                     <div className="flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-[2rem] bg-emerald-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-200 border-4 border-white">
+                           <Scale size={36} />
+                        </div>
+                        <div className="space-y-4">
+                           <div className="space-y-1">
+                              <h3 className="text-2xl font-black text-slate-800 tracking-tight">Audit Reconciliation</h3>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Statement Match Framework v4.0</p>
+                           </div>
+                           <div className="flex items-center gap-4">
+                              <div className="space-y-1">
+                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Period End</label>
+                                 <input type="date" className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500" value={reconcileAsOf} onChange={e => setReconcileAsOf(e.target.value)} />
+                              </div>
+                              <div className="space-y-1">
+                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Actual Statement Balance</label>
+                                 <div className="relative">
+                                    <input type="number" step="0.01" className="bg-white border-2 border-indigo-600/20 rounded-xl pl-8 pr-4 py-1.5 text-base font-mono font-black text-slate-900 outline-none focus:border-indigo-600" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₱</span>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                     <div className={`p-8 rounded-[2rem] border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Unreconciled Difference</p>
+                        <div className="flex items-baseline gap-2">
+                           <span className="text-xs font-black">₱</span>
+                           <div className={`text-4xl font-mono font-black tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {reconciliationData?.difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                           </div>
+                        </div>
+                        {Math.abs(reconciliationData?.difference || 0) < 0.01 ? (
+                          <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-bounce">
+                             <ShieldCheck size={18} /> Verified Match
+                          </div>
+                        ) : (
+                           <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-rose-600 uppercase tracking-widest">
+                             <AlertCircle size={18} /> Variance Found
+                          </div>
+                        )}
+                     </div>
+                  </div>
+
+                  <div className="p-10 space-y-6 bg-white">
+                     <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                           <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><ListChecks size={18} /></div>
+                           <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Audit Checklist</h4>
+                        </div>
+                        <div className="flex items-center gap-4">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              {reconciliationData?.unclearedLines.length} Pending
+                           </p>
+                           <button 
+                             onClick={handleBulkClear}
+                             className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                           >
+                             Clear All
+                           </button>
+                        </div>
+                     </div>
+
+                     <div className="space-y-3">
+                        {reconciliationData?.unclearedLines.length === 0 && (
+                          <div className="py-20 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 text-slate-400">
+                             <CheckSquare size={32} className="mx-auto mb-3 opacity-20" />
+                             <p className="text-xs font-bold uppercase tracking-widest italic">Ledger and Statement are perfectly matched.</p>
+                          </div>
+                        )}
+                        {reconciliationData?.unclearedLines.map(line => {
+                          const entry = entries.find(e => e.id === line.journalEntryId);
+                          return (
+                            <button 
+                              key={line.id}
+                              onClick={() => onToggleClearLine(line.id)}
+                              className="w-full flex items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 hover:border-indigo-600 hover:shadow-lg transition-all text-left group"
+                            >
+                               <div className="flex items-center gap-5">
+                                  <div className="w-12 h-12 rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-200 group-hover:border-indigo-600 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
+                                     <Check size={24} strokeWidth={4} />
+                                  </div>
+                                  <div>
+                                     <p className="text-[10px] font-mono font-black text-indigo-600">{entry?.date} • {entry?.reference}</p>
+                                     <p className="text-sm font-bold text-slate-800 uppercase tracking-tight">{entry?.description}</p>
+                                  </div>
+                               </div>
+                               <div className="text-right">
+                                  <p className={`text-lg font-mono font-black ${line.debit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                     {line.debit > 0 ? `+${formatCurrency(line.debit)}` : `-${formatCurrency(line.credit)}`}
+                                  </p>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{line.memo || 'Direct Ledger Posting'}</p>
+                               </div>
+                            </button>
+                          )
+                        })}
+                     </div>
+
+                     <div className="mt-12 pt-10 border-t border-slate-100">
+                        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-10">
+                           <div className="flex-1 space-y-4">
+                              <div className="flex items-center gap-3">
+                                 <ShieldCheck size={32} className="text-brand" />
+                                 <h4 className="text-2xl font-black tracking-tight uppercase">Immutable Closure</h4>
+                              </div>
+                              <p className="text-sm text-slate-400 leading-relaxed font-medium">
+                                 Finalizing reconciliation establishes a cryptographic audit anchor for {reconcileAsOf}. 
+                                 This lock ensures that historical liquidity positions remain constant for subsequent reporting cycles.
+                              </p>
+                           </div>
+                           <div className="flex flex-col items-end gap-3 shrink-0">
+                              <button 
+                                disabled={Math.abs(reconciliationData?.difference || 0) > 0.01}
+                                className="px-12 py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                              >
+                                 Anchor Balance Snapshot
+                              </button>
+                              <div className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                 <Zap size={12} className="text-brand" /> Verified Session User: {new Date().toLocaleTimeString()}
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+             )}
           </div>
         </div>
       )}
 
-      {/* Entry Modal */}
+      {/* Direct Entry Modal */}
       {showEntryModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
@@ -394,7 +557,6 @@ const BankingView: React.FC<BankingViewProps> = ({
         </div>
       )}
 
-      {/* Transfer Modal */}
       {showTransferModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
@@ -462,7 +624,6 @@ const BankingView: React.FC<BankingViewProps> = ({
         </div>
       )}
 
-      {/* Add Bank Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">

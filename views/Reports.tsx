@@ -1,8 +1,7 @@
-
 import React, { useState, useMemo } from 'react';
 import { TransactionSummary, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
-import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter } from 'lucide-react';
+import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2 } from 'lucide-react';
 
 interface ReportsProps {
   summaries: TransactionSummary[];
@@ -13,11 +12,12 @@ interface ReportsProps {
   batches: Batch[];
   orgName?: string;
   currency?: string;
+  logoUrl?: string;
 }
 
 type ReportType = 'BS' | 'IS' | 'TB' | 'CFS';
 
-const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualifications, batches, orgName = 'Institution Ledger', currency = 'USD' }) => {
+const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualifications, batches, orgName = 'Institution Ledger', currency = 'USD', logoUrl }) => {
   const [reportType, setReportType] = useState<ReportType>('BS');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>('');
   
@@ -37,27 +37,21 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   }, [accounts, entries, lines, endDate]);
 
   const reportSummariesIS = useMemo(() => {
-    // 1. Time-base filter
     const dateFilteredEntries = entries.filter(e => e.date >= startDate && e.date <= endDate);
     const dateFilteredEntryIds = new Set(dateFilteredEntries.map(e => e.id));
     let targetLines = lines.filter(l => dateFilteredEntryIds.has(l.journalEntryId));
     
-    // 2. Segment-base filter (Nominal accounts attribution)
     if (selectedQualificationId && reportType === 'IS') {
-      // Find all batches that belong to the selected qualification
       const qualBatchIds = new Set(batches.filter(b => b.qualificationId === selectedQualificationId).map(b => b.id));
-      // Find accounts specifically linked to this qualification in the COA
       const qualAccountIds = new Set(accounts.filter(a => a.qualificationId === selectedQualificationId).map(a => a.id));
 
       targetLines = targetLines.filter(line => {
-        // Line matches if it's tagged with a relevant batch OR it uses a dedicated account for this qualification
         const isAttributedBatch = line.batchId && qualBatchIds.has(line.batchId);
         const isAttributedAccount = qualAccountIds.has(line.accountId);
         return isAttributedBatch || isAttributedAccount;
       });
     }
 
-    // 3. Summarize the attributed transactional data
     return AccountingService.getLedgerSummaries(accounts, targetLines);
   }, [accounts, entries, lines, batches, startDate, endDate, selectedQualificationId, reportType]);
 
@@ -147,7 +141,28 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   const activeQualification = qualifications.find(q => q.id === selectedQualificationId);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20 print:m-0 print:p-0">
+      {/* Print-Only Confidentiality Watermark */}
+      <div className="hidden print:flex justify-between items-center mb-8 border-b-2 border-slate-900 pb-6">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 rounded-full border-2 border-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+             {logoUrl ? (
+               <img src={logoUrl} className="w-full h-full object-cover" alt="Institutional Logo" />
+             ) : (
+               <Building2 size={32} />
+             )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tight leading-none">{orgName}</h1>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Official Institutional Financial Record</p>
+          </div>
+        </div>
+        <div className="text-right">
+           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Classification</p>
+           <p className="text-xs font-black text-rose-600 uppercase">Highly Confidential</p>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-6 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex bg-slate-100 rounded-2xl p-1.5 border border-slate-200">
@@ -161,7 +176,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               onClick={handlePrint}
               className="flex items-center gap-2 px-5 py-2.5 text-slate-600 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
             >
-              <Printer size={16} /> Print
+              <Printer size={16} /> Print Report
             </button>
             <button 
               onClick={handleExport}
@@ -223,9 +238,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden flex flex-col min-h-[800px]">
-        <div className="p-16 border-b border-slate-50 bg-slate-50/20 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
+        <div className="p-16 border-b border-slate-50 bg-slate-50/20 text-center print:bg-white print:p-8">
+          <div className="flex items-center justify-center gap-2 mb-4 no-print">
              <div className="w-12 h-1 bg-indigo-600 rounded-full"></div>
              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
              <div className="w-12 h-1 bg-indigo-600 rounded-full"></div>
@@ -242,7 +257,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           </div>
           
           <div className="mt-8">
-            <h1 className="text-lg font-black text-indigo-700 uppercase tracking-widest">
+            <h1 className="text-lg font-black text-indigo-700 uppercase tracking-widest print:text-slate-900">
               {reportType === 'BS' ? 'Statement of Financial Position' : 
                reportType === 'IS' ? 'Statement of Comprehensive Income' : 
                reportType === 'CFS' ? 'Statement of Cash Flows' : 'Trial Balance Registry'}
@@ -253,7 +268,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           </div>
         </div>
 
-        <div className="p-16 flex-1 bg-white">
+        <div className="p-16 flex-1 bg-white print:p-8">
           {reportType === 'BS' && (
             <div className="space-y-12 max-w-3xl mx-auto">
               <FinancialSection title="I. ASSETS" items={bs.assets} total={bs.totalAssets} symbol={currencySymbol} />
@@ -274,7 +289,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               <FinancialSection title="REVENUE SOURCES" items={isReport.revenue} total={isReport.totalRevenue} symbol={currencySymbol} />
               <FinancialSection title="OPERATING EXPENSES" items={isReport.expenses} total={isReport.totalExpenses} symbol={currencySymbol} />
               
-              <div className={`pt-10 mt-10 border-t-2 border-slate-900 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              <div className={`pt-10 mt-10 border-t-2 border-slate-900 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-emerald-700 print:text-slate-900' : 'text-rose-700 print:text-slate-900'}`}>
                 <span className="text-sm font-black uppercase tracking-widest">NET COMPREHENSIVE INCOME / (LOSS)</span>
                 <span className="text-lg font-mono font-black underline decoration-double underline-offset-4">
                   {currencySymbol} {formatCurrency(isReport.netIncome)}
@@ -285,10 +300,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
           {reportType === 'CFS' && (
             <div className="space-y-12 max-w-3xl mx-auto">
-              {/* OPERATING ACTIVITIES */}
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
+                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
                    CASH FLOW FROM OPERATING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -322,10 +336,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                 </div>
               </div>
 
-              {/* INVESTING ACTIVITIES */}
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
+                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
                    CASH FLOW FROM INVESTING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -340,10 +353,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                 </div>
               </div>
 
-              {/* FINANCING ACTIVITIES */}
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
+                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
                    CASH FLOW FROM FINANCING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -358,10 +370,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                 </div>
               </div>
 
-              {/* RECONCILIATION */}
-              <div className="pt-10 mt-10 border-t-4 border-double border-slate-900 bg-slate-50/50 p-8 rounded-3xl">
+              <div className="pt-10 mt-10 border-t-4 border-double border-slate-900 bg-slate-50/50 p-8 rounded-3xl print:bg-white print:p-0">
                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-sm font-black text-indigo-700 uppercase tracking-[0.2em]">
+                    <div className="flex justify-between items-center text-sm font-black text-indigo-700 uppercase tracking-[0.2em] print:text-slate-900">
                        <span>NET INCREASE / (DECREASE) IN CASH</span>
                        <span className="font-mono">{currencySymbol} {formatCurrency(cfsReport.netCashFlow)}</span>
                     </div>
@@ -379,16 +390,16 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           )}
 
           {reportType === 'TB' && (
-            <div className="max-w-4xl mx-auto overflow-hidden rounded-[2rem] border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50">
+            <div className="max-w-4xl mx-auto overflow-hidden rounded-[2rem] border border-slate-200 print:border-slate-900">
+              <table className="min-w-full divide-y divide-slate-100 print:divide-slate-900">
+                <thead className="bg-slate-50 print:bg-white">
                   <tr>
-                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">G/L Account Title</th>
-                    <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Debit</th>
-                    <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</th>
+                    <th className="px-10 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">G/L Account Title</th>
+                    <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Debit</th>
+                    <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Credit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-50 print:divide-slate-200">
                   {reportSummariesBS.filter(s => {
                     const acc = accounts.find(a => a.id === s.accountId);
                     return acc && !acc.isHeader;
@@ -405,20 +416,38 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           )}
         </div>
 
-        <div className="px-16 py-10 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-6">
+        {/* Print Footer: Signatures & Certification */}
+        <div className="hidden print:block p-16 pt-0">
+           <div className="grid grid-cols-2 gap-20 pt-20">
+              <div className="space-y-12">
+                 <div className="border-t border-slate-900 pt-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Prepared & Certified Correct By:</p>
+                    <p className="text-sm font-black text-slate-900 mt-1 uppercase">Institutional Accountant</p>
+                 </div>
+              </div>
+              <div className="space-y-12">
+                 <div className="border-t border-slate-900 pt-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Reviewed & Approved By:</p>
+                    <p className="text-sm font-black text-slate-900 mt-1 uppercase">Institutional President</p>
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        <div className="px-16 py-10 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-white print:border-slate-900">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+             <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 print:bg-white print:border print:border-slate-900">
                 <ShieldCheck size={20} />
              </div>
              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Internal Certification</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Internal Certification</p>
                 <p className="text-xs font-bold text-slate-700">Audit-Ready Snapshot • GAAP Compliant</p>
              </div>
           </div>
-          <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+          <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] print:text-slate-900">
              <div className="flex items-center gap-1.5"><Clock size={14} /> SYS_SYNC: {new Date().toLocaleTimeString()}</div>
-             <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
-             <div className="italic text-indigo-400">AccounTech Engine v4.0.1</div>
+             <div className="w-1 h-1 bg-slate-200 rounded-full print:bg-slate-900"></div>
+             <div className="italic text-indigo-400 print:text-slate-900">AccounTech Engine v4.0.1</div>
           </div>
         </div>
       </div>
@@ -436,33 +465,32 @@ const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void 
 );
 
 const FinancialSection: React.FC<{ title: string, items: TransactionSummary[], total: number, symbol: string }> = ({ title, items, total, symbol }) => {
-  // Only show accounts that have a non-zero balance for this specific segment view
   const visibleItems = items.filter(i => Math.abs(i.balance) > 0.01);
   
   return (
     <div className="animate-in fade-in duration-700 slide-in-from-bottom-2">
       <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.3em] mb-8 flex items-center gap-4">
-         <div className="flex-1 h-px bg-slate-100"></div>
+         <div className="flex-1 h-px bg-slate-100 print:bg-slate-900"></div>
          {title}
-         <div className="flex-1 h-px bg-slate-100"></div>
+         <div className="flex-1 h-px bg-slate-100 print:bg-slate-900"></div>
       </h4>
       <div className="space-y-4 px-5">
         {visibleItems.length > 0 ? visibleItems.map(item => (
           <div key={item.accountId} className="flex justify-between items-center group">
             <div className="flex items-center gap-3">
-               <ChevronRight size={12} className="text-slate-200 group-hover:text-indigo-400 transition-colors" />
-               <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors tracking-tight">{item.accountName}</span>
+               <ChevronRight size={12} className="text-slate-200 group-hover:text-indigo-400 transition-colors print:text-slate-900" />
+               <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors tracking-tight print:text-slate-900">{item.accountName}</span>
             </div>
-            <span className="font-mono text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">
+            <span className="font-mono text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors print:text-slate-900">
               {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
         )) : (
-          <div className="py-4 text-center text-slate-300 italic text-[10px] uppercase tracking-widest">
+          <div className="py-4 text-center text-slate-300 italic text-[10px] uppercase tracking-widest print:text-slate-400">
             No activity attributed to this segment.
           </div>
         )}
-        <div className="flex justify-between items-center pt-6 mt-6 border-t border-slate-100 text-sm font-black text-slate-900 uppercase tracking-widest">
+        <div className="flex justify-between items-center pt-6 mt-6 border-t border-slate-100 text-sm font-black text-slate-900 uppercase tracking-widest print:border-slate-900">
           <span>SUBTOTAL {title}</span>
           <span className="border-b-2 border-slate-900 pb-1">{symbol} {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>

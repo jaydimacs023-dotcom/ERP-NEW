@@ -1,37 +1,17 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  LayoutDashboard, BookText, TableProperties, FileBarChart, 
-  ShieldCheck, Building2, Users, Award, GraduationCap, 
-  Layers, MapPin, LogOut, Database, Plus, Menu, X, ChevronRight,
-  AlertCircle, Handshake, Box, Landmark, FileText, Truck, HardDrive,
-  History, CalendarClock, ShoppingCart, CheckCircle2, AlertTriangle, Info,
-  UserCog, Binary, Terminal, ShieldAlert, Lock, Sparkles, CreditCard,
-  Palette, Settings
-} from 'lucide-react';
-import { 
-  Organization, User, ChartOfAccount, JournalEntry, 
-  JournalEntryLine, AuditLog, Student, Qualification, 
-  Trainer, Batch, TransactionSummary, Location, Sponsor, NonStockItem,
-  Vendor, BankAccount, FixedAsset, TrainerSchedule, PurchaseOrder,
-  PurchaseOrderStatus, BatchStatus
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus
 } from './types';
-import { 
-  INITIAL_ORGS, INITIAL_USERS, INITIAL_COA, INITIAL_ENTRIES, 
-  INITIAL_LINES, INITIAL_AUDIT_LOGS, INITIAL_STUDENTS, 
-  INITIAL_QUALIFICATIONS, INITIAL_TRAINERS, INITIAL_BATCHES, 
-  INITIAL_LOCATIONS, INITIAL_SPONSORS, INITIAL_ITEMS, 
-  INITIAL_VENDORS, INITIAL_BANK_ACCOUNTS, INITIAL_FIXED_ASSETS,
-  INITIAL_SCHEDULES, COA_TEMPLATE 
-} from './db';
+import { INITIAL_ORGS, INITIAL_USERS, INITIAL_COA, INITIAL_VENDORS, INITIAL_BANK_ACCOUNTS, INITIAL_STUDENTS, INITIAL_EMPLOYEES, INITIAL_SPONSORS, INITIAL_ITEMS, INITIAL_QUALIFICATIONS, INITIAL_TRAINERS, INITIAL_SCHEDULES, INITIAL_BATCHES, INITIAL_LOCATIONS } from './db';
 import { AccountingService } from './accountingService';
 
 // View Imports
 import Dashboard from './views/Dashboard';
 import Ledger from './views/Ledger';
-import ChartOfAccounts from './views/ChartOfAccounts';
 import Reports from './views/Reports';
-import AuditTrail from './views/AuditTrail';
+import ChartOfAccounts from './views/ChartOfAccounts';
+import OrganizationsView from './views/OrganizationsView';
 import LoginView from './views/LoginView';
 import StudentsView from './views/StudentsView';
 import QualificationsView from './views/QualificationsView';
@@ -41,459 +21,375 @@ import LocationsView from './views/LocationsView';
 import SponsorsView from './views/SponsorsView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
-import ARView from './views/ARView';
-import APView from './views/APView';
-import VendorsView from './views/VendorsView';
 import AssetsView from './views/AssetsView';
+import APView from './views/APView';
+import ARView from './views/ARView';
+import VendorsView from './views/VendorsView';
 import SchedulesView from './views/SchedulesView';
 import PurchaseOrdersView from './views/PurchaseOrdersView';
+import AuditTrail from './views/AuditTrail';
 import UsersManagementView from './views/UsersManagementView';
 import SchemaManualView from './views/SchemaManualView';
 import TenantManagementView from './views/TenantManagementView';
 import BrandingView from './views/BrandingView';
 import SubscriptionView from './views/SubscriptionView';
+import StudentPortalView from './views/StudentPortalView';
+import TrainerPortalView from './views/TrainerPortalView';
+import BudgetView from './views/BudgetView';
+import EmployeesView from './views/EmployeesView';
+import PayrollView from './views/PayrollView';
 import JournalForm from './components/JournalForm';
+import MaintenanceView from './views/MaintenanceView';
 
-interface Toast {
-  id: string;
-  type: 'success' | 'error' | 'info';
-  message: string;
-}
+// Lucide Icons
+import { 
+  LayoutDashboard, BookText, PieChart, Landmark, Users, 
+  Award, GraduationCap, Layers, MapPin, Handshake, 
+  Truck, Box, CalendarClock, ShoppingCart, ShieldCheck, 
+  History, UserCog, Settings, Palette, CreditCard, 
+  Binary, Terminal, Receipt, Calculator, Briefcase, 
+  LogOut, Menu, X, PlusCircle, Building2, Wrench,
+  FileText, Tag, Wallet, Activity
+} from 'lucide-react';
 
-const App: React.FC = () => {
+export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>(INITIAL_ORGS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [currentOrgId, setCurrentOrgId] = useState<string>('org-3');
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Master Data State
-  const [organizations, setOrganizations] = useState<Organization[]>(INITIAL_ORGS);
-  const [currentOrgId, setCurrentOrgId] = useState<string>(INITIAL_ORGS[1].id); 
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [accounts, setAccounts] = useState<ChartOfAccount[]>(INITIAL_COA);
-  const [entries, setEntries] = useState<JournalEntry[]>(INITIAL_ENTRIES);
-  const [lines, setLines] = useState<JournalEntryLine[]>(INITIAL_LINES);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
-  
   const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
   const [qualifications, setQualifications] = useState<Qualification[]>(INITIAL_QUALIFICATIONS);
-  const [trainers, setTrainer] = useState<Trainer[]>(INITIAL_TRAINERS);
+  const [trainers, setTrainers] = useState<Trainer[]>(INITIAL_TRAINERS);
   const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
-  const [locations, setLocations] = useState<Location[]>(INITIAL_LOCATIONS);
   const [sponsors, setSponsors] = useState<Sponsor[]>(INITIAL_SPONSORS);
   const [items, setItems] = useState<NonStockItem[]>(INITIAL_ITEMS);
   const [vendors, setVendors] = useState<Vendor[]>(INITIAL_VENDORS);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANK_ACCOUNTS);
-  const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>(INITIAL_FIXED_ASSETS);
+  const [locations, setLocations] = useState<Location[]>(INITIAL_LOCATIONS);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>(INITIAL_SCHEDULES);
+  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(INITIAL_BANK_ACCOUNTS);
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>(INITIAL_COA);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
+  // Financial Cycle State
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
+  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
+  const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Modals
   const [showJournalForm, setShowJournalForm] = useState(false);
 
-  // Notification Helper
-  const showNotify = (type: 'success' | 'error' | 'info', message: string) => {
-    const id = Date.now().toString();
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  // Derived Accounting Context
+  const currentOrg = organizations.find(o => o.id === currentOrgId);
+  const brandColor = currentOrg?.primaryColor || '#4f46e5';
+
+  const filteredAccounts = useMemo(() => accounts.filter(a => a.orgId === currentOrgId && !a.isDeleted), [accounts, currentOrgId]);
+  const activeJournalEntries = useMemo(() => journalEntries.filter(e => e.orgId === currentOrgId && !e.isDeleted), [journalEntries, currentOrgId]);
+  const activeEntryIds = useMemo(() => new Set(activeJournalEntries.map(e => e.id)), [activeJournalEntries]);
+  const filteredLines = useMemo(() => journalLines.filter(l => activeEntryIds.has(l.journalEntryId)), [journalLines, activeEntryIds]);
+  const summaries = useMemo(() => AccountingService.getLedgerSummaries(filteredAccounts, filteredLines), [filteredAccounts, filteredLines]);
+
+  // RBAC Controls
+  const isSysAdmin = currentUser?.role === 'SYSTEM_ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PRESIDENT' || isSysAdmin;
+  const isFinance = ['ACCOUNTANT', 'FINANCE_MANAGER', 'AR_SPECIALIST', 'AP_SPECIALIST', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
+  const isRegistrar = ['REGISTRAR', 'ADMIN'].includes(currentUser?.role || '');
+  const isAR = ['AR_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
+  const isAP = ['AP_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
+
+  const handleNotify = (type: 'success' | 'error' | 'info', message: string) => {
+    console.log(`[ERP Notification: ${type.toUpperCase()}]`, message);
   };
-
-  const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
-
-  // Motif Injection Logic
-  useEffect(() => {
-    if (currentOrg?.primaryColor) {
-      document.documentElement.style.setProperty('--brand-primary', currentOrg.primaryColor);
-      document.documentElement.style.setProperty('--brand-primary-light', `${currentOrg.primaryColor}15`); // ~10% opacity
-    } else {
-      document.documentElement.style.setProperty('--brand-primary', '#4f46e5'); // Default Indigo 600
-      document.documentElement.style.setProperty('--brand-primary-light', '#4f46e515');
-    }
-  }, [currentOrg]);
-
-  // Trial Days Calculation
-  const trialRemainingDays = useMemo(() => {
-    if (currentOrg?.subscriptionStatus !== 'TRIAL' || !currentOrg.licenseExpiry) return null;
-    const expiry = new Date(currentOrg.licenseExpiry);
-    const today = new Date();
-    const diff = expiry.getTime() - today.getTime();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }, [currentOrg]);
-
-  // RBAC + License Gating Menu Filtering
-  const menuSections = useMemo(() => {
-    const isSystemAdmin = currentUser?.role === 'SYSTEM_ADMIN';
-    const isAdmin = currentUser?.role === 'ADMIN';
-    const isRegistrar = currentUser?.role === 'REGISTRAR';
-    const plan = currentOrg?.planType || 'BASIC';
-    
-    const sections = [];
-
-    if (isSystemAdmin) {
-      sections.push({
-        label: 'Platform Console',
-        items: [
-          { id: 'tenants-mgmt', label: 'Tenant Control', icon: Terminal, locked: false },
-          { id: 'system-audit', label: 'Platform Logs', icon: ShieldAlert, locked: false },
-          { id: 'blueprint', label: 'Core Schema', icon: Binary, locked: false },
-        ]
-      });
-    }
-
-    if (isAdmin || isSystemAdmin) {
-      const financialItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, locked: false },
-        { id: 'banking', label: 'Banking & Cash', icon: Landmark, locked: plan === 'BASIC' },
-        { id: 'ar', label: 'Receivables (AR)', icon: FileText, locked: plan === 'BASIC' },
-        { id: 'po', label: 'Procurement (PO)', icon: ShoppingCart, locked: plan !== 'ENTERPRISE' },
-        { id: 'ap', label: 'Payables (AP)', icon: Truck, locked: plan === 'BASIC' },
-        { id: 'assets', label: 'Fixed Assets', icon: HardDrive, locked: plan !== 'ENTERPRISE' },
-        { id: 'ledger', label: 'General Ledger', icon: BookText, locked: false },
-        { id: 'coa', label: 'Chart of Accounts', icon: TableProperties, locked: false },
-        { id: 'items', label: 'Items & Services', icon: Box, locked: plan === 'BASIC' },
-        { id: 'sponsors', label: 'Sponsors', icon: Handshake, locked: plan === 'BASIC' },
-        { id: 'reports', label: 'Financial Reports', icon: FileBarChart, locked: false },
-        { id: 'audit', label: 'Audit Trail', icon: ShieldCheck, locked: plan !== 'ENTERPRISE' },
-      ];
-
-      sections.push({
-        label: 'Financials',
-        items: financialItems
-      });
-    }
-
-    if (isAdmin || isRegistrar || isSystemAdmin) {
-      const isOpsLocked = plan === 'BASIC';
-      sections.push({
-        label: 'Operations',
-        items: [
-          { id: 'schedules', label: 'Trainer Schedule', icon: CalendarClock, locked: isOpsLocked },
-          { id: 'locations', label: 'Locations', icon: MapPin, locked: isOpsLocked },
-          ...(isAdmin || isSystemAdmin ? [
-            { id: 'vendors', label: 'Vendors', icon: Truck, locked: isOpsLocked },
-            { id: 'users-mgmt', label: 'System Users', icon: UserCog, locked: plan !== 'ENTERPRISE' },
-            { id: 'subscription', label: 'Subscription & Billing', icon: CreditCard, locked: false },
-            { id: 'branding', label: 'Branding & Motif', icon: Palette, locked: false }
-          ] : []),
-          { id: 'students', label: 'Students', icon: Users, locked: isOpsLocked },
-          { id: 'qualifications', label: 'Qualifications', icon: Award, locked: isOpsLocked },
-          { id: 'trainers', label: 'Trainers', icon: GraduationCap, locked: isOpsLocked },
-          { id: 'batches', label: 'Batches', icon: Layers, locked: isOpsLocked },
-        ]
-      });
-    }
-
-    return sections;
-  }, [currentUser, currentOrg]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setCurrentOrgId(user.orgId);
-    if (user.role === 'SYSTEM_ADMIN') {
-      setActiveTab('tenants-mgmt');
-    } else if (user.role === 'REGISTRAR') {
-      setActiveTab('students');
-    } else {
-      setActiveTab('dashboard');
-    }
+    if (user.role === 'STUDENT') setActiveTab('student-portal');
+    else if (user.role === 'TRAINER') setActiveTab('trainer-portal');
+    else setActiveTab('dashboard');
   };
 
-  const handleRegister = (org: Organization, admin: User) => {
-    setOrganizations(prev => [...prev, org]);
-    setUsers(prev => [...prev, admin]);
-    const template = COA_TEMPLATE(org.id);
-    setAccounts(prev => [...prev, ...template]);
-    setCurrentUser(admin);
-    setCurrentOrgId(org.id);
-    setActiveTab('dashboard');
-    showNotify('success', `Trial Workspace: ${org.name} provisioned successfully.`);
-  };
+  const handlePostJournal = (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
+    const fullEntry = {
+      ...entry,
+      id: entry.id || `je-${Date.now()}`,
+      orgId: currentOrgId,
+      status: 'POSTED',
+      createdBy: currentUser?.id || 'system',
+      createdAt: new Date().toISOString()
+    } as JournalEntry;
 
-  const handleUpdateOrg = (updatedOrg: Organization) => {
-    setOrganizations(prev => prev.map(o => o.id === updatedOrg.id ? updatedOrg : o));
-    showNotify('success', 'Organization settings synchronized.');
-  };
-
-  const filteredAccounts = useMemo(() => accounts.filter(a => a.orgId === currentOrgId), [accounts, currentOrgId]);
-  const filteredEntries = useMemo(() => entries.filter(e => e.orgId === currentOrgId), [entries, currentOrgId]);
-  const filteredLines = useMemo(() => {
-    const entryIds = new Set(filteredEntries.map(e => e.id));
-    return lines.filter(l => entryIds.has(l.journalEntryId));
-  }, [lines, filteredEntries]);
-
-  const ledgerSummaries = useMemo(() => 
-    AccountingService.getLedgerSummaries(filteredAccounts, filteredLines),
-  [filteredAccounts, filteredLines]);
-
-  const handlePostJournal = (entry: any, entryLines: any[]) => {
-    const entryId = entry.id || `je-${Date.now()}`;
-    const newEntry = { ...entry, id: entryId, orgId: currentOrgId, createdBy: currentUser?.id };
+    setJournalEntries(prev => [...prev, fullEntry]);
+    setJournalLines(prev => [...prev, ...lines]);
     
-    const newLog: AuditLog = {
+    setAuditLogs(prev => [...prev, {
       id: `log-${Date.now()}`,
       timestamp: new Date().toISOString(),
       userId: currentUser?.name || 'System',
       action: 'POST',
-      entityType: entry.sourceType || 'MANUAL',
-      entityId: entryId,
-      details: `Posted ${entry.sourceType || 'Journal Entry'}: ${entry.description}.`
-    };
-
-    setEntries(prev => [...prev, newEntry]);
-    setLines(prev => [...prev, ...entryLines]);
-    setAuditLogs(prev => [...prev, newLog]);
-    setShowJournalForm(false);
-    showNotify('success', `Transaction committed: ${entry.reference}`);
+      entityType: 'JOURNAL_ENTRY',
+      entityId: fullEntry.id,
+      details: `Posted ${fullEntry.sourceType}: ${fullEntry.description}`
+    }]);
   };
 
-  const handleOnboardTenant = (newOrg: Organization) => {
-    setOrganizations(prev => [...prev, newOrg]);
-    const template = COA_TEMPLATE(newOrg.id);
-    setAccounts(prev => [...prev, ...template]);
-    showNotify('success', `Tenant provisioned: ${newOrg.name}`);
+  const handleConvertToBill = (po: PurchaseOrder) => {
+    setActiveTab('ap');
+    handleNotify('info', `PO ${po.reference} converted for Bill processing.`);
   };
 
-  const handleUpdateTenant = (updatedOrg: Organization) => {
-    setOrganizations(prev => prev.map(o => o.id === updatedOrg.id ? updatedOrg : o));
-    showNotify('info', `Subscription updated for ${updatedOrg.name}`);
-  };
-
-  const handleBatchAddStudents = (newStudents: Student[]) => {
-    const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
-    setStudents(prev => [...prev, ...studentsWithOrg]);
-    showNotify('success', `Batch import successful: ${newStudents.length} learners added.`);
-  };
-
-  if (!currentUser) return <LoginView onLogin={handleLogin} onRegister={handleRegister} organizations={organizations} users={users} />;
-
-  const isSystemAdmin = currentUser.role === 'SYSTEM_ADMIN';
-  const isAdmin = currentUser.role === 'ADMIN' || isSystemAdmin;
+  if (!currentUser) {
+    return <LoginView onLogin={handleLogin} onRegister={(o, a) => { setOrganizations(p => [...p, o]); setUsers(p => [...p, a]); setCurrentUser(a); setCurrentOrgId(o.id); setActiveTab('dashboard'); }} organizations={organizations} users={users} />;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex overflow-hidden font-sans antialiased">
-      <style>{`
-        :root {
-          --brand-primary: #4f46e5;
-          --brand-primary-light: #4f46e515;
-        }
-        .bg-brand { background-color: var(--brand-primary) !important; }
-        .text-brand { color: var(--brand-primary) !important; }
-        .border-brand { border-color: var(--brand-primary) !important; }
-        .ring-brand:focus { --tw-ring-color: var(--brand-primary) !important; }
-        .sidebar-item-active { background-color: var(--brand-primary) !important; color: white !important; }
-        .btn-brand { background-color: var(--brand-primary); color: white; transition: opacity 0.2s; }
-        .btn-brand:hover { opacity: 0.9; }
-        .btn-brand:active { transform: scale(0.98); }
-        .bg-brand-light { background-color: var(--brand-primary-light) !important; }
-      `}</style>
-
-      {/* Toast Portal */}
-      <div className="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
-        {toasts.map(toast => (
-          <div key={toast.id} className={`pointer-events-auto min-w-[300px] max-w-[450px] p-4 rounded-2xl shadow-2xl border backdrop-blur-md animate-in slide-in-from-right-10 duration-300 flex items-start gap-4 ${
-            toast.type === 'success' ? 'bg-emerald-600/90 border-emerald-400 text-white' : 
-            toast.type === 'error' ? 'bg-rose-600/90 border-rose-400 text-white' : 
-            'bg-brand/90 border-brand text-white'
-          }`}>
-            <div className="mt-0.5 text-white">
-              {toast.type === 'success' && <CheckCircle2 size={20} />}
-              {toast.type === 'error' && <AlertTriangle size={20} />}
-              {toast.type === 'info' && <Info size={20} />}
-            </div>
-            <div className="flex-1">
-               <p className="text-xs font-black uppercase tracking-widest opacity-70 mb-1">{toast.type}</p>
-               <p className="text-sm font-bold leading-relaxed">{toast.message}</p>
-            </div>
-            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} className="opacity-50 hover:opacity-100 transition-opacity text-white">
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <aside className={`bg-slate-900 text-slate-400 w-72 flex-shrink-0 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full absolute h-full z-40'}`}>
-        <div className="p-8 border-b border-slate-800 flex flex-col items-center text-center">
-          <div className={`w-[1in] h-[1in] rounded-full border-4 ${isSystemAdmin ? 'border-rose-600' : 'border-brand'} overflow-hidden flex items-center justify-center bg-white shadow-2xl mb-4 shrink-0 transition-all hover:scale-105`}>
-            {currentOrg?.logoUrl ? (
-              <img src={currentOrg.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
-              <div className={`w-full h-full flex items-center justify-center ${isSystemAdmin ? 'bg-rose-600' : 'bg-brand'} text-white`}>
-                <Database size={40} />
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col overflow-hidden w-full">
-             <span className="text-white font-black text-xl leading-tight truncate uppercase tracking-tight">AccounTech</span>
-             <div className="flex items-center justify-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Institutional Core</span>
+    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
+        <div className="p-8 flex items-center justify-between border-b border-white/5 bg-slate-900/50">
+           {sidebarOpen ? (
+             <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden"
+                  style={{ backgroundColor: brandColor }}
+                >
+                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={20} />}
+                </div>
+                <div className="min-w-0">
+                   <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate w-32">{currentOrg?.name}</h1>
+                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{currentUser.role.replace('_', ' ')}</p>
+                </div>
              </div>
-          </div>
+           ) : (
+             <div 
+               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto text-white shadow-xl"
+               style={{ backgroundColor: brandColor }}
+             >
+               <Terminal size={20} />
+             </div>
+           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-6">
-          {menuSections.map((section, sIdx) => (
-            <div key={sIdx} className="space-y-1">
-              <h3 className="text-[11px] font-normal text-slate-500 uppercase tracking-wider px-4 mb-2">{section.label}</h3>
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                const isLocked = item.locked;
-                
-                return (
-                  <button 
-                    key={item.id} 
-                    onClick={() => !isLocked && setActiveTab(item.id)} 
-                    className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-colors group ${
-                      isActive ? (isSystemAdmin && sIdx === 0 ? 'bg-rose-600 text-white' : 'sidebar-item-active') : 
-                      isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 text-sm font-normal">
-                      <Icon size={18} />
-                      {item.label}
-                    </div>
-                    {isLocked ? <Lock size={12} className="opacity-50" /> : isActive && <ChevronRight size={14} className="opacity-50" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+        <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5 scrollbar-hide">
+           {/* Portals */}
+           {currentUser.role === 'STUDENT' && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
+               <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {currentUser.role === 'TRAINER' && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
+               <NavItem icon={<LayoutDashboard size={20}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {/* Financial Core & Analytics */}
+           {isFinance && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Financial Core</p>}
+               <NavItem icon={<LayoutDashboard size={20}/>} label="Executive Console" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<BookText size={20}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<PieChart size={20}/>} label="Reporting Hub" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Landmark size={20}/>} label="Treasury" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
+               {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'ap'} onClick={() => setActiveTab('ap')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+               <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {/* Operations */}
+           {isRegistrar && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
+               <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {/* Registries */}
+           {isFinance && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
+               <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Tag size={20}/>} label="Item Catalog" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {/* Administration */}
+           {isAdmin && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
+               <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
+           {/* System Level */}
+           {isSysAdmin && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Platform Host</p>}
+               <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
         </nav>
-        <div className="p-6 border-t border-slate-800">
-          <button onClick={() => setCurrentUser(null)} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-slate-800 text-sm"><LogOut size={18} /> Sign Out</button>
+
+        <div className="p-6 mt-auto border-t border-white/5">
+           <button onClick={() => setCurrentUser(null)} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
+              <LogOut size={20} />
+              {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
+           </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Trial Banner */}
-        {trialRemainingDays !== null && (
-          <div className="bg-brand px-8 py-2.5 flex items-center justify-between shadow-2xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-            <div className="flex items-center gap-4 relative z-10">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center animate-bounce duration-[3000ms]">
-                <Sparkles size={16} className="text-white" />
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between z-40">
+           <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)} 
+                className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all border border-slate-100"
+              >
+                 {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
+              </button>
+              <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
+           </div>
+           <div className="flex items-center gap-6">
+              {isFinance && (
+                <button 
+                  onClick={() => setShowJournalForm(true)} 
+                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
+                  style={{ backgroundColor: brandColor }}
+                >
+                   <PlusCircle size={18} /> Manual Post
+                </button>
+              )}
+              <div className="h-10 w-px bg-slate-100 mx-2" />
+              <div className="flex items-center gap-3">
+                 <div className="text-right">
+                    <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
+                 </div>
+                 <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
+                    {currentUser.name.substring(0,2)}
+                 </div>
               </div>
-              <p className="text-xs font-black text-white uppercase tracking-widest">
-                Trial Evaluation Mode: <span className="underline decoration-white/30 decoration-2 underline-offset-4">{trialRemainingDays} days left</span>
-              </p>
-            </div>
-            <button 
-              onClick={() => setActiveTab('subscription')}
-              className="relative z-10 px-6 py-1.5 bg-white text-brand rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-            >
-              <CreditCard size={14} /> Buy Full License
-            </button>
-          </div>
-        )}
-
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 flex-shrink-0 z-30">
-          <div className="flex items-center gap-4">
-             {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"><Menu size={20} /></button>}
-             <div className="flex flex-col">
-                <span className="text-sm font-black text-slate-800 leading-none tracking-tight">{currentOrg?.name}</span>
-                <div className="flex items-center gap-2 mt-1.5">
-                   <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                     currentOrg?.planType === 'ENTERPRISE' ? 'bg-rose-50 border-rose-100 text-rose-600' :
-                     currentOrg?.planType === 'PROFESSIONAL' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                     'bg-slate-50 border-slate-200 text-slate-500'
-                   }`}>
-                     {currentOrg?.planType} TIER
-                   </span>
-                   <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">/</span>
-                   <span className={`text-[9px] font-black uppercase tracking-widest ${isSystemAdmin ? 'text-rose-600' : 'text-slate-400'}`}>
-                     {currentUser.role.replace('_', ' ')}
-                   </span>
-                </div>
-             </div>
-          </div>
-          {isAdmin && activeTab !== 'tenants-mgmt' && (
-            <button onClick={() => setShowJournalForm(true)} className="flex items-center gap-2 px-4 py-2.5 btn-brand rounded-xl transition-all text-sm font-bold shadow-lg shadow-brand-light"><Plus size={16} /> New Entry</button>
-          )}
+           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
-          {activeTab === 'tenants-mgmt' && isSystemAdmin && (
-            <TenantManagementView 
-              organizations={organizations} 
-              onAddTenant={handleOnboardTenant} 
-              onUpdateTenant={handleUpdateTenant}
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-10 scrollbar-hide">
+          {activeTab === 'student-portal' && currentUser.studentId && (
+            <StudentPortalView 
+              student={students.find(s => s.id === currentUser.studentId)!}
+              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+              trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
+              locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)}
+              schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={journalLines}
+              onUpdateStudent={s => setStudents(prev => prev.map(x => x.id === s.id ? s : x))}
             />
           )}
-          {activeTab === 'dashboard' && isAdmin && <Dashboard summaries={ledgerSummaries} currency={currentOrg?.currency} />}
-          {activeTab === 'branding' && isAdmin && currentOrg && <BrandingView organization={currentOrg} onUpdate={handleUpdateOrg} />}
-          {activeTab === 'subscription' && isAdmin && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={handleUpdateOrg} />}
-          {activeTab === 'banking' && isAdmin && (
-            <BankingView 
-              bankAccounts={bankAccounts} 
-              summaries={ledgerSummaries} 
-              accounts={filteredAccounts}
-              entries={filteredEntries}
-              lines={filteredLines}
-              onAddBankAccount={(b) => { setBankAccounts(p => [...p, { ...b, orgId: currentOrgId } as BankAccount]); showNotify('success', 'Banking institution connected.'); }}
-              onPostTransfer={handlePostJournal}
-              onNotify={showNotify}
+
+          {activeTab === 'trainer-portal' && currentUser.trainerId && (
+            <TrainerPortalView 
+              trainer={trainers.find(t => t.id === currentUser.trainerId)!}
+              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+              locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)}
+              schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              onUpdateTrainer={t => setTrainers(prev => prev.map(x => x.id === t.id ? t : x))}
             />
           )}
-          {activeTab === 'ar' && isAdmin && (
-            <ARView 
-              entries={filteredEntries} 
-              lines={filteredLines} 
-              students={students.filter(s => s.orgId === currentOrgId)}
-              sponsors={sponsors.filter(s => s.orgId === currentOrgId)}
-              items={items.filter(i => i.orgId === currentOrgId)}
-              accounts={filteredAccounts}
-              bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId)}
-              onPostInvoice={handlePostJournal}
-              onNotify={showNotify}
-            />
-          )}
-          {activeTab === 'blueprint' && isAdmin && (
-            <SchemaManualView />
-          )}
-          {activeTab === 'ledger' && isAdmin && <Ledger accounts={filteredAccounts} entries={filteredEntries} lines={filteredLines} />}
-          {activeTab === 'coa' && isAdmin && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={(acc) => { setAccounts(prev => [...prev, { ...acc, orgId: currentOrgId }]); showNotify('success', 'G/L Account defined.'); }} onUpdateAccount={(a) => { setAccounts(p => p.map(x => x.id === a.id ? a : x)); showNotify('success', 'G/L Configuration updated.'); }} onDeleteAccount={(id) => { setAccounts(p => p.filter(x => x.id !== id)); showNotify('info', 'Account removed from chart.'); }} />}
-          {activeTab === 'items' && isAdmin && <ItemsView items={items} accounts={filteredAccounts} onAddItem={(i) => { setItems(p => [...p, { ...i, orgId: currentOrgId }]); showNotify('success', 'Catalog item defined.'); }} onUpdateItem={(i) => { setItems(p => p.map(x => x.id === i.id ? i : x)); showNotify('success', 'Catalog item updated.'); }} onDeleteItem={(id) => { setItems(p => p.filter(x => x.id !== id)); showNotify('info', 'Item removed from catalog.'); }} />}
-          {activeTab === 'reports' && isAdmin && <Reports summaries={ledgerSummaries} accounts={filteredAccounts} entries={filteredEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} />}
-          {activeTab === 'audit' && isAdmin && <AuditTrail logs={auditLogs} />}
-          {activeTab === 'system-audit' && isSystemAdmin && <AuditTrail logs={auditLogs} />}
-          {activeTab === 'students' && (
-            <StudentsView 
-              students={students.filter(s => s.orgId === currentOrgId)} 
-              onAddStudent={(s) => { setStudents(p => [...p, { ...s, orgId: currentOrgId }]); showNotify('success', 'Learner added to registry.'); }} 
-              onBatchAddStudents={handleBatchAddStudents}
-              onDeleteStudent={(id) => { setStudents(p => p.filter(x => x.id !== id)); showNotify('info', 'Learner record archived.'); }} 
-            />
-          )}
-          {activeTab === 'qualifications' && <QualificationsView qualifications={qualifications} onAddQualification={(q) => { setQualifications(p => [...p, { ...q, orgId: currentOrgId }]); showNotify('success', 'Qualification registered.'); }} onDeleteQualification={(id) => { setQualifications(p => p.filter(x => x.id !== id)); showNotify('info', 'Qualification removed.'); }} />}
-          {activeTab === 'trainers' && <TrainersView trainers={trainers} qualifications={qualifications} onAddTrainer={(t) => { setTrainer(p => [...p, { ...t, orgId: currentOrgId }]); showNotify('success', 'Trainer registered.'); }} onUpdateTrainer={(t) => { setTrainer(p => p.map(x => x.id === t.id ? t : x)); showNotify('success', 'Trainer records updated.'); }} onDeleteTrainer={(id) => { setTrainer(p => p.filter(x => x.id !== id)); showNotify('info', 'Trainer removed.'); }} />}
-          {activeTab === 'batches' && (
-            <BatchesView 
-              batches={batches.filter(b => b.orgId === currentOrgId)}
-              qualifications={qualifications}
-              trainers={trainers}
-              students={students}
-              sponsors={sponsors}
-              schedules={schedules}
-              locations={locations.filter(l => l.orgId === currentOrgId)}
-              onAddBatch={(b) => { setBatches(p => [...p, { ...b, orgId: currentOrgId }]); showNotify('success', 'Training program batch initialized.'); }}
-              onUpdateBatch={(b) => { setBatches(p => p.map(x => x.id === b.id ? b : x)); showNotify('success', 'Batch details synchronized.'); }}
-              onDeleteBatch={(id) => { setBatches(p => p.filter(x => x.id !== id)); showNotify('info', 'Batch cycle terminated.'); }}
-            />
-          )}
-          {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId)} onAddLocation={(l) => { setLocations(p => [...p, { ...l, orgId: currentOrgId }]); showNotify('success', 'Location added.'); }} onUpdateLocation={(l) => { setLocations(p => p.map(x => x.id === l.id ? l : x)); }} onDeleteLocation={(id) => { setLocations(p => p.filter(x => x.id !== id)); }} />}
-          {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId)} accounts={filteredAccounts} lines={filteredLines} onAddSponsor={(s) => { setSponsors(p => [...p, { ...s, orgId: currentOrgId }]); }} onUpdateSponsor={(s) => { setSponsors(p => p.map(x => x.id === s.id ? s : x)); }} onDeleteSponsor={(id) => { setSponsors(p => p.filter(x => x.id !== id)); }} />}
-          {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={(v) => { setVendors(p => [...p, { ...v, orgId: currentOrgId }]); }} onUpdateVendor={(v) => { setVendors(p => p.map(x => x.id === v.id ? v : x)); }} onDeleteVendor={(id) => { setVendors(p => p.filter(x => x.id !== id)); }} />}
-          {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId)} accounts={filteredAccounts} lines={filteredLines} entries={filteredEntries} onDepreciate={(id) => { showNotify('info', 'Depreciation scheduled.'); }} onAddAsset={(a) => { setFixedAssets(p => [...p, { ...a, orgId: currentOrgId }]); }} />}
-          {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId)} trainers={trainers.filter(t => t.orgId === currentOrgId)} locations={locations.filter(l => l.orgId === currentOrgId)} onUpdateSchedule={(s) => { setSchedules(p => { const exists = p.find(x => x.id === s.id); return exists ? p.map(x => x.id === s.id ? s : x) : [...p, { ...s, orgId: currentOrgId }]; }); }} onDeleteSchedule={(id) => { setSchedules(p => p.filter(x => x.id !== id)); }} />}
-          {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders.filter(p => p.orgId === currentOrgId)} vendors={vendors.filter(v => v.orgId === currentOrgId)} items={items.filter(i => i.orgId === currentOrgId)} onCreatePO={(p) => { setPurchaseOrders(prev => [...prev, { ...p, orgId: currentOrgId }]); }} onUpdateStatus={(id, status) => { setPurchaseOrders(p => p.map(x => x.id === id ? { ...x, status } : x)); }} onConvertToBill={(p) => { showNotify('success', 'PO converted to Bill.'); }} />}
-          {activeTab === 'ap' && <APView vendors={vendors.filter(v => v.orgId === currentOrgId)} entries={filteredEntries} lines={filteredLines} items={items.filter(i => i.orgId === currentOrgId)} accounts={filteredAccounts} bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId)} onPostBill={handlePostJournal} onNotify={showNotify} />}
-          {activeTab === 'users-mgmt' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={(u) => { setUsers(p => [...p, { ...u, orgId: currentOrgId }]); }} onDeleteUser={(id) => { setUsers(p => p.filter(x => x.id !== id)); }} />}
+
+          {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} />}
+          {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
+          
+          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ap' && <APView vendors={vendors} entries={activeJournalEntries} lines={filteredLines} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostBill={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
+          
+          {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'items' && <ItemsView items={items} accounts={filteredAccounts} onAddItem={i => setItems(p => [...p, i])} onUpdateItem={i => setItems(p => p.map(x => x.id === i.id ? i : x))} onDeleteItem={id => setItems(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors} accounts={filteredAccounts} lines={filteredLines} onAddSponsor={s => setSponsors(p => [...p, s])} onUpdateSponsor={s => setSponsors(p => p.map(x => x.id === s.id ? s : x))} onDeleteSponsor={id => setSponsors(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'vendors' && <VendorsView vendors={vendors} accounts={filteredAccounts} lines={filteredLines} onAddVendor={v => setVendors(p => [...p, v])} onUpdateVendor={v => setVendors(p => p.map(x => x.id === v.id ? v : x))} onDeleteVendor={id => setVendors(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'assets' && <AssetsView assets={[]} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={() => {}} onAddAsset={() => {}} />}
+          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={b => setBankAccounts(prev => [...prev, {...b, orgId: currentOrgId} as BankAccount])} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+          
+          {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
+          {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
+          
+          {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={(r, l, e, el) => { setPayrollRuns(prev => [...prev, r as PayrollRun]); setPayrollLines(prev => [...prev, ...l as PayrollLine[]]); handlePostJournal(e, el); }} />}
+          {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddStudent={s => setStudents(p => [...p, s])} onUpdateStudent={s => setStudents(p => p.map(x => x.id === s.id ? s : x))} onDeleteStudent={id => setStudents(p => p.filter(x => x.id !== id))} onBatchAddStudents={s => setStudents(p => [...p, ...s])} />}
+          {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={t => setTrainers(p => [...p, t])} onUpdateTrainer={t => setTrainers(p => p.map(x => x.id === t.id ? t : x))} onDeleteTrainer={id => setTrainers(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={b => setBatches(p => [...p, b])} onUpdateBatch={b => setBatches(p => p.map(x => x.id === b.id ? b : x))} onDeleteBatch={id => setBatches(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={l => setLocations(p => [...p, l])} onUpdateLocation={l => setLocations(p => p.map(x => x.id === l.id ? l : x))} onDeleteLocation={id => setLocations(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={s => setSchedules(p => [...p, s])} onUpdateSchedule={s => setSchedules(p => p.map(x => x.id === s.id ? s : x))} onDeleteSchedule={id => setSchedules(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}
+          
+          {activeTab === 'users' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={u => setUsers(p => [...p, u])} onDeleteUser={id => setUsers(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'audit' && <AuditTrail logs={auditLogs} />}
+          {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
+          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={o => setOrganizations(p => [...p, o])} onUpdateTenant={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
+          {activeTab === 'schema' && <SchemaManualView />}
         </div>
       </main>
 
-      {showJournalForm && <JournalForm accounts={filteredAccounts} students={students} trainers={trainers} sponsors={sponsors} batches={batches} items={items} onSubmit={handlePostJournal} onClose={() => setShowJournalForm(false)} />}
+      {showJournalForm && (
+        <JournalForm 
+          accounts={filteredAccounts}
+          students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+          trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
+          sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+          batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+          items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+          entries={activeJournalEntries}
+          onClose={() => setShowJournalForm(false)}
+          onSubmit={(entry, lines) => { handlePostJournal(entry, lines); setShowJournalForm(false); }}
+        />
+      )}
     </div>
   );
-};
+}
 
-export default App;
+interface NavItemProps {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  compact: boolean;
+  brandColor: string;
+}
+
+function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemProps) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+      style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
+    >
+      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</div>
+      {!compact && <span className="text-[11px] font-black uppercase tracking-widest truncate">{label}</span>}
+    </button>
+  );
+}

@@ -56,42 +56,51 @@ export enum PurchaseOrderStatus {
 export type SubscriptionStatus = 'ACTIVE' | 'TRIAL' | 'SUSPENDED' | 'EXPIRED' | 'PENDING';
 export type PlanType = 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
 
-export interface Organization {
+export interface BaseEntity {
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+}
+
+export interface Organization extends BaseEntity {
   id: string;
   name: string;
   currency: string;
   taxId?: string;
   isVatRegistered: boolean;
-  // Subscription management
   subscriptionStatus: SubscriptionStatus;
   planType: PlanType;
   pendingPlanType?: PlanType;
   paymentReference?: string;
   licenseExpiry?: string;
   createdAt: string;
-  // Branding/Motif
-  primaryColor?: string; // Hex code
+  primaryColor?: string;
   logoUrl?: string;
 }
 
-export interface User {
+export interface User extends BaseEntity {
   id: string;
   name: string;
   email: string;
   password?: string;
-  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'VIEWER';
+  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'STUDENT' | 'TRAINER' | 'AP_SPECIALIST' | 'AR_SPECIALIST' | 'FINANCE_MANAGER' | 'PRESIDENT';
   orgId: string;
+  studentId?: string; 
+  trainerId?: string; 
 }
 
 export interface StudentDocument {
   id: string;
   name: string;
-  status: 'PENDING' | 'UPLOADED' | 'VERIFIED';
+  status: 'PENDING' | 'UPLOADED' | 'VERIFIED' | 'REJECTED';
   fileData?: string;
   isOther?: boolean;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  remarks?: string;
 }
 
-export interface Student {
+export interface Student extends BaseEntity {
   id: string;
   orgId: string;
   uli: string;
@@ -117,10 +126,13 @@ export interface Student {
   province: string;
   guardian: string;
   documents: StudentDocument[];
+  isEnrollmentOverridden?: boolean;
+  overriddenBy?: string;
+  complianceNotes?: string;
   createdAt: string;
 }
 
-export interface Trainer {
+export interface Trainer extends BaseEntity {
   id: string;
   orgId: string;
   firstName: string;
@@ -134,12 +146,12 @@ export interface Trainer {
 }
 
 export interface DaySlot {
-  dayIndex: number; // 0-6 (Sun-Sat)
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  dayIndex: number;
+  startTime: string;
+  endTime: string;
 }
 
-export interface TrainerSchedule {
+export interface TrainerSchedule extends BaseEntity {
   id: string;
   orgId: string;
   trainerId: string;
@@ -149,7 +161,7 @@ export interface TrainerSchedule {
   createdAt: string;
 }
 
-export interface Sponsor {
+export interface Sponsor extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
@@ -162,7 +174,7 @@ export interface Sponsor {
   createdAt: string;
 }
 
-export interface Vendor {
+export interface Vendor extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
@@ -184,7 +196,7 @@ export interface PurchaseOrderLine {
   taxAmount: number;
 }
 
-export interface PurchaseOrder {
+export interface PurchaseOrder extends BaseEntity {
   id: string;
   orgId: string;
   vendorId: string;
@@ -197,7 +209,7 @@ export interface PurchaseOrder {
   createdAt: string;
 }
 
-export interface FixedAsset {
+export interface FixedAsset extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
@@ -213,7 +225,7 @@ export interface FixedAsset {
   status: 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED';
 }
 
-export interface BankAccount {
+export interface BankAccount extends BaseEntity {
   id: string;
   orgId: string;
   bankName: string;
@@ -223,7 +235,7 @@ export interface BankAccount {
   currency: string;
 }
 
-export interface NonStockItem {
+export interface NonStockItem extends BaseEntity {
   id: string;
   orgId: string;
   code: string;
@@ -238,17 +250,17 @@ export interface NonStockItem {
   createdAt: string;
 }
 
-export interface Qualification {
+export interface Qualification extends BaseEntity {
   id: string;
   orgId: string;
   code: string;
   name: string;
-  durationDays: number; // 1 day = 8 hours rule
+  durationDays: number;
   sector?: string;
   createdAt: string;
 }
 
-export interface Batch {
+export interface Batch extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
@@ -265,7 +277,7 @@ export interface Batch {
   createdAt: string;
 }
 
-export interface ChartOfAccount {
+export interface ChartOfAccount extends BaseEntity {
   id: string;
   orgId: string;
   code: string;
@@ -277,7 +289,7 @@ export interface ChartOfAccount {
   isHeader: boolean;
 }
 
-export interface Location {
+export interface Location extends BaseEntity {
   id: string;
   orgId: string;
   code: string;
@@ -286,7 +298,7 @@ export interface Location {
   createdAt: string;
 }
 
-export interface JournalEntry {
+export interface JournalEntry extends BaseEntity {
   id: string;
   orgId: string;
   periodId: string;
@@ -296,7 +308,7 @@ export interface JournalEntry {
   status: 'DRAFT' | 'POSTED' | 'REVERSED';
   createdBy: string;
   createdAt: string;
-  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER';
+  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL';
 }
 
 export interface JournalEntryLine {
@@ -307,10 +319,11 @@ export interface JournalEntryLine {
   credit: number;
   memo?: string;
   contactId?: string; 
-  contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER';
+  contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
   batchId?: string; 
   itemId?: string;
   assetId?: string;
+  isCleared?: boolean; 
 }
 
 export interface TransactionSummary {
@@ -332,4 +345,64 @@ export interface AuditLog {
   details: string;
   previousState?: any;
   newState?: any;
+}
+
+export interface Budget extends BaseEntity {
+  id: string;
+  orgId: string;
+  fiscalYear: number;
+  name: string;
+  status: 'ACTIVE' | 'DRAFT' | 'CLOSED';
+  createdAt: string;
+}
+
+export interface BudgetLine {
+  id: string;
+  budgetId: string;
+  accountId: string;
+  budgetedAmount: number;
+}
+
+export interface Employee extends BaseEntity {
+  id: string;
+  orgId: string;
+  firstName: string;
+  lastName: string;
+  designation: string;
+  tin?: string;
+  sss?: string;
+  philhealth?: string;
+  pagibig?: string;
+  basicSalary: number;
+  bankName?: string;
+  bankAccount?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PayrollRun extends BaseEntity {
+  id: string;
+  orgId: string;
+  periodStart: string;
+  periodEnd: string;
+  status: 'DRAFT' | 'POSTED';
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+  createdAt: string;
+}
+
+export interface PayrollLine {
+  id: string;
+  payrollRunId: string;
+  employeeId: string;
+  grossPay: number;
+  deductions: {
+    tax: number;
+    sss: number;
+    philhealth: number;
+    pagibig: number;
+    other: number;
+  };
+  netPay: number;
 }

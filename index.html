@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,40 +27,99 @@
 
         /* Print Optimization */
         @media print {
-            aside, header, .no-print, button, input[type="date"], select {
+            /* Hide all UI chrome */
+            aside, header, .no-print, button, input[type="date"], select, .toast-portal, .no-print * {
                 display: none !important;
             }
-            main {
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            #root, body, html {
+            
+            /* Reset Layout for Print Engine */
+            /* We must unlock all height-restricted containers */
+            html, body, #root, #root > div, main, main > div {
                 background: white !important;
                 color: black !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+                position: static !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
             }
-            .bg-slate-50, .bg-slate-100, .bg-indigo-50 {
+
+            /* Ensure the inner scrollable div expands */
+            .overflow-y-auto {
+                overflow: visible !important;
+                height: auto !important;
+            }
+
+            /* Aesthetics for Paper */
+            .bg-slate-50, .bg-slate-100, .bg-indigo-50, .bg-slate-900, .bg-brand, .bg-slate-50\/50, .bg-slate-50\/20 {
                 background-color: transparent !important;
+                color: black !important;
             }
+            
             .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
                 box-shadow: none !important;
             }
-            .border, .border-slate-200 {
-                border: none !important;
+            
+            .border, .border-slate-200, .border-slate-100, .border-slate-800 {
+                border: 1px solid #e2e8f0 !important;
             }
-            .rounded-[2rem], .rounded-[2.5rem] {
-                border-radius: 0 !important;
+
+            .rounded-[2rem], .rounded-[2.5rem], .rounded-3xl, .rounded-[3rem] {
+                border-radius: 0 !important; 
             }
-            .p-16 {
-                padding: 2rem !important;
+
+            .p-8, .p-10, .p-16 {
+                padding: 1rem !important;
             }
-            .max-w-5xl {
+
+            /* Force black text for readability */
+            .text-slate-400, .text-slate-500, .text-slate-600 {
+                color: #334155 !important;
+            }
+
+            .text-indigo-600, .text-brand {
+                color: #4f46e5 !important;
+            }
+
+            .max-w-5xl, .max-w-6xl {
                 max-width: 100% !important;
+            }
+
+            /* Ensure charts scale if present */
+            .recharts-responsive-container {
+                width: 100% !important;
+                height: 400px !important;
+            }
+            
+            /* Page break rules */
+            h1, h2, h3, h4 {
+                page-break-after: avoid;
+            }
+            table {
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
             }
         }
     </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
 </head>
 <body class="bg-slate-50 text-slate-900 h-full">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

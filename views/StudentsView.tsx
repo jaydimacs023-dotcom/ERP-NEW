@@ -6,12 +6,15 @@ import {
   Upload, CheckCircle, Clock, Trash2, X, Camera, RefreshCw,
   UserCircle, UploadCloud, ShieldCheck, AlertCircle, FileSpreadsheet,
   CheckCircle2, AlertTriangle, ArrowRight, MapPin, Fingerprint,
-  GraduationCap, Globe, Building2, Baby
+  GraduationCap, Globe, Building2, Baby, Eye, ShieldAlert,
+  ThumbsUp, ThumbsDown, Check, BookOpen, Briefcase, Heart,
+  Printer, MoreVertical, ExternalLink, Shield
 } from 'lucide-react';
 
 interface StudentsViewProps {
   students: Student[];
   onAddStudent: (student: Student) => void;
+  onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
   onBatchAddStudents: (students: Student[]) => void;
 }
@@ -23,7 +26,7 @@ const MANDATORY_DOCS = [
   'Passport Size Photo'
 ];
 
-const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onDeleteStudent, onBatchAddStudents }) => {
+const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -32,6 +35,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   
+  const [auditStudent, setAuditStudent] = useState<Student | null>(null);
+
   const [mandatoryDocStatuses, setMandatoryDocStatuses] = useState<Record<string, 'PENDING' | 'UPLOADED' | 'VERIFIED'>>({
     'TOR (Transcript of Records)': 'PENDING',
     'Birth Certificate': 'PENDING',
@@ -59,7 +64,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
     birthProvince: '',
     birthCity: '',
     civilStatus: 'Single',
-    educationalAttainment: '',
+    educationalAttainment: 'College Graduate',
     nationality: 'Filipino',
     email: '',
     contactNumber: '',
@@ -76,8 +81,21 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
     s.uli.includes(searchTerm)
   );
 
-  const triggerFileInput = (docName: string) => {
-    fileInputRefs.current[docName]?.click();
+  const handleDocumentAudit = (docId: string, action: 'VERIFY' | 'REJECT') => {
+    if (!auditStudent) return;
+    const nextDocs = auditStudent.documents.map(d => 
+      d.id === docId ? { ...d, status: action === 'VERIFY' ? 'VERIFIED' as const : 'REJECTED' as const } : d
+    );
+    const updated = { ...auditStudent, documents: nextDocs };
+    onUpdateStudent(updated);
+    setAuditStudent(updated);
+  };
+
+  const handleToggleOverride = () => {
+    if (!auditStudent) return;
+    const updated = { ...auditStudent, isEnrollmentOverridden: !auditStudent.isEnrollmentOverridden };
+    onUpdateStudent(updated);
+    setAuditStudent(updated);
   };
 
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,40 +108,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
       const lines = text.split(/\r?\n/);
       const studentData: Student[] = [];
       
-      // MIS 03-02 Parsing Logic (v3.0.2)
       for (let i = 8; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
-        
         const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
         if (cols.length < 40) continue; 
-
         const lastName = cols[15]?.replace(/"/g, '').trim();
         const firstName = cols[16]?.replace(/"/g, '').trim();
-        const middleName = cols[17]?.replace(/"/g, '').trim() === '.' ? '' : cols[17]?.replace(/"/g, '').trim();
-        const extension = cols[18]?.replace(/"/g, '').trim();
-        const contact = cols[19]?.replace(/"/g, '').trim();
-        const email = cols[20]?.replace(/"/g, '').trim();
-        
-        // Address parts
-        const street = cols[21]?.replace(/"/g, '').trim();
-        const barangay = cols[22]?.replace(/"/g, '').trim();
-        const city = cols[23]?.replace(/"/g, '').trim();
-        const district = cols[24]?.replace(/"/g, '').trim();
-        const province = cols[25]?.replace(/"/g, '').trim();
-
-        // Birth Place info (Assuming typical MIS columns 32, 33, 34 for Birth Region, Province, City)
-        const bRegion = cols[32]?.replace(/"/g, '').trim() || '';
-        const bProvince = cols[33]?.replace(/"/g, '').trim() || '';
-        const bCity = cols[34]?.replace(/"/g, '').trim() || '';
-
-        const sexStr = cols[26]?.replace(/"/g, '').trim();
-        const sex: 'Male' | 'Female' = (sexStr?.toLowerCase().startsWith('f')) ? 'Female' : 'Male';
-        
-        const dob = cols[27]?.replace(/"/g, '').trim();
-        const age = parseInt(cols[28]?.replace(/"/g, '').trim()) || 0;
-        const civilStatus = cols[29]?.replace(/"/g, '').trim();
-        const educationalAttainment = cols[30]?.replace(/"/g, '').trim();
-        const nationality = cols[31]?.replace(/"/g, '').trim();
         const uli = cols[46]?.replace(/"/g, '').trim();
 
         if (lastName && firstName && uli) {
@@ -133,24 +123,24 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
             uli,
             lastName,
             firstName,
-            middleName: middleName || '',
-            extension: extension || '',
-            sex,
-            dateOfBirth: dob,
-            age,
-            birthRegion: bRegion,
-            birthProvince: bProvince,
-            birthCity: bCity,
-            civilStatus: civilStatus || 'Single',
-            educationalAttainment: educationalAttainment || '',
-            nationality: nationality || 'Filipino',
-            email,
-            contactNumber: contact,
-            street: street || '',
-            barangay: barangay || '',
-            city: city || '',
-            district: district || '',
-            province: province || '',
+            middleName: cols[17]?.replace(/"/g, '').trim() || '',
+            extension: cols[18]?.replace(/"/g, '').trim() || '',
+            sex: cols[26]?.toLowerCase().startsWith('f') ? 'Female' : 'Male',
+            dateOfBirth: cols[27]?.replace(/"/g, '').trim(),
+            age: parseInt(cols[28]) || 0,
+            birthRegion: cols[32]?.replace(/"/g, '').trim(),
+            birthProvince: cols[33]?.replace(/"/g, '').trim(),
+            birthCity: cols[34]?.replace(/"/g, '').trim(),
+            civilStatus: cols[29]?.replace(/"/g, '').trim() || 'Single',
+            educationalAttainment: cols[30]?.replace(/"/g, '').trim() || '',
+            nationality: cols[31]?.replace(/"/g, '').trim() || 'Filipino',
+            email: cols[20]?.replace(/"/g, '').trim(),
+            contactNumber: cols[19]?.replace(/"/g, '').trim(),
+            street: cols[21]?.replace(/"/g, '').trim() || '',
+            barangay: cols[22]?.replace(/"/g, '').trim() || '',
+            city: cols[23]?.replace(/"/g, '').trim() || '',
+            district: cols[24]?.replace(/"/g, '').trim() || '',
+            province: cols[25]?.replace(/"/g, '').trim() || '',
             guardian: '',
             documents: MANDATORY_DOCS.map((doc, dIdx) => ({
               id: `doc-${dIdx}-${Date.now()}-${i}`,
@@ -161,58 +151,38 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
           });
         }
       }
-
       if (studentData.length > 0) {
         setImportPreview(studentData);
         setShowImportModal(true);
-      } else {
-        alert("No valid learner data found. Ensure you are using the MIS 03-02 CSV format.");
       }
     };
     reader.readAsText(file);
-    if (csvInputRef.current) csvInputRef.current.value = '';
-  };
-
-  const executeBatchImport = () => {
-    onBatchAddStudents(importPreview);
-    setShowImportModal(false);
-    setImportPreview([]);
-  };
-
-  const calculateAge = (dob: string) => {
-    if (!dob) return 0;
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age < 0 ? 0 : age;
   };
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const dob = e.target.value;
-    const age = calculateAge(dob);
-    setFormData({ ...formData, dateOfBirth: dob, age });
+    const age = new Date().getFullYear() - new Date(dob).getFullYear();
+    setFormData({ ...formData, dateOfBirth: dob, age: Math.max(0, age) });
   };
 
-  const startCamera = async () => {
+  const startCamera = () => {
     setShowCamera(true);
-    setPhotoPreview(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
-      });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
-      alert("Camera access denied.");
-      setShowCamera(false);
-    }
+    setTimeout(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
+        });
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch (err) {
+        alert("Camera access denied.");
+        setShowCamera(false);
+      }
+    }, 100);
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
     }
     setShowCamera(false);
   };
@@ -241,7 +211,6 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
         const dataUrl = reader.result as string;
         setMandatoryDocStatuses(prev => ({ ...prev, [docName]: 'UPLOADED' }));
         setMandatoryDocFiles(prev => ({ ...prev, [docName]: dataUrl }));
-        if (docName === 'Passport Size Photo') setPhotoPreview(dataUrl);
       };
       reader.readAsDataURL(file);
     }
@@ -255,45 +224,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
       status: mandatoryDocStatuses[doc],
       fileData: mandatoryDocFiles[doc]
     }));
-
-    const newStudent: Student = {
-      ...formData as Student,
-      id: `stud-${Date.now()}`,
-      orgId: 'temp',
-      documents,
-      createdAt: new Date().toISOString()
-    };
-    onAddStudent(newStudent);
+    onAddStudent({ ...formData as Student, id: `stud-${Date.now()}`, orgId: 'temp', documents, createdAt: new Date().toISOString() });
     setShowModal(false);
-    resetLocalState();
-  };
-
-  const resetLocalState = () => {
-    setFormData({ 
-      age: 0, 
-      sex: 'Male', 
-      civilStatus: 'Single', 
-      nationality: 'Filipino',
-      extension: '',
-      middleName: '',
-      street: '',
-      barangay: '',
-      city: '',
-      district: '',
-      province: '',
-      birthRegion: '',
-      birthProvince: '',
-      birthCity: '',
-      guardian: ''
-    });
-    setPhotoPreview(null);
-    setMandatoryDocStatuses({
-      'TOR (Transcript of Records)': 'PENDING',
-      'Birth Certificate': 'PENDING',
-      'Application Form': 'PENDING',
-      'Passport Size Photo': 'PENDING'
-    });
-    setMandatoryDocFiles({});
   };
 
   return (
@@ -301,39 +233,17 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Learner Ledger</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Comprehensive TESDA MIS Registry (v3.0.2)</p>
+          <p className="text-sm text-slate-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.0)</p>
         </div>
         <div className="flex items-center gap-3">
           <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
-          <button 
-            onClick={() => csvInputRef.current?.click()}
-            className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm active:scale-95"
-          >
-            <FileSpreadsheet size={18} className="text-emerald-600" /> Batch MIS Upload
+          <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm">
+            <FileSpreadsheet size={18} className="text-emerald-600" /> MIS Batch
           </button>
-          <button 
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 font-bold text-sm active:scale-95"
-          >
+          <button onClick={() => { setShowModal(true); setPhotoPreview(null); }} className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-lg font-bold text-sm">
             <Plus size={18} /> Register Learner
           </button>
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl border shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by ULI or Name..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors text-xs font-black uppercase tracking-widest">
-          <Filter size={14} /> Filter Compliance
-        </button>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
@@ -341,163 +251,248 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
           <thead className="bg-slate-50">
             <tr>
               <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Learner Identification</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Birth & Profile</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Permanent Address</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Docs</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Status</th>
+              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Residence</th>
+              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredStudents.length > 0 ? filteredStudents.map(student => (
-              <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-sm shrink-0">
-                      {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                        <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
-                      ) : (
-                        <UserCircle className="text-indigo-300" size={24} />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-800 leading-tight">
-                        {student.lastName.toUpperCase()}, {student.firstName} {student.extension}
+            {filteredStudents.map(student => {
+              const pendingDocs = student.documents.filter(d => d.status === 'UPLOADED').length;
+              const verifiedDocs = student.documents.filter(d => d.status === 'VERIFIED').length;
+              const isCompliant = verifiedDocs === student.documents.length || student.isEnrollmentOverridden;
+
+              return (
+                <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-sm shrink-0">
+                        {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                          <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="S" className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="text-indigo-300" size={24} />
+                        )}
                       </div>
-                      <div className="text-[10px] font-mono font-bold text-indigo-600 mt-1">ULI: {student.uli}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-black text-slate-800 leading-tight">
+                          {student.lastName.toUpperCase()}, {student.firstName}
+                        </div>
+                        <div className="text-[9px] font-mono font-bold text-indigo-600 mt-1 uppercase">ULI: {student.uli}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex flex-col gap-1">
-                     <div className="text-xs font-bold text-slate-700">{student.sex} • {student.age} yrs</div>
-                     <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                        <Baby size={10} className="text-indigo-400" /> {student.birthCity || 'N/A'}, {student.birthProvince || 'N/A'}
-                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex items-start gap-2">
-                     <MapPin size={12} className="text-indigo-500 shrink-0 mt-0.5" />
-                     <div className="min-w-0">
-                        <p className="text-[10px] text-slate-600 font-bold leading-tight truncate">{student.city}, {student.province}</p>
-                        <p className="text-[9px] text-slate-400 font-medium truncate uppercase tracking-tighter">{student.barangay}</p>
-                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-5">
-                  <div className="flex gap-1">
-                    {student.documents.slice(0, 4).map(doc => (
-                      <div key={doc.id} title={`${doc.name}: ${doc.status}`} className={`w-3.5 h-1.5 rounded-full ${
-                        doc.status === 'UPLOADED' || doc.status === 'VERIFIED' ? 'bg-indigo-500 shadow-sm shadow-indigo-100' : 'bg-slate-200'
-                      }`} />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-6 py-5 text-right">
-                  {confirmDelete === student.id ? (
-                    <div className="flex items-center justify-end gap-2 animate-in fade-in slide-in-from-right-2">
-                       <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Cancel</button>
-                       <button onClick={() => { onDeleteStudent(student.id); setConfirmDelete(null); }} className="px-3 py-1 text-[10px] font-bold uppercase text-white bg-rose-600 rounded-lg">Delete</button>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col gap-1.5">
+                       {isCompliant ? (
+                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
+                            <Check size={10} /> Qualified
+                         </span>
+                       ) : pendingDocs > 0 ? (
+                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 w-fit animate-pulse">
+                            <ShieldAlert size={10} /> {pendingDocs} Audit Pending
+                         </span>
+                       ) : (
+                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 w-fit">
+                            Incomplete
+                         </span>
+                       )}
                     </div>
-                  ) : (
-                    <button onClick={() => setConfirmDelete(student.id)} className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-xl transition-all">
-                      <Trash2 size={16} />
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="text-[10px] text-slate-600 font-bold leading-tight">{student.city}</div>
+                    <div className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{student.province}</div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button onClick={() => setAuditStudent(student)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
+                      <Eye size={16} />
                     </button>
-                  )}
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan={5} className="py-24 text-center text-slate-400 italic">No registered learners found.</td></tr>
-            )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
-      {showImportModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200 my-8">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-               <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-200"><FileSpreadsheet size={24} /></div>
+      {/* Audit Modal (View Function) */}
+      {auditStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200 my-8 flex flex-col h-full max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center shrink-0">
+               <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden bg-white border-4 border-white shadow-xl flex items-center justify-center shrink-0">
+                    {auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                      <img src={auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserCircle size={32} className="text-slate-300" />
+                    )}
+                  </div>
                   <div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Review Batch Import (MIS 03-02)</h3>
-                    <p className="text-sm text-slate-500 font-medium">Extracted <span className="text-emerald-600 font-bold">{importPreview.length}</span> learner profiles from the file.</p>
+                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none mb-1">
+                      {auditStudent.lastName.toUpperCase()}, {auditStudent.firstName}
+                    </h3>
+                    <div className="flex items-center gap-3">
+                       <span className="text-[10px] font-mono font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
+                       <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
+                         (auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                         : 'bg-amber-50 text-amber-600 border-amber-100'
+                       }`}>
+                         {auditStudent.isEnrollmentOverridden ? 'ADMIN OVERRIDE ACTIVE' : 'STANDARD REGISTRY'}
+                       </span>
+                    </div>
                   </div>
                </div>
-               <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={28} /></button>
-            </div>
-            
-            <div className="p-8 max-h-[60vh] overflow-y-auto bg-slate-50/30">
-               <table className="min-w-full border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                       <th className="px-4 pb-2 text-left">Learner Name</th>
-                       <th className="px-4 pb-2 text-left">Identification</th>
-                       <th className="px-4 pb-2 text-left">Birth Place</th>
-                       <th className="px-4 pb-2 text-left">Residency (V-Z)</th>
-                       <th className="px-4 pb-2 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importPreview.map((s, idx) => {
-                      const isDuplicate = students.some(existing => existing.uli === s.uli);
-                      return (
-                        <tr key={idx} className="bg-white group">
-                           <td className="px-6 py-4 rounded-l-2xl border-y border-l border-slate-100">
-                             <div className="text-sm font-bold text-slate-800">{s.lastName}, {s.firstName} {s.extension}</div>
-                             <div className="text-[10px] text-slate-400 font-medium">{s.dateOfBirth} • {s.age} yrs</div>
-                           </td>
-                           <td className="px-6 py-4 border-y border-slate-100">
-                             <div className="font-mono text-xs font-bold text-indigo-600">{s.uli}</div>
-                             <div className="text-[10px] text-slate-400 font-medium">{s.nationality}</div>
-                           </td>
-                           <td className="px-6 py-4 border-y border-slate-100">
-                             <div className="text-[10px] text-slate-600 font-bold">{s.birthCity}</div>
-                             <div className="text-[9px] text-slate-400 uppercase font-black">{s.birthProvince}</div>
-                           </td>
-                           <td className="px-6 py-4 border-y border-slate-100">
-                             <p className="text-[10px] text-slate-700 font-bold">{s.city}, {s.province}</p>
-                             <p className="text-[9px] text-slate-400 uppercase tracking-tighter">{s.barangay}</p>
-                           </td>
-                           <td className="px-6 py-4 border-y border-r border-slate-100 rounded-r-2xl text-center">
-                             {isDuplicate ? (
-                               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 text-[10px] font-black uppercase">
-                                  <AlertTriangle size={12} /> Exists
-                               </div>
-                             ) : (
-                               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[10px] font-black uppercase">
-                                  <CheckCircle2 size={12} /> Ready
-                               </div>
-                             )}
-                           </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-               </table>
+               <div className="flex items-center gap-3">
+                  <button className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 text-slate-400 hover:text-slate-800 transition-colors"><Printer size={20} /></button>
+                  <button onClick={() => setAuditStudent(null)} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors"><X size={20} /></button>
+               </div>
             </div>
 
-            <div className="p-10 bg-white border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
-               <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-100 rounded-2xl max-w-lg">
-                  <ShieldCheck size={24} className="text-blue-600 shrink-0" />
-                  <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
-                    Importing these records will populate the Registry and automatically create individual compliance folders for each learner. Birthplace data from the MIS 03-02 file will be mapped to each profile.
-                  </p>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+               {/* Left Column: Comprehensive Profile */}
+               <div className="flex-1 overflow-y-auto p-10 space-y-12 scrollbar-hide border-r border-slate-100 bg-white">
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><User size={18}/></div>
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personal Registry Details</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                       <DataPoint label="Birth Date" value={auditStudent.dateOfBirth} />
+                       <DataPoint label="Sex" value={auditStudent.sex} />
+                       <DataPoint label="Civil Status" value={auditStudent.civilStatus} />
+                       <DataPoint label="Nationality" value={auditStudent.nationality} />
+                       <DataPoint label="Birth Region" value={auditStudent.birthRegion} />
+                       <DataPoint label="Birth City" value={auditStudent.birthCity} />
+                       <DataPoint label="Educational Attainment" value={auditStudent.educationalAttainment} isSpan2 />
+                    </div>
+                  </section>
+
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><MapPin size={18}/></div>
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Residence & Contact</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <DataPoint label="Official Email" value={auditStudent.email} />
+                       <DataPoint label="Contact Number" value={auditStudent.contactNumber} />
+                    </div>
+                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                       <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Detailed Address</div>
+                       <p className="text-sm font-bold text-slate-800 uppercase leading-relaxed">
+                          {auditStudent.street}, {auditStudent.barangay}, {auditStudent.city}, {auditStudent.district}, {auditStudent.province}
+                       </p>
+                    </div>
+                  </section>
+
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Heart size={18}/></div>
+                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Family Background</h4>
+                    </div>
+                    <DataPoint label="Primary Guardian / Parent" value={auditStudent.guardian || 'Not Declared'} />
+                  </section>
                </div>
-               <div className="flex gap-4 w-full md:w-auto">
-                  <button onClick={() => setShowImportModal(false)} className="flex-1 px-8 py-4 text-sm font-black text-slate-500 hover:bg-slate-100 rounded-2xl transition-all">Discard</button>
-                  <button onClick={executeBatchImport} className="flex-1 px-12 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-3">
-                    Batch Enroll <ArrowRight size={20} />
-                  </button>
+
+               {/* Right Column: Compliance Ledger & Audit */}
+               <div className="w-full md:w-[450px] bg-slate-50 overflow-y-auto p-10 flex flex-col shrink-0">
+                  <div className="flex items-center justify-between mb-8">
+                     <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <ShieldCheck size={18} className="text-indigo-600" />
+                        Compliance Audit
+                     </h4>
+                     <button 
+                       onClick={handleToggleOverride}
+                       className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                         auditStudent.isEnrollmentOverridden 
+                         ? 'bg-rose-600 text-white shadow-lg' 
+                         : 'bg-white border border-slate-200 text-slate-400 hover:text-rose-600'
+                       }`}
+                     >
+                       {auditStudent.isEnrollmentOverridden ? 'Revoke Override' : 'Force Qualify'}
+                     </button>
+                  </div>
+
+                  <div className="space-y-6">
+                     {auditStudent.documents.map(doc => {
+                       const isUploaded = doc.status === 'UPLOADED' || doc.status === 'VERIFIED';
+                       const isVerified = doc.status === 'VERIFIED';
+                       const isRejected = doc.status === 'REJECTED';
+
+                       return (
+                         <div key={doc.id} className={`p-6 rounded-[2rem] border transition-all ${
+                           isVerified ? 'bg-emerald-50/50 border-emerald-100 shadow-sm' :
+                           isRejected ? 'bg-rose-50 border-rose-100' :
+                           isUploaded ? 'bg-white border-indigo-100 shadow-xl' : 'bg-slate-100/50 border-slate-200 opacity-60'
+                         }`}>
+                            <div className="flex justify-between items-start mb-4">
+                               <div className="flex items-center gap-3 min-w-0">
+                                  {isVerified ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0"/> : 
+                                   isRejected ? <ShieldAlert size={20} className="text-rose-500 shrink-0"/> :
+                                   isUploaded ? <UploadCloud size={20} className="text-indigo-500 shrink-0 animate-bounce"/> :
+                                   <Clock size={20} className="text-slate-300 shrink-0"/>}
+                                  <div className="min-w-0">
+                                     <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight truncate">{doc.name}</p>
+                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Status: {doc.status}</p>
+                                  </div>
+                               </div>
+                               {doc.fileData && (
+                                 <button className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600"><ExternalLink size={16}/></button>
+                               )}
+                            </div>
+
+                            {doc.fileData && doc.status === 'UPLOADED' && (
+                              <div className="flex gap-2 pt-4 border-t border-slate-100">
+                                 <button onClick={() => handleDocumentAudit(doc.id, 'REJECT')} className="flex-1 py-2.5 bg-white border border-rose-100 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-rose-600 hover:text-white transition-all">
+                                    <ThumbsDown size={14}/> Reject
+                                 </button>
+                                 <button onClick={() => handleDocumentAudit(doc.id, 'VERIFY')} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">
+                                    <ThumbsUp size={14}/> Verify
+                                 </button>
+                              </div>
+                            )}
+
+                            {isVerified && (
+                               <div className="text-[9px] font-black text-emerald-600 uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
+                            )}
+                         </div>
+                       )
+                     })}
+                  </div>
+
+                  <div className="mt-auto pt-10">
+                     <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-2xl relative overflow-hidden">
+                        <div className="relative z-10 flex items-center gap-4">
+                           <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10">
+                              <Shield size={24} className="text-brand" />
+                           </div>
+                           <div>
+                              <p className="text-[10px] font-black text-brand uppercase tracking-widest">Enrollment Status</p>
+                              <p className="text-base font-black uppercase">
+                                 {(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                                 ? 'Qualified for Deployment'
+                                 : 'Incomplete Compliance'}
+                              </p>
+                           </div>
+                        </div>
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                           <CheckCircle size={100} />
+                        </div>
+                     </div>
+                  </div>
                </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Manual Registration Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8 flex flex-col md:flex-row h-full max-h-[95vh]">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8 flex flex-col md:flex-row h-full max-h-[95vh]">
             <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
@@ -507,38 +502,45 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-10 pb-10">
-                {/* Personal Information Section */}
-                <section>
-                   <div className="flex items-center gap-3 mb-6">
+              <form onSubmit={handleSubmit} className="space-y-12 pb-10">
+                {/* 1. Personal Identity */}
+                <section className="space-y-6">
+                   <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><Fingerprint size={16} /></div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Personal Identification</h4>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">I. Personal Identification</h4>
                    </div>
-                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="md:col-span-1 space-y-1">
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-3 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">ULI (Learner ID)</label>
+                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-black text-indigo-600 font-mono" value={formData.uli} onChange={e => setFormData({...formData, uli: e.target.value})} />
+                    </div>
+                    <div className="md:col-span-3 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Last Name</label>
                       <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
                     </div>
-                    <div className="md:col-span-1 space-y-1">
+                    <div className="md:col-span-3 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">First Name</label>
                       <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
                     </div>
-                    <div className="md:col-span-1 space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Middle Name</label>
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Middle</label>
                       <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
                     </div>
                     <div className="md:col-span-1 space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Extension</label>
-                      <input placeholder="Jr / III" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Ext.</label>
+                      <input placeholder="Jr" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex justify-between">
-                           Birth Date <span className="text-slate-300 font-normal italic lowercase">(mm-dd-yy)</span>
-                        </label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Date</label>
                         <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                     </div>
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Computed Age</label>
+                        <input readOnly className="w-full px-4 py-3 bg-slate-100 border border-slate-100 rounded-2xl text-sm font-black text-slate-500" value={formData.age} />
                      </div>
                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sex</label>
@@ -556,99 +558,73 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
                            <option value="Separated">Separated</option>
                         </select>
                      </div>
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nationality</label>
-                        <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
-                     </div>
-                  </div>
-
-                  {/* Birth Info Section */}
-                  <div className="mt-8 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                     <div className="flex items-center gap-2 mb-4">
-                        <Baby size={16} className="text-indigo-600" />
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Place of Birth (MIS Requirements)</h4>
-                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                           <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birth Region</label>
-                           <input placeholder="e.g. Region IV-A" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-xs font-bold" value={formData.birthRegion} onChange={e => setFormData({...formData, birthRegion: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                           <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birth Province</label>
-                           <input placeholder="e.g. Batangas" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-xs font-bold" value={formData.birthProvince} onChange={e => setFormData({...formData, birthProvince: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                           <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birth City/Municipality</label>
-                           <input placeholder="e.g. Lipa City" className="w-full px-4 py-2.5 bg-white border border-slate-100 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-xs font-bold" value={formData.birthCity} onChange={e => setFormData({...formData, birthCity: e.target.value})} />
-                        </div>
-                     </div>
                   </div>
                 </section>
 
-                {/* Educational Attainment Section */}
-                <section>
-                   <div className="flex items-center gap-3 mb-6">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><GraduationCap size={16} /></div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Education & Compliance</h4>
+                {/* 2. Contact & Address */}
+                <section className="space-y-6">
+                   <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><MapPin size={16} /></div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">II. Contact & Residence</h4>
                    </div>
+
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Highest Educational Attainment</label>
-                        <input placeholder="e.g. High School Graduate" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})} />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">TESDA ULI Reference</label>
-                        <input placeholder="24-703-xxx-xxxxx" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-mono font-black text-indigo-600 uppercase" value={formData.uli} onChange={e => setFormData({...formData, uli: e.target.value})} />
-                     </div>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Institutional Email</label>
+                         <input required type="email" placeholder="learner@manila.edu.ph" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Contact Number</label>
+                         <input required placeholder="09XX XXX XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                      </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
+                      <div className="md:col-span-4 space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">House # / Street</label>
+                         <input required placeholder="Kalsada St. / Bldg 123" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
+                      </div>
+                      <div className="md:col-span-3 space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Barangay</label>
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
+                      </div>
+                      <div className="md:col-span-3 space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">City / Municipality</label>
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                      </div>
+                      <div className="md:col-span-2 space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Province</label>
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
+                      </div>
                    </div>
                 </section>
 
-                {/* Granular Address Section */}
-                <section>
-                   <div className="flex items-center gap-3 mb-6">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><Globe size={16} /></div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Residency & Mailing (MIS 03-02 Table)</h4>
+                {/* 3. Education & Guardian */}
+                <section className="space-y-6">
+                   <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><BookOpen size={16} /></div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">III. Background & Guardian</h4>
                    </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                         <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Contact Number</label>
-                            <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
-                         </div>
-                         <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Email Address</label>
-                            <input type="email" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                         </div>
-                         <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Emergency Contact / Guardian</label>
-                            <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
-                         </div>
-                      </div>
 
-                      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                         <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Building2 size={12}/> Complete Permanent Address</div>
-                         <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2 space-y-1">
-                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Street / House No.</label>
-                               <input className="w-full px-3 py-2 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
-                            </div>
-                            <div className="space-y-1">
-                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Barangay</label>
-                               <input className="w-full px-3 py-2 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
-                            </div>
-                            <div className="space-y-1">
-                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">City/Municipality</label>
-                               <input className="w-full px-3 py-2 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
-                            </div>
-                            <div className="space-y-1">
-                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">District</label>
-                               <input className="w-full px-3 py-2 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})} />
-                            </div>
-                            <div className="space-y-1">
-                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Province</label>
-                               <input className="w-full px-3 py-2 bg-white border border-slate-100 rounded-xl text-xs font-bold" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
-                            </div>
-                         </div>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Educational Attainment</label>
+                         <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
+                            <option value="Elementary Graduate">Elementary Graduate</option>
+                            <option value="High School Graduate">High School Graduate</option>
+                            <option value="College Level">College Level</option>
+                            <option value="College Graduate">College Graduate</option>
+                            <option value="TVET Graduate">TVET Graduate</option>
+                            <option value="Masteral/PhD">Masteral/PhD</option>
+                         </select>
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nationality</label>
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                         <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
                       </div>
                    </div>
                 </section>
@@ -663,12 +639,37 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <FileText size={16} className="text-indigo-600" /> Compliance Folder
               </h4>
+              
+              {/* Camera Hero Section */}
+              <div className="mb-8 p-6 bg-slate-900 rounded-3xl text-white shadow-2xl relative overflow-hidden group">
+                 <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-4">
+                       <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Official Portrait</h5>
+                       <span className="px-2 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase">Standard: 2x2</span>
+                    </div>
+                    {photoPreview ? (
+                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-indigo-500/30 overflow-hidden bg-black shadow-2xl transition-transform group-hover:scale-105">
+                         <img src={photoPreview} className="w-full h-full object-cover" alt="Passport" />
+                      </div>
+                    ) : (
+                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-slate-500 group-hover:border-indigo-400/50 transition-all">
+                         <User size={32} />
+                         <span className="text-[8px] font-black uppercase mt-2">No Photo</span>
+                      </div>
+                    )}
+                    <button onClick={startCamera} className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/40">
+                       <Camera size={14} /> Open System Camera
+                    </button>
+                 </div>
+                 <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <ShieldCheck size={120} />
+                 </div>
+              </div>
 
               <div className="space-y-4 flex-1">
-                {MANDATORY_DOCS.map(doc => {
+                {MANDATORY_DOCS.filter(d => d !== 'Passport Size Photo').map(doc => {
                   const status = mandatoryDocStatuses[doc];
                   const hasFile = status === 'UPLOADED' || status === 'VERIFIED';
-                  
                   return (
                     <div key={doc} className={`p-4 rounded-3xl border transition-all ${hasFile ? 'bg-white border-indigo-100 shadow-sm' : 'bg-slate-100/50 border-slate-200'}`}>
                       <div className="flex items-center justify-between mb-3">
@@ -677,60 +678,58 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onD
                           <span className={`text-[11px] font-black uppercase tracking-tight truncate ${hasFile ? 'text-slate-800' : 'text-slate-400'}`}>{doc}</span>
                         </div>
                       </div>
-                      
                       <div className="flex gap-2">
-                        {doc === 'Passport Size Photo' && (
-                          <button onClick={startCamera} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-600 hover:border-indigo-600 transition-colors">
-                            <Camera size={14} /> Capture
-                          </button>
-                        )}
-                        <button onClick={() => triggerFileInput(doc)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-600 hover:border-indigo-600 transition-colors`}>
+                        <button onClick={() => fileInputRefs.current[doc]?.click()} className={`flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-600 hover:border-indigo-600 transition-colors`}>
                           <Upload size={14} /> {hasFile ? 'Replace' : 'Attach'}
                         </button>
                       </div>
-                      
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        ref={el => { if (el) fileInputRefs.current[doc] = el; }} 
-                        onChange={(e) => handleDocumentUpload(doc, e)}
-                        accept={doc === 'Passport Size Photo' ? "image/*" : ".pdf,.jpg,.jpeg,.png"}
-                      />
+                      <input type="file" className="hidden" ref={el => { if (el) fileInputRefs.current[doc] = el; }} onChange={(e) => handleDocumentUpload(doc, e)} accept=".pdf,.jpg,.jpeg,.png" />
                     </div>
                   );
                 })}
-
-                {photoPreview && (
-                  <div className="relative w-full aspect-square rounded-3xl overflow-hidden border-2 border-indigo-600 shadow-2xl animate-in fade-in zoom-in duration-300">
-                    <img src={photoPreview} className="w-full h-full object-cover" alt="Passport Preview" />
-                    <div className="absolute top-2 right-2 flex gap-1">
-                       <button onClick={() => { setPhotoPreview(null); setMandatoryDocStatuses(p => ({...p, 'Passport Size Photo': 'PENDING'})); }} className="p-2 bg-black/50 text-white rounded-xl hover:bg-black/70"><X size={16} /></button>
-                    </div>
-                  </div>
-                )}
               </div>
-
-              {showCamera && (
-                <div className="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-4 backdrop-blur-md">
-                  <div className="relative w-full max-w-sm aspect-square bg-slate-800 rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl">
-                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                    <canvas ref={canvasRef} className="hidden" />
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                       <div className="w-3/4 h-3/4 border-2 border-dashed border-white/50 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="mt-12 flex items-center gap-8">
-                    <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all"><X size={28} /></button>
-                    <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-slate-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-2xl ring-8 ring-white/10"><Camera size={40} /></button>
-                  </div>
-                </div>
-              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Overlay */}
+      {showCamera && (
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
+          <div className="w-full max-w-md space-y-12">
+             <div className="text-center">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Identity Capture</h3>
+                <p className="text-slate-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
+             </div>
+             <div className="relative aspect-square w-full bg-slate-900 rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl ring-24 ring-indigo-600/10">
+                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                   <div className="w-3/4 h-3/4 border-2 border-dashed border-white/40 rounded-[2rem] relative">
+                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-1/2 h-1/2 border-2 border-white/20 rounded-full"></div>
+                   </div>
+                </div>
+             </div>
+             <div className="flex items-center justify-center gap-12">
+                <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all">
+                  <X size={28} />
+                </button>
+                <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-slate-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-2xl ring-8 ring-white/10">
+                  <Camera size={40} />
+                </button>
+             </div>
           </div>
         </div>
       )}
     </div>
   );
 };
+
+const DataPoint: React.FC<{ label: string, value: string, isSpan2?: boolean }> = ({ label, value, isSpan2 }) => (
+  <div className={isSpan2 ? 'md:col-span-2' : ''}>
+     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>
+     <p className="text-sm font-black text-slate-800 leading-tight uppercase">{value || 'N/A'}</p>
+  </div>
+);
 
 export default StudentsView;

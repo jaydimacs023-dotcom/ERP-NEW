@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Sponsor, Student, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
+import { AccountingService } from '../accountingService';
 import { 
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock, 
   MoreVertical, CreditCard, ChevronRight, X, User, Handshake, 
@@ -34,7 +35,7 @@ const ARView: React.FC<ARViewProps> = ({
 
   // Invoice Form State
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [invoiceRef, setInvoiceRef] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [invoiceRef, setInvoiceRef] = useState('');
   const [recipientType, setRecipientType] = useState<'STUDENT' | 'SPONSOR'>('SPONSOR');
   const [recipientId, setRecipientId] = useState('');
   const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number }[]>([
@@ -43,11 +44,24 @@ const ARView: React.FC<ARViewProps> = ({
 
   // Collection Form State
   const [collDate, setCollDate] = useState(new Date().toISOString().split('T')[0]);
-  const [collRef, setCollRef] = useState(`OR-${Date.now().toString().slice(-6)}`);
+  const [collRef, setCollRef] = useState('');
   const [collPayerType, setCollPayerType] = useState<'STUDENT' | 'SPONSOR'>('SPONSOR');
   const [collPayerId, setCollPayerId] = useState('');
   const [collAmount, setCollAmount] = useState<number>(0);
   const [collBankId, setCollBankId] = useState('');
+
+  // Load next sequential references
+  useEffect(() => {
+    if (showInvoiceModal) {
+      setInvoiceRef(AccountingService.getNextReference(entries, 'SI'));
+    }
+  }, [showInvoiceModal, entries]);
+
+  useEffect(() => {
+    if (showCollectionModal) {
+      setCollRef(AccountingService.getNextReference(entries, 'OR'));
+    }
+  }, [showCollectionModal, entries]);
 
   const arInvoices = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
   const arCollections = entries.filter(e => e.sourceType === 'COLLECTION' && e.status !== 'REVERSED');
@@ -175,10 +189,9 @@ const ARView: React.FC<ARViewProps> = ({
     onPostInvoice({ id: entryId, date: collDate, reference: collRef, description: `Collection Payment: ${payerName}`, sourceType: 'COLLECTION', status: 'POSTED' }, finalizedLines);
     setShowCollectionModal(false);
     setCollAmount(0);
-    setCollRef(`OR-${Date.now().toString().slice(-6)}`);
   };
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-6">
@@ -199,8 +212,8 @@ const ARView: React.FC<ARViewProps> = ({
                <BarChart3 size={14} className="inline mr-1.5" /> Aging Report
              </button>
            </div>
-           <button onClick={() => { setCollRef(`OR-${Date.now().toString().slice(-6)}`); setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
-           <button onClick={() => { setInvoiceRef(`INV-${Date.now().toString().slice(-6)}`); setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
+           <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
+           <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
         </div>
       </div>
 
@@ -328,86 +341,183 @@ const ARView: React.FC<ARViewProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {agingReport.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
+                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-5 text-sm font-bold text-slate-800">{row.name}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-emerald-600">{formatCurrency(row.current)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-amber-600">{formatCurrency(row.thirty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-orange-600">{formatCurrency(row.sixty)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-bold">{formatCurrency(row.ninety)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-sm text-slate-900 font-black">{formatCurrency(row.total)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-bold bg-rose-50/20">{formatCurrency(row.ninety)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-sm font-black text-slate-900">{formatCurrency(row.total)}</td>
                   </tr>
                 ))}
+                {agingReport.length === 0 && (
+                   <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">No outstanding receivables found as of this date.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Record Collection Modal */}
-      {showCollectionModal && (
+      {/* Invoice Modal */}
+      {showInvoiceModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-md"><Receipt size={20} /></div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Record Official Collection</h3>
-              </div>
-              <button onClick={() => setShowCollectionModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl"><FileText size={24} /></div>
+                  <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Generate Sales Invoice</h3>
+               </div>
+               <button onClick={() => setShowInvoiceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
             </div>
-            <form onSubmit={handlePostCollection} className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Collection Date</label><input type="date" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={collDate} onChange={e => setCollDate(e.target.value)} /></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">OR # / Ref Code</label><input required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-black text-indigo-600" value={collRef} onChange={e => setCollRef(e.target.value)} /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payer Type</label><select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={collPayerType} onChange={e => { setCollPayerType(e.target.value as any); setCollPayerId(''); }}><option value="SPONSOR">Sponsor</option><option value="STUDENT">Student</option></select></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Payer</label><select required className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm font-bold text-indigo-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}><option value="">Choose Payer...</option>{collPayerType === 'SPONSOR' ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name} (Bal: {formatCurrency(subsidiaryBalances[s.id] || 0)})</option>) : students.map(s => <option key={s.id} value={s.id}>{s.lastName}, {s.firstName} (Bal: {formatCurrency(subsidiaryBalances[s.id] || 0)})</option>)}</select></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Deposit To</label><select required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={collBankId} onChange={e => setCollBankId(e.target.value)}><option value="">Select Account...</option>{bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}</select></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount Received</label><input type="number" step="0.01" required className="w-full px-4 py-2.5 bg-white border border-emerald-200 rounded-xl text-lg font-mono font-black text-emerald-600 outline-none" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" /></div>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3"><AlertCircle className="text-amber-600 shrink-0" size={20} /><p className="text-[11px] text-amber-800 leading-relaxed font-medium">This collection will reduce the outstanding Accounts Receivable for the selected entity and increase the Book Balance of the selected cash/bank account.</p></div>
-              <div className="pt-6 flex gap-3"><button type="button" onClick={() => setShowCollectionModal(false)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl">Discard</button><button type="submit" disabled={collAmount <= 0 || !collPayerId || !collBankId} className="flex-1 py-3.5 bg-emerald-600 text-white rounded-2xl text-sm font-black shadow-lg">Post Official Receipt</button></div>
+
+            <form onSubmit={handlePostInvoice} className="p-10 space-y-10">
+               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Invoice Date</label>
+                    <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Sequential #</label>
+                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-indigo-600 font-mono" value={invoiceRef} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Recipient Type</label>
+                    <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); }}>
+                      <option value="SPONSOR">Corporate Sponsor</option>
+                      <option value="STUDENT">Individual Learner</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Select Entity</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-indigo-100 rounded-2xl text-sm font-black text-indigo-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
+                      <option value="">Choose...</option>
+                      {recipientType === 'SPONSOR' 
+                        ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
+                        : students.map(st => <option key={st.id} value={st.id}>{st.lastName}, {st.firstName}</option>)
+                      }
+                    </select>
+                  </div>
+               </div>
+
+               <div className="space-y-4">
+                  <div className="grid grid-cols-12 gap-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <div className="col-span-5">Item / Service</div>
+                    <div className="col-span-2 text-center">Qty</div>
+                    <div className="col-span-2 text-right">Rate</div>
+                    <div className="col-span-2 text-right">Subtotal</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  {invoiceLines.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-100 transition-all">
+                      <div className="col-span-5">
+                        <select required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
+                          <option value="">Select Item...</option>
+                          {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-center text-xs font-black" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
+                      <div className="col-span-2"><input type="number" step="0.01" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-right text-xs font-mono font-bold" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
+                      <div className="col-span-2 text-right font-mono font-black text-sm">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                      <div className="col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+                    </div>
+                  ))}
+                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border-2 border-dashed border-indigo-100"><Plus size={14}/> Add Invoice Line</button>
+               </div>
+
+               <div className="p-10 bg-slate-900 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
+                  <div className="flex gap-10">
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Output VAT (12%)</p>
+                        <p className="text-xl font-mono font-black text-white">₱ {formatCurrency(totalVat)}</p>
+                     </div>
+                     <div className="w-px h-12 bg-white/10"></div>
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-black text-brand uppercase tracking-widest">Gross Invoice Value</p>
+                        <p className="text-3xl font-mono font-black text-white tracking-tighter">₱ {formatCurrency(grossInvoiceAmount)}</p>
+                     </div>
+                  </div>
+                  <div className="flex gap-4 w-full md:w-auto">
+                    <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Discard</button>
+                    <button type="submit" className="flex-1 px-12 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-900/40 hover:bg-indigo-500 active:scale-95 transition-all">Authorize & Post SI</button>
+                  </div>
+               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* New Invoice Modal */}
-      {showInvoiceModal && (
+      {/* Collection Modal */}
+      {showCollectionModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><FileText size={20} /></div>
-                <h3 className="text-xl font-semibold text-slate-800 uppercase tracking-tight">Generate PH-Compliant Invoice</h3>
-              </div>
-              <button onClick={() => setShowInvoiceModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-200"><Landmark size={24} /></div>
+                  <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Record Receipt (OR)</h3>
+               </div>
+               <button onClick={() => setShowCollectionModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
             </div>
-            <form onSubmit={handlePostInvoice} className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Invoice Date</label><input type="date" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} /></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Reference #</label><input required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold" value={invoiceRef} onChange={e => setInvoiceRef(e.target.value)} /></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Type</label><select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); }}><option value="SPONSOR">Sponsor</option><option value="STUDENT">Learner</option></select></div>
-                <div className="space-y-1.5"><label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Select Customer</label><select required className="w-full px-4 py-2.5 bg-white border border-indigo-200 rounded-xl text-sm font-semibold text-indigo-700 appearance-none" value={recipientId} onChange={e => setRecipientId(e.target.value)}><option value="">Choose...</option>{recipientType === 'SPONSOR' ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>) : students.map(s => <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>)}</select></div>
-              </div>
-              <div className="space-y-4 mb-8">
-                {invoiceLines.map((line, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-3 items-center p-3 bg-white rounded-2xl border border-slate-100">
-                    <div className="col-span-5"><select required className="w-full px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}><option value="">Select Item...</option>{items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
-                    <div className="col-span-2"><input type="number" min="1" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-bold" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
-                    <div className="col-span-2"><input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-right text-xs font-mono" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
-                    <div className="col-span-2 text-right font-mono text-sm font-bold">{formatCurrency(line.qty * line.price)}</div>
-                    <div className="col-span-1 text-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)}><Trash2 size={16} className="text-slate-300" /></button></div>
+
+            <form onSubmit={handlePostCollection} className="p-10 space-y-8">
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Receipt Date</label>
+                    <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collDate} onChange={e => setCollDate(e.target.value)} />
                   </div>
-                ))}
-                <button type="button" onClick={handleAddInvoiceLine} className="text-xs font-bold text-indigo-600">+ Add Row</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8 bg-slate-50 rounded-3xl border border-slate-200">
-                <div className="space-y-2"><SummaryRow label="VAT (12%)" value={totalVat} isHighlighted /><SummaryRow label="Gross Amount" value={grossInvoiceAmount} isBig /></div>
-                <div className="flex flex-col justify-end gap-3 md:col-start-3"><button type="button" onClick={() => setShowInvoiceModal(false)} className="py-3 text-sm font-bold text-slate-500">Discard</button><button type="submit" className="py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg">Post Invoice</button></div>
-              </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">OR # / Reference</label>
+                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-emerald-600 font-mono" value={collRef} />
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Payer Category</label>
+                    <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collPayerType} onChange={e => { setCollPayerType(e.target.value as any); setCollPayerId(''); }}>
+                      <option value="SPONSOR">Corporate Sponsor</option>
+                      <option value="STUDENT">Individual Learner</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Entity Identity</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-emerald-100 rounded-2xl text-sm font-black text-emerald-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}>
+                      <option value="">Select Payer...</option>
+                      {collPayerType === 'SPONSOR' 
+                        ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name} (Bal: {formatCurrency(subsidiaryBalances[s.id] || 0)})</option>)
+                        : students.map(st => <option key={st.id} value={st.id}>{st.lastName} (Bal: {formatCurrency(subsidiaryBalances[st.id] || 0)})</option>)
+                      }
+                    </select>
+                  </div>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Collection Amount</label>
+                 <div className="relative">
+                    <input type="number" step="0.01" required className="w-full px-6 py-5 bg-slate-50 border-none rounded-[2rem] text-4xl font-mono font-black text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
+                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-black text-slate-300">PHP</span>
+                 </div>
+               </div>
+
+               <div className="space-y-1.5">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Deposit Target</label>
+                 <select required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
+                   <option value="">Select Treasury Account...</option>
+                   {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} ({b.currency})</option>)}
+                 </select>
+               </div>
+
+               <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 flex gap-4">
+                  <CheckCircle size={24} className="text-emerald-600 shrink-0" />
+                  <p className="text-[11px] text-emerald-800 leading-relaxed font-bold">
+                    Receipting will reduce the debtor subsidiary ledger balance and increase the institutional liquid assets. This entry is cryptographic and final.
+                  </p>
+               </div>
+
+               <div className="pt-4 flex gap-4">
+                  <button type="button" onClick={() => setShowCollectionModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-800 transition-colors">Discard</button>
+                  <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-100 active:scale-95 transition-all">Confirm Collection</button>
+               </div>
             </form>
           </div>
         </div>
@@ -416,19 +526,10 @@ const ARView: React.FC<ARViewProps> = ({
   );
 };
 
-const SummaryRow: React.FC<{ label: string, value: number, isHighlighted?: boolean, isBig?: boolean }> = ({ label, value, isHighlighted, isBig }) => (
-  <div className="flex justify-between items-center">
-     <span className={`text-[11px] font-medium ${isHighlighted ? 'text-indigo-700' : 'text-slate-500'}`}>{label}</span>
-     <span className={`font-mono font-bold ${isBig ? 'text-lg text-slate-900' : isHighlighted ? 'text-indigo-700 text-xs' : 'text-slate-700 text-xs'}`}>
-        {new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}
-     </span>
-  </div>
-);
-
 const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
-  <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-     <p className={`text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1`}>{label}</p>
-     <p className={`text-xl font-mono font-bold text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'indigo' ? 'indigo-600' : 'amber-600'}`}>{value}</p>
+  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+     <p className={`text-2xl font-mono font-black text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'indigo' ? 'indigo-600' : 'amber-600'} tracking-tighter`}>{value}</p>
   </div>
 );
 

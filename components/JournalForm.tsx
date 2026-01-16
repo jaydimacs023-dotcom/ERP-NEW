@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChartOfAccount, Student, Trainer, Sponsor, Batch, NonStockItem,
   JournalEntryLine, JournalEntry, AccountClass 
 } from '../types';
+import { AccountingService } from '../accountingService';
 import { X, Plus, Trash2, AlertCircle, Save, CheckCircle2, User, GraduationCap, Handshake, Layers, Box } from 'lucide-react';
 
 interface JournalFormProps {
@@ -12,12 +14,13 @@ interface JournalFormProps {
   sponsors: Sponsor[];
   batches: Batch[];
   items: NonStockItem[];
+  entries: JournalEntry[];
   onSubmit: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onClose: () => void;
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({ 
-  accounts, students, trainers, sponsors, batches, items, onSubmit, onClose 
+  accounts, students, trainers, sponsors, batches, items, entries, onSubmit, onClose 
 }) => {
   const [entry, setEntry] = useState<Partial<JournalEntry>>({
     date: new Date().toISOString().split('T')[0],
@@ -26,6 +29,11 @@ const JournalForm: React.FC<JournalFormProps> = ({
     sourceType: 'MANUAL',
     status: 'POSTED'
   });
+
+  useEffect(() => {
+    const nextRef = AccountingService.getNextReference(entries, 'JV');
+    setEntry(prev => ({ ...prev, reference: nextRef }));
+  }, [entries]);
 
   const [lines, setLines] = useState<Partial<JournalEntryLine>[]>([
     { id: '1', accountId: '', debit: 0, credit: 0, contactId: '', contactType: 'OTHER', batchId: '', itemId: '' },
@@ -60,14 +68,10 @@ const JournalForm: React.FC<JournalFormProps> = ({
       
       const newLine = { ...l, ...updates };
 
-      // SMART ITEM TAGGING:
-      // If an item is selected, automatically set the account and price
       if (updates.itemId) {
         const item = items.find(i => i.id === updates.itemId);
         if (item) {
           newLine.accountId = item.defaultAccountId;
-          // Determine if it should be Debit or Credit based on account class
-          // This is a simple heuristic: Revenue items usually go to Credit
           const acc = accounts.find(a => a.id === item.defaultAccountId);
           if (acc?.class === AccountClass.REVENUE) {
             newLine.credit = item.unitPrice;
@@ -80,8 +84,6 @@ const JournalForm: React.FC<JournalFormProps> = ({
         }
       }
 
-      // SMART BILLING LOGIC:
-      // If a batch is selected, automatically determine the correct billing contact
       if (updates.batchId) {
         const batch = batches.find(b => b.id === updates.batchId);
         if (batch) {
@@ -126,7 +128,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
         <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Save size={20} /></div>
-            <h3 className="text-xl font-semibold text-slate-800 uppercase tracking-tight">Post Transaction (Automated Accounting)</h3>
+            <h3 className="text-xl font-semibold text-slate-800 uppercase tracking-tight">Post Transaction (Journal Voucher)</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
         </div>
@@ -137,9 +139,13 @@ const JournalForm: React.FC<JournalFormProps> = ({
               <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Transaction Date</label>
               <input type="date" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={entry.date} onChange={e => setEntry({...entry, date: e.target.value})} />
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Journal Memo / Reference Header</label>
-              <input required placeholder="e.g. Batch CSS NCII Enrollment Billing" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={entry.description} onChange={e => setEntry({...entry, description: e.target.value})} />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Voucher Ref (Sequential)</label>
+              <input readOnly className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-black text-indigo-600 font-mono" value={entry.reference} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Journal Memo / Header</label>
+              <input required placeholder="e.g. Correction of Depreciation" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium" value={entry.description} onChange={e => setEntry({...entry, description: e.target.value})} />
             </div>
           </div>
 
@@ -156,7 +162,6 @@ const JournalForm: React.FC<JournalFormProps> = ({
             {lines.map((line) => (
               <div key={line.id} className="grid grid-cols-12 gap-3 items-start p-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors shadow-sm">
                 
-                {/* Item Select */}
                 <div className="col-span-2">
                   <select 
                     className="w-full px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] font-bold text-indigo-700 outline-none"
@@ -170,7 +175,6 @@ const JournalForm: React.FC<JournalFormProps> = ({
                   </select>
                 </div>
 
-                {/* Batch Link */}
                 <div className="col-span-2">
                   <select 
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold outline-none appearance-none"
@@ -184,7 +188,6 @@ const JournalForm: React.FC<JournalFormProps> = ({
                   </select>
                 </div>
 
-                {/* Account & Contact */}
                 <div className="col-span-3 space-y-2">
                   <select required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none" value={line.accountId} onChange={e => updateLine(line.id!, { accountId: e.target.value })}>
                     <option value="">Account Title...</option>
@@ -206,7 +209,6 @@ const JournalForm: React.FC<JournalFormProps> = ({
                   </div>
                 </div>
 
-                {/* Amounts */}
                 <div className="col-span-2">
                   <input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-right text-sm font-mono font-medium" value={line.debit || ''} onChange={e => updateLine(line.id!, { debit: parseFloat(e.target.value) || 0, credit: 0 })} />
                 </div>
@@ -240,7 +242,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
                {isBalanced ? (
                  <div className="flex items-center gap-2 text-emerald-600 px-4">
                    <CheckCircle2 size={24} />
-                   <span className="text-[10px] font-black uppercase tracking-widest">Balanced</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest">Balanced Voucher</span>
                  </div>
                ) : (
                  <div className="flex items-center gap-2 text-amber-500 px-4">
@@ -249,7 +251,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
                  </div>
                )}
                <button type="button" onClick={onClose} className="px-8 py-3 text-sm font-semibold text-slate-500 hover:bg-white rounded-2xl border border-transparent hover:border-slate-200">Discard</button>
-               <button type="submit" disabled={!isBalanced} className="px-10 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-xl shadow-indigo-100 disabled:opacity-50 hover:bg-indigo-700 active:scale-95 transition-all">Post to Ledger</button>
+               <button type="submit" disabled={!isBalanced} className="px-10 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-xl shadow-indigo-100 disabled:opacity-50 hover:bg-indigo-700 active:scale-95 transition-all">Post Journal</button>
             </div>
           </div>
         </form>

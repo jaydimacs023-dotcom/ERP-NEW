@@ -1,5 +1,5 @@
 
-import { AccountClass, JournalEntryLine, ChartOfAccount, TransactionSummary } from './types';
+import { AccountClass, JournalEntryLine, ChartOfAccount, TransactionSummary, JournalEntry } from './types';
 
 export class AccountingService {
   /**
@@ -12,6 +12,27 @@ export class AccountingService {
       return debit - credit;
     }
     return credit - debit;
+  }
+
+  /**
+   * Generates the next sequential reference number for a document type.
+   * Format: PREFIX-YYYY-0000X (e.g., SI-2024-00001)
+   */
+  static getNextReference(entries: JournalEntry[], prefix: string): string {
+    const year = new Date().getFullYear();
+    const pattern = new RegExp(`^${prefix}-${year}-(\\d+)$`);
+    
+    let maxSeq = 0;
+    entries.forEach(e => {
+      const match = e.reference.match(pattern);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    });
+
+    const nextSeq = (maxSeq + 1).toString().padStart(5, '0');
+    return `${prefix}-${year}-${nextSeq}`;
   }
 
   static getLedgerSummaries(

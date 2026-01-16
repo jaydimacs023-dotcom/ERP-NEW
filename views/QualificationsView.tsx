@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Qualification } from '../types';
 import { 
@@ -35,9 +36,11 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   });
 
   const filteredQuals = qualifications.filter(q => 
+    !q.isDeleted && (
     q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     q.sector?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -199,7 +202,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           {filteredQuals.map(qual => {
             const color = getSectorColor(qual.sector || '');
             return (
-              <div key={qual.id} className="bg-white rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all group overflow-hidden flex flex-col">
+              <div key={qual.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all group overflow-hidden flex flex-col">
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-6">
                     <div className={`w-14 h-14 rounded-2xl bg-${color}-50 text-${color}-600 flex items-center justify-center border border-${color}-100 transition-all group-hover:scale-110`}>
