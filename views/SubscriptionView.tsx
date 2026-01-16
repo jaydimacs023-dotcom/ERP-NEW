@@ -4,7 +4,9 @@ import {
   CreditCard, Check, ShieldCheck, Zap, Database, 
   Sparkles, ArrowRight, CheckCircle2, ChevronLeft,
   Smartphone, Landmark, Info, Copy, ExternalLink,
-  Lock, Wallet, Hash, Clock, Loader2, UserCheck
+  Lock, Wallet, Hash, Clock, Loader2, UserCheck,
+  Calculator, GraduationCap, History, ShoppingCart,
+  Layers, Users, Award
 } from 'lucide-react';
 import { Organization, PlanType } from '../types';
 
@@ -25,59 +27,63 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
   const PLANS = [
     {
       id: 'BASIC' as PlanType,
-      name: 'Basic Ledger',
+      name: 'Ledger Core',
       price: '49',
-      desc: 'Ideal for small training centers needing pure accounting compliance.',
+      desc: 'Simple double-entry compliance for small service entities.',
       icon: <Database size={24} />,
       features: [
-        'General Ledger Core',
-        'Standard PH Chart of Accounts',
-        'Income Statement & Balance Sheet',
-        'Single User Access',
-        'Cloud Data Security'
+        'General Ledger & Journal Postings',
+        'Standard Chart of Accounts',
+        'Basic Balance Sheet & P&L',
+        'Single Administrator License',
+        'Cloud-Secure Data Vault'
       ],
       notIncluded: [
-        'Learner Registry',
-        'Batch Projections',
-        'Procurement (PO)',
-        'Fixed Asset Registry'
+        'School Management Module',
+        'Student & Trainer Portals',
+        'AR/AP Subsidiary Ledgers',
+        'Full Statutory Payroll'
       ]
     },
     {
       id: 'PROFESSIONAL' as PlanType,
-      name: 'Professional Operations',
-      price: '99',
-      desc: 'Full operational suite for growing institutions and TVET providers.',
-      icon: <Zap size={24} />,
+      name: 'Institutional Ops',
+      price: '149',
+      desc: 'Complete School Management & Learner Self-Service.',
+      icon: <GraduationCap size={24} />,
       isPopular: true,
       features: [
-        'Everything in Basic',
-        'Learner & Trainer Master Data',
-        'MIS 03-02 Batch Imports',
-        'Automated Completion Forecasts',
-        'Subsidiary Ledgers (AR/AP)',
-        'Banking & Treasury Management'
+        'Everything in Core',
+        'School Management Module',
+        '8-Hour Rule Batch Forecasting',
+        'Student Document Compliance',
+        'Instructor Capacity Matrix',
+        'Student & Trainer Hub Access',
+        'Subsidiary AR & AP Ledgers',
+        'Official Receipt (OR) Engine'
       ],
       notIncluded: [
-        'Procurement (PO)',
-        'Fixed Asset Management',
-        'System Audit Logs'
+        'Purchase Order Approvals',
+        'Fixed Asset Depreciation',
+        'Full Payroll & Payslips',
+        'Forensic Delta Audit Trail'
       ]
     },
     {
       id: 'ENTERPRISE' as PlanType,
-      name: 'Enterprise Strategic',
-      price: '299',
-      desc: 'The complete ERP for multi-site institutions and large-scale operations.',
-      icon: <Sparkles size={24} />,
+      name: 'Governance Pro',
+      price: '499',
+      desc: 'Institutional-grade control, HR, and asset management.',
+      icon: <ShieldCheck size={24} />,
       features: [
         'Everything in Professional',
-        'Purchase Orders (PO)',
-        'Fixed Asset Depreciation Engine',
-        'Full System Audit Trails',
-        'Advanced RBAC Security',
-        'Unlimited User Capacity',
-        'Dedicated Support'
+        'Institutional HR & Payroll Engine',
+        'Statutory Deduction Logic',
+        'Purchase Order (PO) Workflows',
+        'Fixed Asset Life Management',
+        'Depreciation Automation',
+        'Forensic Audit (State Deltas)',
+        'Budget Variance Tracking'
       ],
       notIncluded: []
     }
@@ -93,7 +99,6 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
   const handleSubmitReference = () => {
     if (referenceNumber.trim() && selectedPlan) {
       setIsVerifying(true);
-      // Actual state update to PENDING for system admin verification
       setTimeout(() => {
         onUpdate({
           ...organization,
@@ -119,19 +124,19 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
              <div className="w-20 h-20 bg-white rounded-[2rem] shadow-xl flex items-center justify-center mx-auto mb-6 text-amber-600 border-2 border-amber-100">
                 <Clock size={40} className="animate-pulse" />
              </div>
-             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Verification in Progress</h2>
-             <p className="text-slate-600 font-medium mt-2">Your payment reference is now in the System Verification Queue.</p>
+             <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Verification Queue</h2>
+             <p className="text-slate-600 font-medium mt-2 italic px-10">We are verifying your institutional funds. Professional features unlock automatically upon validation.</p>
           </div>
 
           <div className="p-12 space-y-10">
              <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-1">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Requested Tier</p>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Tier</p>
                    <p className="text-lg font-black text-slate-800 uppercase tracking-tight">{currentPlanDetails.name}</p>
                 </div>
                 <div className="space-y-1 text-right">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reference Submitted</p>
-                   <p className="text-lg font-mono font-black text-brand">{organization.paymentReference}</p>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Network Reference</p>
+                   <p className="text-lg font-mono font-black text-indigo-600">{organization.paymentReference}</p>
                 </div>
              </div>
 
@@ -141,33 +146,21 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
                       <UserCheck size={20} className="text-indigo-600" />
                    </div>
                    <div>
-                      <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Waiting for Owner Confirmation</p>
-                      <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                        A System Administrator will verify the funds against the transaction log and manually activate your institutional license. 
-                        This process usually takes 1-2 hours during business hours.
+                      <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Onboarding Policy</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium mt-1">
+                        Professional and Enterprise licenses require a standard AML fund check. Your instructional modules and portals will be active within 60 minutes.
                       </p>
                    </div>
-                </div>
-
-                <div className="flex items-center gap-4 py-4 px-6 bg-white rounded-2xl border border-slate-200">
-                   <div className="flex -space-x-2">
-                      <div className="w-8 h-8 rounded-full bg-slate-900 border-2 border-white flex items-center justify-center text-[10px] font-black text-white">S</div>
-                      <div className="w-8 h-8 rounded-full bg-indigo-500 border-2 border-white flex items-center justify-center text-[10px] font-black text-white">V</div>
-                   </div>
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification Services Active</p>
                 </div>
              </div>
 
              <div className="pt-6 border-t border-slate-100">
                 <button 
                   onClick={() => window.location.reload()}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-xl"
                 >
-                  Refresh Dashboard Status
+                  Refresh Subscription Data
                 </button>
-                <p className="text-center mt-6 text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                  Secure Institutional Billing Module v4.0
-                </p>
              </div>
           </div>
         </div>
@@ -180,7 +173,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
       <div className="space-y-8 max-w-4xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <button 
           onClick={() => setStep('SELECT')}
-          className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-brand transition-colors group"
+          className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors group"
         >
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           Back to Plans
@@ -188,158 +181,128 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
 
         <header className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand/10 border border-brand/20 rounded-full text-brand text-[10px] font-black uppercase tracking-widest">
-            <Lock size={14} /> Secure Checkout
+            <Lock size={14} /> High-Security Checkout
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Institutional Payment</h1>
-          <p className="text-slate-500 font-medium">Complete your subscription for <span className="text-slate-900 font-black">{currentPlanDetails.name}</span></p>
+          <h1 className="text-4xl font-black text-slate-800 tracking-tight uppercase">Authorize Tier Upgrade</h1>
+          <p className="text-slate-500 font-medium italic">Establishing full institutional functionality for <span className="text-slate-900 font-black">{organization.name}</span>.</p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-1 space-y-6">
             <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Order Summary</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Subscription Summary</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-black text-slate-800">{currentPlanDetails.name}</p>
-                    <p className="text-[10px] text-slate-400 font-medium mt-1">Monthly Billing</p>
+                    <p className="text-sm font-black text-slate-800 uppercase">{currentPlanDetails.name}</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">Institutional License</p>
                   </div>
                   <p className="text-sm font-black text-slate-900">${currentPlanDetails.price}</p>
                 </div>
                 <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Amount</span>
-                  <span className="text-xl font-black text-brand">${currentPlanDetails.price}</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total / Mo</span>
+                  <span className="text-xl font-black text-indigo-600">${currentPlanDetails.price}</span>
                 </div>
               </div>
             </div>
             
-            <div className="bg-brand-light rounded-[2rem] p-6 flex gap-3">
-              <Info size={18} className="text-brand shrink-0 mt-0.5" />
-              <p className="text-[10px] text-brand font-bold leading-relaxed">
-                Enter your transaction reference number after making the transfer. Manual activation by the System Administrator is required.
+            <div className="bg-indigo-50 rounded-[2rem] p-6 flex gap-3 border border-indigo-100">
+              <Info size={18} className="text-indigo-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-indigo-700 font-bold leading-relaxed">
+                Platform operations verify all institutional transfers manually. Once verified, all requested School Management and Accounting modules will be hot-deployed to your instance.
               </p>
             </div>
           </div>
 
           <div className="md:col-span-2 space-y-6">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Select Transfer Method</h3>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">Choose Settlement Network</h3>
             
             <div className="grid grid-cols-1 gap-4">
               <button 
                 onClick={() => { setPaymentMethod('GCASH'); setReferenceNumber(''); }}
-                className={`flex items-center justify-between p-6 rounded-[2rem] border-2 transition-all text-left ${
-                  paymentMethod === 'GCASH' ? 'border-brand bg-white shadow-xl ring-4 ring-brand-light' : 'border-slate-100 bg-white hover:border-slate-300'
+                className={`flex items-center justify-between p-6 rounded-[2.5rem] border-2 transition-all text-left ${
+                  paymentMethod === 'GCASH' ? 'border-indigo-600 bg-white shadow-xl ring-4 ring-indigo-50' : 'border-slate-100 bg-white hover:border-slate-300 shadow-sm'
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-4 rounded-2xl ${paymentMethod === 'GCASH' ? 'bg-brand text-white' : 'bg-slate-50 text-slate-400'}`}>
-                    <Wallet size={24} />
+                  <div className={`p-4 rounded-2xl ${paymentMethod === 'GCASH' ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                    <Smartphone size={24} />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">GCash Mobile</p>
-                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Instant Online Wallet Transfer</p>
+                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">GCash Digital Wallet</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">Secure Mobile Settlement</p>
                   </div>
                 </div>
-                {paymentMethod === 'GCASH' && <CheckCircle2 size={24} className="text-brand" />}
+                {paymentMethod === 'GCASH' && <CheckCircle2 size={24} className="text-indigo-600" />}
               </button>
 
               <button 
                 onClick={() => { setPaymentMethod('BPI'); setReferenceNumber(''); }}
-                className={`flex items-center justify-between p-6 rounded-[2rem] border-2 transition-all text-left ${
-                  paymentMethod === 'BPI' ? 'border-brand bg-white shadow-xl ring-4 ring-brand-light' : 'border-slate-100 bg-white hover:border-slate-300'
+                className={`flex items-center justify-between p-6 rounded-[2.5rem] border-2 transition-all text-left ${
+                  paymentMethod === 'BPI' ? 'border-indigo-600 bg-white shadow-xl ring-4 ring-indigo-50' : 'border-slate-100 bg-white hover:border-slate-300 shadow-sm'
                 }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`p-4 rounded-2xl ${paymentMethod === 'BPI' ? 'bg-brand text-white' : 'bg-slate-50 text-slate-400'}`}>
+                  <div className={`p-4 rounded-2xl ${paymentMethod === 'BPI' ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
                     <Landmark size={24} />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">BPI Online Transfer</p>
-                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Direct Bank-to-Bank Deposit</p>
+                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Institutional BPI Deposit</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">Corporate Bank-to-Bank Transfer</p>
                   </div>
                 </div>
-                {paymentMethod === 'BPI' && <CheckCircle2 size={24} className="text-brand" />}
+                {paymentMethod === 'BPI' && <CheckCircle2 size={24} className="text-indigo-600" />}
               </button>
             </div>
 
             {paymentMethod && (
-              <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
-                <div className="absolute -top-10 -right-10 opacity-5">
-                   {paymentMethod === 'GCASH' ? <Smartphone size={160} /> : <Landmark size={160} />}
-                </div>
+              <div className="bg-slate-950 rounded-[3rem] p-10 text-white shadow-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
                 <div className="relative z-10 space-y-8">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-[10px] font-black text-brand uppercase tracking-[0.3em]">Official Account Details</h4>
-                    <span className="px-3 py-1 bg-white/10 rounded-full text-[9px] font-black uppercase tracking-widest border border-white/10">Verified Partner</span>
+                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Institutional Settlement Vault</h4>
+                    <span className="px-3 py-1 bg-white/10 rounded-full text-[8px] font-black uppercase tracking-widest border border-white/10">Compliance: Level 3</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {paymentMethod === 'GCASH' ? (
-                      <>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Registered Name</p>
-                          <p className="text-lg font-black tracking-tight">Jay B. Dimaculangan</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">GCash Number</p>
-                          <div className="flex items-center gap-3">
-                            <p className="text-2xl font-mono font-black text-brand">0955 231 5522</p>
-                            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors"><Copy size={14}/></button>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Account Name</p>
-                          <p className="text-lg font-black tracking-tight">Jay B. Dimaculangan</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">BPI Account Number</p>
-                          <div className="flex items-center gap-3">
-                            <p className="text-2xl font-mono font-black text-brand">5606041367</p>
-                            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors"><Copy size={14}/></button>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <div className="space-y-2">
+                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recipient Entity</p>
+                       <p className="text-lg font-black tracking-tight uppercase">JAY B. DIMACULANGAN</p>
+                    </div>
+                    <div className="space-y-2">
+                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Network Target</p>
+                       <div className="flex items-center gap-3">
+                          <p className="text-2xl font-mono font-black text-indigo-400 tracking-tighter">{paymentMethod === 'GCASH' ? '0955 231 5522' : '5606-0413-67'}</p>
+                          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors" onClick={() => { navigator.clipboard.writeText(paymentMethod === 'GCASH' ? '09552315522' : '5606041367'); }}><Copy size={14}/></button>
+                       </div>
+                    </div>
                   </div>
 
                   <div className="pt-8 border-t border-white/10 space-y-4">
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <Hash size={12} className="text-brand" /> Transaction Reference Number
+                          <Hash size={12} className="text-indigo-400" /> Fund Transfer Reference Number
                        </label>
                        <input 
                           type="text"
-                          placeholder="e.g. 9012 345 6789"
-                          className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-4 text-xl font-mono font-black text-white focus:border-brand focus:ring-4 focus:ring-brand/20 outline-none transition-all placeholder:text-slate-700"
+                          placeholder="Provide the unique network txn id..."
+                          className="w-full bg-white/5 border-2 border-white/10 rounded-2xl px-6 py-5 text-2xl font-mono font-black text-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/20 outline-none transition-all placeholder:text-slate-800"
                           value={referenceNumber}
                           onChange={(e) => setReferenceNumber(e.target.value)}
                        />
-                       <p className="text-[9px] text-slate-500 font-bold italic">Verification is subject to System Admin confirmation (Manual Audit).</p>
                     </div>
 
                     <button 
                       onClick={handleSubmitReference}
                       disabled={!referenceNumber.trim() || isVerifying}
-                      className={`w-full py-5 rounded-3xl text-sm font-black uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 ${
+                      className={`w-full py-5 rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 ${
                         referenceNumber.trim() 
-                          ? 'bg-brand text-white shadow-brand/20 hover:scale-[1.02]' 
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5 shadow-none'
+                          ? 'bg-indigo-600 text-white shadow-indigo-600/20' 
+                          : 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5'
                       }`}
                     >
-                      {isVerifying ? (
-                        <Loader2 className="animate-spin" size={20} />
-                      ) : (
-                        <ShieldCheck size={20} />
-                      )}
-                      {isVerifying ? 'Submitting...' : referenceNumber.trim() ? 'Submit for Verification' : 'Enter Reference to Proceed'}
+                      {isVerifying ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
+                      {isVerifying ? 'Verifying Integrity...' : 'Commit Activation Request'}
                     </button>
-                    
-                    <p className="text-[10px] text-slate-500 font-bold text-center mt-4 uppercase tracking-tighter">
-                      Activation is not instant. System Admin will verify the transfer.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -351,14 +314,14 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
   }
 
   return (
-    <div className="space-y-12 max-w-6xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-12 max-w-6xl mx-auto pb-24 animate-in fade-in duration-700">
       <header className="text-center space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-600 text-[10px] font-black uppercase tracking-widest mb-2">
-          <ShieldCheck size={14} /> Secure Billing Portal
+          <ShieldCheck size={14} /> Modular ERP Licensing
         </div>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Institutional License & Tiering</h1>
-        <p className="text-slate-500 max-w-2xl mx-auto font-medium">
-          Scale your institutional capabilities. Choose a plan that aligns with your operational complexity and compliance requirements.
+        <h1 className="text-5xl font-black text-slate-800 tracking-tighter uppercase">Choose Your Scale</h1>
+        <p className="text-slate-500 max-w-3xl mx-auto font-medium leading-relaxed italic">
+          Unlock institutional governance with our modular framework. Each tier is calibrated for specific compliance requirements, from lean bookkeeping to full School Management.
         </p>
       </header>
 
@@ -370,66 +333,66 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
           return (
             <div 
               key={plan.id}
-              className={`relative bg-white rounded-[2.5rem] border-2 transition-all flex flex-col ${
-                isCurrent ? 'border-brand shadow-2xl scale-105 z-10' : 'border-slate-100 hover:border-slate-300'
+              className={`relative bg-white rounded-[3rem] border-2 transition-all flex flex-col group ${
+                isCurrent ? 'border-indigo-600 shadow-2xl scale-105 z-10' : 'border-slate-100 hover:border-slate-300 shadow-sm'
               }`}
             >
               {plan.isPopular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-brand text-white px-6 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                  Most Popular
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-xl">
+                  Institutional Standard
                 </div>
               )}
 
               <div className="p-10 border-b border-slate-50">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border shadow-sm ${
-                  plan.id === 'ENTERPRISE' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 border shadow-sm transition-all group-hover:scale-110 ${
+                  plan.id === 'ENTERPRISE' ? 'bg-slate-900 text-indigo-400 border-slate-950' :
                   plan.id === 'PROFESSIONAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                  'bg-slate-50 text-slate-500 border-slate-200'
+                  'bg-slate-50 text-slate-400 border-slate-200'
                 }`}>
                   {plan.icon}
                 </div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">{plan.name}</h3>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2 uppercase">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-black text-slate-900 tracking-tighter">${plan.price}</span>
-                  <span className="text-sm font-bold text-slate-400">/ month</span>
+                  <span className="text-4xl font-mono font-black text-slate-900 tracking-tighter">${plan.price}</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ month</span>
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed font-medium">{plan.desc}</p>
+                <p className="text-xs text-slate-400 leading-relaxed font-bold italic">{plan.desc}</p>
               </div>
 
-              <div className="p-10 flex-1 space-y-4">
+              <div className="p-10 flex-1 space-y-5">
                 {plan.features.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="mt-0.5 p-0.5 bg-emerald-100 text-emerald-600 rounded-full">
+                    <div className={`mt-0.5 p-0.5 rounded-full ${plan.id === 'ENTERPRISE' ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
                       <Check size={12} strokeWidth={4} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 leading-tight">{feature}</span>
+                    <span className="text-[11px] font-black text-slate-700 leading-tight uppercase tracking-tight">{feature}</span>
                   </div>
                 ))}
                 {plan.notIncluded.map((feature, i) => (
-                  <div key={i} className="flex items-start gap-3 opacity-40">
+                  <div key={i} className="flex items-start gap-3 opacity-30">
                     <div className="mt-0.5 p-0.5 bg-slate-100 text-slate-400 rounded-full">
-                      <ArrowRight size={12} strokeWidth={4} className="rotate-180" />
+                      <Lock size={10} strokeWidth={3} />
                     </div>
-                    <span className="text-xs font-medium text-slate-400 leading-tight line-through">{feature}</span>
+                    <span className="text-[11px] font-bold text-slate-400 leading-tight uppercase tracking-tight line-through">{feature}</span>
                   </div>
                 ))}
               </div>
 
               <div className="p-10 pt-0">
                 {isCurrent && !isTrial ? (
-                  <div className="w-full py-4 rounded-2xl border-2 border-brand text-brand text-center text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                    <CheckCircle2 size={18} /> Active Plan
+                  <div className="w-full py-4 rounded-2xl border-2 border-indigo-600 text-indigo-600 text-center text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                    <CheckCircle2 size={18} /> Active Environment
                   </div>
                 ) : (
                   <button 
                     onClick={() => handleSelectPlan(plan.id)}
-                    className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
-                      plan.id === 'ENTERPRISE' ? 'bg-rose-600 text-white shadow-rose-100 hover:bg-rose-700' :
-                      plan.id === 'PROFESSIONAL' ? 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700' :
-                      'bg-slate-900 text-white shadow-slate-100 hover:bg-slate-800'
+                    className={`w-full py-4 rounded-3xl text-xs font-black uppercase tracking-[0.2em] transition-all active:scale-95 shadow-xl ${
+                      plan.id === 'ENTERPRISE' ? 'bg-slate-900 text-white shadow-indigo-900/10 hover:bg-black' :
+                      plan.id === 'PROFESSIONAL' ? 'bg-indigo-600 text-white shadow-indigo-900/10 hover:bg-indigo-700' :
+                      'bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-50'
                     }`}
                   >
-                    {isCurrent && isTrial ? 'Activate License' : 'Upgrade to ' + plan.id}
+                    {isCurrent && isTrial ? 'Settle Full License' : 'Upgrade Instance'}
                   </button>
                 )}
               </div>
@@ -438,52 +401,70 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
         })}
       </div>
 
-      <div className="bg-slate-900 rounded-[2.5rem] p-12 text-white shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-10 rotate-12">
-          <CreditCard size={160} />
-        </div>
-        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <h4 className="text-2xl font-black tracking-tight">Institutional Billing Cycle</h4>
-            <p className="text-slate-400 font-medium leading-relaxed italic">
-              "Unified invoicing and secure payment gateways ensure that your institutional operations remain uninterrupted. 
-              Our ERP system adheres to international security standards for financial data handling."
+      {/* Feature Spotlight: School Management */}
+      <div className="bg-white rounded-[3.5rem] p-12 border-2 border-indigo-600 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-16">
+         <div className="flex-1 space-y-6 relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg">
+               Market Leading Capability
+            </div>
+            <h4 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">
+               Comprehensive School Management Engine
+            </h4>
+            <p className="text-sm text-slate-500 leading-relaxed font-bold italic">
+               The Professional tier unlocks the 8-Hour Rule Forecast Engine, which dynamically computes program terminal dates based on real-time instructor capacity. 
+               Bridge your academic logistics with your financial ledger in a single unified workspace.
             </p>
-            <div className="flex gap-8">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-brand uppercase tracking-widest">PCI-DSS</p>
-                <p className="text-xs font-bold text-slate-300">Certified Compliant</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-brand uppercase tracking-widest">Encryption</p>
-                <p className="text-xs font-bold text-slate-300">AES-256 Bit SSL</p>
-              </div>
+            <div className="flex flex-wrap gap-8 pt-4 border-t border-slate-100">
+               <FeatureHighlight icon={<Users size={20}/>} label="Learner Registry" />
+               <FeatureHighlight icon={<Layers size={20}/>} label="Batch Forecasts" />
+               <FeatureHighlight icon={<Award size={20}/>} label="NTTC Accreditation" />
             </div>
-          </div>
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                <span>Current Tier</span>
-                <span className="text-brand">{organization.planType}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                <span>Account Status</span>
-                <span className={organization.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : 'text-amber-400'}>
-                  {organization.subscriptionStatus}
-                </span>
-              </div>
-              <div className="pt-4 mt-4 border-t border-white/10 flex justify-between items-center">
-                 <p className="text-sm font-bold">Manage Billing Methods</p>
-                 <button className="p-2 hover:bg-white/10 rounded-xl transition-all">
-                    <ArrowRight size={20} />
-                 </button>
-              </div>
+         </div>
+         <div className="shrink-0 relative z-10">
+            <div className="w-64 h-64 bg-slate-900 rounded-[3rem] shadow-2xl p-10 text-white flex flex-col justify-between border-4 border-white/5 rotate-3">
+               <GraduationCap size={48} className="text-indigo-400" />
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Available on:</p>
+                  <p className="text-xl font-black text-white uppercase tracking-tight">Professional+</p>
+               </div>
             </div>
-          </div>
-        </div>
+         </div>
+         <div className="absolute top-0 right-0 p-12 opacity-[0.03] -mr-20 -mt-20">
+            <GraduationCap size={350} />
+         </div>
+      </div>
+
+      <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white shadow-2xl flex flex-col md:flex-row items-center gap-12 border border-white/5">
+         <div className="flex-1 space-y-4">
+            <h4 className="text-2xl font-black uppercase tracking-tight flex items-center gap-4">
+               <History size={32} className="text-indigo-400" />
+               Cryptographic Audit Anchoring
+            </h4>
+            <p className="text-sm text-slate-400 leading-relaxed font-medium">
+               Institutional data is immutable. Upgrading to **Enterprise** unlocks the forensic delta engine, which logs exact JSON state changes for every record, 
+               providing a legal-grade audit trail for institutional donors and government regulators.
+            </p>
+         </div>
+         <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/10 grid grid-cols-2 gap-10 shrink-0">
+            <div className="text-center">
+               <p className="text-3xl font-mono font-black text-indigo-400">99.9%</p>
+               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Uptime SLA</p>
+            </div>
+            <div className="text-center">
+               <p className="text-3xl font-mono font-black text-emerald-400">AES-256</p>
+               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Vault Privacy</p>
+            </div>
+         </div>
       </div>
     </div>
   );
 };
+
+const FeatureHighlight: React.FC<{ icon: React.ReactNode, label: string }> = ({ icon, label }) => (
+  <div className="flex items-center gap-3">
+     <div className="text-indigo-600">{icon}</div>
+     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+  </div>
+);
 
 export default SubscriptionView;

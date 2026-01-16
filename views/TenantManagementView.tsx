@@ -23,7 +23,6 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
   const [newOrgName, setNewOrgName] = useState('');
   const [currency, setCurrency] = useState('PHP');
   const [plan, setPlan] = useState<PlanType>('BASIC');
-  const [expiry, setExpiry] = useState('');
 
   const filteredOrgs = organizations.filter(o => 
     o.id !== 'org-system' && 
@@ -36,7 +35,8 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
     const profCount = organizations.filter(o => o.planType === 'PROFESSIONAL').length;
     const entCount = organizations.filter(o => o.planType === 'ENTERPRISE').length;
     
-    const mrr = (basicCount * 49) + (profCount * 99) + (entCount * 299);
+    // New Pricing logic: 49, 149, 499
+    const mrr = (basicCount * 49) + (profCount * 149) + (entCount * 499);
 
     return { active, mrr, total: organizations.length - 1 };
   }, [organizations]);
@@ -114,28 +114,28 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
       <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
          <div className="p-8 border-b bg-slate-50/50 flex items-center gap-3">
             <Info size={20} className="text-indigo-600" />
-            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Tier Feature Matrix</h3>
+            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Internal Service Matrix (Admin)</h3>
          </div>
          <div className="grid grid-cols-3 divide-x divide-slate-100">
             <PlanInfo 
               tier="BASIC" 
               price="$49/mo" 
-              desc="Lite Ledger" 
-              features={["General Ledger", "Standard COA", "Core Reports", "Single User"]} 
-              locked={["Ops Modules", "Subsidiary Ledgers", "Procurement", "Fixed Assets"]}
+              desc="Standard Bookkeeping" 
+              features={["General Ledger", "Standard COA", "Core Reports", "Manual Posting"]} 
+              locked={["Ops Modules", "Subsidiaries", "Payroll", "Fixed Assets"]}
             />
             <PlanInfo 
               tier="PROFESSIONAL" 
-              price="$99/mo" 
-              desc="Full Operations" 
-              features={["Everything in Basic", "Learner/Trainer Registry", "Banking & AR/AP", "Projected Completion"]} 
-              locked={["Procurement (PO)", "Fixed Assets", "Audit Logs", "System Users Mgmt"]}
+              price="$149/mo" 
+              desc="Operational Heart" 
+              features={["Registries", "8-Hour Batch Forecast", "AR/AP Subs", "Banking & OR", "Portals"]} 
+              locked={["PO Workflow", "Asset Depreciation", "Audit Deltas", "Forensic Logs"]}
             />
             <PlanInfo 
               tier="ENTERPRISE" 
-              price="$299/mo" 
-              desc="Strategic ERP" 
-              features={["Everything in Professional", "Purchase Orders (PO)", "Fixed Asset Depr.", "Audit Logs & RBAC"]} 
+              price="$499/mo" 
+              desc="Strategic Oversight" 
+              features={["PO Approval Cycles", "Asset Depr. Engine", "Full Payroll", "Forensic Audit", "RBAC Matrix"]} 
               locked={[]}
             />
          </div>
@@ -146,15 +146,11 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
            <div className="relative w-full md:w-96">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
               <input 
-                placeholder="Search Tenants by ID or Name..." 
+                placeholder="Filter Tenant Ledger..." 
                 className="w-full pl-12 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-2xl text-sm text-slate-200 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
-           </div>
-           <div className="flex gap-2">
-              <button className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Export CSV</button>
-              <button className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Platform Logs</button>
            </div>
         </div>
 
@@ -163,8 +159,6 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
              <tr>
                <th className="px-8 py-5">Tenant Organization</th>
                <th className="px-8 py-5">Subscription Plan</th>
-               <th className="px-8 py-5">Onboarding Date</th>
-               <th className="px-8 py-5">License Expiry</th>
                <th className="px-8 py-5">Status</th>
                <th className="px-8 py-5 text-right">Dev Actions</th>
              </tr>
@@ -187,29 +181,16 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <CreditCard size={14} className="text-slate-500" />
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-rose-400' : 'text-slate-400'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-brand' : 'text-slate-400'}`}>
                                 {org.planType} Tier
                             </span>
                         </div>
                         {org.subscriptionStatus === 'PENDING' && (
                             <div className="flex items-center gap-2 text-[9px] font-black text-amber-500 uppercase animate-pulse">
-                                <ShieldAlert size={10} /> Pending Upgrade: {org.pendingPlanType}
+                                <ShieldAlert size={10} /> Verify Upgrade: {org.pendingPlanType}
                             </div>
                         )}
                     </div>
-                 </td>
-                 <td className="px-8 py-6 text-xs text-slate-500 font-mono">
-                    {new Date(org.createdAt).toLocaleDateString()}
-                 </td>
-                 <td className="px-8 py-6">
-                    {org.licenseExpiry ? (
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                         <Calendar size={14} className="text-slate-500" />
-                         {org.licenseExpiry}
-                      </div>
-                    ) : (
-                      <span className="text-[10px] font-black text-slate-600 uppercase italic tracking-widest">Lifetime / N/A</span>
-                    )}
                  </td>
                  <td className="px-8 py-6">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${getStatusColor(org.subscriptionStatus)}`}>
@@ -222,15 +203,13 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                           <button 
                             onClick={() => handleVerifyPayment(org)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-900/40 hover:bg-amber-500 transition-all"
-                            title="Verify Payment Reference"
                           >
-                             <Hash size={12} /> Verify {org.paymentReference}
+                             <Hash size={12} /> Confirm {org.paymentReference}
                           </button>
                        )}
                        <button 
                         onClick={() => toggleStatus(org)}
                         className={`p-2 rounded-xl border border-slate-700 hover:border-slate-500 transition-all ${org.subscriptionStatus === 'ACTIVE' ? 'text-rose-500' : 'text-emerald-500'}`}
-                        title={org.subscriptionStatus === 'ACTIVE' ? 'Suspend Instance' : 'Activate Instance'}
                        >
                           {org.subscriptionStatus === 'ACTIVE' ? <Pause size={16} /> : <Play size={16} />}
                        </button>
@@ -251,7 +230,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
              <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
                    <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-xl"><Building2 size={24} /></div>
-                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">Provision Tenant Environment</h3>
+                   <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Direct Provisioning</h3>
                 </div>
                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
              </div>
@@ -259,9 +238,9 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
              <form onSubmit={handleSubmit} className="p-10 space-y-8">
                 <div className="space-y-6">
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Organization Legal Name</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Institutional Title</label>
                       <input 
-                        required autoFocus placeholder="e.g. Skyline Finance Group"
+                        required autoFocus placeholder="e.g. Philippine Skills Center"
                         className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-rose-500 font-bold text-slate-800"
                         value={newOrgName} onChange={e => setNewOrgName(e.target.value)}
                       />
@@ -269,42 +248,36 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
 
                    <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Functional Currency</label>
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">G/L Currency</label>
                          <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none font-bold text-slate-800 appearance-none"
                            value={currency} onChange={e => setCurrency(e.target.value)}>
-                            <option value="PHP">PHP - Philippine Peso</option>
-                            <option value="USD">USD - US Dollar</option>
-                            <option value="EUR">EUR - Euro</option>
+                            <option value="PHP">PHP</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
                          </select>
                       </div>
                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Initial Service Level</label>
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">License Tier</label>
                          <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none font-bold text-slate-800 appearance-none"
                            value={plan} onChange={e => setPlan(e.target.value as PlanType)}>
-                            <option value="BASIC">Basic (Lite Ledger)</option>
-                            <option value="PROFESSIONAL">Professional (Full Ops)</option>
-                            <option value="ENTERPRISE">Enterprise (Multi-Site)</option>
+                            <option value="BASIC">Basic</option>
+                            <option value="PROFESSIONAL">Professional</option>
+                            <option value="ENTERPRISE">Enterprise</option>
                          </select>
                       </div>
-                   </div>
-
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">License Expiry (Optional)</label>
-                      <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none font-bold text-slate-800"
-                        value={expiry} onChange={e => setExpiry(e.target.value)} />
                    </div>
                 </div>
 
                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex gap-4">
                    <AlertCircle size={24} className="text-amber-600 shrink-0" />
                    <p className="text-[11px] text-amber-900 leading-relaxed font-bold">
-                     Provisioning will initialize a unique tenant database container and automatically seed the Organizational Chart of Accounts (COA) template v4.0.
+                     Manual provisioning bypasses the payment gateway. Use only for internal institutional testing or direct-billed Enterprise clients.
                    </p>
                 </div>
 
                 <div className="pt-4 flex gap-4">
                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl">Discard</button>
-                   <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-3xl text-sm font-black shadow-2xl shadow-slate-200 active:scale-95 transition-all">Launch Environment</button>
+                   <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-3xl text-sm font-black shadow-2xl active:scale-95 transition-all">Launch Environment</button>
                 </div>
              </form>
           </div>
@@ -319,7 +292,6 @@ const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: 
      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{tier}</p>
      <div className="flex items-baseline gap-2 mb-2">
         <span className="text-2xl font-black text-slate-900 tracking-tight">{price}</span>
-        <span className="text-xs text-slate-400 font-bold">/ tenant</span>
      </div>
      <p className="text-xs text-indigo-600 font-bold italic mb-6">{desc}</p>
      <div className="space-y-3">
