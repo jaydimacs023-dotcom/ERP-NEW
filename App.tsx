@@ -273,7 +273,8 @@ export default function App() {
               <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
            </div>
            <div className="flex items-center gap-6">
-              {isFinance && (
+              {/* Refined visibility: Only show Manual Post to specific functional finance/admin roles, excluding President, Registrar, Trainer, Student */}
+              {isFinance && !['PRESIDENT', 'REGISTRAR', 'TRAINER', 'STUDENT'].includes(currentUser?.role || '') && (
                 <button 
                   onClick={() => setShowJournalForm(true)} 
                   className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
