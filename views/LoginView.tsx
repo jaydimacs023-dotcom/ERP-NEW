@@ -89,119 +89,119 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 overflow-hidden relative">
+    <div className="w-screen h-screen bg-slate-950 flex items-center justify-center p-4 overflow-auto relative">
       {/* Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[160px] animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-rose-600/10 rounded-full blur-[160px]"></div>
       </div>
 
-      <div className="w-full max-w-7xl flex flex-col xl:flex-row gap-12 items-center justify-center relative z-10">
+      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-8 items-center justify-center relative z-10 my-auto py-8">
         
         {/* Left Column: Product Branding & Demo Directory */}
         {!isRegistering && (
-          <div className="w-full max-w-2xl space-y-10 animate-in slide-in-from-left-12 duration-700">
-            <div className="text-center xl:text-left">
-              <div className="inline-flex items-center justify-center p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-500/20 mb-8 border-4 border-white/5">
-                <Database className="text-white" size={40} />
+          <div className="w-full max-w-xl space-y-6 animate-in slide-in-from-left-12 duration-700 hidden lg:block">
+            <div className="text-left">
+              <div className="inline-flex items-center justify-center p-3 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-500/20 mb-4 border-2 border-white/5">
+                <Database className="text-white" size={28} />
               </div>
-              <h1 className="text-6xl font-black text-white tracking-tighter leading-none mb-4">AccounTech<span className="text-indigo-500">.</span></h1>
-              <p className="text-xl text-slate-400 font-medium max-w-lg leading-relaxed">
+              <h1 className="text-4xl font-black text-white tracking-tighter leading-none mb-3">AccounTech<span className="text-indigo-500">.</span></h1>
+              <p className="text-sm text-slate-400 font-medium max-w-md leading-relaxed">
                 The world-class, multi-tenant ERP core for institutional compliance and financial oversight.
               </p>
             </div>
 
-            <div className="bg-slate-900/40 backdrop-blur-2xl border border-white/5 rounded-[3rem] p-10 space-y-8 shadow-2xl overflow-hidden relative group">
-               <div className="absolute top-0 right-0 p-12 opacity-5 -mr-12 -mt-12">
-                  <Fingerprint size={240} />
+            <div className="bg-slate-900/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 space-y-6 shadow-2xl overflow-hidden relative group max-h-80 overflow-y-auto scrollbar-hide">
+               <div className="absolute top-0 right-0 p-8 opacity-5 -mr-8 -mt-8">
+                  <Fingerprint size={160} />
                </div>
                
                <header className="flex justify-between items-center relative z-10">
-                  <div className="space-y-1">
-                    <h3 className="text-xs font-black text-indigo-400 uppercase tracking-[0.3em]">Developer Console</h3>
-                    <p className="text-lg font-black text-white uppercase tracking-tight">Credential Directory</p>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em]">Developer Console</h3>
+                    <p className="text-sm font-black text-white uppercase tracking-tight">Credential Directory</p>
                   </div>
-                  <div className="px-4 py-1 bg-white/5 rounded-full border border-white/10 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                     Session Sandbox v4.1
+                  <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                     v4.1
                   </div>
                </header>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-                  <div className="space-y-3">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 mb-1">Administrative & Platform</p>
+               <div className="grid grid-cols-2 gap-2 relative z-10">
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Admin</p>
                      <DemoItem 
                        role="System Architect" 
                        email="dev@accountech.io" 
                        pass="admin"
-                       icon={<Terminal size={14}/>} 
+                       icon={<Terminal size={12}/>} 
                        onClick={() => handleQuickLogin('dev@accountech.io', 'org-system', 'admin')}
                        color="indigo"
                      />
                      <DemoItem 
-                       role="Institution President" 
+                       role="President" 
                        email="president@manila.ph" 
-                       icon={<ShieldCheck size={14}/>} 
+                       icon={<ShieldCheck size={12}/>} 
                        onClick={() => handleQuickLogin('president@manila.ph', 'org-3')}
                        color="amber"
                      />
                      <DemoItem 
-                       role="Workspace Admin" 
+                       role="Admin" 
                        email="maria@manila.ph" 
-                       icon={<Building2 size={14}/>} 
+                       icon={<Building2 size={12}/>} 
                        onClick={() => handleQuickLogin('maria@manila.ph', 'org-3')}
                        color="slate"
                      />
                   </div>
                   
-                  <div className="space-y-3">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 mb-1">Financial & Compliance</p>
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Finance</p>
                      <DemoItem 
                        role="Finance Manager" 
                        email="finance@manila.ph" 
-                       icon={<Landmark size={14}/>} 
+                       icon={<Landmark size={12}/>} 
                        onClick={() => handleQuickLogin('finance@manila.ph', 'org-3')}
                        color="emerald"
                      />
                      <DemoItem 
-                       role="Senior Accountant" 
+                       role="Accountant" 
                        email="alicia@manila.ph" 
-                       icon={<BookOpen size={14}/>} 
+                       icon={<BookOpen size={12}/>} 
                        onClick={() => handleQuickLogin('alicia@manila.ph', 'org-3')}
                        color="indigo"
                      />
                      <DemoItem 
-                       role="AR/AP Specialist" 
+                       role="AR/AP Spec" 
                        email="ana@manila.ph" 
-                       icon={<History size={14}/>} 
+                       icon={<History size={12}/>} 
                        onClick={() => handleQuickLogin('ana@manila.ph', 'org-3')}
                        color="blue"
                      />
                   </div>
 
-                  <div className="space-y-3">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 mb-1">Operations & Academic</p>
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Ops</p>
                      <DemoItem 
-                       role="Lead Registrar" 
+                       role="Registrar" 
                        email="ricardo@manila.ph" 
-                       icon={<Users size={14}/>} 
+                       icon={<Users size={12}/>} 
                        onClick={() => handleQuickLogin('ricardo@manila.ph', 'org-3')}
                        color="rose"
                      />
                      <DemoItem 
-                       role="Professional Trainer" 
+                       role="Trainer" 
                        email="juan.dc@academy.ph" 
-                       icon={<GraduationCap size={14}/>} 
+                       icon={<GraduationCap size={12}/>} 
                        onClick={() => handleQuickLogin('juan.dc@academy.ph', 'org-3')}
                        color="emerald"
                      />
                   </div>
 
-                  <div className="space-y-3">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 mb-1">Learner Self-Service</p>
+                  <div className="space-y-2">
+                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Student</p>
                      <DemoItem 
-                       role="Active Student" 
+                       role="Learner" 
                        email="jose@learner.ph" 
-                       icon={<UserCircle size={14}/>} 
+                       icon={<UserCircle size={12}/>} 
                        onClick={() => handleQuickLogin('jose@learner.ph', 'org-3')}
                        color="indigo"
                      />
@@ -212,21 +212,21 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
         )}
 
         {/* Right Column: Interactive Login Form */}
-        <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-3xl border border-slate-800 p-10 rounded-[3.5rem] shadow-2xl ring-24 ring-white/5 animate-in slide-in-from-right-12 duration-700">
+        <div className="w-full max-w-sm bg-slate-900/80 backdrop-blur-3xl border border-slate-800 p-8 rounded-3xl shadow-2xl ring-24 ring-white/5 animate-in slide-in-from-right-12 duration-700">
           {!isRegistering ? (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <header className="space-y-2 text-center xl:text-left">
-                 <h2 className="text-3xl font-black text-white uppercase tracking-tight">Authorize</h2>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <header className="space-y-1 text-center lg:text-left">
+                 <h2 className="text-2xl font-black text-white uppercase tracking-tight">Authorize</h2>
                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Provide institutional credentials</p>
               </header>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Institutional Tenant</label>
                   <div className="relative group">
-                    <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
                     <select 
-                      className="w-full pl-14 pr-10 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-black outline-none appearance-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-black outline-none appearance-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                       value={orgId}
                       onChange={e => setOrgId(e.target.value)}
                     >
@@ -240,10 +240,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Identity (Email)</label>
                   <div className="relative group">
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
                     <input 
                       type="email" required placeholder="staff@institution.ph"
-                      className="w-full pl-14 pr-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                       value={email} onChange={e => setEmail(e.target.value)}
                     />
                   </div>
@@ -252,10 +252,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Access Token (Password)</label>
                   <div className="relative group">
-                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
                     <input 
                       type="password" required placeholder="••••••••"
-                      className="w-full pl-14 pr-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                       value={password} onChange={e => setPassword(e.target.value)}
                     />
                   </div>
@@ -263,30 +263,30 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
               </div>
 
               {error && (
-                <div className="p-5 bg-rose-500/10 border-2 border-rose-500/20 rounded-[2rem] flex gap-4 animate-in fade-in slide-in-from-top-4">
-                  <AlertCircle className="text-rose-500 shrink-0" size={24} />
-                  <p className="text-xs text-rose-200 font-bold leading-relaxed">{error}</p>
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex gap-3">
+                  <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={18} />
+                  <p className="text-xs text-red-300 font-bold leading-relaxed">{error}</p>
                 </div>
               )}
 
               <button 
                 disabled={loading}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[2.2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-indigo-900/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center gap-3"
+                className="w-full py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-indigo-900/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (
-                  <>Open Workspace <ArrowRight size={20} /></>
+                  <>Open Workspace <ArrowRight size={16} /></>
                 )}
               </button>
 
-              <div className="pt-6 border-t border-slate-800 text-center space-y-4">
+              <div className="pt-4 border-t border-slate-800 text-center">
                 <button 
                   type="button"
                   onClick={() => setIsRegistering(true)}
                   className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-indigo-400 transition-colors flex items-center justify-center gap-2 mx-auto"
                 >
-                  <Database size={14} /> Provision New Ledger
+                  <Database size={12} /> Provision New Ledger
                 </button>
               </div>
             </form>
@@ -381,7 +381,7 @@ const DemoItem: React.FC<{ role: string, email: string, pass?: string, icon: Rea
           <p className="text-xs font-black text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">{role}</p>
           <div className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black text-slate-500 uppercase">{pass}</div>
        </div>
-       <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-tighter truncate opacity-70">{email}</p>
+       <p className="text-[9px] font-mono text-slate-500 uppercase tracking-tighter truncate opacity-70">{email}</p>
     </div>
     <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
        <Key size={14} className="text-indigo-500" />
