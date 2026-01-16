@@ -5,6 +5,7 @@ import {
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
+import { authService } from './services/AuthService';
 import { config } from './config/app';
 
 // View Imports
@@ -61,6 +62,24 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const session = authService.getSession();
+    if (session) {
+      setCurrentUser(session.user);
+      setCurrentOrgId(session.user.orgId);
+      console.info('[App] Restored user session:', session.user.email);
+    }
+  }, []);
+
+  // Logout handler
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    setCurrentOrgId('');
+    console.info('[App] User logged out');
+  };
 
   // Master Data State
   const [students, setStudents] = useState<Student[]>([]);
@@ -165,6 +184,10 @@ export default function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setCurrentOrgId(user.orgId);
+    // Store session for persistence
+    const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
+    localStorage.setItem('at_erp_session', JSON.stringify(session));
+    console.info('[App] User session stored:', user.email);
     if (user.role === 'STUDENT') setActiveTab('student-portal');
     else if (user.role === 'TRAINER') setActiveTab('trainer-portal');
     else setActiveTab('dashboard');
@@ -331,7 +354,7 @@ export default function App() {
         )}
 
         <div className="p-6 mt-auto border-t border-white/5">
-           <button onClick={() => setCurrentUser(null)} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
+           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
               <LogOut size={20} />
               {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
            </button>

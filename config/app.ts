@@ -5,14 +5,15 @@
  * Supports Runtime Overrides for instant switching between Mock and Cloud.
  */
 
-const getEnv = () => {
-  const meta = import.meta as any;
-  if (meta && meta.env) return meta.env;
-  if (typeof process !== 'undefined' && process.env) return process.env;
-  return {};
-};
+// Vite automatically exposes VITE_* env vars via import.meta.env
+const env = import.meta.env;
 
-const env = getEnv();
+console.debug('[Config] Vite import.meta.env:', {
+  keys: Object.keys(env).filter(k => k.startsWith('VITE_')),
+  VITE_SUPABASE_URL: env.VITE_SUPABASE_URL?.substring(0, 40) || 'MISSING',
+  VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ? 'PRESENT' : 'MISSING',
+  VITE_FORCE_SUPABASE: env.VITE_FORCE_SUPABASE
+});
 
 // Check for runtime override in browser
 const getRuntimeOverride = () => {

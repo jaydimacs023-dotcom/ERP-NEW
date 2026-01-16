@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Database, ShieldCheck, ArrowRight, Lock, Mail, Building2, UserCircle, Fingerprint, AlertCircle, ChevronRight, Briefcase, GraduationCap, Users, History, Terminal, Landmark, BookOpen, Key } from 'lucide-react';
 import { Organization, User } from '../types';
+import { authService } from '../services/AuthService';
 
 interface LoginViewProps {
   onLogin: (user: User) => void;
@@ -12,8 +13,8 @@ interface LoginViewProps {
 
 const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organizations, users }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('team011515@gmail.com');
+  const [password, setPassword] = useState('admin');
   const [orgId, setOrgId] = useState(organizations.find(o => o.id === 'org-3')?.id || organizations[0]?.id || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,26 +25,33 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
   const [regPassword, setRegPassword] = useState('');
   const [regCurrency, setRegCurrency] = useState('PHP');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const trimmedEmail = email.trim().toLowerCase();
-      const user = users.find(u => 
-        u.email.toLowerCase() === trimmedEmail && 
-        u.orgId === orgId && 
-        u.password === password
-      );
+    try {
+      // Authenticate with Supabase Auth
+      const result = await authService.login(email, password);
       
-      if (user) {
-        onLogin(user);
+      if (result) {
+        const user = result.user;
+        // Verify user belongs to selected org
+        if (user.orgId === orgId) {
+          onLogin(user);
+        } else {
+          setError('User does not belong to the selected organization.');
+          setLoading(false);
+        }
       } else {
-        setError('Authentication failed. Ensure the correct Organization is selected for this user.');
+        setError('Invalid credentials. Please try again.');
         setLoading(false);
       }
-    }, 800);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An error occurred during login. Please try again.');
+      setLoading(false);
+    }
   };
 
   const handleQuickLogin = (roleEmail: string, roleOrgId: string, rolePass: string = 'password') => {
