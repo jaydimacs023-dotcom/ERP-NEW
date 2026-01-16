@@ -1,21 +1,22 @@
 
 import { IDataService, InitialData } from './IDataService';
-import { config } from '../config/app';
+import { MockDataService } from './MockDataService';
 
+/**
+ * SupabaseDataService
+ * 
+ * Future implementation for Cloud synchronization.
+ * Currently serves as a graceful proxy to MockDataService to prevent app crashes
+ * when Cloud mode is toggled without a live backend.
+ */
 export class SupabaseDataService implements IDataService {
-  constructor() {
-    if (!config.supabase.url || !config.supabase.anonKey) {
-      console.error("[Supabase] Missing credentials. Ensure .env is configured.");
-    }
-  }
+  private mockFallback = new MockDataService();
 
   async getInitialData(): Promise<InitialData> {
-    console.warn("[Supabase] Fetching real data from cloud...");
+    console.warn("[Supabase] ☁️ Cloud Data Service initialized in 'Simulated' mode.");
+    console.info("[Supabase] Connect your real Supabase instance in 'services/SupabaseDataService.ts' to enable live persistence.");
     
-    // In a real implementation, you would use createClient from @supabase/supabase-js
-    // and perform a series of fetches or a custom RPC call to get the workspace state.
-    
-    // For now, we return an empty structure or throw an error if unconfigured
-    throw new Error("Supabase implementation pending database schema migration.");
+    // Return mock data for now so the app initialization (useEffect) succeeds
+    return this.mockFallback.getInitialData();
   }
 }
