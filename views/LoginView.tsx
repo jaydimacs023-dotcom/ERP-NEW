@@ -378,7 +378,7 @@ const DemoItem: React.FC<{ role: string, email: string, pass?: string, icon: Rea
     </div>
     <div className="flex-1 overflow-hidden">
        <div className="flex items-center gap-2">
-          <p className="text-xs font-black text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">{role}</p>
+          <p className="text-xs text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">{role}</p>
           <div className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black text-slate-500 uppercase">{pass}</div>
        </div>
        <p className="text-[9px] font-mono text-slate-500 uppercase tracking-tighter truncate opacity-70">{email}</p>

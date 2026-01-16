@@ -248,21 +248,21 @@ export default function App() {
            {/* Navigation Items (unchanged logic) */}
            {currentUser.role === 'STUDENT' && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
                <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {currentUser.role === 'TRAINER' && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
                <NavItem icon={<LayoutDashboard size={20}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {isFinance && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Financial Core</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Financial Core</p>}
                <NavItem icon={<LayoutDashboard size={20}/>} label="Executive Console" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<BookText size={20}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<PieChart size={20}/>} label="Reporting Hub" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -277,7 +277,7 @@ export default function App() {
 
            {isRegistrar && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
                <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -288,7 +288,7 @@ export default function App() {
 
            {isFinance && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
                <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -298,7 +298,7 @@ export default function App() {
 
            {isAdmin && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
                <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -310,7 +310,7 @@ export default function App() {
 
            {isSysAdmin && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Platform Host</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Platform Host</p>}
                <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
@@ -323,8 +323,8 @@ export default function App() {
              <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
                 {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
                 <div className="min-w-0">
-                   <p className="text-[8px] font-black uppercase tracking-widest leading-none mb-1">Engine Active</p>
-                   <p className="text-[10px] font-black uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
+                   <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
+                   <p className="text-[10px] uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
                 </div>
              </div>
           </div>
@@ -469,7 +469,7 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
       style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
     >
       <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</div>
-      {!compact && <span className="text-[11px] font-black uppercase tracking-widest truncate">{label}</span>}
+      {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
     </button>
   );
 }

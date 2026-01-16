@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Override font-black to be regular weight for content areas */
+.font-black {
+  font-weight: 400 !important; /* Regular weight instead of 900 */
+}
+
 /* Hide scrollbar while maintaining scroll functionality */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
