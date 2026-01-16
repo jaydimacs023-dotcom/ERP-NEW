@@ -6,7 +6,7 @@ import {
   ShieldCheck, Calculator, Workflow, Download,
   X, UserCog, Building2, MapPin, Landmark,
   Award, Handshake, Truck, Box, CalendarClock,
-  Fingerprint, Clock, Tag, History
+  Fingerprint, Clock, Tag, History, Info
 } from 'lucide-react';
 
 interface SchemaField {
@@ -191,8 +191,26 @@ const SchemaManualView: React.FC = () => {
       ]
     },
     {
+      id: 'catalog',
+      title: 'VI. Service & Item Catalog (Non-Stock)',
+      icon: <Tag size={24} className="text-teal-600" />,
+      colorClass: 'teal',
+      entities: [
+        {
+          title: "Catalog Items (Non-Valuated)",
+          desc: "Services, fees, and materials for direct recognition.",
+          logic: "Zero-Inventory Rule: System explicitly bypasses inventory assets. Procurement debits the mapped Expense/Asset immediately. Sales credit the mapped Revenue immediately. COGS calculation is NOT supported.",
+          rows: [
+            { field: 'code', type: 'String', constraint: 'Unique', desc: 'Internal identifier for the institutional service.' },
+            { field: 'defaultAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Target G/L account for immediate recognition.' },
+            { field: 'type', type: 'Enum', constraint: 'Non-Valuated', desc: 'FEE, SERVICE, MATERIAL, OTHER.' },
+          ]
+        }
+      ]
+    },
+    {
       id: 'capital',
-      title: 'VI. Capital & Procurement',
+      title: 'VII. Capital & Procurement',
       icon: <ShoppingCart size={24} className="text-purple-600" />,
       colorClass: 'purple',
       entities: [
@@ -213,24 +231,6 @@ const SchemaManualView: React.FC = () => {
             { field: 'purchaseCost', type: 'Decimal', constraint: 'Historical', desc: 'Acquisition value at the date of purchase.' },
             { field: 'usefulLifeMonths', type: 'Integer', constraint: 'Min: 1', desc: 'Estimated period of economic utility.' },
             { field: 'depreciationAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Asset account link for Accumulated Depreciation.' },
-          ]
-        }
-      ]
-    },
-    {
-      id: 'catalog',
-      title: 'VII. Service & Item Catalog',
-      icon: <Tag size={24} className="text-teal-600" />,
-      colorClass: 'teal',
-      entities: [
-        {
-          title: "Catalog Items (Non-Stock)",
-          desc: "Defined services, fees, and material items.",
-          logic: "Tax Propagation: The taxCategory and whtRate define automated calculations in the AR (Invoice) and AP (Bill) modules.",
-          rows: [
-            { field: 'code', type: 'String', constraint: 'Unique', desc: 'Internal SKU or identifier (e.g. TUIT-NCII).' },
-            { field: 'defaultAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Target G/L account for revenue or expense recognition.' },
-            { field: 'taxCategory', type: 'Enum', constraint: 'VAT/EXEMPT', desc: 'Standard tax classification for the item.' },
           ]
         }
       ]
@@ -308,16 +308,29 @@ const SchemaManualView: React.FC = () => {
         </button>
       </header>
 
-      <div className="p-8 bg-amber-50 rounded-[2.5rem] border-2 border-amber-100 flex gap-6 items-start shadow-sm">
-        <div className="p-3 bg-white rounded-2xl shadow-sm text-amber-600 border border-amber-100 shrink-0">
-          <ShieldCheck size={32} />
-        </div>
-        <div>
-          <h4 className="text-lg font-black text-amber-900 uppercase tracking-tight mb-1">Architectural Integrity Statement</h4>
-          <p className="text-sm text-amber-800 leading-relaxed font-medium">
-            This manual details the entire data model of the AccounTech system. All entities are architected for <strong>multi-tenant isolation</strong> via the mandatory <code className="bg-amber-200/50 px-1.5 py-0.5 rounded font-mono text-xs">orgId</code> key. Financial calculations adhere to GAAP double-entry standards, while operational modules follow TESDA MIS 03-02 registry protocols.
-          </p>
-        </div>
+      {/* Explicit Inventory Policy Declaration */}
+      <div className="p-10 bg-indigo-900 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-10">
+         <div className="relative z-10 flex-1 space-y-4">
+            <div className="flex items-center gap-4">
+               <div className="p-3 bg-white/10 rounded-2xl border border-white/10">
+                  <ShieldCheck size={32} className="text-brand" />
+               </div>
+               <h4 className="text-2xl font-black tracking-tight uppercase">Architectural Boundary: No Valuated Inventory</h4>
+            </div>
+            <p className="text-sm text-indigo-200 leading-relaxed font-medium">
+                AccounTech is architected strictly as a <strong>Service-Ledger ERP</strong>. It does not contain an Inventory Sub-Ledger. 
+               Materials are recognized as expenses at the point of procurement (Periodic Method). Cost of Goods Sold (COGS) tracking is omitted 
+               to maintain lean GAAP compliance for institutional service providers.
+            </p>
+         </div>
+         <div className="shrink-0 relative z-10">
+            <div className="px-6 py-3 bg-white text-indigo-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+               <Info size={16} /> Technical Decision v4.0
+            </div>
+         </div>
+         <div className="absolute top-0 right-0 p-12 opacity-10">
+            <Layers size={180} />
+         </div>
       </div>
 
       <div className="space-y-16">

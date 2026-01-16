@@ -225,7 +225,7 @@ export default function App() {
                {sidebarOpen && <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
                <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Tag size={20}/>} label="Item Catalog" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
