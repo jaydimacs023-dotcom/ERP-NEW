@@ -4,106 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AccounTech - ERP Accounting</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
     <style>
-        /* Global Font Override for Century Gothic */
-        @font-face {
-            font-family: 'Century Gothic';
-            src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic');
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        html, body, #root, * {
-            font-family: 'Century Gothic', CenturyGothic, AppleGothic, Futura, 'URW Gothic L', sans-serif !important;
+        html, body, #root {
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
         }
 
-        /* Minor adjustments for Century Gothic's geometry */
-        input, select, textarea, button {
-            letter-spacing: -0.01em;
-        }
-        
-        .font-mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
         }
 
-        /* Print Optimization */
+        #root {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
         @media print {
-            /* Hide all UI chrome */
-            aside, header, .no-print, button, input[type="date"], select, .toast-portal, .no-print * {
-                display: none !important;
+            .no-print {
+                display: none;
             }
-            
-            /* Reset Layout for Print Engine */
-            /* We must unlock all height-restricted containers */
-            html, body, #root, #root > div, main, main > div {
-                background: white !important;
-                color: black !important;
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            html, body, #root, #root > div {
                 height: auto !important;
-                min-height: 0 !important;
                 overflow: visible !important;
-                display: block !important;
-                position: static !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-            }
-
-            /* Ensure the inner scrollable div expands */
-            .overflow-y-auto {
-                overflow: visible !important;
-                height: auto !important;
-            }
-
-            /* Aesthetics for Paper */
-            .bg-slate-50, .bg-slate-100, .bg-indigo-50, .bg-slate-900, .bg-brand, .bg-slate-50\/50, .bg-slate-50\/20 {
-                background-color: transparent !important;
-                color: black !important;
-            }
-            
-            .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
-                box-shadow: none !important;
-            }
-            
-            .border, .border-slate-200, .border-slate-100, .border-slate-800 {
-                border: 1px solid #e2e8f0 !important;
-            }
-
-            .rounded-[2rem], .rounded-[2.5rem], .rounded-3xl, .rounded-[3rem] {
-                border-radius: 0 !important; 
-            }
-
-            .p-8, .p-10, .p-16 {
-                padding: 1rem !important;
-            }
-
-            /* Force black text for readability */
-            .text-slate-400, .text-slate-500, .text-slate-600 {
-                color: #334155 !important;
-            }
-
-            .text-indigo-600, .text-brand {
-                color: #4f46e5 !important;
-            }
-
-            .max-w-5xl, .max-w-6xl {
-                max-width: 100% !important;
-            }
-
-            /* Ensure charts scale if present */
-            .recharts-responsive-container {
-                width: 100% !important;
-                height: 400px !important;
-            }
-            
-            /* Page break rules */
-            h1, h2, h3, h4 {
-                page-break-after: avoid;
-            }
-            table {
-                page-break-inside: auto;
-            }
-            tr {
-                page-break-inside: avoid;
-                page-break-after: auto;
             }
         }
     </style>
