@@ -2,12 +2,17 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "./**/*.{js,ts,jsx,tsx}",
-    "./views/**/*.{js,ts,jsx,tsx}",
+    "./App.tsx",
     "./components/**/*.{js,ts,jsx,tsx}",
+    "./views/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Century Gothic', 'CenturyGothic', 'AppleGothic', 'Futura', 'sans-serif'],
+      },
+    },
   },
+  plugins: [],
 }

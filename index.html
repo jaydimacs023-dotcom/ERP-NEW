@@ -6,6 +6,11 @@
     <title>AccounTech - ERP Accounting</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
     <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -60,5 +65,15 @@
 </head>
 <body class="bg-slate-50 text-slate-900 h-full">
     <div id="root"></div>
+    
+    <!-- Test script to verify JavaScript is running -->
+    <script>
+        console.log("✅ Inline script executed - JavaScript is working");
+        console.log("📄 Document ready state:", document.readyState);
+        console.log("🌐 Root element found:", !!document.getElementById('root'));
+    </script>
+    
+    <!-- Main React app -->
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

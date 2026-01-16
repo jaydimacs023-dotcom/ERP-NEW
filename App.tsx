@@ -91,8 +91,19 @@ export default function App() {
   useEffect(() => {
     async function loadData() {
       try {
+        console.log("📊 App: Starting data load...");
+        console.log("🔧 Config:", { useMockData: config.useMockData, supabaseConfigured: !!(config.supabase?.url && config.supabase?.anonKey) });
+        
         const service = DataServiceFactory.getService();
+        console.log(`📦 Using service: ${config.useMockData ? 'MOCK' : 'SUPABASE'}`);
+        
         const data = await service.getInitialData();
+        console.log("✅ Data loaded:", { 
+          organizations: data.organizations.length,
+          users: data.users.length,
+          students: data.students.length,
+          accounts: data.accounts.length
+        });
         
         setOrganizations(data.organizations);
         setUsers(data.users);
@@ -118,9 +129,11 @@ export default function App() {
         if (data.organizations.length > 0) {
           setCurrentOrgId('org-3');
         }
+        console.log("✅ State updated, data load complete");
       } catch (error) {
-        console.error("Critical Data Load Error:", error);
+        console.error("❌ Critical Data Load Error:", error);
       } finally {
+        console.log("🏁 Setting isLoading to false");
         setIsLoading(false);
       }
     }
