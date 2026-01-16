@@ -14,13 +14,14 @@ interface TrainerPortalViewProps {
   qualifications: Qualification[];
   locations: Location[];
   schedules: TrainerSchedule[];
+  brandColor: string;
   onUpdateTrainer: (trainer: Trainer) => void;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({ 
-  trainer, batches, qualifications, locations, schedules, onUpdateTrainer 
+  trainer, batches, qualifications, locations, schedules, brandColor, onUpdateTrainer 
 }) => {
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'QUALIFICATIONS' | 'SCHEDULE' | 'PROFILE'>('OVERVIEW');
 
@@ -56,7 +57,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
             <GraduationCap size={200} />
          </div>
          <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-            <div className="w-28 h-28 rounded-[2rem] bg-brand border-4 border-white/10 flex items-center justify-center shadow-2xl shrink-0">
+            <div className="w-28 h-28 rounded-[2rem] border-4 border-white/10 flex items-center justify-center shadow-2xl shrink-0" style={{ backgroundColor: brandColor }}>
                <UserCircle size={60} />
             </div>
             <div className="text-center md:text-left flex-1">
@@ -65,7 +66,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                   <span className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/5">NTTC Certified</span>
                </div>
                <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
-                  <span className="text-xs font-black text-indigo-400 bg-white/5 px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-2">
+                  <span className="text-xs font-black bg-white/5 px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-2" style={{ color: brandColor }}>
                      <Briefcase size={14} /> {trainer.specialization}
                   </span>
                   <span className="text-xs font-black text-slate-400 bg-white/5 px-3 py-1.5 rounded-full uppercase tracking-widest flex items-center gap-2">
@@ -83,10 +84,10 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
 
       {/* Navigation */}
       <div className="flex bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm max-w-lg mx-auto md:mx-0 overflow-x-auto">
-         <TabButton active={activeTab === 'OVERVIEW'} onClick={() => setActiveTab('OVERVIEW')} label="My Work" icon={<LayoutDashboard size={14}/>} />
-         <TabButton active={activeTab === 'QUALIFICATIONS'} onClick={() => setActiveTab('QUALIFICATIONS')} label="Programs" icon={<Award size={14}/>} />
-         <TabButton active={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} label="My Shifts" icon={<CalendarDays size={14}/>} />
-         <TabButton active={activeTab === 'PROFILE'} onClick={() => setActiveTab('PROFILE')} label="Profile" icon={<Settings size={14}/>} />
+         <TabButton active={activeTab === 'OVERVIEW'} onClick={() => setActiveTab('OVERVIEW')} label="My Work" icon={<LayoutDashboard size={14}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'QUALIFICATIONS'} onClick={() => setActiveTab('QUALIFICATIONS')} label="Programs" icon={<Award size={14}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} label="My Shifts" icon={<CalendarDays size={14}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'PROFILE'} onClick={() => setActiveTab('PROFILE')} label="Profile" icon={<Settings size={14}/>} brandColor={brandColor} />
       </div>
 
       {activeTab === 'OVERVIEW' && (
@@ -95,7 +96,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
               {/* Active Batches Section */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3 px-2">
-                   <div className="p-2 bg-brand text-white rounded-lg shadow-lg">
+                   <div className="p-2 text-white rounded-lg shadow-lg" style={{ backgroundColor: brandColor }}>
                       <Layers size={18} />
                    </div>
                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Active Training Commitments</h3>
@@ -119,10 +120,10 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                               <h4 className="text-2xl font-black text-slate-800 leading-tight tracking-tight">{qual?.name}</h4>
                               <div className="flex items-center gap-4 mt-4">
                                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                    <MapPin size={14} className="text-indigo-600" /> {location?.name || 'Main Hub'}
+                                    <MapPin size={14} style={{ color: brandColor }} /> {location?.name || 'Main Hub'}
                                  </div>
                                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                    <Users size={14} className="text-indigo-600" /> {batch.studentIds.length} Learners
+                                    <Users size={14} style={{ color: brandColor }} /> {batch.studentIds.length} Learners
                                  </div>
                               </div>
                            </div>
@@ -133,7 +134,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                               </div>
                               <div className="text-right">
                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Cycle End</p>
-                                 <p className="text-sm font-black text-brand">{batch.endDate}</p>
+                                 <p className="text-sm font-black" style={{ color: brandColor }}>{batch.endDate}</p>
                               </div>
                            </div>
                         </div>
@@ -151,17 +152,17 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
 
            <div className="space-y-6">
               <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
-                 <h4 className="text-[10px] font-black text-brand uppercase tracking-[0.3em] mb-6">Instructor Snapshot</h4>
+                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6" style={{ color: brandColor }}>Instructor Snapshot</h4>
                  <div className="space-y-4">
-                    <StatusItemPortal label="Accreditations" value={accreditedQuals.length.toString()} icon={<Award size={14}/>} />
-                    <StatusItemPortal label="Total Batches" value={batches.length.toString()} icon={<Layers size={14}/>} />
-                    <StatusItemPortal label="Weekly Hours" value={trainerSchedule?.slots.length ? "Defined" : "Pending"} icon={<Clock size={14}/>} />
+                    <StatusItemPortal label="Accreditations" value={accreditedQuals.length.toString()} icon={<Award size={14}/>} brandColor={brandColor} />
+                    <StatusItemPortal label="Total Batches" value={batches.length.toString()} icon={<Layers size={14}/>} brandColor={brandColor} />
+                    <StatusItemPortal label="Weekly Hours" value={trainerSchedule?.slots.length ? "Defined" : "Pending"} icon={<Clock size={14}/>} brandColor={brandColor} />
                  </div>
               </div>
 
               <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
                  <div className="flex gap-4">
-                    <Info size={24} className="text-indigo-600 shrink-0" />
+                    <Info size={24} className="shrink-0" style={{ color: brandColor }} />
                     <div>
                        <h4 className="text-xs font-black text-slate-800 uppercase">MIS Compliance</h4>
                        <p className="text-[10px] text-slate-500 leading-relaxed font-bold mt-2">
@@ -177,18 +178,20 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
       {activeTab === 'QUALIFICATIONS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
            {accreditedQuals.length > 0 ? accreditedQuals.map(qual => (
-             <div key={qual.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 space-y-6 group hover:shadow-2xl hover:border-brand transition-all">
+             <div key={qual.id} className="bg-white rounded-[2.5rem] border border-slate-200 p-8 space-y-6 group hover:shadow-2xl transition-all" style={{ '--hover-border': brandColor } as any}>
                 <div className="flex justify-between items-start">
-                   <div className="p-4 bg-brand-light text-brand rounded-2xl shadow-sm group-hover:bg-brand group-hover:text-white transition-all"><Award size={28}/></div>
+                   <div className="p-4 rounded-2xl shadow-sm group-hover:text-white transition-all" style={{ backgroundColor: `${brandColor}11`, color: brandColor }}>
+                      <Award size={28}/>
+                   </div>
                    <Star size={18} className="text-amber-400 fill-amber-400" />
                 </div>
                 <div>
                    <h3 className="text-lg font-black text-slate-800 leading-tight tracking-tight">{qual.name}</h3>
-                   <p className="text-[10px] font-mono font-black text-indigo-600 uppercase tracking-widest mt-2">{qual.code}</p>
+                   <p className="text-[10px] font-mono font-black uppercase tracking-widest mt-2" style={{ color: brandColor }}>{qual.code}</p>
                 </div>
                 <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Duration: {qual.durationDays} Days</div>
-                   <div className="text-indigo-600"><ChevronRight size={16} strokeWidth={3} /></div>
+                   <div style={{ color: brandColor }}><ChevronRight size={16} strokeWidth={3} /></div>
                 </div>
              </div>
            )) : (
@@ -207,16 +210,16 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                   <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
                      <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                           <div className="p-2 bg-indigo-600 text-white rounded-lg"><Calendar size={18} /></div>
+                           <div className="p-2 text-white rounded-lg" style={{ backgroundColor: brandColor }}><Calendar size={18} /></div>
                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Weekly Work Shifts</h3>
                         </div>
                      </div>
                      <div className="p-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            {trainerSchedule.slots.map(slot => (
-                              <div key={slot.dayIndex} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between group hover:bg-white hover:border-brand transition-all">
+                              <div key={slot.dayIndex} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between group hover:bg-white transition-all">
                                  <div>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">{DAYS[slot.dayIndex]}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: brandColor }}>{DAYS[slot.dayIndex]}</p>
                                     <p className="text-lg font-black text-slate-800 font-mono tracking-tighter">{slot.startTime} - {slot.endTime}</p>
                                  </div>
                                  <div className="p-3 bg-white rounded-2xl text-slate-300 group-hover:text-brand transition-all"><Clock size={20} /></div>
@@ -227,7 +230,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                   </div>
                   <div className="space-y-8">
                      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
-                        <h4 className="text-[10px] font-black text-brand uppercase tracking-[0.3em] mb-4">Institutional Note</h4>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-4" style={{ color: brandColor }}>Institutional Note</h4>
                         <p className="text-xs text-slate-400 font-medium leading-relaxed italic">
                            "Shifts are optimized based on institutional capacity. If you need to request a schedule adjustment, please contact the Registrar's Office directly."
                         </p>
@@ -254,17 +257,17 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Institutional Email</label>
-                    <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand transition-all" value={editProfile.email} onChange={e => setEditProfile({...editProfile, email: e.target.value})} />
+                    <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 transition-all" style={{ '--tw-ring-color': brandColor } as any} value={editProfile.email} onChange={e => setEditProfile({...editProfile, email: e.target.value})} />
                  </div>
                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Mobile Contact</label>
-                    <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand transition-all" value={editProfile.contactNumber} onChange={e => setEditProfile({...editProfile, contactNumber: e.target.value})} />
+                    <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 transition-all" style={{ '--tw-ring-color': brandColor } as any} value={editProfile.contactNumber} onChange={e => setEditProfile({...editProfile, contactNumber: e.target.value})} />
                  </div>
               </div>
 
               <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Core Specialization</label>
-                 <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand transition-all" value={editProfile.specialization} onChange={e => setEditProfile({...editProfile, specialization: e.target.value})} />
+                 <input className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 transition-all" style={{ '--tw-ring-color': brandColor } as any} value={editProfile.specialization} onChange={e => setEditProfile({...editProfile, specialization: e.target.value})} />
               </div>
 
               <div className="pt-8 border-t border-slate-100 flex gap-4">
@@ -278,14 +281,20 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
   );
 };
 
-const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void, icon: React.ReactNode }> = ({ active, label, onClick, icon }) => (
-  <button onClick={onClick} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-slate-400 hover:text-slate-600'}`}>{icon} {label}</button>
+const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void, icon: React.ReactNode, brandColor: string }> = ({ active, label, onClick, icon, brandColor }) => (
+  <button 
+    onClick={onClick} 
+    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+    style={active ? { backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}44` } : {}}
+  >
+    {icon} {label}
+  </button>
 );
 
-const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.ReactNode }> = ({ label, value, icon }) => (
+const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.ReactNode, brandColor: string }> = ({ label, value, icon, brandColor }) => (
   <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
      <div className="flex items-center gap-3">
-        <div className="p-2 bg-brand-light rounded-lg text-brand">{icon}</div>
+        <div className="p-2 rounded-lg" style={{ backgroundColor: `${brandColor}22`, color: brandColor }}>{icon}</div>
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
      </div>
      <span className="text-xs font-black text-white">{value}</span>

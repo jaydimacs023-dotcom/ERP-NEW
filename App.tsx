@@ -318,6 +318,7 @@ export default function App() {
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
               locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)}
               schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              brandColor={brandColor}
               onUpdateTrainer={t => setTrainers(prev => prev.map(x => x.id === t.id ? t : x))}
             />
           )}
