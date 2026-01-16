@@ -25,6 +25,10 @@ const getRuntimeOverride = () => {
 const runtimeOverride = getRuntimeOverride();
 const isProduction = (env.MODE || env.NODE_ENV) === 'production';
 
+const supabaseUrl = env.VITE_SUPABASE_URL || '';
+const supabaseKey = env.VITE_SUPABASE_ANON_KEY || '';
+const hasSupabaseCreds = supabaseUrl.length > 0 && supabaseKey.length > 0;
+
 export const config = {
   mode: env.MODE || env.NODE_ENV || 'development',
   isDev: (env.MODE || env.NODE_ENV || 'development') === 'development',
@@ -32,19 +36,22 @@ export const config = {
   
   /**
    * Logic for Data Source Selection:
-   * 1. Check Runtime Override (localStorage)
-   * 2. Check Force Flag (env variable)
-   * 3. Default to Mock in Dev, Cloud in Prod
+   * 1. FORCE Mock if credentials are missing (Safety Fallback)
+   * 2. Check Runtime Override (localStorage)
+   * 3. Check Force Flag (env variable)
+   * 4. Default to Mock in Dev, Cloud in Prod
    */
-  useMockData: runtimeOverride 
-    ? runtimeOverride === 'MOCK' 
-    : isProduction 
-      ? false 
-      : env.VITE_FORCE_SUPABASE !== 'true',
+  useMockData: !hasSupabaseCreds 
+    ? true 
+    : (runtimeOverride 
+        ? runtimeOverride === 'MOCK' 
+        : isProduction 
+          ? false 
+          : env.VITE_FORCE_SUPABASE !== 'true'),
     
   supabase: {
-    url: env.VITE_SUPABASE_URL || '',
-    anonKey: env.VITE_SUPABASE_ANON_KEY || '',
+    url: supabaseUrl,
+    anonKey: supabaseKey,
   },
 
   // Helper to trigger a switch
@@ -58,6 +65,10 @@ export const config = {
     window.location.reload();
   }
 };
+
+if (!hasSupabaseCreds && runtimeOverride === 'CLOUD') {
+  console.warn("[ERP System] Cloud Mode was requested but credentials are missing. Falling back to MOCK_LOCAL.");
+}
 
 console.log(`%c[ERP System] Data Strategy: ${config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}`, 
   `color: white; background: ${config.useMockData ? '#4f46e5' : '#059669'}; padding: 2px 8px; border-radius: 4px; font-weight: bold;`);
