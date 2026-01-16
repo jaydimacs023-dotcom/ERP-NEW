@@ -8,7 +8,8 @@ import {
   CheckCircle2, AlertTriangle, ArrowRight, MapPin, Fingerprint,
   GraduationCap, Globe, Building2, Baby, Eye, ShieldAlert,
   ThumbsUp, ThumbsDown, Check, BookOpen, Briefcase, Heart,
-  Printer, MoreVertical, ExternalLink, Shield
+  Printer, MoreVertical, ExternalLink, Shield, Download,
+  CheckSquare
 } from 'lucide-react';
 
 interface StudentsViewProps {
@@ -26,6 +27,13 @@ const MANDATORY_DOCS = [
   'Passport Size Photo'
 ];
 
+const CSV_HEADERS = [
+  'ULI', 'LastName', 'FirstName', 'MiddleName', 'Extension', 'Sex', 'DateOfBirth',
+  'BirthRegion', 'BirthProvince', 'BirthCity', 'CivilStatus', 'EducationalAttainment',
+  'Nationality', 'Email', 'ContactNumber', 'Street', 'Barangay', 'City', 'District',
+  'Province', 'Guardian'
+];
+
 const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -33,7 +41,6 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   const [importPreview, setImportPreview] = useState<Student[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
 
@@ -52,34 +59,99 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Student>>({
-    uli: '',
-    lastName: '',
-    firstName: '',
-    middleName: '',
-    extension: '',
-    sex: 'Male',
-    dateOfBirth: '',
-    age: 0,
-    birthRegion: '',
-    birthProvince: '',
-    birthCity: '',
-    civilStatus: 'Single',
-    educationalAttainment: 'College Graduate',
-    nationality: 'Filipino',
-    email: '',
-    contactNumber: '',
-    street: '',
-    barangay: '',
-    city: '',
-    district: '',
-    province: '',
-    guardian: '',
+    uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
+    dateOfBirth: '', age: 0, birthRegion: '', birthProvince: '', birthCity: '',
+    civilStatus: 'Single', educationalAttainment: 'College Graduate', nationality: 'Filipino',
+    email: '', contactNumber: '', street: '', barangay: '', city: '', district: '',
+    province: '', guardian: '',
   });
 
   const filteredStudents = students.filter(s => 
     `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.uli.includes(searchTerm)
   );
+
+  const downloadTemplate = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",") + "\n" + 
+      "24-701-01-0001,Dela Cruz,Juan,Protacio,,Male,1995-05-15,NCR,Metro Manila,Manila,Single,College Graduate,Filipino,juan@email.com,09171234567,123 Rizal St,Brgy 1,Manila,1st District,Metro Manila,Maria Dela Cruz";
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Learner_Batch_Template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split(/\r?\n/);
+      if (lines.length < 2) return;
+
+      const studentData: Student[] = [];
+      const headers = lines[0].split(',').map(h => h.trim());
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        
+        // Simple mapping based on expected header order or indices
+        const getVal = (idx: number) => cols[idx] || '';
+
+        const dob = getVal(6);
+        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 0;
+
+        studentData.push({
+          id: `batch-${Date.now()}-${i}`,
+          orgId: 'temp',
+          uli: getVal(0),
+          lastName: getVal(1),
+          firstName: getVal(2),
+          middleName: getVal(3),
+          extension: getVal(4),
+          sex: (getVal(5) as any) || 'Male',
+          dateOfBirth: dob,
+          age: Math.max(0, age),
+          birthRegion: getVal(7),
+          birthProvince: getVal(8),
+          birthCity: getVal(9),
+          civilStatus: getVal(10) || 'Single',
+          educationalAttainment: getVal(11),
+          nationality: getVal(12) || 'Filipino',
+          email: getVal(13),
+          contactNumber: getVal(14),
+          street: getVal(15),
+          barangay: getVal(16),
+          city: getVal(17),
+          district: getVal(18),
+          province: getVal(19),
+          guardian: getVal(20),
+          documents: MANDATORY_DOCS.map((doc, dIdx) => ({
+            id: `doc-${dIdx}-${Date.now()}-${i}`,
+            name: doc,
+            status: 'PENDING'
+          })),
+          createdAt: new Date().toISOString()
+        });
+      }
+      setImportPreview(studentData);
+      setShowImportModal(true);
+      if (csvInputRef.current) csvInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  const commitBatch = () => {
+    onBatchAddStudents(importPreview);
+    setImportPreview([]);
+    setShowImportModal(false);
+  };
 
   const handleDocumentAudit = (docId: string, action: 'VERIFY' | 'REJECT') => {
     if (!auditStudent) return;
@@ -96,67 +168,6 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
     const updated = { ...auditStudent, isEnrollmentOverridden: !auditStudent.isEnrollmentOverridden };
     onUpdateStudent(updated);
     setAuditStudent(updated);
-  };
-
-  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split(/\r?\n/);
-      const studentData: Student[] = [];
-      
-      for (let i = 8; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-        if (cols.length < 40) continue; 
-        const lastName = cols[15]?.replace(/"/g, '').trim();
-        const firstName = cols[16]?.replace(/"/g, '').trim();
-        const uli = cols[46]?.replace(/"/g, '').trim();
-
-        if (lastName && firstName && uli) {
-          studentData.push({
-            id: `imported-${uli}-${Date.now()}-${i}`,
-            orgId: 'temp',
-            uli,
-            lastName,
-            firstName,
-            middleName: cols[17]?.replace(/"/g, '').trim() || '',
-            extension: cols[18]?.replace(/"/g, '').trim() || '',
-            sex: cols[26]?.toLowerCase().startsWith('f') ? 'Female' : 'Male',
-            dateOfBirth: cols[27]?.replace(/"/g, '').trim(),
-            age: parseInt(cols[28]) || 0,
-            birthRegion: cols[32]?.replace(/"/g, '').trim(),
-            birthProvince: cols[33]?.replace(/"/g, '').trim(),
-            birthCity: cols[34]?.replace(/"/g, '').trim(),
-            civilStatus: cols[29]?.replace(/"/g, '').trim() || 'Single',
-            educationalAttainment: cols[30]?.replace(/"/g, '').trim() || '',
-            nationality: cols[31]?.replace(/"/g, '').trim() || 'Filipino',
-            email: cols[20]?.replace(/"/g, '').trim(),
-            contactNumber: cols[19]?.replace(/"/g, '').trim(),
-            street: cols[21]?.replace(/"/g, '').trim() || '',
-            barangay: cols[22]?.replace(/"/g, '').trim() || '',
-            city: cols[23]?.replace(/"/g, '').trim() || '',
-            district: cols[24]?.replace(/"/g, '').trim() || '',
-            province: cols[25]?.replace(/"/g, '').trim() || '',
-            guardian: '',
-            documents: MANDATORY_DOCS.map((doc, dIdx) => ({
-              id: `doc-${dIdx}-${Date.now()}-${i}`,
-              name: doc,
-              status: 'PENDING'
-            })),
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
-      if (studentData.length > 0) {
-        setImportPreview(studentData);
-        setShowImportModal(true);
-      }
-    };
-    reader.readAsText(file);
   };
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,9 +244,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Learner Ledger</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.0)</p>
+          <p className="text-sm text-slate-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.1)</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
+            <Download size={16} /> Template
+          </button>
           <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
           <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm">
             <FileSpreadsheet size={18} className="text-emerald-600" /> MIS Batch
@@ -314,7 +328,76 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         </table>
       </div>
 
-      {/* Audit Modal (View Function) */}
+      {/* Batch Import Preview Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200 my-8 flex flex-col h-full max-h-[90vh]">
+            <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center shrink-0">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-100"><FileSpreadsheet size={24} /></div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Batch Import Preview</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Found {importPreview.length} Institutional Records</p>
+                  </div>
+               </div>
+               <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={28}/></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-0 scrollbar-hide">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50 sticky top-0 z-10">
+                   <tr>
+                     <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Identities</th>
+                     <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Personal Info</th>
+                     <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact & Residence</th>
+                     <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Registry Data</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                   {importPreview.map((p, idx) => (
+                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                       <td className="px-8 py-5">
+                          <p className="text-sm font-black text-slate-800 uppercase">{p.lastName}, {p.firstName}</p>
+                          <p className="text-[10px] font-mono font-bold text-indigo-600 uppercase mt-0.5">{p.uli}</p>
+                       </td>
+                       <td className="px-8 py-5">
+                          <p className="text-xs font-bold text-slate-600">{p.dateOfBirth} ({p.age}y)</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-black">{p.sex} • {p.civilStatus}</p>
+                       </td>
+                       <td className="px-8 py-5">
+                          <p className="text-xs font-bold text-slate-600 truncate max-w-[200px]">{p.email}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-black">{p.city}, {p.province}</p>
+                       </td>
+                       <td className="px-8 py-5">
+                          <p className="text-xs font-bold text-slate-600">{p.educationalAttainment}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-black">Guardian: {p.guardian || 'N/A'}</p>
+                       </td>
+                     </tr>
+                   ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-8 bg-slate-900 flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/5">
+               <div className="flex items-center gap-4 text-white">
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10">
+                     <ShieldCheck size={24} className="text-brand" />
+                  </div>
+                  <div>
+                     <p className="text-sm font-black uppercase tracking-tight">Integrity Verification</p>
+                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Full registry alignment checked against institutional schema.</p>
+                  </div>
+               </div>
+               <div className="flex gap-4 w-full md:w-auto">
+                  <button onClick={() => setShowImportModal(false)} className="flex-1 px-8 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-white transition-colors">Discard Batch</button>
+                  <button onClick={commitBatch} className="flex-1 px-12 py-4 bg-brand text-white rounded-3xl text-xs font-black uppercase tracking-widest shadow-2xl shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">Commit {importPreview.length} Records</button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Audit Modal (View Function) */}
       {auditStudent && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200 my-8 flex flex-col h-full max-h-[90vh]">
