@@ -33,22 +33,15 @@ const hasSupabaseCreds = supabaseUrl.length > 0 && supabaseKey.length > 0;
 export const config = {
   mode: env.MODE || env.NODE_ENV || 'development',
   isDev: (env.MODE || env.NODE_ENV || 'development') === 'development',
-  isProd: isProduction,
+  isProv: isProduction,
   
   /**
-   * Logic for Data Source Selection:
-   * 1. FORCE Mock if credentials are missing (Safety Fallback)
-   * 2. Check Runtime Override (localStorage)
-   * 3. Check Force Flag (env variable)
-   * 4. Default to Mock in Dev, Cloud in Prod
+   * SUPABASE-ONLY MODE
+   * All data is fetched from Supabase REST API
+   * Empty tables show "No data available" fallback
+   * No mock data fallback
    */
-  useMockData: !hasSupabaseCreds 
-    ? true 
-    : (runtimeOverride 
-        ? runtimeOverride === 'MOCK' 
-        : isProduction 
-          ? false 
-          : env.VITE_FORCE_SUPABASE !== 'true'),
+  useMockData: false,
     
   supabase: {
     url: supabaseUrl,

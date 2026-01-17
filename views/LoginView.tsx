@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Database, ShieldCheck, ArrowRight, Lock, Mail, Building2, UserCircle, Fingerprint, AlertCircle, ChevronRight, Briefcase, GraduationCap, Users, History, Terminal, Landmark, BookOpen, Key } from 'lucide-react';
+import { Database, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import { Organization, User } from '../types';
 import { authService } from '../services/AuthService';
 
@@ -13,9 +13,8 @@ interface LoginViewProps {
 
 const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organizations, users }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [email, setEmail] = useState('team011515@gmail.com');
-  const [password, setPassword] = useState('admin');
-  const [orgId, setOrgId] = useState(organizations.find(o => o.id === 'org-3')?.id || organizations[0]?.id || '');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,20 +30,15 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
     setLoading(true);
 
     try {
-      // Authenticate with Supabase Auth
+      // Authenticate with Supabase or Mock - system auto-detects org from user record
       const result = await authService.login(email, password);
       
       if (result) {
         const user = result.user;
-        // Verify user belongs to selected org
-        if (user.orgId === orgId) {
-          onLogin(user);
-        } else {
-          setError('User does not belong to the selected organization.');
-          setLoading(false);
-        }
+        // User's org is already stored in their Supabase record (org_id column)
+        onLogin(user);
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError('Invalid email or password. Please try again.');
         setLoading(false);
       }
     } catch (err) {
@@ -52,13 +46,6 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
       setError('An error occurred during login. Please try again.');
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (roleEmail: string, roleOrgId: string, rolePass: string = 'password') => {
-    setEmail(roleEmail);
-    setOrgId(roleOrgId);
-    setPassword(rolePass);
-    setError('');
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -104,117 +91,19 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
         <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-rose-600/10 rounded-full blur-[160px]"></div>
       </div>
 
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-8 items-center justify-center relative z-10 my-auto py-8">
+      <div className="w-full max-w-4xl flex flex-col lg:flex-row gap-8 items-center justify-center relative z-10 my-auto py-8">
         
-        {/* Left Column: Product Branding & Demo Directory */}
+        {/* Left Column: Product Branding Only */}
         {!isRegistering && (
-          <div className="w-full max-w-xl space-y-6 animate-in slide-in-from-left-12 duration-700 hidden lg:block">
-            <div className="text-left">
-              <div className="inline-flex items-center justify-center p-3 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-500/20 mb-4 border-2 border-white/5">
+          <div className="w-full max-w-sm space-y-6 animate-in slide-in-from-left-12 duration-700 hidden lg:block text-center lg:text-left">
+            <div>
+              <div className="inline-flex items-center justify-center p-3 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-500/20 mb-4 border-2 border-white/5 mx-auto lg:mx-0">
                 <Database className="text-white" size={28} />
               </div>
               <h1 className="text-4xl font-black text-white tracking-tighter leading-none mb-3">AccounTech<span className="text-indigo-500">.</span></h1>
-              <p className="text-sm text-slate-400 font-medium max-w-md leading-relaxed">
+              <p className="text-sm text-slate-400 font-medium leading-relaxed">
                 The world-class, multi-tenant ERP core for institutional compliance and financial oversight.
               </p>
-            </div>
-
-            <div className="bg-slate-900/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 space-y-6 shadow-2xl overflow-hidden relative group max-h-80 overflow-y-auto scrollbar-hide">
-               <div className="absolute top-0 right-0 p-8 opacity-5 -mr-8 -mt-8">
-                  <Fingerprint size={160} />
-               </div>
-               
-               <header className="flex justify-between items-center relative z-10">
-                  <div className="space-y-0.5">
-                    <h3 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em]">Developer Console</h3>
-                    <p className="text-sm font-black text-white uppercase tracking-tight">Credential Directory</p>
-                  </div>
-                  <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                     v4.1
-                  </div>
-               </header>
-
-               <div className="grid grid-cols-2 gap-2 relative z-10">
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Admin</p>
-                     <DemoItem 
-                       role="System Architect" 
-                       email="dev@accountech.io" 
-                       pass="admin"
-                       icon={<Terminal size={12}/>} 
-                       onClick={() => handleQuickLogin('dev@accountech.io', 'org-system', 'admin')}
-                       color="indigo"
-                     />
-                     <DemoItem 
-                       role="President" 
-                       email="president@manila.ph" 
-                       icon={<ShieldCheck size={12}/>} 
-                       onClick={() => handleQuickLogin('president@manila.ph', 'org-3')}
-                       color="amber"
-                     />
-                     <DemoItem 
-                       role="Admin" 
-                       email="maria@manila.ph" 
-                       icon={<Building2 size={12}/>} 
-                       onClick={() => handleQuickLogin('maria@manila.ph', 'org-3')}
-                       color="slate"
-                     />
-                  </div>
-                  
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Finance</p>
-                     <DemoItem 
-                       role="Finance Manager" 
-                       email="finance@manila.ph" 
-                       icon={<Landmark size={12}/>} 
-                       onClick={() => handleQuickLogin('finance@manila.ph', 'org-3')}
-                       color="emerald"
-                     />
-                     <DemoItem 
-                       role="Accountant" 
-                       email="alicia@manila.ph" 
-                       icon={<BookOpen size={12}/>} 
-                       onClick={() => handleQuickLogin('alicia@manila.ph', 'org-3')}
-                       color="indigo"
-                     />
-                     <DemoItem 
-                       role="AR/AP Spec" 
-                       email="ana@manila.ph" 
-                       icon={<History size={12}/>} 
-                       onClick={() => handleQuickLogin('ana@manila.ph', 'org-3')}
-                       color="blue"
-                     />
-                  </div>
-
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Ops</p>
-                     <DemoItem 
-                       role="Registrar" 
-                       email="ricardo@manila.ph" 
-                       icon={<Users size={12}/>} 
-                       onClick={() => handleQuickLogin('ricardo@manila.ph', 'org-3')}
-                       color="rose"
-                     />
-                     <DemoItem 
-                       role="Trainer" 
-                       email="juan.dc@academy.ph" 
-                       icon={<GraduationCap size={12}/>} 
-                       onClick={() => handleQuickLogin('juan.dc@academy.ph', 'org-3')}
-                       color="emerald"
-                     />
-                  </div>
-
-                  <div className="space-y-2">
-                     <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Student</p>
-                     <DemoItem 
-                       role="Learner" 
-                       email="jose@learner.ph" 
-                       icon={<UserCircle size={12}/>} 
-                       onClick={() => handleQuickLogin('jose@learner.ph', 'org-3')}
-                       color="indigo"
-                     />
-                  </div>
-               </div>
             </div>
           </div>
         )}
@@ -229,22 +118,6 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
               </header>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Institutional Tenant</label>
-                  <div className="relative group">
-                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                    <select 
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-black outline-none appearance-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
-                      value={orgId}
-                      onChange={e => setOrgId(e.target.value)}
-                    >
-                      {organizations.map(org => (
-                        <option key={org.id} value={org.id} className="bg-slate-900">{org.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Identity (Email)</label>
                   <div className="relative group">
@@ -367,34 +240,5 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
     </div>
   );
 };
-
-const DemoItem: React.FC<{ role: string, email: string, pass?: string, icon: React.ReactNode, onClick: () => void, color: string }> = ({ role, email, pass = 'password', icon, onClick, color }) => (
-  <button 
-    type="button"
-    onClick={onClick}
-    className="w-full flex items-center gap-4 p-4 bg-white/5 border border-white/5 rounded-[1.5rem] text-left hover:bg-white/10 hover:border-white/10 transition-all group active:scale-95 overflow-hidden"
-  >
-    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 shadow-xl shrink-0 transition-transform group-hover:scale-110 ${
-      color === 'indigo' ? 'bg-indigo-600 border-indigo-400 text-white' :
-      color === 'emerald' ? 'bg-emerald-600 border-emerald-400 text-white' :
-      color === 'amber' ? 'bg-amber-600 border-amber-400 text-white' :
-      color === 'rose' ? 'bg-rose-600 border-rose-400 text-white' :
-      color === 'blue' ? 'bg-blue-600 border-blue-400 text-white' :
-      'bg-slate-700 border-slate-500 text-white'
-    }`}>
-      {icon}
-    </div>
-    <div className="flex-1 overflow-hidden">
-       <div className="flex items-center gap-2">
-          <p className="text-xs text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">{role}</p>
-          <div className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black text-slate-500 uppercase">{pass}</div>
-       </div>
-       <p className="text-[9px] font-mono text-slate-500 uppercase tracking-tighter truncate opacity-70">{email}</p>
-    </div>
-    <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-       <Key size={14} className="text-indigo-500" />
-    </div>
-  </button>
-);
 
 export default LoginView;

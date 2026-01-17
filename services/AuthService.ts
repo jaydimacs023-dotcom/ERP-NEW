@@ -1,5 +1,6 @@
 import { config } from '../config/app';
 import { User } from '../types';
+import * as db from '../db';
 
 /**
  * AuthService: Handles Supabase Authentication
@@ -33,15 +34,45 @@ export class AuthService {
    * Returns the authenticated user from the users table
    */
   async login(email: string, password: string): Promise<{ user: User; token: string } | null> {
-    if (!this.supabaseUrl || !this.supabaseKey) {
-      console.error('[Auth] Supabase credentials not configured', {
-        supabaseUrl: this.supabaseUrl,
-        supabaseKey: this.supabaseKey ? '***' : 'missing',
-        fallback: 'Cannot authenticate without Supabase credentials'
-      });
-      return null;
+    // Handle Mock Login (when Supabase not configured)
+    if (config.useMockData || !this.supabaseUrl || !this.supabaseKey) {
+      console.info('[Auth] Using mock authentication');
+      
+      // Find user in mock data
+      const mockUser = db.INITIAL_USERS.find(u => u.email === email);
+      if (!mockUser) {
+        console.error('[Auth] Mock user not found:', email);
+        return null;
+      }
+
+      // Verify password
+      if (mockUser.password !== password) {
+        console.error('[Auth] Mock password mismatch for user:', email);
+        return null;
+      }
+
+      // Map mock user to User type
+      const user: User = {
+        id: mockUser.id,
+        name: mockUser.name,
+        email: mockUser.email,
+        role: mockUser.role,
+        orgId: mockUser.orgId,
+      };
+
+      // Create a simple JWT-like token for session
+      const token = btoa(JSON.stringify({
+        userId: mockUser.id,
+        email: mockUser.email,
+        iat: Date.now(),
+      }));
+
+      console.info('[Auth] Mock login successful:', { email, userId: user.id, role: user.role, orgId: user.orgId });
+      this.storeSession({ user, token });
+      return { user, token };
     }
 
+    // Handle Supabase Login (when credentials configured)
     try {
       // Step 1: Fetch user by email
       const usersResponse = await fetch(
@@ -70,8 +101,19 @@ export class AuthService {
 
       // Step 2: Verify password against password_hash
       const encodedPassword = this.encodePassword(password);
+      console.debug('[Auth] Password verification:', {
+        email: dbUser.email,
+        inputPassword: password,
+        encodedPassword,
+        dbPasswordHash: dbUser.password_hash,
+        match: dbUser.password_hash === encodedPassword
+      });
+      
       if (dbUser.password_hash !== encodedPassword) {
-        console.error('[Auth] Password mismatch for user:', email);
+        console.error('[Auth] Password mismatch for user:', email, {
+          expected: dbUser.password_hash,
+          received: encodedPassword
+        });
         return null;
       }
 
@@ -91,7 +133,8 @@ export class AuthService {
         iat: Date.now(),
       }));
 
-      console.info('[Auth] Login successful:', { email, userId: user.id, role: user.role });
+      console.info('[Auth] Supabase login successful:', { email, userId: user.id, role: user.role });
+      this.storeSession({ user, token });
       return { user, token };
     } catch (error) {
       console.error('[Auth] Login error:', error);

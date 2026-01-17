@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Location } from '../types';
+import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, MapPin, Trash2, X, Edit2, ShieldCheck, 
   Map, Building, Globe, ChevronRight, MoreVertical
@@ -143,14 +144,13 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             </div>
           </div>
         )) : (
-          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300">
-             <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200">
-                   <Map size={32} />
-                </div>
-                <p className="text-slate-400 text-sm font-medium italic">No training facilities registered in this workspace.</p>
-             </div>
-          </div>
+          <EmptyState 
+            title="No training facilities"
+            description="Register your first training location to manage classrooms and satellite centers."
+            actionLabel="Add Facility"
+            onAction={() => { resetForm(); setShowModal(true); }}
+            icon={<MapPin size={48} className="text-slate-300" />}
+          />
         )}
       </div>
 

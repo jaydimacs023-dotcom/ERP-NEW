@@ -78,6 +78,18 @@ export interface Organization extends BaseEntity {
   logoUrl?: string;
 }
 
+export interface PaymentHistory extends BaseEntity {
+  orgId: string;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  paidDate?: string;
+  status: 'PAID' | 'OVERDUE' | 'PENDING' | 'CANCELLED';
+  planType: PlanType;
+  description: string;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+}
 export interface User extends BaseEntity {
   id: string;
   name: string;
@@ -106,30 +118,29 @@ export interface Student extends BaseEntity {
   uli: string;
   lastName: string;
   firstName: string;
-  middleName: string;
-  extension: string;
-  sex: 'Male' | 'Female';
-  dateOfBirth: string;
-  age: number;
-  birthRegion: string;
-  birthProvince: string;
-  birthCity: string;
-  civilStatus: string;
-  educationalAttainment: string;
-  nationality: string;
-  email: string;
-  contactNumber: string;
-  street: string;
-  barangay: string;
-  city: string;
-  district: string;
-  province: string;
-  guardian: string;
-  documents: StudentDocument[];
-  isEnrollmentOverridden?: boolean;
-  overriddenBy?: string;
-  complianceNotes?: string;
-  createdAt: string;
+  middleName?: string;
+  extension?: string;
+  sex?: string;
+  dateOfBirth?: string;
+  birthRegion?: string;
+  birthProvince?: string;
+  birthCity?: string;
+  civilStatus?: string;
+  educationalAttainment?: string;
+  nationality?: string;
+  email?: string;
+  contactNumber?: string;
+  street?: string;
+  barangay?: string;
+  city?: string;
+  district?: string;
+  province?: string;
+  guardian?: string;
+  locationId?: string;
+  sponsorId?: string;
+  documents?: string[];                    // Array of document names/IDs
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Trainer extends BaseEntity {
@@ -394,15 +405,14 @@ export interface PayrollRun extends BaseEntity {
 
 export interface PayrollLine {
   id: string;
+  orgId: string;
   payrollRunId: string;
   employeeId: string;
   grossPay: number;
-  deductions: {
-    tax: number;
-    sss: number;
-    philhealth: number;
-    pagibig: number;
-    other: number;
-  };
+  deductionsTax: number;
+  deductionsSss: number;
+  deductionsPhilhealth: number;
+  deductionsPagibig: number;
+  deductionsOther: number;
   netPay: number;
 }

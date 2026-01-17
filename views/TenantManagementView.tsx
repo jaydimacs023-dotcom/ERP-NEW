@@ -8,6 +8,7 @@ import {
   ShieldAlert, Hash
 } from 'lucide-react';
 import { Organization, SubscriptionStatus, PlanType } from '../types';
+import { generateUUID } from '../utils/uuid';
 
 interface TenantManagementViewProps {
   organizations: Organization[];
@@ -44,7 +45,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAddTenant({
-      id: `org-${Date.now()}`,
+      id: generateUUID(),
       name: newOrgName,
       currency: currency,
       isVatRegistered: true,
@@ -171,9 +172,22 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                        <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-rose-500 transition-colors border border-slate-700 shadow-xl">
                           <Building2 size={24} />
                        </div>
-                       <div>
+                       <div className="flex-1">
                           <div className="text-sm font-black text-slate-200 group-hover:text-white">{org.name}</div>
-                          <div className="text-[10px] font-mono font-bold text-slate-500 mt-0.5 tracking-tighter uppercase">{org.id}</div>
+                          <div className="text-[10px] font-mono font-bold text-slate-500 mt-1 tracking-tighter uppercase flex items-center gap-2 group-hover:text-slate-400 transition-colors">
+                            {org.id}
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(org.id);
+                                alert('Organization UUID copied!');
+                              }}
+                              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[8px] font-bold text-amber-400 transition-colors"
+                              title="Copy UUID"
+                            >
+                              COPY
+                            </button>
+                          </div>
                        </div>
                     </div>
                  </td>
@@ -181,7 +195,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <CreditCard size={14} className="text-slate-500" />
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-brand' : 'text-slate-400'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-rose-500' : org.planType === 'PROFESSIONAL' ? 'text-indigo-500' : 'text-blue-500'}`}>
                                 {org.planType} Tier
                             </span>
                         </div>

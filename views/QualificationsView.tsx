@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Qualification } from '../types';
+import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle, 
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
@@ -184,13 +185,14 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={4} className="px-6 py-24 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-16 h-16 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200">
-                        <Award size={32} />
-                      </div>
-                      <p className="text-slate-400 text-sm font-medium italic">No qualifications found in the registry.</p>
-                    </div>
+                  <td colSpan={4} className="px-6 py-12">
+                    <EmptyState 
+                      title="No qualifications registered"
+                      description="Add your first professional qualification to your TESDA-registered program catalog."
+                      actionLabel="Add Qualification"
+                      onAction={() => setShowModal(true)}
+                      icon={<Award size={48} className="text-slate-300" />}
+                    />
                   </td>
                 </tr>
               )}

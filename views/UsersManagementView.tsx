@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import EmptyState from '../components/EmptyState';
+import { generateUUID } from '../utils/uuid';
 import { 
   UserCog, Search, Plus, Trash2, X, Shield, Users, 
   Key, Mail, Eye, EyeOff, ShieldCheck, UserCircle,
@@ -22,12 +24,16 @@ const ROLES = [
 const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddUser, onDeleteUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState<Partial<User>>({
+  const [formData, setFormData] = useState({
+    id: '',
     name: '',
     email: '',
-    password: '',
-    role: 'REGISTRAR'
+    password_hash: 'YWRtaW4=',
+    salt: 'default_salt',
+    role: 'REGISTRAR' as const,
+    is_active: true,
+    failed_login_attempts: 0,
+    auth_uid: ''
   });
 
   const filteredUsers = users.filter(u => 
@@ -37,20 +43,32 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddU
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password) return;
+    if (!formData.id || !formData.name || !formData.email || !formData.auth_uid) {
+      alert('Please fill in: ID (UUID), Name, Email, and Auth UID');
+      return;
+    }
 
     const newUser: User = {
-      id: `user-${Date.now()}`,
-      orgId: 'temp',
+      id: formData.id,
+      orgId: formData.orgId || '',
       name: formData.name,
       email: formData.email,
-      password: formData.password,
       role: formData.role as any
     };
 
     onAddUser(newUser);
     setShowModal(false);
-    setFormData({ name: '', email: '', password: '', role: 'REGISTRAR' });
+    setFormData({
+      id: '',
+      name: '',
+      email: '',
+      password_hash: 'YWRtaW4=',
+      salt: 'default_salt',
+      role: 'REGISTRAR',
+      is_active: true,
+      failed_login_attempts: 0,
+      auth_uid: ''
+    });
   };
 
   const getRoleBadge = (role: string) => {
@@ -103,7 +121,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddU
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map(user => (
+            {filteredUsers.length > 0 ? filteredUsers.map(user => (
               <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-4">
@@ -145,7 +163,19 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddU
                   </div>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={4} className="px-8 py-12">
+                  <EmptyState 
+                    title="No system users"
+                    description="Onboard your first user to give them access to the ERP system."
+                    actionLabel="Onboard User"
+                    onAction={() => setShowModal(true)}
+                    icon={<Users size={48} className="text-slate-300" />}
+                  />
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -169,28 +199,29 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({ users, onAddU
             <form onSubmit={handleSubmit} className="p-10 space-y-8">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Full Legal Name</label>
-                  <input required autoFocus placeholder="e.g. Maria Clara" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">User UUID (from Supabase Auth)</label>
+                  <input required autoFocus placeholder="e.g. a1b2c3d4-e5f6-7890-abcd-ef1234567890" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-mono text-sm text-slate-800"
+                    value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Auth UID (should match User UUID)</label>
+                  <input required placeholder="Paste same UUID here" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-mono text-sm text-slate-800"
+                    value={formData.auth_uid} onChange={e => setFormData({...formData, auth_uid: e.target.value})} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Full Name</label>
+                  <input required placeholder="e.g. Maria Clara" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
                     value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Institutional Email</label>
                   <div className="relative">
-                    <input required type="email" placeholder="name@academy.ph" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                    <input required type="email" placeholder="name@institution.edu" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
                       value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                     <Mail className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Security Credential</label>
-                  <div className="relative">
-                    <input required type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-mono font-bold text-slate-800"
-                      value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600">
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
                   </div>
                 </div>
 

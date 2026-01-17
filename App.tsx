@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -39,6 +39,8 @@ import TrainerPortalView from './views/TrainerPortalView';
 import BudgetView from './views/BudgetView';
 import EmployeesView from './views/EmployeesView';
 import PayrollView from './views/PayrollView';
+import PaymentHistoryView from './views/PaymentHistoryView';
+import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
 import MaintenanceView from './views/MaintenanceView';
 
@@ -51,7 +53,7 @@ import {
   Binary, Terminal, Receipt, Calculator, Briefcase, 
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
-  Cloud
+  Cloud, BarChart2
 } from 'lucide-react';
 
 export default function App() {
@@ -62,6 +64,9 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Data service reference for CRUD operations
+  const [dataService] = useState(() => DataServiceFactory.getService());
 
   // Check for existing session on mount
   useEffect(() => {
@@ -95,6 +100,7 @@ export default function App() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [payments, setPayments] = useState<PaymentHistory[]>([]);
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
@@ -144,9 +150,42 @@ export default function App() {
         setPayrollLines(data.payrollLines);
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
+        setPayments(data.paymentHistories);
         
         if (data.organizations.length > 0) {
-          setCurrentOrgId('org-3');
+          // Get the restored session to check user's orgId
+          const restoredSession = authService.getSession();
+          const restoredUser = restoredSession?.user;
+          const userOrgId = restoredUser?.orgId;
+          const userOrgExists = data.organizations.some(o => o.id === userOrgId && !o.isDeleted);
+          const isSystemAdmin = restoredUser?.role === 'SYSTEM_ADMIN';
+          
+          console.log('[App] Organization selection:', { userOrgId, userOrgExists, isSystemAdmin, user: restoredUser?.email });
+          
+          // Validate: User must have an organization OR be a SYSTEM_ADMIN
+          if (restoredUser && !userOrgExists && !isSystemAdmin) {
+            console.error('[App] ❌ Validation failed: User has no valid organization and is not SYSTEM_ADMIN');
+            authService.logout();
+            setCurrentUser(null);
+            setCurrentOrgId('');
+            handleNotify('error', 'Access Denied: Your organization is no longer available. Please contact your system administrator.');
+            setIsLoading(false);
+            return;
+          }
+          
+          if (userOrgId && userOrgExists) {
+            // User belongs to this org - use it
+            setCurrentOrgId(userOrgId);
+            console.log('[App] ✅ Set organization from user record:', userOrgId);
+          } else if (isSystemAdmin && data.organizations.length > 0) {
+            // SYSTEM_ADMIN: use first available organization
+            setCurrentOrgId(data.organizations[0].id);
+            console.log('[App] SYSTEM_ADMIN: Set organization to first available:', data.organizations[0].id);
+          } else if (data.organizations.length > 0 && !restoredUser) {
+            // No user logged in: use first organization for initial context
+            setCurrentOrgId(data.organizations[0].id);
+            console.log('[App] No logged-in user: Set organization to first available:', data.organizations[0].id);
+          }
         }
         console.log("✅ State updated, data load complete");
       } catch (error) {
@@ -172,6 +211,25 @@ export default function App() {
   // RBAC Controls
   const isSysAdmin = currentUser?.role === 'SYSTEM_ADMIN';
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PRESIDENT' || isSysAdmin;
+  const isTenantAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PRESIDENT'; // Excludes SYSTEM_ADMIN
+
+  // ============================================================================
+  // PAYMENT DUE NOTIFICATION FOR TENANT ADMIN (5 days before due)
+  // ============================================================================
+  const paymentsDueSoon = useMemo(() => {
+    if (!isTenantAdmin) return [];
+    
+    const today = new Date();
+    const fiveDaysFromNow = new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000);
+    
+    return payments.filter(p => {
+      const dueDate = new Date(p.dueDate);
+      return p.orgId === currentOrgId && 
+             p.status === 'PENDING' && 
+             dueDate >= today && 
+             dueDate <= fiveDaysFromNow;
+    });
+  }, [payments, currentOrgId, isTenantAdmin]);
   const isFinance = ['ACCOUNTANT', 'FINANCE_MANAGER', 'AR_SPECIALIST', 'AP_SPECIALIST', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
   const isRegistrar = ['REGISTRAR', 'ADMIN'].includes(currentUser?.role || '');
   const isAR = ['AR_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
@@ -182,8 +240,18 @@ export default function App() {
   };
 
   const handleLogin = (user: User) => {
+    // Validate that user has an organization, OR is a SYSTEM_ADMIN
+    const userHasOrg = user.orgId && organizations.some(o => o.id === user.orgId && !o.isDeleted);
+    const isSystemAdmin = user.role === 'SYSTEM_ADMIN';
+    
+    if (!userHasOrg && !isSystemAdmin) {
+      handleNotify('error', 'Access Denied: User must belong to an organization to login. Contact your system administrator.');
+      console.warn('[App] Login denied: User has no valid organization and is not SYSTEM_ADMIN', user.email);
+      return;
+    }
+
     setCurrentUser(user);
-    setCurrentOrgId(user.orgId);
+    setCurrentOrgId(user.orgId || ''); // Empty string for system admin if no org
     // Store session for persistence
     const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
     localStorage.setItem('at_erp_session', JSON.stringify(session));
@@ -222,6 +290,197 @@ export default function App() {
     handleNotify('info', `PO ${po.reference} converted for Bill processing.`);
   };
 
+  // ============================================================================
+  // ORGANIZATION & USER HANDLERS WITH SUPABASE PERSISTENCE
+  // ============================================================================
+
+  const handleAddOrganization = async (org: Organization) => {
+    try {
+      console.info('[App] Creating organization:', org.name);
+      const savedOrg = await dataService.createOrganization(org);
+      setOrganizations(prev => [...prev, savedOrg]);
+      handleNotify('success', `Organization "${org.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating organization:', error);
+      handleNotify('error', 'Failed to create organization. Falling back to memory storage.');
+      // Fallback to memory storage if Supabase fails
+      setOrganizations(prev => [...prev, org]);
+    }
+  };
+
+  const handleUpdateOrganization = async (id: string, updates: Partial<Organization>) => {
+    try {
+      console.info('[App] Updating organization:', id);
+      const updated = await dataService.updateOrganization(id, updates);
+      setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updated } : o));
+      handleNotify('success', 'Organization updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating organization:', error);
+      handleNotify('error', 'Failed to update organization. Falling back to memory storage.');
+      // Fallback to memory storage
+      setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+    }
+  };
+
+  const handleDeleteOrganization = async (id: string) => {
+    try {
+      console.info('[App] Deleting organization:', id);
+      await dataService.deleteOrganization(id);
+      setOrganizations(prev => prev.filter(o => o.id !== id));
+      handleNotify('success', 'Organization deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting organization:', error);
+      handleNotify('error', 'Failed to delete organization. Falling back to memory storage.');
+      // Fallback to memory storage
+      setOrganizations(prev => prev.filter(o => o.id !== id));
+    }
+  };
+
+  // ============================================================================
+  // USER CRUD HANDLERS WITH SUPABASE PERSISTENCE
+  // ============================================================================
+
+  const handleAddUser = async (user: User) => {
+    try {
+      console.info('[App] Creating user:', user.email);
+      // Ensure user has orgId set
+      const userWithOrg = { ...user, orgId: currentOrgId };
+      const savedUser = await dataService.createUser(userWithOrg);
+      setUsers(prev => [...prev, savedUser]);
+      handleNotify('success', `User "${user.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating user:', error);
+      handleNotify('error', 'Failed to create user. Falling back to memory storage.');
+      // Fallback to memory storage
+      const userWithOrg = { ...user, orgId: currentOrgId };
+      setUsers(prev => [...prev, userWithOrg]);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      console.info('[App] Deleting user:', id);
+      await dataService.deleteUser(id);
+      setUsers(prev => prev.filter(u => u.id !== id));
+      handleNotify('success', 'User deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting user:', error);
+      handleNotify('error', 'Failed to delete user. Falling back to memory storage.');
+      // Fallback to memory storage
+      setUsers(prev => prev.filter(u => u.id !== id));
+    }
+  };
+
+  const handleRegisterWithPersistence = async (org: Organization, admin: User) => {
+    try {
+      console.info('[App] Registering new organization and admin user');
+      
+      // Create organization
+      const savedOrg = await dataService.createOrganization(org);
+      setOrganizations(p => [...p, savedOrg]);
+      
+      // Create admin user
+      const savedAdmin = await dataService.createUser(admin);
+      setUsers(p => [...p, savedAdmin]);
+      
+      setCurrentUser(savedAdmin);
+      setCurrentOrgId(savedOrg.id);
+      setActiveTab('dashboard');
+      
+      handleNotify('success', `Welcome! Organization "${org.name}" registered successfully`);
+      console.info('[App] Registration complete');
+    } catch (error) {
+      console.error('[App] Error during registration:', error);
+      handleNotify('error', 'Registration failed. Falling back to memory storage.');
+      // Fallback to memory storage
+      setOrganizations(p => [...p, org]);
+      setUsers(p => [...p, admin]);
+      setCurrentUser(admin);
+      setCurrentOrgId(org.id);
+      setActiveTab('dashboard');
+    }
+  };
+
+  // ============================================================================
+  // STUDENT CRUD HANDLERS WITH SUPABASE PERSISTENCE & REFERENTIAL INTEGRITY
+  // ============================================================================
+
+  const handleAddStudent = async (student: Student) => {
+    try {
+      console.info('[App] Creating student:', student.uli);
+      const studentWithOrg = { ...student, orgId: currentOrgId };
+      const savedStudent = await dataService.createStudent(studentWithOrg);
+      setStudents(prev => [...prev, savedStudent]);
+      handleNotify('success', `Student "${student.firstName} ${student.lastName}" registered successfully`);
+    } catch (error) {
+      console.error('[App] Error creating student:', error);
+      handleNotify('error', 'Failed to create student. Falling back to memory storage.');
+      const studentWithOrg = { ...student, orgId: currentOrgId };
+      setStudents(prev => [...prev, studentWithOrg]);
+    }
+  };
+
+  const handleUpdateStudent = async (student: Student) => {
+    try {
+      console.info('[App] Updating student:', student.id);
+      const updated = await dataService.updateStudent(student.id, student);
+      setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
+      handleNotify('success', 'Student record updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating student:', error);
+      handleNotify('error', 'Failed to update student. Falling back to memory storage.');
+      setStudents(prev => prev.map(s => s.id === student.id ? student : s));
+    }
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    try {
+      console.info('[App] Checking student usage before deletion:', id);
+      
+      // Check if student is used in other modules
+      const usage = await dataService.checkStudentUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete student. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false; // Return false to indicate deletion failed
+      }
+
+      // Proceed with hard delete (Supabase table doesn't support soft delete)
+      console.info('[App] Deleting student:', id);
+      await dataService.deleteStudent(id);
+      setStudents(prev => prev.filter(s => s.id !== id));
+      handleNotify('success', 'Student record deleted successfully');
+      return true; // Return true to indicate successful deletion
+    } catch (error) {
+      console.error('[App] Error deleting student:', error);
+      handleNotify('error', 'Failed to delete student. Falling back to memory storage.');
+      // Fallback to hard delete in memory
+      setStudents(prev => prev.filter(s => s.id !== id));
+      return true;
+    }
+  };
+
+  const handleBatchAddStudents = async (newStudents: Student[]) => {
+    try {
+      console.info('[App] Batch adding students:', newStudents.length);
+      const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
+      
+      // Create each student
+      const savedStudents = await Promise.all(
+        studentsWithOrg.map(s => dataService.createStudent(s))
+      );
+      
+      setStudents(prev => [...prev, ...savedStudents]);
+      handleNotify('success', `${newStudents.length} students imported successfully`);
+    } catch (error) {
+      console.error('[App] Error batch adding students:', error);
+      handleNotify('error', 'Failed to import students. Falling back to memory storage.');
+      // Fallback to memory storage
+      const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
+      setStudents(prev => [...prev, ...studentsWithOrg]);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
@@ -237,7 +496,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginView onLogin={handleLogin} onRegister={(o, a) => { setOrganizations(p => [...p, o]); setUsers(p => [...p, a]); setCurrentUser(a); setCurrentOrgId(o.id); setActiveTab('dashboard'); }} organizations={organizations} users={users} />;
+    return <LoginView onLogin={handleLogin} onRegister={handleRegisterWithPersistence} organizations={organizations} users={users} />;
   }
 
   return (
@@ -245,15 +504,27 @@ export default function App() {
       <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
         <div className="p-8 flex items-center justify-between border-b border-white/5 bg-slate-900/50">
            {sidebarOpen ? (
-             <div className="flex items-center gap-3">
+             <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
                   style={{ backgroundColor: brandColor }}
                 >
                    {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={20} />}
                 </div>
-                <div className="min-w-0">
-                   <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate w-32">{currentOrg?.name}</h1>
+                <div className="min-w-0 flex-1">
+                   {organizations.length > 1 ? (
+                     <select 
+                       value={currentOrgId} 
+                       onChange={(e) => setCurrentOrgId(e.target.value)}
+                       className="w-full text-sm font-black text-white uppercase tracking-tighter bg-slate-800 border border-slate-700 rounded px-2 py-1 hover:border-slate-600 focus:outline-none focus:border-indigo-500"
+                     >
+                       {organizations.map(org => (
+                         <option key={org.id} value={org.id}>{org.name}</option>
+                       ))}
+                     </select>
+                   ) : (
+                     <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate">{currentOrg?.name}</h1>
+                   )}
                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
@@ -319,29 +590,39 @@ export default function App() {
              </div>
            )}
 
-           {isAdmin && (
+           {isTenantAdmin && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
+               <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
+               <div className="relative">
+                 <NavItem icon={<CreditCard size={20}/>} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
+                 {paymentsDueSoon.length > 0 && (
+                   <div className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-full">
+                     {paymentsDueSoon.length}
+                   </div>
+                 )}
+               </div>
                <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {isSysAdmin && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Platform Host</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
+               <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<BarChart2 size={20}/>} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
         </nav>
 
-        {/* System Data Engine Status Badge */}
-        {sidebarOpen && (
+        {/* System Data Engine Status Badge - SYSTEM_ADMIN only */}
+        {sidebarOpen && isSysAdmin && (
           <div className="px-8 mb-4">
              <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
                 {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
@@ -439,22 +720,30 @@ export default function App() {
           {activeTab === 'assets' && <AssetsView assets={[]} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={() => {}} onAddAsset={() => {}} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={b => setBankAccounts(prev => [...prev, {...b, orgId: currentOrgId} as BankAccount])} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           
-          {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
-          {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
+          {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={payments.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} />}
           
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={(r, l, e, el) => { setPayrollRuns(prev => [...prev, r as PayrollRun]); setPayrollLines(prev => [...prev, ...l as PayrollLine[]]); handlePostJournal(e, el); }} />}
-          {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddStudent={s => setStudents(p => [...p, s])} onUpdateStudent={s => setStudents(p => p.map(x => x.id === s.id ? s : x))} onDeleteStudent={id => setStudents(p => p.filter(x => x.id !== id))} onBatchAddStudents={s => setStudents(p => [...p, ...s])} />}
+          {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={t => setTrainers(p => [...p, t])} onUpdateTrainer={t => setTrainers(p => p.map(x => x.id === t.id ? t : x))} onDeleteTrainer={id => setTrainers(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={b => setBatches(p => [...p, b])} onUpdateBatch={b => setBatches(p => p.map(x => x.id === b.id ? b : x))} onDeleteBatch={id => setBatches(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={l => setLocations(p => [...p, l])} onUpdateLocation={l => setLocations(p => p.map(x => x.id === l.id ? l : x))} onDeleteLocation={id => setLocations(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={s => setSchedules(p => [...p, s])} onUpdateSchedule={s => setSchedules(p => p.map(x => x.id === s.id ? s : x))} onDeleteSchedule={id => setSchedules(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}
           
-          {activeTab === 'users' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={u => setUsers(p => [...p, u])} onDeleteUser={id => setUsers(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'employees' && <EmployeesView 
+            employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} 
+            onAddEmployee={(emp) => { emp.orgId = currentOrgId; setEmployees(p => [...p, emp]); }} 
+            onUpdateEmployee={(emp) => setEmployees(p => p.map(x => x.id === emp.id ? emp : x))} 
+            onDeleteEmployee={(id) => setEmployees(p => p.map(x => x.id === id ? { ...x, isDeleted: true, deletedAt: new Date().toISOString() } : x))} 
+          />}
+          {activeTab === 'users' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={handleAddUser} onDeleteUser={handleDeleteUser} />}
           {activeTab === 'audit' && <AuditTrail logs={auditLogs} />}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
-          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={o => setOrganizations(p => [...p, o])} onUpdateTenant={o => setOrganizations(p => p.map(x => x.id === o.id ? o : x))} />}
+          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'schema' && <SchemaManualView />}
+          {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
         </div>
       </main>
 

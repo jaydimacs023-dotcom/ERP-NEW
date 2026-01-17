@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Vendor, ChartOfAccount, JournalEntryLine, AccountClass } from '../types';
+import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
   ShieldCheck, Globe, Building, Filter, FileText, 
@@ -185,7 +186,15 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                 </tr>
               );
             }) : (
-              <tr><td colSpan={5} className="py-20 text-center text-slate-400 italic">No suppliers registered in the master database.</td></tr>
+              <tr><td colSpan={5} className="px-6 py-12">
+                <EmptyState 
+                  title="No suppliers registered"
+                  description="Add your first vendor to your procurement master registry."
+                  actionLabel="Add Supplier"
+                  onAction={() => setShowModal(true)}
+                  icon={<Truck size={48} className="text-slate-300" />}
+                />
+              </td></tr>
             )}
           </tbody>
         </table>

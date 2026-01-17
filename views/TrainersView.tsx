@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trainer, Qualification } from '../types';
+import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, Filter, GraduationCap, Award, Mail, Phone, 
   Trash2, X, Info, ShieldCheck, CheckCircle, ChevronRight,
@@ -170,13 +171,14 @@ const TrainersView: React.FC<TrainersViewProps> = ({
               </tr>
             )) : (
               <tr>
-                <td colSpan={4} className="px-6 py-20 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200">
-                      <GraduationCap size={32} />
-                    </div>
-                    <p className="text-slate-400 text-sm font-medium italic">No instructors registered in the workspace.</p>
-                  </div>
+                <td colSpan={4} className="px-6 py-20">
+                  <EmptyState 
+                    title="No trainers registered"
+                    description="Add your first trainer to get started with staff management."
+                    actionLabel="Register Trainer"
+                    onAction={() => setShowModal(true)}
+                    icon={<GraduationCap size={48} className="text-slate-300" />}
+                  />
                 </td>
               </tr>
             )}

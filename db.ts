@@ -170,3 +170,52 @@ export const INITIAL_BATCHES: Batch[] = [
 export const INITIAL_ENTRIES: JournalEntry[] = [];
 export const INITIAL_LINES: JournalEntryLine[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
+// Payment History
+import { PaymentHistory } from './types';
+
+const today = new Date();
+const fiveDaysFromNow = new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000);
+const tenDaysFromNow = new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000);
+
+export const INITIAL_PAYMENTS: PaymentHistory[] = [
+  {
+    id: 'pay-1',
+    orgId: 'org-3',
+    amount: 2999,
+    currency: 'USD',
+    dueDate: fiveDaysFromNow.toISOString().split('T')[0],
+    status: 'PENDING',
+    planType: 'PROFESSIONAL',
+    description: 'Monthly Subscription - Professional Plan',
+    invoiceNumber: 'INV-2025-001',
+    createdAt: today.toISOString(),
+    updatedAt: today.toISOString()
+  },
+  {
+    id: 'pay-2',
+    orgId: 'org-3',
+    amount: 2999,
+    currency: 'USD',
+    dueDate: '2025-01-10',
+    paidDate: '2025-01-08',
+    status: 'PAID',
+    planType: 'PROFESSIONAL',
+    description: 'Monthly Subscription - Professional Plan',
+    invoiceNumber: 'INV-2025-002',
+    createdAt: '2025-01-08T00:00:00Z',
+    updatedAt: '2025-01-08T00:00:00Z'
+  },
+  {
+    id: 'pay-3',
+    orgId: 'org-3',
+    amount: 2999,
+    currency: 'USD',
+    dueDate: '2024-12-15',
+    status: 'OVERDUE',
+    planType: 'PROFESSIONAL',
+    description: 'Monthly Subscription - Professional Plan',
+    invoiceNumber: 'INV-2024-012',
+    createdAt: '2024-12-10T00:00:00Z',
+    updatedAt: '2024-12-10T00:00:00Z'
+  }
+];
