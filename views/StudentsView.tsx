@@ -34,10 +34,10 @@ const MANDATORY_DOCS = [
 ];
 
 const CSV_HEADERS = [
-  'ULI', 'LastName', 'FirstName', 'MiddleName', 'Extension', 'Sex', 'DateOfBirth',
-  'BirthRegion', 'BirthProvince', 'BirthCity', 'CivilStatus', 'EducationalAttainment',
-  'Nationality', 'Email', 'ContactNumber', 'Street', 'Barangay', 'City', 'District',
-  'Province', 'Guardian', 'LocationId', 'SponsorId'
+  'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Contact Number',
+  'E-mail Address', 'Street Address', 'Barangay', 'Municipality/City', 'District',
+  'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status', 
+  'Highest Educational Attainment', 'Nationality', 'ULI'
 ];
 
 const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
@@ -49,6 +49,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   const [importPreview, setImportPreview] = useState<Student[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
+  const [showEditCamera, setShowEditCamera] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
@@ -64,8 +66,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const editVideoRef = useRef<HTMLVideoElement>(null);
+  const editCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Student>>({
     uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
@@ -81,8 +86,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   );
 
   const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",") + "\n" + 
-      "24-701-01-0001,Dela Cruz,Juan,Protacio,,Male,1995-05-15,NCR,Metro Manila,Manila,Single,College Graduate,Filipino,juan@email.com,09171234567,123 Rizal St,Brgy 1,Manila,1st District,Metro Manila,Maria Dela Cruz,loc-uuid-123,sponsor-uuid-123";
+    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -110,39 +114,57 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         if (!lines[i].trim()) continue;
         const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
         
-        // Simple mapping based on expected header order or indices
+        // Mapping based on MIS file format:
+        // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: Contact Number,
+        // 5: E-mail Address, 6: Street Address, 7: Barangay, 8: Municipality/City, 9: District,
+        // 10: Province, 11: Sex, 12: Date of Birth, 13: Age, 14: Civil Status, 
+        // 15: Educational Attainment, 16: Nationality, 17: ULI
         const getVal = (idx: number) => cols[idx] || '';
 
-        const dob = getVal(6);
-        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 0;
+        // Parse date - handle mm-dd-yy or mm/dd/yyyy format
+        const dobRaw = getVal(12);
+        let dob = '';
+        if (dobRaw) {
+          const dateParts = dobRaw.split(/[\/\-]/);
+          if (dateParts.length === 3) {
+            const month = dateParts[0].padStart(2, '0');
+            const day = dateParts[1].padStart(2, '0');
+            let year = dateParts[2];
+            if (year.length === 2) {
+              year = parseInt(year) > 50 ? '19' + year : '20' + year;
+            }
+            dob = `${year}-${month}-${day}`;
+          }
+        }
+        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : parseInt(getVal(13)) || 0;
 
         studentData.push({
           id: `batch-${Date.now()}-${i}`,
           orgId: 'temp',
-          uli: getVal(0),
-          lastName: getVal(1),
-          firstName: getVal(2),
-          middleName: getVal(3),
-          extension: getVal(4),
-          sex: (getVal(5) as any) || 'Male',
+          uli: getVal(17),
+          lastName: getVal(0),
+          firstName: getVal(1),
+          middleName: getVal(2),
+          extension: getVal(3),
+          sex: (getVal(11) as any) || 'Male',
           dateOfBirth: dob,
           age: Math.max(0, age),
-          birthRegion: getVal(7),
-          birthProvince: getVal(8),
-          birthCity: getVal(9),
-          civilStatus: getVal(10) || 'Single',
-          educationalAttainment: getVal(11),
-          nationality: getVal(12) || 'Filipino',
-          email: getVal(13),
-          contactNumber: getVal(14),
-          street: getVal(15),
-          barangay: getVal(16),
-          city: getVal(17),
-          district: getVal(18),
-          province: getVal(19),
-          guardian: getVal(20),
-          locationId: getVal(21) || undefined,
-          sponsorId: getVal(22) || undefined,
+          birthRegion: '',
+          birthProvince: '',
+          birthCity: '',
+          civilStatus: getVal(14) || 'Single',
+          educationalAttainment: getVal(15),
+          nationality: getVal(16) || 'Filipino',
+          email: getVal(5),
+          contactNumber: getVal(4),
+          street: getVal(6),
+          barangay: getVal(7),
+          city: getVal(8),
+          district: getVal(9),
+          province: getVal(10),
+          guardian: '',
+          locationId: undefined,
+          sponsorId: undefined,
           documents: MANDATORY_DOCS.map((doc, dIdx) => ({
             id: `doc-${dIdx}-${Date.now()}-${i}`,
             name: doc,
@@ -868,7 +890,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Update {editingStudent.firstName} {editingStudent.lastName}'s Information</p>
                 </div>
               </div>
-              <button onClick={() => { setShowEditModal(false); setEditingStudent(null); }} className="p-3 hover:bg-white rounded-xl transition-colors">
+              <button onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="p-3 hover:bg-white rounded-xl transition-colors">
                 <X size={20} className="text-slate-400" />
               </button>
             </div>
@@ -876,12 +898,29 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
             <form onSubmit={(e) => {
               e.preventDefault();
               try {
+                // Update documents with new photo if changed
+                let updatedDocuments = editingStudent.documents || [];
+                if (editPhotoPreview) {
+                  const photoDocIndex = updatedDocuments.findIndex(d => d.name === 'Passport Size Photo');
+                  const newPhotoDoc = {
+                    id: photoDocIndex >= 0 ? updatedDocuments[photoDocIndex].id : `doc-photo-${Date.now()}`,
+                    name: 'Passport Size Photo',
+                    status: 'UPLOADED' as const,
+                    fileData: editPhotoPreview
+                  };
+                  if (photoDocIndex >= 0) {
+                    updatedDocuments = updatedDocuments.map((d, i) => i === photoDocIndex ? newPhotoDoc : d);
+                  } else {
+                    updatedDocuments = [...updatedDocuments, newPhotoDoc];
+                  }
+                }
+
                 const updatedStudent: Student = {
                   ...editingStudent,
                   ...formData,
                   id: editingStudent.id,
                   orgId: editingStudent.orgId,
-                  documents: editingStudent.documents,
+                  documents: updatedDocuments,
                   createdAt: editingStudent.createdAt,
                   createdBy: editingStudent.createdBy
                 } as Student;
@@ -889,10 +928,96 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 showToast(`Student ${formData.firstName} ${formData.lastName} updated successfully!`, 'success');
                 setShowEditModal(false);
                 setEditingStudent(null);
+                setEditPhotoPreview(null);
               } catch (error) {
                 showToast(`Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
               }
             }} className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+
+              {/* Student Photo */}
+              <div className="flex flex-col items-center mb-4 gap-4">
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-3xl border-4 border-slate-200 overflow-hidden bg-slate-100 flex items-center justify-center shadow-lg">
+                    {showEditCamera ? (
+                      <video ref={editVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                    ) : editPhotoPreview ? (
+                      <img src={editPhotoPreview} alt="New Photo" className="w-full h-full object-cover" />
+                    ) : editingStudent.documents?.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                      <img src={editingStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={48} className="text-slate-300" />
+                    )}
+                  </div>
+                  {editPhotoPreview && (
+                    <button type="button" onClick={() => setEditPhotoPreview(null)} className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <canvas ref={editCanvasRef} className="hidden" />
+                <input type="file" ref={editPhotoInputRef} accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setEditPhotoPreview(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }
+                }} />
+                <div className="flex gap-2">
+                  {showEditCamera ? (
+                    <>
+                      <button type="button" onClick={() => {
+                        if (editVideoRef.current && editCanvasRef.current) {
+                          const context = editCanvasRef.current.getContext('2d');
+                          if (context) {
+                            editCanvasRef.current.width = editVideoRef.current.videoWidth;
+                            editCanvasRef.current.height = editVideoRef.current.videoHeight;
+                            context.drawImage(editVideoRef.current, 0, 0);
+                            const dataUrl = editCanvasRef.current.toDataURL('image/jpeg', 0.8);
+                            setEditPhotoPreview(dataUrl);
+                            if (editVideoRef.current?.srcObject) {
+                              (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                            }
+                            setShowEditCamera(false);
+                          }
+                        }
+                      }} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-green-700 transition-colors flex items-center gap-2">
+                        <Camera size={14} /> Capture
+                      </button>
+                      <button type="button" onClick={() => {
+                        if (editVideoRef.current?.srcObject) {
+                          (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                        }
+                        setShowEditCamera(false);
+                      }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors">
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => {
+                        setShowEditCamera(true);
+                        setTimeout(async () => {
+                          try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                              video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
+                            });
+                            if (editVideoRef.current) editVideoRef.current.srcObject = stream;
+                          } catch (err) {
+                            alert("Camera access denied.");
+                            setShowEditCamera(false);
+                          }
+                        }, 100);
+                      }} className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-amber-200 transition-colors flex items-center gap-2">
+                        <Camera size={14} /> Camera
+                      </button>
+                      <button type="button" onClick={() => editPhotoInputRef.current?.click()} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors flex items-center gap-2">
+                        <Upload size={14} /> Upload
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
               
               {/* Personal Information */}
               <section className="space-y-6">
@@ -936,6 +1061,22 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   <div className="md:col-span-2 space-y-1">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Date of Birth</label>
                     <input required type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                  </div>
+                </div>
+
+                {/* Birth Address */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Region</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthRegion || ''} onChange={e => setFormData({...formData, birthRegion: e.target.value})} placeholder="e.g. NCR, Region IV-A" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Province</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthProvince || ''} onChange={e => setFormData({...formData, birthProvince: e.target.value})} placeholder="e.g. Metro Manila, Laguna" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth City/Municipality</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthCity || ''} onChange={e => setFormData({...formData, birthCity: e.target.value})} placeholder="e.g. Manila, Calamba" />
                   </div>
                 </div>
 
@@ -1015,13 +1156,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
-                    <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
+                    <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian || ''} onChange={e => setFormData({...formData, guardian: e.target.value})} />
                   </div>
                 </div>
               </section>
 
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => { setShowEditModal(false); setEditingStudent(null); }} className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="button" onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Cancel</button>
                 <button type="submit" className="flex-1 py-4 bg-amber-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-amber-100 hover:bg-amber-700 active:scale-95 transition-all">Save Changes</button>
               </div>
             </form>

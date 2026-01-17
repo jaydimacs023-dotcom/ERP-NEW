@@ -512,19 +512,7 @@ export default function App() {
                    {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={20} />}
                 </div>
                 <div className="min-w-0 flex-1">
-                   {organizations.length > 1 ? (
-                     <select 
-                       value={currentOrgId} 
-                       onChange={(e) => setCurrentOrgId(e.target.value)}
-                       className="w-full text-sm font-black text-white uppercase tracking-tighter bg-slate-800 border border-slate-700 rounded px-2 py-1 hover:border-slate-600 focus:outline-none focus:border-indigo-500"
-                     >
-                       {organizations.map(org => (
-                         <option key={org.id} value={org.id}>{org.name}</option>
-                       ))}
-                     </select>
-                   ) : (
-                     <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate">{currentOrg?.name}</h1>
-                   )}
+                   <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate">{currentOrg?.name || 'No Organization'}</h1>
                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
