@@ -7,7 +7,7 @@ interface ItemsViewProps {
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   onAddItem: (item: NonStockItem) => void;
-  onUpdateItem: (item: NonStockItem) => void;
+  onUpdateItem: (id: string, updates: Partial<NonStockItem>) => void;
   onDeleteItem: (id: string) => void;
 }
 
@@ -19,12 +19,10 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
   const [formData, setFormData] = useState<Partial<NonStockItem>>({
     code: '',
     name: '',
-    type: 'FEE',
-    defaultAccountId: '',
+    description: '',
     unitPrice: 0,
-    taxCategory: TaxCategory.VAT,
-    whtRate: WHTCategory.NONE,
-    isActive: true
+    incomeAccountId: '',
+    expenseAccountId: ''
   });
 
   const filteredItems = items.filter(i => 
@@ -33,33 +31,29 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', type: 'FEE', defaultAccountId: '', unitPrice: 0, taxCategory: TaxCategory.VAT, whtRate: WHTCategory.NONE, isActive: true });
-    setEditingEmp(null);
-  };
-
-  const setEditingEmp = (item: NonStockItem | null) => {
-      // Just a helper to satisfy the reset logic
+    setFormData({ code: '', name: '', description: '', unitPrice: 0, incomeAccountId: '', expenseAccountId: '' });
+    setEditingItem(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.defaultAccountId) return;
+    if (!formData.name || !formData.incomeAccountId) return;
 
     if (editingItem) {
-      onUpdateItem({ ...editingItem, ...formData } as NonStockItem);
+      onUpdateItem(editingItem.id, formData);
     } else {
       const newItem: NonStockItem = {
         id: `item-${Date.now()}`,
         orgId: 'temp',
         code: formData.code || `ITEM-${Date.now()}`,
         name: formData.name,
-        type: formData.type as any,
-        defaultAccountId: formData.defaultAccountId,
+        description: formData.description,
         unitPrice: Number(formData.unitPrice) || 0,
-        taxCategory: formData.taxCategory || TaxCategory.VAT,
-        whtRate: Number(formData.whtRate) || WHTCategory.NONE,
-        isActive: true,
-        createdAt: new Date().toISOString()
+        incomeAccountId: formData.incomeAccountId || '',
+        expenseAccountId: formData.expenseAccountId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDeleted: false
       };
       onAddItem(newItem);
     }
@@ -125,15 +119,16 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
           <thead className="bg-slate-50">
             <tr>
               <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Description</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">G/L Destination</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tax / WHT</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Standard Rate</th>
+              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Income Account</th>
+              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expense Account</th>
+              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit Price</th>
               <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredItems.length > 0 ? filteredItems.map(item => {
-              const acc = accounts.find(a => a.id === item.defaultAccountId);
+              const incomeAcc = accounts.find(a => a.id === item.incomeAccountId);
+              const expenseAcc = accounts.find(a => a.id === item.expenseAccountId);
               return (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-5">
@@ -143,24 +138,25 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                       </div>
                       <div>
                         <div className="text-sm font-black text-slate-800 leading-tight uppercase">{item.name}</div>
-                        <div className="text-[9px] font-mono font-black text-indigo-600 uppercase tracking-tighter mt-1">{item.code} • {item.type}</div>
+                        <div className="text-[9px] font-mono font-black text-indigo-600 uppercase tracking-tighter mt-1">{item.code}</div>
+                        {item.description && <div className="text-[10px] text-slate-500 mt-1">{item.description}</div>}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-col">
                        <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                         {acc?.name}
+                         {incomeAcc?.name || '-'}
                        </div>
-                       <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {acc?.code}</div>
+                       {incomeAcc && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {incomeAcc?.code}</div>}
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-widest uppercase ${
-                        item.taxCategory === TaxCategory.VAT ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-100 text-slate-500'
-                      }`}>{item.taxCategory}</span>
-                      <span className="text-[8px] font-bold text-slate-400">WHT: {(item.whtRate * 100).toFixed(0)}%</span>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col">
+                       <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                         {expenseAcc?.name || '-'}
+                       </div>
+                       {expenseAcc && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {expenseAcc?.code}</div>}
                     </div>
                   </td>
                   <td className="px-6 py-5 text-right font-mono font-black text-slate-800">
@@ -208,42 +204,50 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                    <LinkIcon size={14} /> G/L Target Recognition
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Description (Optional)</label>
+                  <textarea placeholder="Additional notes..." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm text-slate-700" rows={2}
+                    value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-green-600 uppercase tracking-widest flex items-center gap-2">
+                    <LinkIcon size={14} /> Income Account (Revenue)
                   </label>
-                  <select required className="w-full px-4 py-3 bg-white border-2 border-indigo-100 rounded-2xl outline-none text-sm font-black text-indigo-700 appearance-none"
-                    value={formData.defaultAccountId} onChange={e => setFormData({...formData, defaultAccountId: e.target.value})}>
-                    <option value="">Select Target Account...</option>
-                    {accounts.filter(a => !a.isHeader).map(acc => (
+                  <select required className="w-full px-4 py-3 bg-white border-2 border-green-100 rounded-2xl outline-none text-sm font-black text-green-700 appearance-none"
+                    value={formData.incomeAccountId} onChange={e => setFormData({...formData, incomeAccountId: e.target.value})}>
+                    <option value="">Select Income Account...</option>
+                    {accounts.filter(a => !a.isHeader && a.class === 'REVENUE').map(acc => (
                       <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>
                     ))}
                   </select>
-                  <p className="text-[9px] text-slate-400 italic">Select the Expense or Revenue account for direct recognition. This bypasses inventory assets.</p>
+                  <p className="text-[9px] text-slate-400 italic">Revenue account for income recognition when this item is sold.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Item Classification</label>
-                    <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-700"
-                      value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})}>
-                      <option value="FEE">Instructional Fee</option>
-                      <option value="SERVICE">Service</option>
-                      <option value="MATERIAL">Non-Stock Material</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Base Rate</label>
-                    <input type="number" step="0.01" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-black text-slate-900"
-                      value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: Number(e.target.value)})} />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2">
+                    <LinkIcon size={14} /> Expense Account (Cost)
+                  </label>
+                  <select className="w-full px-4 py-3 bg-white border-2 border-rose-100 rounded-2xl outline-none text-sm font-black text-rose-700 appearance-none"
+                    value={formData.expenseAccountId} onChange={e => setFormData({...formData, expenseAccountId: e.target.value})}>
+                    <option value="">Select Expense Account (Optional)...</option>
+                    {accounts.filter(a => !a.isHeader && a.class === 'EXPENSE').map(acc => (
+                      <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[9px] text-slate-400 italic">Expense account for cost recognition when this item is purchased.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Unit Price</label>
+                  <input type="number" step="0.01" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono font-black text-slate-900"
+                    value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: Number(e.target.value)})} />
                 </div>
               </div>
 
               <div className="bg-amber-50 p-5 rounded-2xl border border-amber-100 flex gap-4">
                  <AlertCircle className="text-amber-600 shrink-0" size={20} />
                  <p className="text-[11px] text-amber-900 leading-relaxed font-bold">
-                   Notice: This catalog does not support FIFO/LIFO tracking. Procurement increases the mapped expense account balance immediately.
+                   Notice: This catalog does not support FIFO/LIFO tracking. Items are non-stock and trigger direct G/L entries.
                  </p>
               </div>
 

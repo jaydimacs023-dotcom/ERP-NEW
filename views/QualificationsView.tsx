@@ -2,16 +2,25 @@
 import React, { useState } from 'react';
 import { Qualification } from '../types';
 import EmptyState from '../components/EmptyState';
+import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle, 
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
-  LayoutGrid, List, Timer, MoreVertical, Edit2
+  LayoutGrid, List, Timer, MoreVertical, Edit2, Loader2,
+  CheckCircle, AlertCircle
 } from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface QualificationsViewProps {
   qualifications: Qualification[];
-  onAddQualification: (qual: Qualification) => void;
-  onDeleteQualification: (id: string) => void;
+  onAddQualification: (qual: Qualification) => void | Promise<void>;
+  onUpdateQualification: (qual: Qualification) => void | Promise<void>;
+  onDeleteQualification: (id: string) => void | Promise<boolean>;
 }
 
 const SECTORS = [
@@ -25,10 +34,14 @@ const SECTORS = [
   'Electronics'
 ];
 
-const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, onAddQualification, onDeleteQualification }) => {
+const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showModal, setShowModal] = useState(false);
+  const [editingQual, setEditingQual] = useState<Qualification | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [formData, setFormData] = useState<Partial<Qualification>>({
     name: '',
     code: '',
@@ -44,23 +57,94 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     )
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
+    setEditingQual(null);
+  };
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  const openEditModal = (qual: Qualification) => {
+    setEditingQual(qual);
+    setFormData({
+      name: qual.name,
+      code: qual.code,
+      durationDays: qual.durationDays,
+      sector: qual.sector || 'ICT'
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.code || !formData.durationDays) return;
 
-    const newQual: Qualification = {
-      id: `qual-${Date.now()}`,
-      orgId: 'temp',
-      name: formData.name,
-      code: formData.code,
-      durationDays: Number(formData.durationDays),
-      sector: formData.sector,
-      createdAt: new Date().toISOString()
-    };
+    setIsSubmitting(true);
+    
+    try {
+      if (editingQual) {
+        // Update existing qualification
+        const updatedQual: Qualification = {
+          ...editingQual,
+          name: formData.name,
+          code: formData.code,
+          durationDays: Number(formData.durationDays),
+          sector: formData.sector,
+          updatedAt: new Date().toISOString()
+        };
+        await onUpdateQualification(updatedQual);
+        showToast(`Qualification "${formData.name}" updated successfully!`, 'success');
+      } else {
+        // Create new qualification with proper UUID
+        const newQual: Qualification = {
+          id: generateUUID(),
+          orgId: '', // Will be set by App.tsx handler
+          name: formData.name,
+          code: formData.code,
+          durationDays: Number(formData.durationDays),
+          sector: formData.sector,
+          createdAt: new Date().toISOString()
+        };
+        await onAddQualification(newQual);
+        showToast(`Qualification "${formData.name}" registered successfully!`, 'success');
+      }
+      
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving qualification:', error);
+      showToast(`Failed to save qualification: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    onAddQualification(newQual);
-    setShowModal(false);
-    setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this qualification? This action cannot be undone.')) return;
+    
+    const qualToDelete = qualifications.find(q => q.id === id);
+    setDeletingId(id);
+    try {
+      const result = await onDeleteQualification(id);
+      if (result === false) {
+        showToast('Cannot delete qualification: It is currently in use by batches or trainers.', 'error');
+      } else {
+        showToast(`Qualification "${qualToDelete?.name || 'Unknown'}" deleted successfully!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Failed to delete qualification: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getSectorColor = (sector: string) => {
@@ -75,7 +159,34 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
@@ -171,14 +282,20 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 hover:bg-slate-100 text-slate-300 hover:text-indigo-600 rounded-xl transition-all">
-                        <FileText size={18} />
+                      <button 
+                        onClick={() => openEditModal(qual)}
+                        className="p-2 hover:bg-indigo-50 text-slate-300 hover:text-indigo-600 rounded-xl transition-all"
+                        title="Edit"
+                      >
+                        <Edit2 size={18} />
                       </button>
                       <button 
-                        onClick={() => onDeleteQualification(qual.id)}
-                        className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-xl transition-all"
+                        onClick={() => handleDelete(qual.id)}
+                        disabled={deletingId === qual.id}
+                        className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-xl transition-all disabled:opacity-50"
+                        title="Delete"
                       >
-                        <Trash2 size={18} />
+                        {deletingId === qual.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                       </button>
                     </div>
                   </td>
@@ -235,14 +352,20 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
                 <div className="bg-slate-50/80 px-8 py-5 flex items-center justify-between border-t border-slate-100">
                    <div className="flex gap-2">
-                      <button className="p-2 hover:bg-white text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-slate-200">
+                      <button 
+                        onClick={() => openEditModal(qual)}
+                        className="p-2 hover:bg-white text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-slate-200"
+                        title="Edit"
+                      >
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => onDeleteQualification(qual.id)}
-                        className="p-2 hover:bg-white text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-transparent hover:border-slate-200"
+                        onClick={() => handleDelete(qual.id)}
+                        disabled={deletingId === qual.id}
+                        className="p-2 hover:bg-white text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-transparent hover:border-slate-200 disabled:opacity-50"
+                        title="Delete"
                       >
-                        <Trash2 size={16} />
+                        {deletingId === qual.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                       </button>
                    </div>
                    <button className="text-indigo-600 text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
@@ -267,9 +390,11 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200">
                   <Award size={24} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Register Qualification</h3>
+                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                  {editingQual ? 'Edit Qualification' : 'Register Qualification'}
+                </h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={28} />
               </button>
             </div>
@@ -335,8 +460,15 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all">Register Program</button>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting && <Loader2 size={18} className="animate-spin" />}
+                  {editingQual ? 'Update Program' : 'Register Program'}
+                </button>
               </div>
             </form>
           </div>

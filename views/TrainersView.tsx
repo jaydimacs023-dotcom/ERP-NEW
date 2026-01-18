@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
 import { Trainer, Qualification } from '../types';
 import EmptyState from '../components/EmptyState';
+import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Filter, GraduationCap, Award, Mail, Phone, 
   Trash2, X, Info, ShieldCheck, CheckCircle, ChevronRight,
-  BookOpen, PlusCircle, Check
+  BookOpen, PlusCircle, Check, Edit2, Loader2, AlertCircle
 } from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface TrainersViewProps {
   trainers: Trainer[];
   qualifications: Qualification[];
-  onAddTrainer: (trainer: Trainer) => void;
-  onUpdateTrainer: (trainer: Trainer) => void;
-  onDeleteTrainer: (id: string) => void;
+  onAddTrainer: (trainer: Trainer) => void | Promise<void>;
+  onUpdateTrainer: (trainer: Trainer) => void | Promise<void>;
+  onDeleteTrainer: (id: string) => void | Promise<boolean>;
 }
 
 const TrainersView: React.FC<TrainersViewProps> = ({ 
@@ -25,6 +32,10 @@ const TrainersView: React.FC<TrainersViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState<Trainer | null>(null);
+  const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   
   const [formData, setFormData] = useState<Partial<Trainer>>({
     firstName: '',
@@ -41,39 +52,151 @@ const TrainersView: React.FC<TrainersViewProps> = ({
     t.specialization.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.firstName || !formData.lastName || !formData.email) return;
-
-    const newTrainer: Trainer = {
-      id: `trainer-${Date.now()}`,
-      orgId: 'temp',
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      middleName: formData.middleName || '',
-      email: formData.email,
-      contactNumber: formData.contactNumber || '',
-      specialization: formData.specialization || 'General',
-      qualificationIds: formData.qualificationIds || [],
-      createdAt: new Date().toISOString()
-    };
-
-    onAddTrainer(newTrainer);
-    setShowModal(false);
-    setFormData({ qualificationIds: [] });
+  const resetForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      email: '',
+      contactNumber: '',
+      specialization: '',
+      qualificationIds: []
+    });
+    setEditingTrainer(null);
   };
 
-  const toggleQualificationAssignment = (trainer: Trainer, qualId: string) => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  const openEditModal = (trainer: Trainer) => {
+    setEditingTrainer(trainer);
+    setFormData({
+      firstName: trainer.firstName,
+      lastName: trainer.lastName,
+      middleName: trainer.middleName,
+      email: trainer.email,
+      contactNumber: trainer.contactNumber,
+      specialization: trainer.specialization,
+      qualificationIds: [...trainer.qualificationIds]
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.firstName || !formData.lastName || !formData.email) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      if (editingTrainer) {
+        // Update existing trainer
+        const updatedTrainer: Trainer = {
+          ...editingTrainer,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          middleName: formData.middleName || '',
+          email: formData.email,
+          contactNumber: formData.contactNumber || '',
+          specialization: formData.specialization || 'General',
+          qualificationIds: formData.qualificationIds || [],
+          updatedAt: new Date().toISOString()
+        };
+        await onUpdateTrainer(updatedTrainer);
+        showToast(`Trainer "${formData.firstName} ${formData.lastName}" updated successfully!`, 'success');
+      } else {
+        // Create new trainer with proper UUID
+        const newTrainer: Trainer = {
+          id: generateUUID(),
+          orgId: '', // Will be set by App.tsx handler
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          middleName: formData.middleName || '',
+          email: formData.email,
+          contactNumber: formData.contactNumber || '',
+          specialization: formData.specialization || 'General',
+          qualificationIds: formData.qualificationIds || [],
+          createdAt: new Date().toISOString()
+        };
+        await onAddTrainer(newTrainer);
+        showToast(`Trainer "${formData.firstName} ${formData.lastName}" registered successfully!`, 'success');
+      }
+      
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving trainer:', error);
+      showToast(`Failed to save trainer: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this trainer? This action cannot be undone.')) return;
+    
+    const trainerToDelete = trainers.find(t => t.id === id);
+    setDeletingId(id);
+    try {
+      const result = await onDeleteTrainer(id);
+      if (result === false) {
+        showToast('Cannot delete trainer: They are currently assigned to active batches.', 'error');
+      } else {
+        showToast(`Trainer "${trainerToDelete?.firstName} ${trainerToDelete?.lastName}" deleted successfully!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Failed to delete trainer: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const toggleQualificationAssignment = async (trainer: Trainer, qualId: string) => {
     const isAssigned = trainer.qualificationIds.includes(qualId);
     const newQualIds = isAssigned 
       ? trainer.qualificationIds.filter(id => id !== qualId)
       : [...trainer.qualificationIds, qualId];
     
-    onUpdateTrainer({ ...trainer, qualificationIds: newQualIds });
+    await onUpdateTrainer({ ...trainer, qualificationIds: newQualIds, updatedAt: new Date().toISOString() });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
@@ -161,10 +284,19 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                 <td className="px-6 py-5 text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
-                      onClick={() => onDeleteTrainer(trainer.id)}
-                      className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                      onClick={() => openEditModal(trainer)}
+                      className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                      title="Edit Trainer"
                     >
-                      <Trash2 size={16} />
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(trainer.id)}
+                      disabled={deletingId === trainer.id}
+                      className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50"
+                      title="Delete Trainer"
+                    >
+                      {deletingId === trainer.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>
                   </div>
                 </td>
@@ -186,28 +318,35 @@ const TrainersView: React.FC<TrainersViewProps> = ({
         </table>
       </div>
 
-      {/* Registration Modal */}
+      {/* Registration/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
-                  <GraduationCap size={20} />
+                <div className={`p-2 ${editingTrainer ? 'bg-amber-600' : 'bg-indigo-600'} text-white rounded-xl shadow-md`}>
+                  {editingTrainer ? <Edit2 size={20} /> : <GraduationCap size={20} />}
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">Register New Trainer</h3>
+                <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">
+                  {editingTrainer ? 'Edit Trainer' : 'Register New Trainer'}
+                </h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={24} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">First Name</label>
                   <input required placeholder="Elena" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-sm font-medium"
                     value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Middle Name</label>
+                  <input placeholder="Santos" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-sm font-medium"
+                    value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Last Name</label>
@@ -243,8 +382,28 @@ const TrainersView: React.FC<TrainersViewProps> = ({
               </div>
 
               <div className="pt-6 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-md shadow-indigo-100 active:scale-95 transition-all">Submit Registration</button>
+                <button 
+                  type="button" 
+                  onClick={() => { setShowModal(false); resetForm(); }} 
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors disabled:opacity-50"
+                >
+                  Discard
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className={`flex-1 py-3 ${editingTrainer ? 'bg-amber-600 shadow-amber-100' : 'bg-indigo-600 shadow-indigo-100'} text-white rounded-2xl text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      {editingTrainer ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    editingTrainer ? 'Update Trainer' : 'Submit Registration'
+                  )}
+                </button>
               </div>
             </form>
           </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location } from '../types';
+import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Layers, Award, GraduationCap, Users, Calendar, 
   Trash2, X, CheckCircle, Clock, MoreVertical, Edit2, AlertCircle,
   ChevronRight, Filter, LayoutGrid, List, Handshake, CalendarRange,
-  ShieldCheck, Timer, MapPin, Calculator, CalendarDays
+  ShieldCheck, Timer, MapPin, Calculator, CalendarDays, Loader2, Play
 } from 'lucide-react';
 
 interface BatchesViewProps {
@@ -15,9 +16,10 @@ interface BatchesViewProps {
   sponsors: Sponsor[];
   schedules: TrainerSchedule[];
   locations: Location[];
-  onAddBatch: (batch: Batch) => void;
-  onUpdateBatch: (batch: Batch) => void;
-  onDeleteBatch: (id: string) => void;
+  onAddBatch: (batch: Batch) => Promise<void> | void;
+  onUpdateBatch: (batch: Batch) => Promise<void> | void;
+  onDeleteBatch: (id: string) => Promise<boolean | void> | void;
+  onNotify?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 const getSlotHours = (start: string, end: string) => {
@@ -79,23 +81,28 @@ const calculateProjectedEndDate = (
 
 const BatchesView: React.FC<BatchesViewProps> = ({ 
   batches, qualifications, trainers, students, sponsors, schedules, locations,
-  onAddBatch, onUpdateBatch, onDeleteBatch 
+  onAddBatch, onUpdateBatch, onDeleteBatch, onNotify 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [viewingBatch, setViewingBatch] = useState<Batch | null>(null);
 
   const [formData, setFormData] = useState<Partial<Batch>>({
     name: '',
+    batchCode: '',
     year: new Date().getFullYear(),
     qualificationId: '',
     trainerId: '',
     sponsorId: '',
     locationId: '',
     studentIds: [],
-    status: BatchStatus.DRAFT,
+    status: BatchStatus.PLANNED,
     startDate: '',
-    endDate: ''
+    endDate: '',
+    maxStudents: 30
   });
 
   const [projection, setProjection] = useState<{ totalHours: number; calendarDays: number; trainingDays: number } | null>(null);
@@ -126,70 +133,146 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   }, [formData.startDate, formData.qualificationId, formData.trainerId, qualifications, schedules]);
 
   const filteredBatches = batches.filter(b => 
-    b.name.toLowerCase().includes(searchTerm.toLowerCase())
+    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const resetForm = () => {
     setFormData({
       name: '',
+      batchCode: '',
       year: new Date().getFullYear(),
       qualificationId: '',
       trainerId: '',
       sponsorId: '',
       locationId: '',
       studentIds: [],
-      status: BatchStatus.DRAFT,
+      status: BatchStatus.PLANNED,
       startDate: '',
-      endDate: ''
+      endDate: '',
+      maxStudents: 30
     });
     setEditingBatch(null);
     setProjection(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.qualificationId || !formData.trainerId) return;
+    if (!formData.name || !formData.qualificationId || !formData.trainerId || isSaving) return;
 
-    if (editingBatch) {
-      onUpdateBatch({ ...editingBatch, ...formData } as Batch);
-    } else {
-      const newBatch: Batch = {
-        id: `batch-${Date.now()}`,
-        orgId: 'temp',
-        name: formData.name!,
-        year: Number(formData.year),
-        qualificationId: formData.qualificationId!,
-        trainerId: formData.trainerId!,
-        sponsorId: formData.sponsorId || undefined,
-        locationId: formData.locationId || undefined,
-        studentIds: formData.studentIds || [],
-        status: formData.status || BatchStatus.DRAFT,
-        startDate: formData.startDate!,
-        endDate: formData.endDate!,
-        createdAt: new Date().toISOString()
-      };
-      onAddBatch(newBatch);
+    setIsSaving(true);
+    try {
+      const studentCount = formData.studentIds?.length || 0;
+      
+      if (editingBatch) {
+        // Keep existing status if it's ongoing, completed or cancelled
+        const finalStatus = (editingBatch.status === BatchStatus.ONGOING || editingBatch.status === BatchStatus.COMPLETED || editingBatch.status === BatchStatus.CANCELLED) 
+          ? editingBatch.status 
+          : BatchStatus.PLANNED;
+        await onUpdateBatch({ ...editingBatch, ...formData, status: finalStatus, currentStudents: studentCount } as Batch);
+        onNotify?.('success', 'Batch updated successfully');
+      } else {
+        const newBatch: Batch = {
+          id: generateUUID(),
+          orgId: '',
+          batchCode: formData.batchCode || '',
+          name: formData.name!,
+          year: Number(formData.year),
+          qualificationId: formData.qualificationId!,
+          trainerId: formData.trainerId!,
+          sponsorId: formData.sponsorId || undefined,
+          locationId: formData.locationId || undefined,
+          studentIds: formData.studentIds || [],
+          status: BatchStatus.PLANNED,
+          startDate: formData.startDate!,
+          endDate: formData.endDate!,
+          maxStudents: formData.maxStudents || 30,
+          currentStudents: studentCount
+        };
+        await onAddBatch(newBatch);
+        onNotify?.('success', 'Batch created successfully');
+      }
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('[BatchesView] Error saving batch:', error);
+      onNotify?.('error', 'Failed to save batch');
+    } finally {
+      setIsSaving(false);
     }
-    setShowModal(false);
-    resetForm();
   };
+
+  const handleDelete = async (id: string) => {
+    if (isDeleting) return;
+    setIsDeleting(id);
+    try {
+      await onDeleteBatch(id);
+      onNotify?.('success', 'Batch deleted successfully');
+    } catch (error) {
+      console.error('[BatchesView] Error deleting batch:', error);
+      onNotify?.('error', 'Failed to delete batch');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  // Commence Training - PLANNED → ONGOING (requires ≥5 students)
+  const [isCommencing, setIsCommencing] = useState<string | null>(null);
+  
+  const handleCommenceTraining = async (batch: Batch) => {
+    if (isCommencing) return;
+    
+    // Validate minimum 5 students
+    if (batch.studentIds.length < 5) {
+      onNotify?.('error', 'Cannot commence training. Minimum 5 students required.');
+      return;
+    }
+    
+    setIsCommencing(batch.id);
+    try {
+      await onUpdateBatch({ ...batch, status: BatchStatus.ONGOING });
+      onNotify?.('success', 'Training commenced successfully!');
+    } catch (error) {
+      console.error('[BatchesView] Error commencing training:', error);
+      onNotify?.('error', 'Failed to commence training');
+    } finally {
+      setIsCommencing(null);
+    }
+  };
+
+  // Auto-complete batches when end_date has passed
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    batches.forEach(async (batch) => {
+      // Only auto-complete ONGOING batches where end_date has passed
+      if (batch.status === BatchStatus.ONGOING && batch.endDate && batch.endDate < today) {
+        try {
+          await onUpdateBatch({ ...batch, status: BatchStatus.COMPLETED });
+          onNotify?.('info', `Batch "${batch.name}" automatically marked as completed`);
+        } catch (error) {
+          console.error('[BatchesView] Error auto-completing batch:', error);
+        }
+      }
+    });
+  }, [batches]);
 
   const getStatusBadge = (status: BatchStatus) => {
     const styles = {
-      [BatchStatus.DRAFT]: 'bg-slate-100 text-slate-600 border-slate-200',
-      [BatchStatus.OPEN]: 'bg-blue-50 text-blue-700 border-blue-100',
+      [BatchStatus.PLANNED]: 'bg-blue-50 text-blue-700 border-blue-100',
       [BatchStatus.ONGOING]: 'bg-amber-50 text-amber-700 border-amber-100',
-      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      [BatchStatus.CANCELLED]: 'bg-slate-100 text-slate-600 border-slate-200'
     };
     const labels = {
-      [BatchStatus.DRAFT]: 'Draft',
-      [BatchStatus.OPEN]: 'Open Enrollment',
+      [BatchStatus.PLANNED]: 'Planned',
       [BatchStatus.ONGOING]: 'On Going',
-      [BatchStatus.COMPLETED]: 'Completed'
+      [BatchStatus.COMPLETED]: 'Completed',
+      [BatchStatus.CANCELLED]: 'Cancelled'
     };
     return (
-      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-tight ${styles[status]}`}>
-        {labels[status]}
+      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-tight ${styles[status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+        {labels[status] || status}
       </span>
     );
   };
@@ -252,27 +335,27 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </div>
                     <h3 className="text-xl font-black text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">{batch.name}</h3>
                   </div>
-                  <div className="relative group/menu">
-                    <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"><MoreVertical size={18} /></button>
-                    <div className="absolute top-full right-0 mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 py-1 hidden group-hover/menu:block z-20">
-                      <button 
-                        onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
-                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <Edit2 size={14} /> Update Record
-                      </button>
-                      <button 
-                        onClick={() => onDeleteBatch(batch.id)}
-                        className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                      >
-                        <Trash2 size={14} /> Delete Batch
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
+                      className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors"
+                      title="Edit Batch"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(batch.id)}
+                      disabled={isDeleting === batch.id}
+                      className="p-2 hover:bg-rose-50 rounded-xl text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                      title="Delete Batch"
+                    >
+                      {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                   <div className="grid grid-cols-2 gap-3">
+                   <div className="grid grid-cols-3 gap-3">
                      <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest ${sponsor ? 'bg-indigo-50 border-indigo-100 text-indigo-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                         {sponsor ? <Handshake size={14} /> : <Users size={14} />}
                         {sponsor ? 'Sponsored' : 'Private'}
@@ -280,6 +363,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                      <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest bg-slate-50 border-slate-100 text-slate-500`}>
                         <MapPin size={14} className="text-indigo-500" />
                         {location?.code || 'TBD'}
+                     </div>
+                     <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest ${batch.currentStudents >= 5 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
+                        <Users size={14} />
+                        {batch.currentStudents}/{batch.maxStudents}
                      </div>
                    </div>
 
@@ -311,9 +398,39 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                        <p className="text-sm font-black tracking-tight">{batch.endDate}</p>
                     </div>
                  </div>
-                 <button className="text-indigo-400 text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all group-hover:text-white">
-                    View <ChevronRight size={16} strokeWidth={3} />
-                 </button>
+                 <div className="flex items-center gap-3">
+                   {batch.status === 'PLANNED' && (
+                     <button 
+                       onClick={() => handleCommenceTraining(batch)}
+                       disabled={isCommencing === batch.id}
+                       className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                       title={batch.currentStudents >= 5 ? "Start Training" : "Requires at least 5 enrolled students"}
+                     >
+                       {isCommencing === batch.id ? (
+                         <Loader2 size={14} className="animate-spin" />
+                       ) : (
+                         <Play size={14} />
+                       )}
+                       Commence
+                     </button>
+                   )}
+                   {batch.status === 'ONGOING' && (
+                     <span className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 text-xs font-black uppercase tracking-widest rounded-xl">
+                       <Play size={14} /> In Progress
+                     </span>
+                   )}
+                   {batch.status === 'COMPLETED' && (
+                     <span className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-widest rounded-xl">
+                       ✓ Completed
+                     </span>
+                   )}
+                   <button 
+                     onClick={() => setViewingBatch(batch)}
+                     className="text-indigo-400 text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all group-hover:text-white"
+                   >
+                      View <ChevronRight size={16} strokeWidth={3} />
+                   </button>
+                 </div>
               </div>
             </div>
           );
@@ -336,9 +453,17 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Identifier</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Code</label>
+                    <input 
+                      placeholder="e.g. BATCH-001" 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800"
+                      value={formData.batchCode} onChange={e => setFormData({...formData, batchCode: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Name</label>
                     <input 
                       required 
                       placeholder="e.g. CSS-2024-B1" 
@@ -397,7 +522,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       value={formData.locationId} onChange={e => setFormData({...formData, locationId: e.target.value})}
                     >
                       <option value="">Remote / External</option>
-                      {locations.map(l => <option key={l.id} value={l.id}>[{l.code}] {l.name}</option>)}
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -470,8 +595,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 )}
 
                 <div className="pt-4 flex gap-4">
-                  <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all">
+                  <button type="button" onClick={() => setShowModal(false)} disabled={isSaving} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all disabled:opacity-50">Cancel</button>
+                  <button type="submit" disabled={isSaving} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {isSaving && <Loader2 size={16} className="animate-spin" />}
                     {editingBatch ? 'Sync Record' : 'Begin Training Program'}
                   </button>
                 </div>
@@ -526,6 +652,252 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <span>Enrolled Learners</span>
                     <span className="text-indigo-600">{formData.studentIds?.length || 0}</span>
                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Detail View Modal */}
+      {viewingBatch && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-8 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 opacity-10">
+                <Layers size={200} strokeWidth={1} />
+              </div>
+              <div className="relative z-10 flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-lg border border-white/30 uppercase tracking-widest">FY {viewingBatch.year}</span>
+                    <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-lg border border-white/30 uppercase tracking-widest">{viewingBatch.batchCode}</span>
+                  </div>
+                  <h2 className="text-3xl font-black uppercase tracking-tight mb-2">{viewingBatch.name}</h2>
+                  <p className="text-indigo-200 text-sm font-bold">Comprehensive Batch Intelligence Report</p>
+                </div>
+                <button 
+                  onClick={() => setViewingBatch(null)}
+                  className="p-3 hover:bg-white/20 rounded-full transition-colors text-white"
+                >
+                  <X size={28} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-10 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-3xl border border-indigo-100">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg">
+                      {getStatusBadge(viewingBatch.status)}
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Current Status</p>
+                  <p className="text-2xl font-black text-slate-800 capitalize">{viewingBatch.status.toLowerCase()}</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-3xl border border-emerald-100">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg">
+                      <Users size={24} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Enrollment</p>
+                  <p className="text-2xl font-black text-slate-800">{viewingBatch.currentStudents} / {viewingBatch.maxStudents}</p>
+                  <div className="mt-3 w-full bg-emerald-100 rounded-full h-2">
+                    <div 
+                      className="bg-emerald-600 h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min((viewingBatch.currentStudents / viewingBatch.maxStudents) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-3xl border border-amber-100">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-amber-600 text-white rounded-2xl shadow-lg">
+                      <CalendarDays size={24} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Timeline</p>
+                  <p className="text-sm font-bold text-slate-600">{viewingBatch.startDate}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase">to</p>
+                  <p className="text-sm font-bold text-slate-800">{viewingBatch.endDate}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Award size={16} className="text-indigo-600" />
+                    Qualification Details
+                  </h3>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <p className="text-lg font-black text-slate-800 mb-2">
+                      {qualifications.find(q => q.id === viewingBatch.qualificationId)?.name || 'Unknown'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Code</p>
+                        <p className="text-sm font-bold text-slate-700">
+                          {qualifications.find(q => q.id === viewingBatch.qualificationId)?.code || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Duration</p>
+                        <p className="text-sm font-bold text-slate-700">
+                          {qualifications.find(q => q.id === viewingBatch.qualificationId)?.durationDays || 0} Days
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <GraduationCap size={16} className="text-indigo-600" />
+                    Lead Instructor
+                  </h3>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    {(() => {
+                      const trainer = trainers.find(t => t.id === viewingBatch.trainerId);
+                      return trainer ? (
+                        <>
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-xl">
+                              {trainer.lastName[0]}{trainer.firstName[0]}
+                            </div>
+                            <div>
+                              <p className="text-lg font-black text-slate-800">{trainer.lastName}, {trainer.firstName}</p>
+                              <p className="text-xs text-slate-500 font-bold">{trainer.email}</p>
+                            </div>
+                          </div>
+                          {trainer.phone && (
+                            <div className="mt-3 pt-3 border-t border-slate-100">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Contact</p>
+                              <p className="text-sm font-bold text-slate-700">{trainer.phone}</p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-slate-400 italic">No trainer assigned</p>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <MapPin size={16} className="text-indigo-600" />
+                    Location & Sponsor
+                  </h3>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Training Location</p>
+                      <p className="text-sm font-bold text-slate-700">
+                        {locations.find(l => l.id === viewingBatch.locationId)?.name || 'Not Specified'}
+                      </p>
+                    </div>
+                    <div className="pt-4 border-t border-slate-100">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Sponsor</p>
+                      <p className="text-sm font-bold text-slate-700">
+                        {sponsors.find(s => s.id === viewingBatch.sponsorId)?.name || 'Private / Self-Funded'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Calculator size={16} className="text-indigo-600" />
+                    Projected Metrics
+                  </h3>
+                  <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl text-white">
+                    {(() => {
+                      const schedule = schedules.find(s => s.trainerId === viewingBatch.trainerId);
+                      const qual = qualifications.find(q => q.id === viewingBatch.qualificationId);
+                      if (schedule && qual && viewingBatch.startDate) {
+                        const projected = calculateProjectedEndDate(viewingBatch.startDate, qual.durationDays, schedule.slots);
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Hours</p>
+                                <p className="text-2xl font-mono font-black">{projected.totalHours}h</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Calendar Days</p>
+                                <p className="text-2xl font-mono font-black">{projected.calendarDays}</p>
+                              </div>
+                            </div>
+                            <div className="pt-4 border-t border-white/10">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Training Days</p>
+                              <p className="text-2xl font-mono font-black text-indigo-400">{projected.trainingDays}</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return <p className="text-slate-400 italic text-sm">Metrics unavailable</p>;
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Users size={16} className="text-indigo-600" />
+                  Enrolled Students ({viewingBatch.studentIds?.length || 0})
+                </h3>
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                  {viewingBatch.studentIds && viewingBatch.studentIds.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {viewingBatch.studentIds.map(studentId => {
+                        const student = students.find(s => s.id === studentId);
+                        return student ? (
+                          <div key={student.id} className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs font-black shrink-0">
+                              {student.lastName[0]}
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                              <p className="text-xs font-black text-slate-800 truncate uppercase">
+                                {student.lastName}, {student.firstName}
+                              </p>
+                              <p className="text-[9px] font-mono text-slate-400 mt-0.5">
+                                {student.uli.slice(-6)}
+                              </p>
+                            </div>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center">
+                      <Users size={48} className="mx-auto text-slate-200 mb-4" />
+                      <p className="text-sm text-slate-400 font-bold">No students enrolled yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-8 flex gap-3">
+                <button 
+                  onClick={() => {
+                    setViewingBatch(null);
+                    setEditingBatch(viewingBatch);
+                    setFormData(viewingBatch);
+                    setShowModal(true);
+                  }}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-100"
+                >
+                  <Edit2 size={18} /> Edit Batch
+                </button>
+                <button 
+                  onClick={() => setViewingBatch(null)}
+                  className="px-8 py-4 bg-slate-100 text-slate-700 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

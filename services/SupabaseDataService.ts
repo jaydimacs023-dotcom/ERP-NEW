@@ -20,6 +20,20 @@ export class SupabaseDataService implements IDataService {
     this.supabaseKey = config.supabase.anonKey;
   }
 
+  // Getter for baseUrl (alias for supabaseUrl REST endpoint)
+  private get baseUrl(): string {
+    return `${this.supabaseUrl}/rest/v1`;
+  }
+
+  // Helper method to get standard headers for Supabase requests
+  private getHeaders(): Record<string, string> {
+    return {
+      'apikey': this.supabaseKey,
+      'Authorization': `Bearer ${this.supabaseKey}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
   /**
    * Generic fetch method for Supabase tables
    * Uses the REST API for simplicity without client library dependency
@@ -97,6 +111,7 @@ export class SupabaseDataService implements IDataService {
         auditLogs,
         purchaseOrders,
         paymentHistories,
+        fixedAssets,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -119,6 +134,7 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('audit_logs'),
         this.fetchFromSupabase('purchase_orders'),
         this.fetchFromSupabase('payment_histories'),
+        this.fetchFromSupabase('fixed_assets'),
       ]);
 
       // Check if we got any real data
@@ -154,6 +170,7 @@ export class SupabaseDataService implements IDataService {
         auditLogs: this.snakeToCamel(auditLogs as any) || [],
         purchaseOrders: this.snakeToCamel(purchaseOrders as any) || [],
         paymentHistories: this.snakeToCamel(paymentHistories as any) || [],
+        fixedAssets: this.snakeToCamel(fixedAssets as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -325,8 +342,9 @@ export class SupabaseDataService implements IDataService {
   /**
    * Filter object to only include valid columns for a given table
    * Removes fields that don't exist in Supabase schema
+   * For inserts, excludes auto-generated columns (created_at, updated_at, net_book_value for fixed_assets)
    */
-  private filterToTableSchema(table: string, data: any): any {
+  private filterToTableSchema(table: string, data: any, isInsert: boolean = false): any {
     const validColumns: Record<string, string[]> = {
       students: [
         'id', 'org_id', 'uli', 'last_name', 'first_name', 'middle_name', 'extension',
@@ -337,15 +355,29 @@ export class SupabaseDataService implements IDataService {
       ],
       organizations: ['id', 'name', 'currency', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'primary_color', 'logo_url'],
       users: ['id', 'name', 'email', 'password', 'role', 'org_id', 'student_id', 'trainer_id', 'created_at'],
-      trainers: ['id', 'org_id', 'first_name', 'last_name', 'email', 'contact_number', 'created_at', 'updated_at'],
+      trainers: ['id', 'org_id', 'first_name', 'last_name', 'middle_name', 'email', 'contact_number', 'specialization', 'qualification_ids', 'created_at', 'updated_at'],
+      qualifications: ['id', 'org_id', 'code', 'name', 'duration_days', 'sector', 'created_at', 'updated_at'],
       employees: ['id', 'org_id', 'first_name', 'last_name', 'designation', 'tin', 'sss', 'philhealth', 'pagibig', 'basic_salary', 'bank_name', 'bank_account', 'is_active', 'created_at', 'updated_at'],
+      locations: ['id', 'org_id', 'code', 'name', 'address', 'capacity', 'created_at', 'updated_at'],
+      schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
+      sponsors: ['id', 'org_id', 'name', 'contact_person', 'email', 'phone', 'address', 'created_at', 'updated_at'],
+      batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
+      fixed_assets: ['id', 'org_id', 'code', 'name', 'description', 'category', 'purchase_date', 'purchase_cost', 'accumulated_depreciation', 'depreciation_method', 'useful_life_years', 'gl_account_id', 'created_at', 'updated_at'],
+      items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'created_at', 'updated_at'],
+    };
+
+    // Columns that are auto-generated and should be excluded on INSERT
+    const generatedColumns: Record<string, string[]> = {
+      fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
+      items: ['created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
+    const excludeColumns = (isInsert && generatedColumns[table]) || [];
     const filtered: any = {};
 
     for (const col of allowedColumns) {
-      if (data.hasOwnProperty(col)) {
+      if (!excludeColumns.includes(col) && data.hasOwnProperty(col)) {
         filtered[col] = data[col];
       }
     }
@@ -630,26 +662,542 @@ export class SupabaseDataService implements IDataService {
   }
 
   // ============================================================================
+  // TRAINER CRUD
+  // ============================================================================
+
+  async createTrainer(trainer: any): Promise<any> {
+    console.debug('[Supabase] createTrainer() INPUT:', trainer);
+    
+    // Convert camelCase input to snake_case FIRST so filtering works correctly
+    const snakeCaseTrainer = this.camelToSnake(trainer);
+    console.debug('[Supabase] After camelToSnake():', snakeCaseTrainer);
+    
+    // Ensure org_id is present
+    if (!snakeCaseTrainer.org_id) {
+      console.warn('[Supabase] Warning: trainer missing org_id');
+    }
+
+    // Filter to only valid columns AFTER converting to snake_case
+    let filteredTrainer = this.filterToTableSchema('trainers', snakeCaseTrainer);
+    console.debug('[Supabase] After filterToTableSchema():', {
+      beforeKeys: Object.keys(snakeCaseTrainer),
+      afterKeys: Object.keys(filteredTrainer),
+      removed: Object.keys(snakeCaseTrainer).filter(k => !Object.keys(filteredTrainer).includes(k))
+    });
+    
+    // Remove id if it's not a valid UUID (let Supabase generate it)
+    if (filteredTrainer.id && !this.isValidUUID(filteredTrainer.id)) {
+      console.debug('[Supabase] Removing invalid UUID:', filteredTrainer.id);
+      delete filteredTrainer.id;
+    }
+
+    // Add timestamps for audit trail
+    const now = new Date().toISOString();
+    filteredTrainer.created_at = now;
+    filteredTrainer.updated_at = now;
+    
+    console.debug('[Supabase] FINAL trainer data ready for POST:', {
+      keys: Object.keys(filteredTrainer),
+      fullData: JSON.stringify(filteredTrainer)
+    });
+    
+    return this.insertToSupabaseRaw('trainers', filteredTrainer);
+  }
+
+  async updateTrainer(id: string, updates: Partial<any>): Promise<any> {
+    // Convert updates to snake_case first so filtering works correctly
+    let snakeCaseUpdates = this.camelToSnake(updates);
+    
+    // Always update the updated_at timestamp
+    snakeCaseUpdates.updated_at = new Date().toISOString();
+
+    // Filter to only valid columns for trainers table
+    const filteredUpdates = this.filterToTableSchema('trainers', snakeCaseUpdates);
+    
+    console.debug('[Supabase] Filtered trainer updates ready for PATCH:', {
+      keys: Object.keys(filteredUpdates),
+      data: filteredUpdates
+    });
+    
+    return this.updateInSupabaseRaw('trainers', id, filteredUpdates);
+  }
+
+  async deleteTrainer(id: string): Promise<void> {
+    // Hard delete
+    await this.deleteFromSupabase('trainers', id);
+  }
+
+  async checkTrainerUsage(trainerId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    // Check if trainer is referenced in other tables (batches, schedules, users, etc.)
+    const usedIn: string[] = [];
+    
+    try {
+      // Check if trainer is assigned to any batches
+      const batchResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/batches?trainer_id=eq.${trainerId}&select=id`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+      const batches = await batchResponse.json();
+      if (Array.isArray(batches) && batches.length > 0) {
+        usedIn.push('Batches');
+      }
+
+      // Check if trainer has any schedules
+      const scheduleResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/schedules?trainer_id=eq.${trainerId}&select=id`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+      const schedules = await scheduleResponse.json();
+      if (Array.isArray(schedules) && schedules.length > 0) {
+        usedIn.push('Trainer Schedules');
+      }
+
+      // Check if trainer has a linked user account
+      const userResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/users?trainer_id=eq.${trainerId}&select=id`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+      const users = await userResponse.json();
+      if (Array.isArray(users) && users.length > 0) {
+        usedIn.push('User Accounts');
+      }
+
+      return {
+        isUsed: usedIn.length > 0,
+        usedIn
+      };
+    } catch (error) {
+      console.warn('[Supabase] Could not check trainer usage:', error);
+      return { isUsed: false, usedIn: [] };
+    }
+  }
+
+  // ============================================================================
+  // QUALIFICATION CRUD
+  // ============================================================================
+
+  async createQualification(qualification: any): Promise<any> {
+    console.debug('[Supabase] createQualification() INPUT:', qualification);
+    
+    // Convert camelCase input to snake_case FIRST so filtering works correctly
+    const snakeCaseQual = this.camelToSnake(qualification);
+    console.debug('[Supabase] After camelToSnake():', snakeCaseQual);
+    
+    // Ensure org_id is present
+    if (!snakeCaseQual.org_id) {
+      console.warn('[Supabase] Warning: qualification missing org_id');
+    }
+
+    // Filter to only valid columns AFTER converting to snake_case
+    let filteredQual = this.filterToTableSchema('qualifications', snakeCaseQual);
+    console.debug('[Supabase] After filterToTableSchema():', {
+      beforeKeys: Object.keys(snakeCaseQual),
+      afterKeys: Object.keys(filteredQual),
+      removed: Object.keys(snakeCaseQual).filter(k => !Object.keys(filteredQual).includes(k))
+    });
+    
+    // Remove id if it's not a valid UUID (let Supabase generate it)
+    if (filteredQual.id && !this.isValidUUID(filteredQual.id)) {
+      console.debug('[Supabase] Removing invalid UUID:', filteredQual.id);
+      delete filteredQual.id;
+    }
+
+    // Add timestamps for audit trail
+    const now = new Date().toISOString();
+    filteredQual.created_at = now;
+    filteredQual.updated_at = now;
+    
+    console.debug('[Supabase] FINAL qualification data ready for POST:', {
+      keys: Object.keys(filteredQual),
+      fullData: JSON.stringify(filteredQual)
+    });
+    
+    return this.insertToSupabaseRaw('qualifications', filteredQual);
+  }
+
+  async updateQualification(id: string, updates: Partial<any>): Promise<any> {
+    // Convert updates to snake_case first so filtering works correctly
+    let snakeCaseUpdates = this.camelToSnake(updates);
+    
+    // Always update the updated_at timestamp
+    snakeCaseUpdates.updated_at = new Date().toISOString();
+
+    // Filter to only valid columns for qualifications table
+    const filteredUpdates = this.filterToTableSchema('qualifications', snakeCaseUpdates);
+    
+    console.debug('[Supabase] Filtered qualification updates ready for PATCH:', {
+      keys: Object.keys(filteredUpdates),
+      data: filteredUpdates
+    });
+    
+    return this.updateInSupabaseRaw('qualifications', id, filteredUpdates);
+  }
+
+  async deleteQualification(id: string): Promise<void> {
+    // Hard delete
+    await this.deleteFromSupabase('qualifications', id);
+  }
+
+  async checkQualificationUsage(qualificationId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    // Check if qualification is referenced in other tables (batches, trainers, etc.)
+    const usedIn: string[] = [];
+    
+    try {
+      // Check if qualification is used in any batches
+      const batchResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/batches?qualification_id=eq.${qualificationId}&select=id`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+      const batches = await batchResponse.json();
+      if (Array.isArray(batches) && batches.length > 0) {
+        usedIn.push('Training Batches');
+      }
+
+      // Check if qualification is assigned to any trainers (in qualification_ids array)
+      // Note: This requires checking if qualificationId is in any trainer's qualification_ids array
+      const trainerResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/trainers?qualification_ids=cs.{${qualificationId}}&select=id`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+      const trainers = await trainerResponse.json();
+      if (Array.isArray(trainers) && trainers.length > 0) {
+        usedIn.push('Trainer Certifications');
+      }
+
+      return {
+        isUsed: usedIn.length > 0,
+        usedIn
+      };
+    } catch (error) {
+      console.warn('[Supabase] Could not check qualification usage:', error);
+      return { isUsed: false, usedIn: [] };
+    }
+  }
+
+  // ============================================================================
   // BATCH CRUD
   // ============================================================================
 
   async createBatch(batch: any): Promise<any> {
+    // Preserve student_ids array
+    const studentIdsBackup = batch.studentIds;
+    
     const snakeCaseBatch = this.camelToSnake(batch);
-    const filteredBatch = this.filterToTableSchema('batches', snakeCaseBatch);
-    if ((filteredBatch as any).id && !this.isValidUUID((filteredBatch as any).id)) {
-      delete (filteredBatch as any).id;
+    let filteredBatch = this.filterToTableSchema('batches', snakeCaseBatch);
+    
+    // Restore student_ids as PostgreSQL array format
+    if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
+      filteredBatch.student_ids = studentIdsBackup;
     }
+    
+    // Handle empty optional foreign keys - convert empty string to null
+    if (filteredBatch.sponsor_id === '' || filteredBatch.sponsor_id === undefined) {
+      filteredBatch.sponsor_id = null;
+    }
+    if (filteredBatch.location_id === '' || filteredBatch.location_id === undefined) {
+      filteredBatch.location_id = null;
+    }
+    
+    // Remove invalid UUID
+    if (filteredBatch.id && !this.isValidUUID(filteredBatch.id)) {
+      delete filteredBatch.id;
+    }
+    
+    console.debug('[Supabase] createBatch - Final payload:', filteredBatch);
+    
     return this.insertToSupabaseRaw('batches', filteredBatch);
   }
 
   async updateBatch(id: string, updates: Partial<any>): Promise<any> {
+    // Preserve student_ids array
+    const studentIdsBackup = updates.studentIds;
+    
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('batches', snakeCaseUpdates);
+    
+    // Restore student_ids as PostgreSQL array format
+    if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
+      filteredUpdates.student_ids = studentIdsBackup;
+    }
+    
+    // Handle empty optional foreign keys - convert empty string to null
+    if (filteredUpdates.sponsor_id === '' || filteredUpdates.sponsor_id === undefined) {
+      filteredUpdates.sponsor_id = null;
+    }
+    if (filteredUpdates.location_id === '' || filteredUpdates.location_id === undefined) {
+      filteredUpdates.location_id = null;
+    }
+    
     return this.updateInSupabaseRaw('batches', id, filteredUpdates);
   }
 
   async deleteBatch(id: string): Promise<void> {
     return this.deleteFromSupabase('batches', id);
+  }
+
+  // ============================================================================
+  // LOCATION CRUD
+  // ============================================================================
+
+  async createLocation(location: any): Promise<any> {
+    const snakeCaseLocation = this.camelToSnake(location);
+    let filteredLocation = this.filterToTableSchema('locations', snakeCaseLocation);
+    console.debug('[Supabase] After filterToTableSchema():', {
+      original: location,
+      snakeCase: snakeCaseLocation,
+      filtered: filteredLocation
+    });
+
+    // Remove ID if not a valid UUID (will be auto-generated by Supabase)
+    if (filteredLocation.id && !this.isValidUUID(filteredLocation.id)) {
+      console.debug(`[Supabase] Removing invalid UUID: ${filteredLocation.id}`);
+      delete filteredLocation.id;
+    }
+
+    return this.insertToSupabaseRaw('locations', filteredLocation);
+  }
+
+  async updateLocation(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('locations', snakeCaseUpdates);
+    return this.updateInSupabaseRaw('locations', id, filteredUpdates);
+  }
+
+  async deleteLocation(id: string): Promise<void> {
+    return this.deleteFromSupabase('locations', id);
+  }
+
+  async checkLocationUsage(locationId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    try {
+      const usedIn: string[] = [];
+
+      // Check if location is used in batches
+      const batchesResponse = await fetch(
+        `${this.baseUrl}/batches?location_id=eq.${locationId}&select=id,name`,
+        { headers: this.getHeaders() }
+      );
+      if (batchesResponse.ok) {
+        const batches = await batchesResponse.json();
+        if (batches.length > 0) {
+          usedIn.push(`${batches.length} batch(es)`);
+        }
+      }
+
+      // Check if location is used in schedules
+      const schedulesResponse = await fetch(
+        `${this.baseUrl}/schedules?location_id=eq.${locationId}&select=id`,
+        { headers: this.getHeaders() }
+      );
+      if (schedulesResponse.ok) {
+        const schedules = await schedulesResponse.json();
+        if (schedules.length > 0) {
+          usedIn.push(`${schedules.length} schedule(s)`);
+        }
+      }
+
+      return {
+        isUsed: usedIn.length > 0,
+        usedIn
+      };
+    } catch (error) {
+      console.warn('[Supabase] Could not check location usage:', error);
+      return { isUsed: false, usedIn: [] };
+    }
+  }
+
+  // ============================================================================
+  // SCHEDULE CRUD
+  // ============================================================================
+
+  async createSchedule(schedule: any): Promise<any> {
+    // Preserve the slots array as-is (JSONB should keep camelCase keys)
+    const slotsBackup = schedule.slots;
+    
+    const snakeCaseSchedule = this.camelToSnake(schedule);
+    let filteredSchedule = this.filterToTableSchema('schedules', snakeCaseSchedule);
+    
+    // Restore the original slots array (JSONB content should not be snake_cased)
+    if (slotsBackup) {
+      filteredSchedule.slots = slotsBackup;
+    }
+    
+    // Handle empty location_id - convert empty string to null for FK constraint
+    if (filteredSchedule.location_id === '' || filteredSchedule.location_id === undefined) {
+      filteredSchedule.location_id = null;
+    }
+    
+    console.debug('[Supabase] createSchedule - Final payload:', {
+      original: schedule,
+      filtered: filteredSchedule
+    });
+
+    // Remove ID if not a valid UUID (will be auto-generated by Supabase)
+    if (filteredSchedule.id && !this.isValidUUID(filteredSchedule.id)) {
+      console.debug(`[Supabase] Removing invalid UUID: ${filteredSchedule.id}`);
+      delete filteredSchedule.id;
+    }
+
+    return this.insertToSupabaseRaw('schedules', filteredSchedule);
+  }
+
+  async updateSchedule(id: string, updates: Partial<any>): Promise<any> {
+    // Preserve the slots array as-is (JSONB should keep camelCase keys)
+    const slotsBackup = updates.slots;
+    
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('schedules', snakeCaseUpdates);
+    
+    // Restore the original slots array (JSONB content should not be snake_cased)
+    if (slotsBackup) {
+      filteredUpdates.slots = slotsBackup;
+    }
+    
+    // Handle empty location_id - convert empty string to null for FK constraint
+    if (filteredUpdates.location_id === '' || filteredUpdates.location_id === undefined) {
+      filteredUpdates.location_id = null;
+    }
+    
+    return this.updateInSupabaseRaw('schedules', id, filteredUpdates);
+  }
+
+  async deleteSchedule(id: string): Promise<void> {
+    return this.deleteFromSupabase('schedules', id);
+  }
+
+  async checkScheduleUsage(scheduleId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    try {
+      const usedIn: string[] = [];
+
+      // Check if schedule is referenced in batches (if there's a schedule_id field)
+      const batchesResponse = await fetch(
+        `${this.baseUrl}/batches?schedule_id=eq.${scheduleId}&select=id,name`,
+        { headers: this.getHeaders() }
+      );
+      if (batchesResponse.ok) {
+        const batches = await batchesResponse.json();
+        if (batches.length > 0) {
+          usedIn.push(`${batches.length} batch(es)`);
+        }
+      }
+
+      return {
+        isUsed: usedIn.length > 0,
+        usedIn
+      };
+    } catch (error) {
+      console.warn('[Supabase] Could not check schedule usage:', error);
+      return { isUsed: false, usedIn: [] };
+    }
+  }
+
+  // ============================================================================
+  // SPONSOR CRUD
+  // ============================================================================
+
+  async createSponsor(sponsor: any): Promise<any> {
+    console.debug('[Supabase] createSponsor called with:', sponsor);
+    
+    // Convert to snake_case
+    const snakeCaseSponsor = this.camelToSnake(sponsor);
+    
+    // Filter to valid columns
+    let filteredSponsor = this.filterToTableSchema('sponsors', snakeCaseSponsor);
+    console.debug('[Supabase] After filterToTableSchema():', {
+      snakeCaseSponsor,
+      filteredSponsor
+    });
+    
+    // Validate or remove invalid ID
+    if (filteredSponsor.id && !this.isValidUUID(filteredSponsor.id)) {
+      console.warn(`[Supabase] Removing invalid UUID: ${filteredSponsor.id}`);
+      delete filteredSponsor.id;
+    }
+
+    // Insert to Supabase
+    return this.insertToSupabaseRaw('sponsors', filteredSponsor);
+  }
+
+  async updateSponsor(id: string, updates: Partial<any>): Promise<any> {
+    console.debug('[Supabase] updateSponsor called with:', { id, updates });
+
+    // Convert to snake_case
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    
+    // Filter to valid columns
+    const filteredUpdates = this.filterToTableSchema('sponsors', snakeCaseUpdates);
+
+    // Update in Supabase
+    return this.updateInSupabaseRaw('sponsors', id, filteredUpdates);
+  }
+
+  async deleteSponsor(id: string): Promise<void> {
+    console.debug('[Supabase] deleteSponsor called with:', id);
+    return this.deleteFromSupabase('sponsors', id);
+  }
+
+  async checkSponsorUsage(sponsorId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    console.debug('[Supabase] checkSponsorUsage called with:', sponsorId);
+    
+    try {
+      const usedIn: string[] = [];
+
+      // Check if sponsor is referenced in students
+      const studentsResponse = await fetch(
+        `${this.baseUrl}/students?sponsor_id=eq.${sponsorId}&select=id,first_name,last_name`,
+        { headers: this.getHeaders() }
+      );
+      if (studentsResponse.ok) {
+        const students = await studentsResponse.json();
+        if (students.length > 0) {
+          usedIn.push(`${students.length} student(s)`);
+        }
+      }
+
+      // Check if sponsor is referenced in batches (if there's a sponsor_id field)
+      const batchesResponse = await fetch(
+        `${this.baseUrl}/batches?sponsor_id=eq.${sponsorId}&select=id,name`,
+        { headers: this.getHeaders() }
+      );
+      if (batchesResponse.ok) {
+        const batches = await batchesResponse.json();
+        if (batches.length > 0) {
+          usedIn.push(`${batches.length} batch(es)`);
+        }
+      }
+
+      return {
+        isUsed: usedIn.length > 0,
+        usedIn
+      };
+    } catch (error) {
+      console.warn('[Supabase] Could not check sponsor usage:', error);
+      return { isUsed: false, usedIn: [] };
+    }
   }
 
   // ============================================================================
@@ -679,5 +1227,51 @@ export class SupabaseDataService implements IDataService {
 
   async deleteEntity(table: string, id: string): Promise<void> {
     return this.deleteFromSupabase(table, id);
+  }
+
+  /**
+   * Fixed Asset CRUD Operations
+   */
+  async createFixedAsset(asset: any): Promise<any> {
+    const snakeCaseAsset = this.camelToSnake(asset);
+    // Use isInsert: true to exclude generated columns (net_book_value, created_at, updated_at)
+    const filteredAsset = this.filterToTableSchema('fixed_assets', snakeCaseAsset, true);
+    if ((filteredAsset as any).id && !this.isValidUUID((filteredAsset as any).id)) {
+      delete (filteredAsset as any).id;
+    }
+    return this.insertToSupabaseRaw('fixed_assets', filteredAsset);
+  }
+
+  async updateFixedAsset(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('fixed_assets', snakeCaseUpdates);
+    return this.updateInSupabaseRaw('fixed_assets', id, filteredUpdates);
+  }
+
+  async deleteFixedAsset(id: string): Promise<void> {
+    return this.deleteFromSupabase('fixed_assets', id);
+  }
+
+  /**
+   * Item Catalog CRUD Operations
+   */
+  async createItem(item: any): Promise<any> {
+    const snakeCaseItem = this.camelToSnake(item);
+    // Use isInsert: true to exclude generated columns (created_at, updated_at)
+    const filteredItem = this.filterToTableSchema('items', snakeCaseItem, true);
+    if ((filteredItem as any).id && !this.isValidUUID((filteredItem as any).id)) {
+      delete (filteredItem as any).id;
+    }
+    return this.insertToSupabaseRaw('items', filteredItem);
+  }
+
+  async updateItem(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('items', snakeCaseUpdates);
+    return this.updateInSupabaseRaw('items', id, filteredUpdates);
+  }
+
+  async deleteItem(id: string): Promise<void> {
+    return this.deleteFromSupabase('items', id);
   }
 }

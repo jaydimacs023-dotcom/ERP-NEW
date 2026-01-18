@@ -86,17 +86,11 @@ export const INITIAL_VENDORS: Vendor[] = [
 export const INITIAL_BANK_ACCOUNTS: BankAccount[] = [
   { id: 'bank-1', orgId: 'org-3', bankName: 'BDO Unibank', accountNumber: '00123-4567-89', type: 'CHECKING', glAccountId: '1100-org-3', currency: 'PHP' }
 ];
+// Fixed assets loaded from Supabase only - no mock data
 export const INITIAL_FIXED_ASSETS: FixedAsset[] = [];
-export const INITIAL_LOCATIONS: Location[] = [
-  {
-    id: 'loc-1',
-    orgId: 'org-3',
-    code: 'MAIN-MNL',
-    name: 'Manila Central Campus',
-    address: '123 Rizal Ave, Santa Cruz, Manila, 1003 Metro Manila',
-    createdAt: '2024-01-01T00:00:00Z'
-  }
-];
+
+// Locations - Empty for production (data sourced from Supabase)
+export const INITIAL_LOCATIONS: Location[] = [];
 
 export const INITIAL_STUDENTS: Student[] = [
   {
@@ -118,55 +112,18 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   { id: 'emp-2', orgId: 'org-3', firstName: 'Juan', lastName: 'Dela Cruz', designation: 'Senior Instructor', basicSalary: 35000, isActive: true, createdAt: '2024-01-01T00:00:00Z' }
 ];
 
-export const INITIAL_SPONSORS: Sponsor[] = [
-  { id: 'spon-1', orgId: 'org-3', name: 'City Government of Manila', type: 'GOVERNMENT', email: 'finance@manila.gov.ph', contactNumber: '+63 2 8527 0011', arAccountId: '1200-org-3', isActive: true, createdAt: '2024-01-01T00:00:00Z' }
-];
-export const INITIAL_ITEMS: NonStockItem[] = [
-  { id: 'item-1', orgId: 'org-3', code: 'TUITION-NCII', name: 'NCII Assessment & Tuition Fee', defaultAccountId: '4100-org-3', unitPrice: 15000, type: 'FEE', taxCategory: TaxCategory.VAT, whtRate: WHTCategory.SERVICES, isActive: true, createdAt: '2024-01-01T00:00:00Z' }
-];
-export const INITIAL_QUALIFICATIONS: Qualification[] = [
-  { id: 'qual-1', orgId: 'org-3', code: 'CSS-NCII', name: 'Computer Systems Servicing NC II', durationDays: 35, sector: 'ICT', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'qual-2', orgId: 'org-3', code: 'BKK-NCIII', name: 'Bookkeeping NC III', durationDays: 37, sector: 'Business', createdAt: '2024-01-05T00:00:00Z' },
-  { id: 'qual-3', orgId: 'org-3', code: 'VGD-NCIII', name: 'Visual Graphic Design NC III', durationDays: 45, sector: 'ICT', createdAt: '2024-01-10T00:00:00Z' }
-];
-export const INITIAL_TRAINERS: Trainer[] = [
-  { 
-    id: 'train-1', orgId: 'org-3', firstName: 'Juan', lastName: 'Dela Cruz', middleName: 'Protacio', 
-    email: 'juan.dc@academy.ph', contactNumber: '+63 917 123 4567', specialization: 'ICT', 
-    qualificationIds: ['qual-1'], createdAt: '2024-01-01T00:00:00Z' 
-  }
-];
-export const INITIAL_SCHEDULES: TrainerSchedule[] = [
-  { 
-    id: 'sch-1', 
-    orgId: 'org-3', 
-    trainerId: 'train-1', 
-    slots: [
-      { dayIndex: 1, startTime: '08:00', endTime: '12:00' },
-      { dayIndex: 2, startTime: '13:00', endTime: '17:00' },
-      { dayIndex: 3, startTime: '08:00', endTime: '16:00' },
-      { dayIndex: 4, startTime: '08:00', endTime: '16:00' },
-      { dayIndex: 5, startTime: '08:00', endTime: '16:00' }
-    ], 
-    description: 'Standard Varied Shift', 
-    createdAt: '2024-01-01T00:00:00Z' 
-  }
-];
-export const INITIAL_BATCHES: Batch[] = [
-  {
-    id: 'batch-1',
-    orgId: 'org-3',
-    name: 'CSS-2024-B1',
-    year: 2024,
-    qualificationId: 'qual-1',
-    trainerId: 'train-1',
-    studentIds: ['stud-1'],
-    status: BatchStatus.ONGOING,
-    startDate: '2024-01-15',
-    endDate: '2024-03-10',
-    createdAt: '2024-01-01T00:00:00Z'
-  }
-];
+// Sponsors - Empty for production (data sourced from Supabase)
+export const INITIAL_SPONSORS: Sponsor[] = [];
+export const INITIAL_ITEMS: NonStockItem[] = [];
+// Qualifications - Empty for production (data sourced from Supabase)
+export const INITIAL_QUALIFICATIONS: Qualification[] = [];
+
+// Trainers - Empty for production (data sourced from Supabase)
+export const INITIAL_TRAINERS: Trainer[] = [];
+
+export const INITIAL_SCHEDULES: TrainerSchedule[] = [];
+
+export const INITIAL_BATCHES: Batch[] = [];
 export const INITIAL_ENTRIES: JournalEntry[] = [];
 export const INITIAL_LINES: JournalEntryLine[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];

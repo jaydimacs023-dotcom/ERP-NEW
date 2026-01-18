@@ -101,6 +101,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
+  const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
@@ -151,6 +152,7 @@ export default function App() {
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
         setPayments(data.paymentHistories);
+        setFixedAssets(data.fixedAssets);
         
         if (data.organizations.length > 0) {
           // Get the restored session to check user's orgId
@@ -481,6 +483,504 @@ export default function App() {
     }
   };
 
+  // ============================================================================
+  // TRAINER CRUD HANDLERS WITH SUPABASE PERSISTENCE & REFERENTIAL INTEGRITY
+  // ============================================================================
+
+  const handleAddTrainer = async (trainer: Trainer) => {
+    try {
+      console.info('[App] Creating trainer:', `${trainer.firstName} ${trainer.lastName}`);
+      const trainerWithOrg = { ...trainer, orgId: currentOrgId };
+      const savedTrainer = await dataService.createTrainer(trainerWithOrg);
+      setTrainers(prev => [...prev, savedTrainer]);
+      handleNotify('success', `Trainer "${trainer.firstName} ${trainer.lastName}" registered successfully`);
+    } catch (error) {
+      console.error('[App] Error creating trainer:', error);
+      handleNotify('error', 'Failed to create trainer. Falling back to memory storage.');
+      const trainerWithOrg = { ...trainer, orgId: currentOrgId };
+      setTrainers(prev => [...prev, trainerWithOrg]);
+    }
+  };
+
+  const handleUpdateTrainer = async (trainer: Trainer) => {
+    try {
+      console.info('[App] Updating trainer:', trainer.id);
+      const updated = await dataService.updateTrainer(trainer.id, trainer);
+      setTrainers(prev => prev.map(t => t.id === trainer.id ? updated : t));
+      handleNotify('success', 'Trainer record updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating trainer:', error);
+      handleNotify('error', 'Failed to update trainer. Falling back to memory storage.');
+      setTrainers(prev => prev.map(t => t.id === trainer.id ? trainer : t));
+    }
+  };
+
+  const handleDeleteTrainer = async (id: string) => {
+    try {
+      console.info('[App] Checking trainer usage before deletion:', id);
+      
+      // Check if trainer is used in other modules
+      const usage = await dataService.checkTrainerUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete trainer. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false; // Return false to indicate deletion failed
+      }
+
+      // Proceed with hard delete
+      console.info('[App] Deleting trainer:', id);
+      await dataService.deleteTrainer(id);
+      setTrainers(prev => prev.filter(t => t.id !== id));
+      handleNotify('success', 'Trainer record deleted successfully');
+      return true; // Return true to indicate successful deletion
+    } catch (error) {
+      console.error('[App] Error deleting trainer:', error);
+      handleNotify('error', 'Failed to delete trainer. Falling back to memory storage.');
+      // Fallback to hard delete in memory
+      setTrainers(prev => prev.filter(t => t.id !== id));
+      return true;
+    }
+  };
+
+  // ============================================================================
+  // QUALIFICATION CRUD HANDLERS WITH SUPABASE PERSISTENCE & REFERENTIAL INTEGRITY
+  // ============================================================================
+
+  const handleAddQualification = async (qualification: Qualification) => {
+    try {
+      console.info('[App] Creating qualification:', qualification.code);
+      const qualWithOrg = { ...qualification, orgId: currentOrgId };
+      const savedQual = await dataService.createQualification(qualWithOrg);
+      setQualifications(prev => [...prev, savedQual]);
+      handleNotify('success', `Qualification "${qualification.name}" registered successfully`);
+    } catch (error) {
+      console.error('[App] Error creating qualification:', error);
+      handleNotify('error', 'Failed to create qualification. Falling back to memory storage.');
+      const qualWithOrg = { ...qualification, orgId: currentOrgId };
+      setQualifications(prev => [...prev, qualWithOrg]);
+    }
+  };
+
+  const handleUpdateQualification = async (qualification: Qualification) => {
+    try {
+      console.info('[App] Updating qualification:', qualification.id);
+      const updated = await dataService.updateQualification(qualification.id, qualification);
+      setQualifications(prev => prev.map(q => q.id === qualification.id ? updated : q));
+      handleNotify('success', 'Qualification record updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating qualification:', error);
+      handleNotify('error', 'Failed to update qualification. Falling back to memory storage.');
+      setQualifications(prev => prev.map(q => q.id === qualification.id ? qualification : q));
+    }
+  };
+
+  const handleDeleteQualification = async (id: string) => {
+    try {
+      console.info('[App] Checking qualification usage before deletion:', id);
+      
+      // Check if qualification is used in other modules
+      const usage = await dataService.checkQualificationUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete qualification. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with hard delete
+      console.info('[App] Deleting qualification:', id);
+      await dataService.deleteQualification(id);
+      setQualifications(prev => prev.filter(q => q.id !== id));
+      handleNotify('success', 'Qualification record deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting qualification:', error);
+      handleNotify('error', 'Failed to delete qualification. Falling back to memory storage.');
+      setQualifications(prev => prev.filter(q => q.id !== id));
+      return true;
+    }
+  };
+
+  // ======================== LOCATION CRUD HANDLERS ========================
+
+  const handleAddLocation = async (location: Location) => {
+    try {
+      console.info('[App] Creating new location:', location);
+      // Ensure orgId is set
+      location.orgId = currentOrgId;
+      
+      const created = await dataService.createLocation(location);
+      console.info('[App] Location created successfully:', created);
+      setLocations(prev => [...prev, created]);
+      handleNotify('success', 'Location registered successfully');
+    } catch (error) {
+      console.error('[App] Error creating location:', error);
+      handleNotify('error', 'Failed to save location. Falling back to memory storage.');
+      // Fallback to local state
+      location.orgId = currentOrgId;
+      setLocations(prev => [...prev, location]);
+    }
+  };
+
+  const handleUpdateLocation = async (location: Location) => {
+    try {
+      console.info('[App] Updating location:', location);
+      const updated = await dataService.updateLocation(location.id, location);
+      console.info('[App] Location updated successfully:', updated);
+      setLocations(prev => prev.map(l => l.id === location.id ? location : l));
+      handleNotify('success', 'Location updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating location:', error);
+      handleNotify('error', 'Failed to update location. Falling back to memory storage.');
+      setLocations(prev => prev.map(l => l.id === location.id ? location : l));
+    }
+  };
+
+  const handleDeleteLocation = async (id: string) => {
+    try {
+      console.info('[App] Checking location usage before deletion:', id);
+      
+      // Check if location is used in other modules
+      const usage = await dataService.checkLocationUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete location. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with hard delete
+      console.info('[App] Deleting location:', id);
+      await dataService.deleteLocation(id);
+      setLocations(prev => prev.filter(l => l.id !== id));
+      handleNotify('success', 'Location deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting location:', error);
+      handleNotify('error', 'Failed to delete location. Falling back to memory storage.');
+      setLocations(prev => prev.filter(l => l.id !== id));
+      return true;
+    }
+  };
+
+  // ======================== SCHEDULE CRUD HANDLERS ========================
+
+  const handleAddSchedule = async (schedule: TrainerSchedule) => {
+    try {
+      console.info('[App] Creating new schedule:', schedule);
+      // Ensure orgId is set
+      schedule.orgId = currentOrgId;
+      
+      const created = await dataService.createSchedule(schedule);
+      console.info('[App] Schedule created successfully:', created);
+      setSchedules(prev => [...prev, created]);
+      handleNotify('success', 'Schedule registered successfully');
+    } catch (error) {
+      console.error('[App] Error creating schedule:', error);
+      handleNotify('error', 'Failed to save schedule. Falling back to memory storage.');
+      // Fallback to local state
+      schedule.orgId = currentOrgId;
+      setSchedules(prev => [...prev, schedule]);
+    }
+  };
+
+  const handleUpdateSchedule = async (schedule: TrainerSchedule) => {
+    try {
+      console.info('[App] Updating schedule:', schedule);
+      const updated = await dataService.updateSchedule(schedule.id, schedule);
+      console.info('[App] Schedule updated successfully:', updated);
+      setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
+      handleNotify('success', 'Schedule updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating schedule:', error);
+      handleNotify('error', 'Failed to update schedule. Falling back to memory storage.');
+      setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      console.info('[App] Checking schedule usage before deletion:', id);
+      
+      // Check if schedule is used in other modules
+      const usage = await dataService.checkScheduleUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete schedule. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with hard delete
+      console.info('[App] Deleting schedule:', id);
+      await dataService.deleteSchedule(id);
+      setSchedules(prev => prev.filter(s => s.id !== id));
+      handleNotify('success', 'Schedule deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting schedule:', error);
+      handleNotify('error', 'Failed to delete schedule. Falling back to memory storage.');
+      setSchedules(prev => prev.filter(s => s.id !== id));
+      return true;
+    }
+  };
+
+  // ============================================================================
+  // BATCH CRUD Handlers
+  // ============================================================================
+
+  const handleAddBatch = async (batch: Batch) => {
+    try {
+      const batchWithOrg = { ...batch, orgId: currentOrgId };
+      console.info('[App] Creating batch:', batchWithOrg);
+      const created = await dataService.createBatch(batchWithOrg);
+      console.info('[App] Batch created successfully:', created);
+      setBatches(prev => [...prev, created]);
+      handleNotify('success', 'Batch created successfully');
+    } catch (error) {
+      console.error('[App] Error creating batch:', error);
+      handleNotify('error', 'Failed to save batch. Falling back to memory storage.');
+      batch.orgId = currentOrgId;
+      setBatches(prev => [...prev, batch]);
+    }
+  };
+
+  const handleUpdateBatch = async (batch: Batch) => {
+    try {
+      console.info('[App] Updating batch:', batch);
+      const updated = await dataService.updateBatch(batch.id, batch);
+      console.info('[App] Batch updated successfully:', updated);
+      setBatches(prev => prev.map(b => b.id === batch.id ? batch : b));
+      handleNotify('success', 'Batch updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating batch:', error);
+      handleNotify('error', 'Failed to update batch. Falling back to memory storage.');
+      setBatches(prev => prev.map(b => b.id === batch.id ? batch : b));
+    }
+  };
+
+  const handleDeleteBatch = async (id: string) => {
+    try {
+      console.info('[App] Deleting batch:', id);
+      await dataService.deleteBatch(id);
+      setBatches(prev => prev.filter(b => b.id !== id));
+      handleNotify('success', 'Batch deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting batch:', error);
+      handleNotify('error', 'Failed to delete batch. Falling back to memory storage.');
+      setBatches(prev => prev.filter(b => b.id !== id));
+      return true;
+    }
+  };
+
+  // ============================================================================
+  // SPONSOR CRUD Handlers
+  // ============================================================================
+
+  const handleAddSponsor = async (sponsor: Sponsor) => {
+    try {
+      const sponsorWithOrg = { ...sponsor, orgId: currentOrgId };
+      console.info('[App] Creating sponsor:', sponsorWithOrg);
+      const created = await dataService.createSponsor(sponsorWithOrg);
+      setSponsors(prev => [...prev, created]);
+      handleNotify('success', `Sponsor "${created.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating sponsor:', error);
+      handleNotify('error', 'Failed to create sponsor. Falling back to memory storage.');
+      setSponsors(prev => [...prev, { ...sponsor, orgId: currentOrgId }]);
+    }
+  };
+
+  const handleUpdateSponsor = async (sponsor: Sponsor) => {
+    try {
+      console.info('[App] Updating sponsor:', sponsor);
+      const updated = await dataService.updateSponsor(sponsor.id, sponsor);
+      setSponsors(prev => prev.map(s => s.id === sponsor.id ? updated : s));
+      handleNotify('success', `Sponsor "${updated.name}" updated successfully`);
+    } catch (error) {
+      console.error('[App] Error updating sponsor:', error);
+      handleNotify('error', 'Failed to update sponsor. Falling back to memory storage.');
+      setSponsors(prev => prev.map(s => s.id === sponsor.id ? sponsor : s));
+    }
+  };
+
+  const handleDeleteSponsor = async (id: string) => {
+    try {
+      console.info('[App] Checking sponsor usage before deletion:', id);
+      
+      // Check if sponsor is used in other modules
+      const usage = await dataService.checkSponsorUsage(id);
+      if (usage.isUsed) {
+        const message = `Cannot delete sponsor. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with hard delete
+      console.info('[App] Deleting sponsor:', id);
+      await dataService.deleteSponsor(id);
+      setSponsors(prev => prev.filter(s => s.id !== id));
+      handleNotify('success', 'Sponsor deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting sponsor:', error);
+      handleNotify('error', 'Failed to delete sponsor. Falling back to memory storage.');
+      setSponsors(prev => prev.filter(s => s.id !== id));
+      return true;
+    }
+  };
+
+  // ============================================================================
+  // FIXED ASSET CRUD HANDLERS
+  // ============================================================================
+
+  const handleAddFixedAsset = async (asset: FixedAsset) => {
+    try {
+      console.info('[App] Creating fixed asset:', asset.name);
+      const assetWithOrg = { ...asset, orgId: currentOrgId };
+      const savedAsset = await dataService.createFixedAsset(assetWithOrg);
+      setFixedAssets(prev => [...prev, savedAsset]);
+      handleNotify('success', `Fixed asset "${asset.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating fixed asset:', error);
+      handleNotify('error', 'Failed to create fixed asset. Falling back to memory storage.');
+      const assetWithOrg = { ...asset, orgId: currentOrgId };
+      setFixedAssets(prev => [...prev, assetWithOrg]);
+    }
+  };
+
+  const handleUpdateFixedAsset = async (id: string, updates: Partial<FixedAsset>) => {
+    try {
+      console.info('[App] Updating fixed asset:', id);
+      const updated = await dataService.updateFixedAsset(id, updates);
+      setFixedAssets(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+      handleNotify('success', 'Fixed asset updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating fixed asset:', error);
+      handleNotify('error', 'Failed to update fixed asset. Falling back to memory storage.');
+      setFixedAssets(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    }
+  };
+
+  const handleDeleteFixedAsset = async (id: string) => {
+    try {
+      console.info('[App] Deleting fixed asset:', id);
+      await dataService.deleteFixedAsset(id);
+      setFixedAssets(prev => prev.filter(a => a.id !== id));
+      handleNotify('success', 'Fixed asset deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting fixed asset:', error);
+      handleNotify('error', 'Failed to delete fixed asset. Falling back to memory storage.');
+      setFixedAssets(prev => prev.filter(a => a.id !== id));
+    }
+  };
+
+  const handleDepreciate = async (assetId: string) => {
+    try {
+      const asset = fixedAssets.find(a => a.id === assetId);
+      if (!asset) {
+        handleNotify('error', 'Asset not found');
+        return;
+      }
+
+      // Calculate monthly depreciation: Purchase Cost / (Useful Life Years * 12)
+      const monthlyDepreciation = asset.purchaseCost / (asset.usefulLifeYears * 12);
+      
+      // Generate entry ID
+      const entryId = `depr-${Date.now()}`;
+
+      // Create depreciation lines with proper journalEntryId reference
+      const deprLines: JournalEntryLine[] = [
+        {
+          id: `line-${Date.now()}-debit`,
+          journalEntryId: entryId,
+          accountId: '', // Depreciation expense account - will use blank for now
+          debit: monthlyDepreciation,
+          credit: 0,
+          description: `Depreciation expense - ${asset.name}`,
+          assetId: assetId
+        },
+        {
+          id: `line-${Date.now()}-credit`,
+          journalEntryId: entryId,
+          accountId: asset.glAccountId, // Fixed Asset account
+          debit: 0,
+          credit: monthlyDepreciation,
+          description: `Accumulated depreciation - ${asset.name}`,
+          assetId: assetId
+        }
+      ];
+
+      // Create depreciation journal entry with double-entry accounting
+      const newEntry: JournalEntry = {
+        id: entryId,
+        orgId: currentOrgId,
+        entryDate: new Date().toISOString().split('T')[0],
+        referenceNumber: `DEP-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`,
+        description: `Monthly depreciation for ${asset.name}`,
+        sourceType: 'DEPRECIATION',
+        isPosted: true,
+        lines: deprLines,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDeleted: false
+      };
+
+      // Add to journal entries and lines
+      setJournalEntries(prev => [...prev, newEntry]);
+      setJournalEntryLines(prev => [...prev, ...deprLines]);
+
+      // Update accumulated depreciation on the asset
+      const newAccumulated = (asset.accumulatedDepreciation || 0) + monthlyDepreciation;
+      await handleUpdateFixedAsset(assetId, { accumulatedDepreciation: newAccumulated });
+
+      handleNotify('success', `Depreciation of ${monthlyDepreciation.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully`);
+    } catch (error) {
+      console.error('[App] Error recording depreciation:', error);
+      handleNotify('error', 'Failed to record depreciation');
+    }
+  };
+
+  // Item Catalog Handlers
+  const handleAddItem = async (item: NonStockItem) => {
+    try {
+      console.info('[App] Creating item:', item.name);
+      const itemWithOrg = { ...item, orgId: currentOrgId };
+      const savedItem = await dataService.createItem(itemWithOrg);
+      setItems(prev => [...prev, savedItem]);
+      handleNotify('success', `Item "${item.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating item:', error);
+      handleNotify('error', 'Failed to create item. Falling back to memory storage.');
+      const itemWithOrg = { ...item, orgId: currentOrgId };
+      setItems(prev => [...prev, itemWithOrg]);
+    }
+  };
+
+  const handleUpdateItem = async (id: string, updates: Partial<NonStockItem>) => {
+    try {
+      console.info('[App] Updating item:', id);
+      const updated = await dataService.updateItem(id, updates);
+      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+      handleNotify('success', 'Item updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating item:', error);
+      handleNotify('error', 'Failed to update item. Falling back to memory storage.');
+      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+    }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      console.info('[App] Deleting item:', id);
+      await dataService.deleteItem(id);
+      setItems(prev => prev.filter(i => i.id !== id));
+      handleNotify('success', 'Item deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting item:', error);
+      handleNotify('error', 'Failed to delete item. Falling back to memory storage.');
+      setItems(prev => prev.filter(i => i.id !== id));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
@@ -562,6 +1062,7 @@ export default function App() {
                {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
                <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -689,7 +1190,7 @@ export default function App() {
               locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)}
               schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               brandColor={brandColor}
-              onUpdateTrainer={t => setTrainers(prev => prev.map(x => x.id === t.id ? t : x))}
+              onUpdateTrainer={handleUpdateTrainer}
             />
           )}
 
@@ -702,10 +1203,10 @@ export default function App() {
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
           
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'items' && <ItemsView items={items} accounts={filteredAccounts} onAddItem={i => setItems(p => [...p, i])} onUpdateItem={i => setItems(p => p.map(x => x.id === i.id ? i : x))} onDeleteItem={id => setItems(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors} accounts={filteredAccounts} lines={filteredLines} onAddSponsor={s => setSponsors(p => [...p, s])} onUpdateSponsor={s => setSponsors(p => p.map(x => x.id === s.id ? s : x))} onDeleteSponsor={id => setSponsors(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
+          {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
           {activeTab === 'vendors' && <VendorsView vendors={vendors} accounts={filteredAccounts} lines={filteredLines} onAddVendor={v => setVendors(p => [...p, v])} onUpdateVendor={v => setVendors(p => p.map(x => x.id === v.id ? v : x))} onDeleteVendor={id => setVendors(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'assets' && <AssetsView assets={[]} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={() => {}} onAddAsset={() => {}} />}
+          {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={b => setBankAccounts(prev => [...prev, {...b, orgId: currentOrgId} as BankAccount])} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
@@ -714,10 +1215,11 @@ export default function App() {
           
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={(r, l, e, el) => { setPayrollRuns(prev => [...prev, r as PayrollRun]); setPayrollLines(prev => [...prev, ...l as PayrollLine[]]); handlePostJournal(e, el); }} />}
           {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
-          {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={t => setTrainers(p => [...p, t])} onUpdateTrainer={t => setTrainers(p => p.map(x => x.id === t.id ? t : x))} onDeleteTrainer={id => setTrainers(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={b => setBatches(p => [...p, b])} onUpdateBatch={b => setBatches(p => p.map(x => x.id === b.id ? b : x))} onDeleteBatch={id => setBatches(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={l => setLocations(p => [...p, l])} onUpdateLocation={l => setLocations(p => p.map(x => x.id === l.id ? l : x))} onDeleteLocation={id => setLocations(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={s => setSchedules(p => [...p, s])} onUpdateSchedule={s => setSchedules(p => p.map(x => x.id === s.id ? s : x))} onDeleteSchedule={id => setSchedules(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
+          {activeTab === 'qualifications' && <QualificationsView qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
+          {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
+          {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
+          {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
           {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}
           
           {activeTab === 'employees' && <EmployeesView 

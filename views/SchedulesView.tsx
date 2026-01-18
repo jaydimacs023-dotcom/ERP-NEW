@@ -1,20 +1,27 @@
 
 import React, { useState, useMemo } from 'react';
 import { Trainer, TrainerSchedule, DaySlot, Location } from '../types';
+import { generateUUID } from '../utils/uuid';
 import { 
   CalendarClock, Search, Plus, Trash2, X, ChevronRight, 
   Clock, Timer, AlertCircle, CalendarDays, Check, MapPin,
   Briefcase, GraduationCap, ArrowRight, Save, ShieldCheck,
-  Info, Sparkles, Activity
+  Info, Sparkles, Activity, Loader2, CheckCircle, Edit2 as Edit2Icon
 } from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface SchedulesViewProps {
   schedules: TrainerSchedule[];
   trainers: Trainer[];
   locations: Location[];
-  onAddSchedule: (sch: TrainerSchedule) => void;
-  onUpdateSchedule: (sch: TrainerSchedule) => void;
-  onDeleteSchedule: (id: string) => void;
+  onAddSchedule: (sch: TrainerSchedule) => void | Promise<void>;
+  onUpdateSchedule: (sch: TrainerSchedule) => void | Promise<void>;
+  onDeleteSchedule: (id: string) => void | Promise<boolean>;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -34,12 +41,14 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<TrainerSchedule | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const [formData, setFormData] = useState<Partial<TrainerSchedule>>({
     trainerId: '',
     locationId: '',
-    slots: [],
-    description: ''
+    slots: []
   });
 
   const [activeSlot, setActiveSlot] = useState<DaySlot>({
@@ -61,33 +70,86 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   }), [schedules, trainers, searchTerm]);
 
   const resetForm = () => {
-    setFormData({ trainerId: '', locationId: '', slots: [], description: '' });
+    setFormData({ trainerId: '', locationId: '', slots: [] });
     setEditingSchedule(null);
     setActiveSlot({ dayIndex: 1, startTime: '08:00', endTime: '12:00' });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.trainerId || !formData.slots?.length) return;
 
-    const sch: TrainerSchedule = {
-      id: editingSchedule?.id || `sch-${Date.now()}`,
-      orgId: 'temp',
-      trainerId: formData.trainerId!,
-      locationId: formData.locationId || undefined,
-      slots: formData.slots!,
-      description: formData.description || 'Institutional Capacity Profile',
-      createdAt: editingSchedule?.createdAt || new Date().toISOString()
-    };
+    setIsSubmitting(true);
+    const trainer = trainers.find(t => t.id === formData.trainerId);
+    const trainerName = trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unknown';
 
-    if (editingSchedule) {
-      onUpdateSchedule(sch);
-    } else {
-      onAddSchedule(sch);
+    try {
+      if (editingSchedule) {
+        // Update existing schedule
+        const updatedSchedule: TrainerSchedule = {
+          ...editingSchedule,
+          trainerId: formData.trainerId!,
+          locationId: formData.locationId || undefined,
+          slots: formData.slots!,
+          updatedAt: new Date().toISOString()
+        };
+        await onUpdateSchedule(updatedSchedule);
+        showToast(`Schedule for "${trainerName}" updated successfully!`, 'success');
+      } else {
+        // Create new schedule with proper UUID
+        const newSchedule: TrainerSchedule = {
+          id: generateUUID(),
+          orgId: '', // Will be set by App.tsx handler
+          trainerId: formData.trainerId!,
+          locationId: formData.locationId || undefined,
+          slots: formData.slots!,
+          createdAt: new Date().toISOString()
+        };
+        await onAddSchedule(newSchedule);
+        showToast(`Schedule for "${trainerName}" created successfully!`, 'success');
+      }
+      
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving schedule:', error);
+      showToast(`Failed to save schedule: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this schedule? This action cannot be undone.')) return;
     
-    setShowModal(false);
-    resetForm();
+    const scheduleToDelete = schedules.find(s => s.id === id);
+    const trainer = scheduleToDelete ? trainers.find(t => t.id === scheduleToDelete.trainerId) : null;
+    const trainerName = trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unknown';
+    
+    setDeletingId(id);
+    try {
+      const result = await onDeleteSchedule(id);
+      if (result === false) {
+        showToast('Cannot delete schedule: It is currently in use.', 'error');
+      } else {
+        showToast(`Schedule for "${trainerName}" deleted successfully!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Failed to delete schedule: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const addSlot = () => {
@@ -102,6 +164,39 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Toast Notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : toast.type === 'error'
+                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                  : 'bg-blue-50 text-blue-800 border-blue-200'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle size={18} className="text-emerald-600" />
+              ) : toast.type === 'error' ? (
+                <AlertCircle size={18} className="text-rose-600" />
+              ) : (
+                <Info size={18} className="text-blue-600" />
+              )}
+              <span className="text-sm font-semibold">{toast.message}</span>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="ml-2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3 uppercase">
@@ -151,7 +246,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         </div>
                         <div>
                            <p className="text-sm font-black text-slate-800 uppercase leading-none">{trainer?.lastName}, {trainer?.firstName}</p>
-                           <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">{sch.description}</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Trainer Schedule</p>
                         </div>
                      </div>
 
@@ -178,14 +273,16 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                      <button 
                        onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
                        className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                       disabled={deletingId === sch.id}
                      >
-                        <Edit2 size={14} /> Adjust Profile
+                        <Edit2Icon size={14} /> Adjust Profile
                      </button>
                      <button 
-                       onClick={() => onDeleteSchedule(sch.id)}
-                       className="p-3 bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100"
+                       onClick={() => handleDelete(sch.id)}
+                       disabled={deletingId === sch.id}
+                       className="p-3 bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
                      >
-                        <Trash2 size={16} />
+                        {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                      </button>
                   </div>
                </div>
@@ -221,7 +318,6 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
         )}
       </div>
 
-      {/* Scheduler Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 flex flex-col md:flex-row h-full max-h-[90vh]">
@@ -267,19 +363,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                               onChange={e => setFormData({...formData, locationId: e.target.value})}
                            >
                               <option value="">Remote / Decentralized</option>
-                              {locations.map(l => <option key={l.id} value={l.id}>[{l.code}] {l.name}</option>)}
+                              {locations.map(l => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
                            </select>
                         </div>
-                     </div>
-
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Profile Classification Memo</label>
-                        <input 
-                           placeholder="e.g. Standard 40hr Weekly Shift, Flex-Morning Profile"
-                           className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-sm"
-                           value={formData.description}
-                           onChange={e => setFormData({...formData, description: e.target.value})}
-                        />
                      </div>
                   </section>
 
@@ -392,10 +478,20 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
                      <button 
                        onClick={handleSubmit}
-                       disabled={!formData.trainerId || !formData.slots?.length}
-                       className="w-full py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-indigo-900/40 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                       disabled={!formData.trainerId || !formData.slots?.length || isSubmitting}
+                       className="w-full py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-indigo-900/40 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
                      >
-                        Commit Professional Profile
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 size={18} className="animate-spin" />
+                            {editingSchedule ? 'Updating...' : 'Committing...'}
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} />
+                            {editingSchedule ? 'Update Professional Profile' : 'Commit Professional Profile'}
+                          </>
+                        )}
                      </button>
                   </div>
                </div>
@@ -407,16 +503,10 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   );
 };
 
-interface Edit2Props { size?: number; className?: string }
-const Edit2: React.FC<Edit2Props> = ({ size = 16, className }) => <Edit2Icon size={size} className={className}/>;
-import { Edit2 as Edit2Icon } from 'lucide-react';
-
 const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.ReactNode }> = ({ label, value, icon }) => (
   <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
-     <div className="flex items-center gap-3">
-        <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">{icon}</div>
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
-     </div>
+     <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">{icon}</div>
+     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
      <span className="text-xs font-black text-white">{value}</span>
   </div>
 );

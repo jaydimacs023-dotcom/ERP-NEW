@@ -38,10 +38,10 @@ export enum NormalBalance {
 }
 
 export enum BatchStatus {
-  DRAFT = 'DRAFT',
-  OPEN = 'OPEN_FOR_ENROLLMENT',
-  ONGOING = 'ON_GOING',
-  COMPLETED = 'COMPLETED'
+  PLANNED = 'PLANNED',
+  ONGOING = 'ONGOING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
 }
 
 export enum PurchaseOrderStatus {
@@ -154,6 +154,7 @@ export interface Trainer extends BaseEntity {
   specialization: string;
   qualificationIds: string[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface DaySlot {
@@ -168,21 +169,20 @@ export interface TrainerSchedule extends BaseEntity {
   trainerId: string;
   locationId?: string;
   slots: DaySlot[];
-  description: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Sponsor extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
-  type: 'CORPORATE' | 'INDIVIDUAL' | 'GOVERNMENT' | 'NGO';
-  representative?: string;
-  email: string;
-  contactNumber: string;
-  arAccountId?: string; 
-  isActive: boolean;
-  createdAt: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Vendor extends BaseEntity {
@@ -223,17 +223,19 @@ export interface PurchaseOrder extends BaseEntity {
 export interface FixedAsset extends BaseEntity {
   id: string;
   orgId: string;
-  name: string;
   code: string;
-  category: AssetCategory;
-  purchaseDate: string;
+  name: string;
+  description?: string;
+  category: string; // Flexible category (can be AssetCategory or other values)
+  purchaseDate: string; // date YYYY-MM-DD
   purchaseCost: number;
-  salvageValue: number;
-  usefulLifeMonths: number;
-  assetAccountId: string; 
-  depreciationAccountId: string; 
-  expenseAccountId: string; 
-  status: 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED';
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  depreciationMethod: string; // e.g., 'STRAIGHT_LINE', 'DECLINING_BALANCE'
+  usefulLifeYears: number;
+  glAccountId: string; // GL account for asset
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface BankAccount extends BaseEntity {
@@ -252,12 +254,9 @@ export interface NonStockItem extends BaseEntity {
   code: string;
   name: string;
   description?: string;
-  defaultAccountId: string; 
   unitPrice: number;
-  type: 'SERVICE' | 'FEE' | 'MATERIAL' | 'OTHER';
-  taxCategory: TaxCategory;
-  whtRate: WHTCategory;
-  isActive: boolean;
+  incomeAccountId: string;  // Maps to income_account_id
+  expenseAccountId: string; // Maps to expense_account_id
   createdAt: string;
 }
 
@@ -269,23 +268,27 @@ export interface Qualification extends BaseEntity {
   durationDays: number;
   sector?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Batch extends BaseEntity {
   id: string;
   orgId: string;
+  batchCode?: string;
   name: string;
   year: number;
   qualificationId: string;
   trainerId: string;
   sponsorId?: string;
-  scheduleId?: string; 
   locationId?: string;
   studentIds: string[];
   status: BatchStatus;
   startDate: string;
   endDate: string;
-  createdAt: string;
+  maxStudents?: number;
+  currentStudents?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChartOfAccount extends BaseEntity {
@@ -303,10 +306,12 @@ export interface ChartOfAccount extends BaseEntity {
 export interface Location extends BaseEntity {
   id: string;
   orgId: string;
-  code: string;
+  code?: string;
   name: string;
   address: string;
+  capacity?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface JournalEntry extends BaseEntity {
