@@ -3,8 +3,14 @@ import { FixedAsset, AssetCategory, ChartOfAccount, JournalEntryLine, AccountCla
 import { 
   Box, Play, Trash2, Calendar, FileText, Plus, ShieldCheck, 
   TrendingDown, DollarSign, Activity, ChevronRight, X, Save,
-  AlertCircle, History, Info, BarChart3, Layers, Search, Tag
+  AlertCircle, History, Info, BarChart3, Layers, Search, Tag, CheckCircle
 } from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface AssetsViewProps {
   assets: FixedAsset[];
@@ -13,27 +19,44 @@ interface AssetsViewProps {
   entries: JournalEntry[];
   onDepreciate: (assetId: string) => void;
   onAddAsset: (asset: FixedAsset) => void;
+  onUpdateAsset?: (id: string, updates: Partial<FixedAsset>) => void;
+  onDeleteAsset?: (id: string) => void;
+  onNotify?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 type AssetTab = 'registry' | 'depreciation_log';
 
-const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entries, onDepreciate, onAddAsset }) => {
+const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entries, onDepreciate, onAddAsset, onUpdateAsset, onNotify }) => {
   const [activeTab, setActiveTab] = useState<AssetTab>('registry');
   const [showModal, setShowModal] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<FixedAsset | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Toast notification helper
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
 
   // Form State
   const [formData, setFormData] = useState<Partial<FixedAsset>>({
     name: '',
+    description: '',
     code: `FA-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-    category: AssetCategory.OFFICE_EQUIPMENT,
+    category: 'Equipment',
     purchaseDate: new Date().toISOString().split('T')[0],
     purchaseCost: 0,
-    salvageValue: 0,
-    usefulLifeMonths: 60,
-    assetAccountId: '',
-    depreciationAccountId: '',
-    expenseAccountId: ''
+    depreciationMethod: 'straight-line',
+    usefulLifeYears: 5,
+    glAccountId: ''
   });
 
   // Derived Financial Stats per Asset
@@ -41,11 +64,8 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
     const data: Record<string, { accumulated: number, bookValue: number }> = {};
     
     assets.forEach(asset => {
-      // Find all credit entries to the Accumulated Depreciation account tagged with this assetId
-      const assetLines = lines.filter(l => l.assetId === asset.id);
-      
-      const accDeprLines = assetLines.filter(l => l.accountId === asset.depreciationAccountId);
-      const totalAccumulated = accDeprLines.reduce((sum, l) => sum + (l.credit - l.debit), 0);
+      // Use accumulatedDepreciation directly from asset (which comes from Supabase or is manually edited)
+      const totalAccumulated = asset.accumulatedDepreciation || 0;
       
       data[asset.id] = {
         accumulated: totalAccumulated,
@@ -75,25 +95,30 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.assetAccountId) return;
+    if (!formData.name || !formData.glAccountId) return;
 
     const newAsset: FixedAsset = {
-      ...formData as FixedAsset,
+      ...formData,
       id: `asset-${Date.now()}`,
       orgId: 'temp',
-      status: 'ACTIVE'
-    };
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isDeleted: false
+    } as FixedAsset;
 
     onAddAsset(newAsset);
+    showToast(`Fixed asset "${formData.name}" created successfully`, 'success');
     setShowModal(false);
     setFormData({
       name: '',
+      description: '',
       code: `FA-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      category: AssetCategory.OFFICE_EQUIPMENT,
+      category: 'Equipment',
       purchaseDate: new Date().toISOString().split('T')[0],
       purchaseCost: 0,
-      salvageValue: 0,
-      usefulLifeMonths: 60
+      depreciationMethod: 'straight-line',
+      usefulLifeYears: 5,
+      glAccountId: ''
     });
   };
 
@@ -101,8 +126,54 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
     return cat.replace(/_/g, ' ');
   };
 
+  const handleEditAccumulated = (asset: FixedAsset) => {
+    setEditingAsset({ ...asset });
+    setShowEditModal(true);
+  };
+
+  const handleSaveAccumulated = () => {
+    if (!editingAsset) return;
+    onUpdateAsset?.(editingAsset.id, { accumulatedDepreciation: editingAsset.accumulatedDepreciation });
+    showToast('Accumulated depreciation updated successfully', 'success');
+    setShowEditModal(false);
+    setEditingAsset(null);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toast Notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : toast.type === 'error'
+                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                  : 'bg-blue-50 text-blue-800 border-blue-200'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle size={18} className="text-emerald-600" />
+              ) : toast.type === 'error' ? (
+                <AlertCircle size={18} className="text-rose-600" />
+              ) : (
+                <Info size={18} className="text-blue-600" />
+              )}
+              <span className="text-sm font-semibold">{toast.message}</span>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="ml-2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
@@ -164,7 +235,8 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
               <tbody className="divide-y divide-slate-100">
                 {filteredAssets.length > 0 ? filteredAssets.map(asset => {
                   const fin = assetFinancials[asset.id] || { accumulated: 0, bookValue: asset.purchaseCost };
-                  const deprPercent = (fin.accumulated / (asset.purchaseCost - asset.salvageValue)) * 100;
+                  // Calculate depreciation percentage: accumulated depreciation / purchase cost * 100
+                  const deprPercent = asset.purchaseCost > 0 ? (fin.accumulated / asset.purchaseCost) * 100 : 0;
                   
                   return (
                     <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -196,13 +268,22 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                         </div>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <button 
-                          onClick={() => onDepreciate(asset.id)}
-                          className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
-                          title="Run Monthly Depreciation for this Asset"
-                        >
-                           <Play size={16} fill="currentColor" />
-                        </button>
+                        <div className="flex items-center gap-2 justify-end">
+                          <button 
+                            onClick={() => handleEditAccumulated(asset)}
+                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95"
+                            title="Edit Accumulated Depreciation"
+                          >
+                             <AlertCircle size={16} />
+                          </button>
+                          <button 
+                            onClick={() => onDepreciate(asset.id)}
+                            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm active:scale-95"
+                            title="Run Monthly Depreciation for this Asset"
+                          >
+                             <Play size={16} fill="currentColor" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -269,20 +350,20 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
             <form onSubmit={handleSubmit} className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Asset Class / Category</label>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Asset Category</label>
                   <select 
                     required 
                     className="w-full px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-sm font-bold text-indigo-700 outline-none appearance-none"
                     value={formData.category}
-                    onChange={e => setFormData({...formData, category: e.target.value as AssetCategory})}
+                    onChange={e => setFormData({...formData, category: e.target.value})}
                   >
-                    <option value={AssetCategory.LAND}>Land (Non-Depreciable)</option>
-                    <option value={AssetCategory.BUILDING_IMPROVEMENTS}>Building & Improvements</option>
-                    <option value={AssetCategory.FURNITURE_FIXTURES}>Furniture & Fixtures</option>
-                    <option value={AssetCategory.OFFICE_EQUIPMENT}>Office Equipment</option>
-                    <option value={AssetCategory.IT_EQUIPMENT}>IT & Server Equipment</option>
-                    <option value={AssetCategory.SERVICE_VEHICLES}>Service Vehicles</option>
-                    <option value={AssetCategory.OTHER_ASSETS}>Other Fixed Assets</option>
+                    <option value="Land">Land (Non-Depreciable)</option>
+                    <option value="Building">Building & Improvements</option>
+                    <option value="Furniture">Furniture & Fixtures</option>
+                    <option value="Equipment">Office Equipment</option>
+                    <option value="IT Equipment">IT & Server Equipment</option>
+                    <option value="Vehicles">Service Vehicles</option>
+                    <option value="Other">Other Fixed Assets</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -305,12 +386,16 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                   <input type="number" step="0.01" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold" value={formData.purchaseCost} onChange={e => setFormData({...formData, purchaseCost: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Salvage Value</label>
-                  <input type="number" step="0.01" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold" value={formData.salvageValue} onChange={e => setFormData({...formData, salvageValue: Number(e.target.value)})} />
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Depreciation Method</label>
+                  <select required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700">
+                    <option value="straight-line">Straight-Line</option>
+                    <option value="declining-balance">Declining Balance</option>
+                    <option value="units-produced">Units Produced</option>
+                  </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Useful Life (Months)</label>
-                  <input type="number" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={formData.usefulLifeMonths} onChange={e => setFormData({...formData, usefulLifeMonths: Number(e.target.value)})} />
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Useful Life (Years)</label>
+                  <input type="number" required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold" value={formData.usefulLifeYears} onChange={e => setFormData({...formData, usefulLifeYears: Number(e.target.value)})} />
                 </div>
               </div>
 
@@ -318,27 +403,17 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <BarChart3 size={14} className="text-indigo-600" /> General Ledger Mappings
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Asset G/L Account</label>
-                    <select required className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700" value={formData.assetAccountId} onChange={e => setFormData({...formData, assetAccountId: e.target.value})}>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">GL Account</label>
+                    <select required className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700" value={formData.glAccountId} onChange={e => setFormData({...formData, glAccountId: e.target.value})}>
                       <option value="">Select Account...</option>
                       {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Accum. Depr. G/L</label>
-                    <select required className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700" value={formData.depreciationAccountId} onChange={e => setFormData({...formData, depreciationAccountId: e.target.value})}>
-                      <option value="">Select Account...</option>
-                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Depr. Expense G/L</label>
-                    <select required className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700" value={formData.expenseAccountId} onChange={e => setFormData({...formData, expenseAccountId: e.target.value})}>
-                      <option value="">Select Account...</option>
-                      {accounts.filter(a => a.class === AccountClass.EXPENSE && !a.isHeader).map(acc => <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>)}
-                    </select>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Details / Notes</label>
+                    <input type="text" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700" placeholder="Additional details (optional)" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                   </div>
                 </div>
               </div>
@@ -348,9 +423,9 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                  <div>
                     <h5 className="text-xs font-bold text-blue-900 uppercase tracking-tight mb-1">Depreciation Strategy</h5>
                     <p className="text-[11px] text-blue-800 leading-relaxed font-medium">
-                      System defaults to <strong>Straight-Line Depreciation</strong>. This configuration will automatically compute a monthly charge of 
+                      System defaults to <strong>Straight-Line Depreciation</strong>. This configuration will automatically compute an annual charge of 
                       <span className="font-bold text-indigo-700 mx-1">
-                        {((Number(formData.purchaseCost || 0) - Number(formData.salvageValue || 0)) / Number(formData.usefulLifeMonths || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {(Number(formData.purchaseCost || 0) / Number(formData.usefulLifeYears || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                       across the defined useful life.
                     </p>
@@ -364,6 +439,59 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Accumulated Depreciation Modal */}
+      {showEditModal && editingAsset && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md"><AlertCircle size={20} /></div>
+                <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">Edit Accumulated Depreciation</h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div>
+                <p className="text-sm text-slate-600 mb-4">Asset: <span className="font-bold text-slate-800">{editingAsset.name}</span></p>
+                <p className="text-sm text-slate-600 mb-4">Code: <span className="font-mono text-slate-800">{editingAsset.code}</span></p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Purchase Cost</label>
+                <input type="text" disabled className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-600" value={editingAsset.purchaseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Accumulated Depreciation</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="w-full px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm font-mono font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={editingAsset.accumulatedDepreciation || 0}
+                  onChange={e => setEditingAsset({...editingAsset, accumulatedDepreciation: Number(e.target.value)})}
+                />
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex gap-3">
+                <AlertCircle className="text-amber-600 shrink-0" size={20} />
+                <div className="text-[11px] text-amber-800">
+                  <p className="font-bold mb-1">Note:</p>
+                  <p>Setting accumulated depreciation directly overwrites calculation from depreciation journal entries. Use this to catch up on missed periods.</p>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl">Cancel</button>
+                <button type="button" onClick={handleSaveAccumulated} className="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                  <Save size={16} /> Save Changes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

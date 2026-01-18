@@ -12,6 +12,12 @@ import {
   CheckSquare
 } from 'lucide-react';
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 interface StudentsViewProps {
   students: Student[];
   onAddStudent: (student: Student) => void;
@@ -28,19 +34,24 @@ const MANDATORY_DOCS = [
 ];
 
 const CSV_HEADERS = [
-  'ULI', 'LastName', 'FirstName', 'MiddleName', 'Extension', 'Sex', 'DateOfBirth',
-  'BirthRegion', 'BirthProvince', 'BirthCity', 'CivilStatus', 'EducationalAttainment',
-  'Nationality', 'Email', 'ContactNumber', 'Street', 'Barangay', 'City', 'District',
-  'Province', 'Guardian'
+  'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Contact Number',
+  'E-mail Address', 'Street Address', 'Barangay', 'Municipality/City', 'District',
+  'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status', 
+  'Highest Educational Attainment', 'Nationality', 'ULI'
 ];
 
 const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [importPreview, setImportPreview] = useState<Student[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
+  const [showEditCamera, setShowEditCamera] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
 
@@ -55,8 +66,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const editVideoRef = useRef<HTMLVideoElement>(null);
+  const editCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Student>>({
     uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
@@ -72,8 +86,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   );
 
   const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",") + "\n" + 
-      "24-701-01-0001,Dela Cruz,Juan,Protacio,,Male,1995-05-15,NCR,Metro Manila,Manila,Single,College Graduate,Filipino,juan@email.com,09171234567,123 Rizal St,Brgy 1,Manila,1st District,Metro Manila,Maria Dela Cruz";
+    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -101,37 +114,57 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         if (!lines[i].trim()) continue;
         const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
         
-        // Simple mapping based on expected header order or indices
+        // Mapping based on MIS file format:
+        // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: Contact Number,
+        // 5: E-mail Address, 6: Street Address, 7: Barangay, 8: Municipality/City, 9: District,
+        // 10: Province, 11: Sex, 12: Date of Birth, 13: Age, 14: Civil Status, 
+        // 15: Educational Attainment, 16: Nationality, 17: ULI
         const getVal = (idx: number) => cols[idx] || '';
 
-        const dob = getVal(6);
-        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 0;
+        // Parse date - handle mm-dd-yy or mm/dd/yyyy format
+        const dobRaw = getVal(12);
+        let dob = '';
+        if (dobRaw) {
+          const dateParts = dobRaw.split(/[\/\-]/);
+          if (dateParts.length === 3) {
+            const month = dateParts[0].padStart(2, '0');
+            const day = dateParts[1].padStart(2, '0');
+            let year = dateParts[2];
+            if (year.length === 2) {
+              year = parseInt(year) > 50 ? '19' + year : '20' + year;
+            }
+            dob = `${year}-${month}-${day}`;
+          }
+        }
+        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : parseInt(getVal(13)) || 0;
 
         studentData.push({
           id: `batch-${Date.now()}-${i}`,
           orgId: 'temp',
-          uli: getVal(0),
-          lastName: getVal(1),
-          firstName: getVal(2),
-          middleName: getVal(3),
-          extension: getVal(4),
-          sex: (getVal(5) as any) || 'Male',
+          uli: getVal(17),
+          lastName: getVal(0),
+          firstName: getVal(1),
+          middleName: getVal(2),
+          extension: getVal(3),
+          sex: (getVal(11) as any) || 'Male',
           dateOfBirth: dob,
           age: Math.max(0, age),
-          birthRegion: getVal(7),
-          birthProvince: getVal(8),
-          birthCity: getVal(9),
-          civilStatus: getVal(10) || 'Single',
-          educationalAttainment: getVal(11),
-          nationality: getVal(12) || 'Filipino',
-          email: getVal(13),
-          contactNumber: getVal(14),
-          street: getVal(15),
-          barangay: getVal(16),
-          city: getVal(17),
-          district: getVal(18),
-          province: getVal(19),
-          guardian: getVal(20),
+          birthRegion: '',
+          birthProvince: '',
+          birthCity: '',
+          civilStatus: getVal(14) || 'Single',
+          educationalAttainment: getVal(15),
+          nationality: getVal(16) || 'Filipino',
+          email: getVal(5),
+          contactNumber: getVal(4),
+          street: getVal(6),
+          barangay: getVal(7),
+          city: getVal(8),
+          district: getVal(9),
+          province: getVal(10),
+          guardian: '',
+          locationId: undefined,
+          sponsorId: undefined,
           documents: MANDATORY_DOCS.map((doc, dIdx) => ({
             id: `doc-${dIdx}-${Date.now()}-${i}`,
             name: doc,
@@ -149,25 +182,37 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
   const commitBatch = () => {
     onBatchAddStudents(importPreview);
+    showToast(`${importPreview.length} students imported successfully!`, 'success');
     setImportPreview([]);
     setShowImportModal(false);
   };
 
   const handleDocumentAudit = (docId: string, action: 'VERIFY' | 'REJECT') => {
     if (!auditStudent) return;
-    const nextDocs = auditStudent.documents.map(d => 
-      d.id === docId ? { ...d, status: action === 'VERIFY' ? 'VERIFIED' as const : 'REJECTED' as const } : d
-    );
-    const updated = { ...auditStudent, documents: nextDocs };
-    onUpdateStudent(updated);
-    setAuditStudent(updated);
+    try {
+      const nextDocs = auditStudent.documents.map(d => 
+        d.id === docId ? { ...d, status: action === 'VERIFY' ? 'VERIFIED' as const : 'REJECTED' as const } : d
+      );
+      const updated = { ...auditStudent, documents: nextDocs };
+      onUpdateStudent(updated);
+      setAuditStudent(updated);
+      const docName = auditStudent.documents.find(d => d.id === docId)?.name || 'Document';
+      showToast(`${docName} ${action === 'VERIFY' ? 'verified' : 'rejected'} successfully!`, 'success');
+    } catch (error) {
+      showToast(`Failed to update document: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   const handleToggleOverride = () => {
     if (!auditStudent) return;
-    const updated = { ...auditStudent, isEnrollmentOverridden: !auditStudent.isEnrollmentOverridden };
-    onUpdateStudent(updated);
-    setAuditStudent(updated);
+    try {
+      const updated = { ...auditStudent, isEnrollmentOverridden: !auditStudent.isEnrollmentOverridden };
+      onUpdateStudent(updated);
+      setAuditStudent(updated);
+      showToast(`Enrollment override ${updated.isEnrollmentOverridden ? 'enabled' : 'disabled'} successfully!`, 'success');
+    } catch (error) {
+      showToast(`Failed to update enrollment override: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,20 +272,72 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const documents: StudentDocument[] = MANDATORY_DOCS.map((doc, idx) => ({
-      id: `doc-${idx}-${Date.now()}`,
-      name: doc,
-      status: mandatoryDocStatuses[doc],
-      fileData: mandatoryDocFiles[doc]
-    }));
-    onAddStudent({ ...formData as Student, id: `stud-${Date.now()}`, orgId: 'temp', documents, createdAt: new Date().toISOString() });
+    try {
+      const documents: StudentDocument[] = MANDATORY_DOCS.map((doc, idx) => ({
+        id: `doc-${idx}-${Date.now()}`,
+        name: doc,
+        status: mandatoryDocStatuses[doc],
+        fileData: mandatoryDocFiles[doc]
+      }));
+      onAddStudent({ ...formData as Student, id: `stud-${Date.now()}`, orgId: 'temp', documents, createdAt: new Date().toISOString() });
+      showToast(`Student ${formData.firstName} ${formData.lastName} registered successfully!`, 'success');
+      setShowModal(false);
+      // Reset form
+      setFormData({
+        uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
+        dateOfBirth: '', age: 0, birthRegion: '', birthProvince: '', birthCity: '',
+        civilStatus: 'Single', educationalAttainment: 'College Graduate', nationality: 'Filipino',
+        email: '', contactNumber: '', street: '', barangay: '', city: '', district: '',
+        province: '', guardian: '',
+      });
+    } catch (error) {
+      showToast(`Failed to register student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
     setShowModal(false);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Learner Ledger</h2>
@@ -317,9 +414,14 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                     <div className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{student.province}</div>
                   </td>
                   <td className="px-6 py-5 text-right">
-                    <button onClick={() => setAuditStudent(student)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
-                      <Eye size={16} />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => { setEditingStudent(student); setShowEditModal(true); setFormData(student); }} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all" title="Edit Student">
+                        <RefreshCw size={16} />
+                      </button>
+                      <button onClick={() => setAuditStudent(student)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="View Audit">
+                        <Eye size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )
@@ -772,6 +874,298 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {showEditModal && editingStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200 my-8">
+            <div className="p-8 border-b bg-gradient-to-r from-amber-50 to-amber-100/50 flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-600 text-white rounded-2xl shadow-xl shadow-amber-100"><RefreshCw size={24} /></div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Edit Student Record</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Update {editingStudent.firstName} {editingStudent.lastName}'s Information</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="p-3 hover:bg-white rounded-xl transition-colors">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                // Update documents with new photo if changed
+                let updatedDocuments = editingStudent.documents || [];
+                if (editPhotoPreview) {
+                  const photoDocIndex = updatedDocuments.findIndex(d => d.name === 'Passport Size Photo');
+                  const newPhotoDoc = {
+                    id: photoDocIndex >= 0 ? updatedDocuments[photoDocIndex].id : `doc-photo-${Date.now()}`,
+                    name: 'Passport Size Photo',
+                    status: 'UPLOADED' as const,
+                    fileData: editPhotoPreview
+                  };
+                  if (photoDocIndex >= 0) {
+                    updatedDocuments = updatedDocuments.map((d, i) => i === photoDocIndex ? newPhotoDoc : d);
+                  } else {
+                    updatedDocuments = [...updatedDocuments, newPhotoDoc];
+                  }
+                }
+
+                const updatedStudent: Student = {
+                  ...editingStudent,
+                  ...formData,
+                  id: editingStudent.id,
+                  orgId: editingStudent.orgId,
+                  documents: updatedDocuments,
+                  createdAt: editingStudent.createdAt,
+                  createdBy: editingStudent.createdBy
+                } as Student;
+                onUpdateStudent(updatedStudent);
+                showToast(`Student ${formData.firstName} ${formData.lastName} updated successfully!`, 'success');
+                setShowEditModal(false);
+                setEditingStudent(null);
+                setEditPhotoPreview(null);
+              } catch (error) {
+                showToast(`Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+              }
+            }} className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+
+              {/* Student Photo */}
+              <div className="flex flex-col items-center mb-4 gap-4">
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-3xl border-4 border-slate-200 overflow-hidden bg-slate-100 flex items-center justify-center shadow-lg">
+                    {showEditCamera ? (
+                      <video ref={editVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                    ) : editPhotoPreview ? (
+                      <img src={editPhotoPreview} alt="New Photo" className="w-full h-full object-cover" />
+                    ) : editingStudent.documents?.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                      <img src={editingStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={48} className="text-slate-300" />
+                    )}
+                  </div>
+                  {editPhotoPreview && (
+                    <button type="button" onClick={() => setEditPhotoPreview(null)} className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <canvas ref={editCanvasRef} className="hidden" />
+                <input type="file" ref={editPhotoInputRef} accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setEditPhotoPreview(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }
+                }} />
+                <div className="flex gap-2">
+                  {showEditCamera ? (
+                    <>
+                      <button type="button" onClick={() => {
+                        if (editVideoRef.current && editCanvasRef.current) {
+                          const context = editCanvasRef.current.getContext('2d');
+                          if (context) {
+                            editCanvasRef.current.width = editVideoRef.current.videoWidth;
+                            editCanvasRef.current.height = editVideoRef.current.videoHeight;
+                            context.drawImage(editVideoRef.current, 0, 0);
+                            const dataUrl = editCanvasRef.current.toDataURL('image/jpeg', 0.8);
+                            setEditPhotoPreview(dataUrl);
+                            if (editVideoRef.current?.srcObject) {
+                              (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                            }
+                            setShowEditCamera(false);
+                          }
+                        }
+                      }} className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-green-700 transition-colors flex items-center gap-2">
+                        <Camera size={14} /> Capture
+                      </button>
+                      <button type="button" onClick={() => {
+                        if (editVideoRef.current?.srcObject) {
+                          (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                        }
+                        setShowEditCamera(false);
+                      }} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors">
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => {
+                        setShowEditCamera(true);
+                        setTimeout(async () => {
+                          try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                              video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
+                            });
+                            if (editVideoRef.current) editVideoRef.current.srcObject = stream;
+                          } catch (err) {
+                            alert("Camera access denied.");
+                            setShowEditCamera(false);
+                          }
+                        }, 100);
+                      }} className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-amber-200 transition-colors flex items-center gap-2">
+                        <Camera size={14} /> Camera
+                      </button>
+                      <button type="button" onClick={() => editPhotoInputRef.current?.click()} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors flex items-center gap-2">
+                        <Upload size={14} /> Upload
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {/* Personal Information */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><User size={16} /></div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">I. Personal Information</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">ULI</label>
+                    <input disabled className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold text-slate-500 opacity-75 cursor-not-allowed" value={formData.uli} />
+                  </div>
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Last Name</label>
+                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">First Name</label>
+                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Middle Name</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-1 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Extension</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-1 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sex</label>
+                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.sex} onChange={e => setFormData({...formData, sex: e.target.value})}>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Date of Birth</label>
+                    <input required type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                  </div>
+                </div>
+
+                {/* Birth Address */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Region</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthRegion || ''} onChange={e => setFormData({...formData, birthRegion: e.target.value})} placeholder="e.g. NCR, Region IV-A" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Province</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthProvince || ''} onChange={e => setFormData({...formData, birthProvince: e.target.value})} placeholder="e.g. Metro Manila, Laguna" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth City/Municipality</label>
+                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.birthCity || ''} onChange={e => setFormData({...formData, birthCity: e.target.value})} placeholder="e.g. Manila, Calamba" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Civil Status</label>
+                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.civilStatus} onChange={e => setFormData({...formData, civilStatus: e.target.value})}>
+                      <option value="Single">Single</option>
+                      <option value="Married">Married</option>
+                      <option value="Widowed">Widowed</option>
+                      <option value="Divorced">Divorced</option>
+                      <option value="Separated">Separated</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Email</label>
+                    <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Contact Number</label>
+                    <input type="tel" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                  </div>
+                </div>
+              </section>
+
+              {/* Address Information */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><MapPin size={16} /></div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">II. Address Information</h4>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Street Address</label>
+                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Barangay</label>
+                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">City / Municipality</label>
+                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Province</label>
+                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Education & Guardian */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><BookOpen size={16} /></div>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">III. Background & Guardian</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Educational Attainment</label>
+                    <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
+                      <option value="Elementary Graduate">Elementary Graduate</option>
+                      <option value="High School Graduate">High School Graduate</option>
+                      <option value="College Level">College Level</option>
+                      <option value="College Graduate">College Graduate</option>
+                      <option value="TVET Graduate">TVET Graduate</option>
+                      <option value="Masteral/PhD">Masteral/PhD</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nationality</label>
+                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                    <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian || ''} onChange={e => setFormData({...formData, guardian: e.target.value})} />
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="flex-1 py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="submit" className="flex-1 py-4 bg-amber-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-amber-100 hover:bg-amber-700 active:scale-95 transition-all">Save Changes</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

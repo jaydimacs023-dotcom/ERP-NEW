@@ -93,8 +93,8 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
             </div>
           </div>
           
-          <div className="h-[350px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[350px] w-full min-h-[350px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -127,8 +127,8 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
           </div>
           <div className="relative z-10">
              <h3 className="text-lg font-black tracking-tight mb-8">Asset Liquidity Mix</h3>
-             <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
+             <div className="h-[250px] min-h-[250px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <BarChart data={classDistributionData} layout="vertical">
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" hide />

@@ -1,16 +1,25 @@
 
 import React, { useState } from 'react';
 import { Location } from '../types';
+import EmptyState from '../components/EmptyState';
+import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, MapPin, Trash2, X, Edit2, ShieldCheck, 
-  Map, Building, Globe, ChevronRight, MoreVertical
+  Map, Building, Globe, ChevronRight, MoreVertical, Loader2,
+  CheckCircle, AlertCircle, Users
 } from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 interface LocationsViewProps {
   locations: Location[];
-  onAddLocation: (location: Location) => void;
-  onUpdateLocation: (location: Location) => void;
-  onDeleteLocation: (id: string) => void;
+  onAddLocation: (location: Location) => void | Promise<void>;
+  onUpdateLocation: (location: Location) => void | Promise<void>;
+  onDeleteLocation: (id: string) => void | Promise<boolean>;
 }
 
 const LocationsView: React.FC<LocationsViewProps> = ({ 
@@ -19,49 +28,140 @@ const LocationsView: React.FC<LocationsViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const [formData, setFormData] = useState<Partial<Location>>({
-    code: '',
     name: '',
-    address: ''
+    address: '',
+    capacity: 0
   });
 
   const filteredLocations = locations.filter(l => 
     !l.isDeleted && (
     l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    l.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (l.code?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     l.address.toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', address: '' });
+    setFormData({ name: '', address: '', capacity: 0 });
     setEditingLocation(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.code || !formData.address) return;
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
 
-    if (editingLocation) {
-      onUpdateLocation({ ...editingLocation, ...formData } as Location);
-    } else {
-      const newLoc: Location = {
-        id: `loc-${Date.now()}`,
-        orgId: 'temp',
-        code: formData.code!,
-        name: formData.name!,
-        address: formData.address!,
-        createdAt: new Date().toISOString()
-      };
-      onAddLocation(newLoc);
+  const openEditModal = (location: Location) => {
+    setEditingLocation(location);
+    setFormData({
+      name: location.name,
+      address: location.address,
+      capacity: location.capacity || 0
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.address) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      if (editingLocation) {
+        // Update existing location
+        const updatedLocation: Location = {
+          ...editingLocation,
+          name: formData.name,
+          address: formData.address,
+          capacity: Number(formData.capacity) || 0,
+          updatedAt: new Date().toISOString()
+        };
+        await onUpdateLocation(updatedLocation);
+        showToast(`Location "${formData.name}" updated successfully!`, 'success');
+      } else {
+        // Create new location with proper UUID
+        const newLocation: Location = {
+          id: generateUUID(),
+          orgId: '', // Will be set by App.tsx handler
+          name: formData.name,
+          address: formData.address,
+          capacity: Number(formData.capacity) || 0,
+          createdAt: new Date().toISOString()
+        };
+        await onAddLocation(newLocation);
+        showToast(`Location "${formData.name}" registered successfully!`, 'success');
+      }
+      
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving location:', error);
+      showToast(`Failed to save location: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-    setShowModal(false);
-    resetForm();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this location? This action cannot be undone.')) return;
+    
+    const locationToDelete = locations.find(l => l.id === id);
+    setDeletingId(id);
+    try {
+      const result = await onDeleteLocation(id);
+      if (result === false) {
+        showToast('Cannot delete location: It is currently in use by batches or schedules.', 'error');
+      } else {
+        showToast(`Location "${locationToDelete?.name || 'Unknown'}" deleted successfully!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Failed to delete location: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
@@ -99,31 +199,34 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-colors group-hover:bg-indigo-600 group-hover:text-white">
                   <Building size={24} />
                 </div>
-                <div className="relative group/menu">
-                   <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"><MoreVertical size={18} /></button>
-                   <div className="absolute top-full right-0 mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 py-1 hidden group-hover/menu:block z-20">
-                      <button 
-                        onClick={() => { setEditingLocation(loc); setFormData(loc); setShowModal(true); }}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-                      >
-                        <Edit2 size={14} /> Edit Details
-                      </button>
-                      <button 
-                        onClick={() => onDeleteLocation(loc.id)}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                      >
-                        <Trash2 size={14} /> Delete Location
-                      </button>
-                   </div>
+                <div className="flex gap-1">
+                   <button 
+                     onClick={() => openEditModal(loc)}
+                     className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors"
+                     title="Edit"
+                   >
+                     <Edit2 size={16} />
+                   </button>
+                   <button 
+                     onClick={() => handleDelete(loc.id)}
+                     disabled={deletingId === loc.id}
+                     className="p-2 hover:bg-rose-50 rounded-xl text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                     title="Delete"
+                   >
+                     {deletingId === loc.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                   </button>
                 </div>
               </div>
 
               <div className="space-y-4">
                  <div>
-                    <div className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-tighter w-fit mb-1">
-                      {loc.code}
-                    </div>
                     <h3 className="text-lg font-semibold text-slate-800 leading-tight truncate">{loc.name}</h3>
+                    {loc.capacity && loc.capacity > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                        <Users size={12} />
+                        <span>Capacity: {loc.capacity}</span>
+                      </div>
+                    )}
                  </div>
 
                  <div className="flex gap-3">
@@ -143,14 +246,13 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             </div>
           </div>
         )) : (
-          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300">
-             <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200">
-                   <Map size={32} />
-                </div>
-                <p className="text-slate-400 text-sm font-medium italic">No training facilities registered in this workspace.</p>
-             </div>
-          </div>
+          <EmptyState 
+            title="No training facilities"
+            description="Register your first training location to manage classrooms and satellite centers."
+            actionLabel="Add Facility"
+            onAction={() => { resetForm(); setShowModal(true); }}
+            icon={<MapPin size={48} className="text-slate-300" />}
+          />
         )}
       </div>
 
@@ -166,7 +268,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                   {editingLocation ? 'Modify Facility' : 'Register Facility'}
                 </h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -174,20 +276,10 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Facility Code (Identifier)</label>
-                  <input 
-                    required 
-                    placeholder="e.g. MAIN-CAMPUS"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none font-mono text-indigo-600 font-semibold"
-                    value={formData.code}
-                    onChange={e => setFormData({...formData, code: e.target.value.toUpperCase().replace(/\s+/g, '-')})}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Facility Display Name</label>
                   <input 
                     required 
+                    autoFocus
                     placeholder="e.g. Skills Development Hub"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none font-semibold text-slate-800"
                     value={formData.name}
@@ -206,6 +298,18 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     onChange={e => setFormData({...formData, address: e.target.value})}
                   />
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Seating Capacity (Optional)</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 50"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none font-semibold text-slate-800"
+                    value={formData.capacity || ''}
+                    onChange={e => setFormData({...formData, capacity: e.target.value === '' ? 0 : Number(e.target.value)})}
+                  />
+                </div>
               </div>
 
               <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex gap-3">
@@ -216,9 +320,14 @@ const LocationsView: React.FC<LocationsViewProps> = ({
               </div>
 
               <div className="pt-6 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-md shadow-indigo-100 active:scale-95 transition-all">
-                   {editingLocation ? 'Apply Updates' : 'Confirm Registration'}
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Discard</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-md shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  {editingLocation ? 'Apply Updates' : 'Confirm Registration'}
                 </button>
               </div>
             </form>

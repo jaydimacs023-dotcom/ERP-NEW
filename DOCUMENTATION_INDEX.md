@@ -182,6 +182,40 @@ AT-ERP/
 
 ---
 
+## 🔧 Recent Fix: "age" Field Error (January 2024)
+
+### Problem
+When creating students in Supabase, the system threw error: `record "new" has no field "age"`
+
+### Solution
+Applied normalized data pipeline: camelCase → snake_case → schema filter → validate → POST
+
+### Key Documents (New)
+- **[SESSION_SUMMARY.md](SESSION_SUMMARY.md)** - Problem, solution, and status (5 min read)
+- **[AGE_FIELD_FIX.md](AGE_FIELD_FIX.md)** - Technical root cause and implementation details (10 min read)
+- **[VISUAL_ARCHITECTURE.md](VISUAL_ARCHITECTURE.md)** - Data flow diagrams and visual explanations (10 min read)
+- **[FIX_VERIFICATION_GUIDE.md](FIX_VERIFICATION_GUIDE.md)** - Testing and deployment guide (15 min read)
+- **[STUDENT_CRUD_COMPLETE.md](STUDENT_CRUD_COMPLETE.md)** - Complete CRUD implementation reference (20 min read)
+- **[IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)** - Verification and deployment checklist (10 min read)
+
+### What Was Fixed
+- ✅ All CRUD methods now properly filter invalid fields
+- ✅ Student, Organization, User, Batch entities all updated
+- ✅ New `insertToSupabaseRaw()` and `updateInSupabaseRaw()` methods added
+- ✅ Comprehensive debug logging for troubleshooting
+- ✅ Complete documentation for maintenance
+
+### Quick Start Testing
+1. Open http://localhost:5174
+2. Go to Students view
+3. Create student with age field
+4. Check browser console for `[Supabase] Filtered student data ready for POST:`
+5. Verify `hasAge: false` in debug output
+6. See [FIX_VERIFICATION_GUIDE.md](FIX_VERIFICATION_GUIDE.md) for full testing
+
+---
+
 **Last Updated:** January 16, 2026  
-**Version:** 1.0 - Supabase Integration Complete  
-**Status:** ✅ Ready for Development
+**Version:** 1.1 - Supabase Integration + age Field Fix  
+**Status:** ✅ Ready for Development & Testing
+

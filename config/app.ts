@@ -5,14 +5,15 @@
  * Supports Runtime Overrides for instant switching between Mock and Cloud.
  */
 
-const getEnv = () => {
-  const meta = import.meta as any;
-  if (meta && meta.env) return meta.env;
-  if (typeof process !== 'undefined' && process.env) return process.env;
-  return {};
-};
+// Vite automatically exposes VITE_* env vars via import.meta.env
+const env = import.meta.env;
 
-const env = getEnv();
+console.debug('[Config] Vite import.meta.env:', {
+  keys: Object.keys(env).filter(k => k.startsWith('VITE_')),
+  VITE_SUPABASE_URL: env.VITE_SUPABASE_URL?.substring(0, 40) || 'MISSING',
+  VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ? 'PRESENT' : 'MISSING',
+  VITE_FORCE_SUPABASE: env.VITE_FORCE_SUPABASE
+});
 
 // Check for runtime override in browser
 const getRuntimeOverride = () => {
@@ -32,22 +33,15 @@ const hasSupabaseCreds = supabaseUrl.length > 0 && supabaseKey.length > 0;
 export const config = {
   mode: env.MODE || env.NODE_ENV || 'development',
   isDev: (env.MODE || env.NODE_ENV || 'development') === 'development',
-  isProd: isProduction,
+  isProv: isProduction,
   
   /**
-   * Logic for Data Source Selection:
-   * 1. FORCE Mock if credentials are missing (Safety Fallback)
-   * 2. Check Runtime Override (localStorage)
-   * 3. Check Force Flag (env variable)
-   * 4. Default to Mock in Dev, Cloud in Prod
+   * SUPABASE-ONLY MODE
+   * All data is fetched from Supabase REST API
+   * Empty tables show "No data available" fallback
+   * No mock data fallback
    */
-  useMockData: !hasSupabaseCreds 
-    ? true 
-    : (runtimeOverride 
-        ? runtimeOverride === 'MOCK' 
-        : isProduction 
-          ? false 
-          : env.VITE_FORCE_SUPABASE !== 'true'),
+  useMockData: false,
     
   supabase: {
     url: supabaseUrl,

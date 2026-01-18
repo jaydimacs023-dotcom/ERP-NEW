@@ -38,10 +38,10 @@ export enum NormalBalance {
 }
 
 export enum BatchStatus {
-  DRAFT = 'DRAFT',
-  OPEN = 'OPEN_FOR_ENROLLMENT',
-  ONGOING = 'ON_GOING',
-  COMPLETED = 'COMPLETED'
+  PLANNED = 'PLANNED',
+  ONGOING = 'ONGOING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
 }
 
 export enum PurchaseOrderStatus {
@@ -78,6 +78,18 @@ export interface Organization extends BaseEntity {
   logoUrl?: string;
 }
 
+export interface PaymentHistory extends BaseEntity {
+  orgId: string;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  paidDate?: string;
+  status: 'PAID' | 'OVERDUE' | 'PENDING' | 'CANCELLED';
+  planType: PlanType;
+  description: string;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+}
 export interface User extends BaseEntity {
   id: string;
   name: string;
@@ -106,30 +118,29 @@ export interface Student extends BaseEntity {
   uli: string;
   lastName: string;
   firstName: string;
-  middleName: string;
-  extension: string;
-  sex: 'Male' | 'Female';
-  dateOfBirth: string;
-  age: number;
-  birthRegion: string;
-  birthProvince: string;
-  birthCity: string;
-  civilStatus: string;
-  educationalAttainment: string;
-  nationality: string;
-  email: string;
-  contactNumber: string;
-  street: string;
-  barangay: string;
-  city: string;
-  district: string;
-  province: string;
-  guardian: string;
-  documents: StudentDocument[];
-  isEnrollmentOverridden?: boolean;
-  overriddenBy?: string;
-  complianceNotes?: string;
-  createdAt: string;
+  middleName?: string;
+  extension?: string;
+  sex?: string;
+  dateOfBirth?: string;
+  birthRegion?: string;
+  birthProvince?: string;
+  birthCity?: string;
+  civilStatus?: string;
+  educationalAttainment?: string;
+  nationality?: string;
+  email?: string;
+  contactNumber?: string;
+  street?: string;
+  barangay?: string;
+  city?: string;
+  district?: string;
+  province?: string;
+  guardian?: string;
+  locationId?: string;
+  sponsorId?: string;
+  documents?: string[];                    // Array of document names/IDs
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Trainer extends BaseEntity {
@@ -143,6 +154,7 @@ export interface Trainer extends BaseEntity {
   specialization: string;
   qualificationIds: string[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface DaySlot {
@@ -157,21 +169,20 @@ export interface TrainerSchedule extends BaseEntity {
   trainerId: string;
   locationId?: string;
   slots: DaySlot[];
-  description: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Sponsor extends BaseEntity {
   id: string;
   orgId: string;
   name: string;
-  type: 'CORPORATE' | 'INDIVIDUAL' | 'GOVERNMENT' | 'NGO';
-  representative?: string;
-  email: string;
-  contactNumber: string;
-  arAccountId?: string; 
-  isActive: boolean;
-  createdAt: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Vendor extends BaseEntity {
@@ -184,6 +195,9 @@ export interface Vendor extends BaseEntity {
   contactNumber: string;
   address: string;
   apAccountId?: string;
+  // Tax configuration
+  taxpayerType?: 'INDIVIDUAL' | 'CORPORATE';
+  isTaxable?: boolean;
   createdAt: string;
 }
 
@@ -209,20 +223,44 @@ export interface PurchaseOrder extends BaseEntity {
   createdAt: string;
 }
 
+export type WithholdingType = 'EXPANDED' | 'FINAL';
+
+export interface Payable extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  refNo?: string;
+  billDate: string;
+  dueDate?: string;
+  currency?: string;
+  grossAmount: number;
+  withholdingType?: WithholdingType;
+  atcItemId?: string;
+  atcRateId?: string;
+  appliedRatePercent?: number;
+  withholdingAmount: number;
+  netPayable: number;
+  status?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface FixedAsset extends BaseEntity {
   id: string;
   orgId: string;
-  name: string;
   code: string;
-  category: AssetCategory;
-  purchaseDate: string;
+  name: string;
+  description?: string;
+  category: string; // Flexible category (can be AssetCategory or other values)
+  purchaseDate: string; // date YYYY-MM-DD
   purchaseCost: number;
-  salvageValue: number;
-  usefulLifeMonths: number;
-  assetAccountId: string; 
-  depreciationAccountId: string; 
-  expenseAccountId: string; 
-  status: 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED';
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  depreciationMethod: string; // e.g., 'STRAIGHT_LINE', 'DECLINING_BALANCE'
+  usefulLifeYears: number;
+  glAccountId: string; // GL account for asset
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface BankAccount extends BaseEntity {
@@ -241,12 +279,9 @@ export interface NonStockItem extends BaseEntity {
   code: string;
   name: string;
   description?: string;
-  defaultAccountId: string; 
   unitPrice: number;
-  type: 'SERVICE' | 'FEE' | 'MATERIAL' | 'OTHER';
-  taxCategory: TaxCategory;
-  whtRate: WHTCategory;
-  isActive: boolean;
+  incomeAccountId: string;  // Maps to income_account_id
+  expenseAccountId: string; // Maps to expense_account_id
   createdAt: string;
 }
 
@@ -258,23 +293,27 @@ export interface Qualification extends BaseEntity {
   durationDays: number;
   sector?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Batch extends BaseEntity {
   id: string;
   orgId: string;
+  batchCode?: string;
   name: string;
   year: number;
   qualificationId: string;
   trainerId: string;
   sponsorId?: string;
-  scheduleId?: string; 
   locationId?: string;
   studentIds: string[];
   status: BatchStatus;
   startDate: string;
   endDate: string;
-  createdAt: string;
+  maxStudents?: number;
+  currentStudents?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChartOfAccount extends BaseEntity {
@@ -292,10 +331,12 @@ export interface ChartOfAccount extends BaseEntity {
 export interface Location extends BaseEntity {
   id: string;
   orgId: string;
-  code: string;
+  code?: string;
   name: string;
   address: string;
+  capacity?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface JournalEntry extends BaseEntity {
@@ -337,14 +378,15 @@ export interface TransactionSummary {
 
 export interface AuditLog {
   id: string;
-  timestamp: string;
+  orgId: string;
   userId: string;
   action: string;
   entityType: string;
   entityId: string;
   details: string;
-  previousState?: any;
-  newState?: any;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
 }
 
 export interface Budget extends BaseEntity {
@@ -394,15 +436,54 @@ export interface PayrollRun extends BaseEntity {
 
 export interface PayrollLine {
   id: string;
+  orgId: string;
   payrollRunId: string;
   employeeId: string;
   grossPay: number;
-  deductions: {
-    tax: number;
-    sss: number;
-    philhealth: number;
-    pagibig: number;
-    other: number;
-  };
+  deductionsTax: number;
+  deductionsSss: number;
+  deductionsPhilhealth: number;
+  deductionsPagibig: number;
+  deductionsOther: number;
   netPay: number;
+}
+
+export interface VendorTaxSetting extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  atcItemId?: string;
+  atcRateId?: string;
+  withholdingType?: WithholdingType;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ATCCategory extends BaseEntity {
+  id: string;
+  code: string; // 'A', 'B', 'C'
+  name: string; // Category name
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCItem extends BaseEntity {
+  id: string;
+  categoryId: string | number; // References atc_categories.id
+  atcCode: string; // e.g., 'WI010'
+  description: string;
+  taxpayerType?: 'Individual' | 'Corporation' | 'Both';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCRate extends BaseEntity {
+  id: string;
+  atcItemId: string | number; // References atc_items.id
+  rate: number; // e.g., 5.00 for 5%
+  rateLabel?: string; // e.g., '5%'
+  createdAt?: string;
+  updatedAt?: string;
 }
