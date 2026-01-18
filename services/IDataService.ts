@@ -3,7 +3,7 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch, 
   Sponsor, NonStockItem, Vendor, BankAccount, Location, 
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
-  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset
+  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -54,6 +54,10 @@ export interface InitialData {
   purchaseOrders: PurchaseOrder[];
   paymentHistories: PaymentHistory[];
   fixedAssets: FixedAsset[];
+  vendorTaxSettings?: any[];
+  atcCategories?: any[];
+  atcItems?: any[];
+  atcRates?: any[];
 }
 
 export interface IDataService {
@@ -109,6 +113,11 @@ export interface IDataService {
   updateSponsor(id: string, updates: Partial<Sponsor>): Promise<Sponsor>;
   deleteSponsor(id: string): Promise<void>;
   checkSponsorUsage(sponsorId: string): Promise<SponsorUsageCheck>;
+
+  // Bank Account CRUD
+  createBankAccount(account: BankAccount): Promise<BankAccount>;
+  updateBankAccount(id: string, updates: Partial<BankAccount>): Promise<BankAccount>;
+  deleteBankAccount(id: string): Promise<void>;
   
   // Fixed Asset CRUD
   createFixedAsset(asset: FixedAsset): Promise<FixedAsset>;
@@ -119,6 +128,11 @@ export interface IDataService {
   createItem(item: NonStockItem): Promise<NonStockItem>;
   updateItem(id: string, updates: Partial<NonStockItem>): Promise<NonStockItem>;
   deleteItem(id: string): Promise<void>;
+
+  // Payables CRUD
+  createPayable(payable: Payable): Promise<Payable>;
+  updatePayable(id: string, updates: Partial<Payable>): Promise<Payable>;
+  deletePayable(id: string): Promise<void>;
   
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;

@@ -1,23 +1,26 @@
 
 import React from 'react';
 import { AuditLog } from '../types';
-import { ShieldCheck, History, User, FileJson, Clock } from 'lucide-react';
+import { ShieldCheck, History, User, Clock } from 'lucide-react';
 
 interface AuditTrailProps {
+  orgId: string;
   logs: AuditLog[];
 }
 
-const AuditTrail: React.FC<AuditTrailProps> = ({ logs }) => {
+const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs }) => {
+  // Filter logs for current organization
+  const orgLogs = logs.filter(log => log.orgId === orgId);
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">System Audit Trail</h2>
-          <p className="text-sm text-slate-500">Immutable history of all system transactions and modifications.</p>
+          <h2 className="text-2xl font-bold text-slate-900">Organization Audit Trail</h2>
+          <p className="text-sm text-slate-500">{orgLogs.length} audit records for this organization</p>
         </div>
         <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg border border-emerald-200 flex items-center gap-2 text-sm font-medium">
           <ShieldCheck size={18} />
-          Audit Ready
+          {orgLogs.length} Events
         </div>
       </div>
 
@@ -33,12 +36,22 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ logs }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {[...logs].reverse().map(log => (
+            {orgLogs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                  <div className="flex flex-col items-center gap-2">
+                    <History size={32} className="text-slate-300" />
+                    <p>No audit records for this organization yet</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              [...orgLogs].reverse().map(log => (
               <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2 text-slate-900 font-medium">
                     <Clock size={14} className="text-slate-400" />
-                    {new Date(log.timestamp).toLocaleString()}
+                    {new Date(log.createdAt).toLocaleString()}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -66,20 +79,19 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ logs }) => {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-slate-600 line-clamp-2 leading-relaxed">
+                  <div className="text-slate-600 leading-relaxed">
                     {log.details}
+                    {log.ipAddress && (
+                      <div className="text-[10px] text-slate-400 mt-2">IP: {log.ipAddress}</div>
+                    )}
                   </div>
-                  {(log.newState || log.previousState) && (
-                    <button className="mt-2 text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 text-[11px]">
-                      <FileJson size={12} /> View State Delta
-                    </button>
-                  )}
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
-        {logs.length === 0 && (
+        {orgLogs.length === 0 && (
           <div className="p-12 text-center">
             <History size={48} className="mx-auto text-slate-200 mb-4" />
             <p className="text-slate-400 font-medium">No audit entries found.</p>

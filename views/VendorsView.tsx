@@ -32,6 +32,8 @@ const VendorsView: React.FC<VendorsViewProps> = ({
     address: '',
     apAccountId: ''
   });
+  const [taxpayerType, setTaxpayerType] = useState('CORPORATE');
+  const [isTaxable, setIsTaxable] = useState(false);
 
   const filteredVendors = vendors.filter(v => 
     v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -79,9 +81,11 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       createdAt: new Date().toISOString()
     };
 
+    newVendor.taxpayerType = taxpayerType;
+    newVendor.isTaxable = isTaxable;
     onAddVendor(newVendor);
     setShowModal(false);
-    setFormData({ category: 'Supplies', apAccountId: '' });
+    setFormData({ category: 'Supplies', apAccountId: '', taxpayerType: 'CORPORATE', isTaxable: false });
   };
 
   return (
@@ -237,10 +241,19 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                       <option value="Other">Other</option>
                     </select>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Taxpayer Type</label>
+                    <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      value={taxpayerType}
+                      onChange={e => setTaxpayerType(e.target.value)}>
+                      <option value="INDIVIDUAL">Individual</option>
+                      <option value="CORPORATE">Corporate</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 text-indigo-600">
+                  <label className="text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 text-indigo-600">
                     <LinkIcon size={12} /> Default G/L Payables Account
                   </label>
                   <select 
@@ -256,6 +269,20 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   </select>
                 </div>
 
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 text-emerald-600">
+                      <ShieldCheck size={12} /> Subject to Withholding Tax (EWT / Final)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button type="button"
+                        onClick={() => setIsTaxable(!isTaxable)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${isTaxable ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        {isTaxable ? 'Taxable: Yes' : 'Taxable: No'}
+                      </button>
+                      <span className="text-[10px] text-slate-400">If Yes, configure ATC in Tax Settings later.</span>
+                    </div>
+                  </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Billing Email</label>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -26,6 +26,7 @@ import AssetsView from './views/AssetsView';
 import APView from './views/APView';
 import ARView from './views/ARView';
 import VendorsView from './views/VendorsView';
+import PayablesView from './views/PayablesView';
 import SchedulesView from './views/SchedulesView';
 import PurchaseOrdersView from './views/PurchaseOrdersView';
 import AuditTrail from './views/AuditTrail';
@@ -94,6 +95,11 @@ export default function App() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [items, setItems] = useState<NonStockItem[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendorTaxSettings, setVendorTaxSettings] = useState<any[]>([]);
+  const [atcCategories, setAtcCategories] = useState<any[]>([]);
+  const [atcItems, setAtcItems] = useState<any[]>([]);
+  const [atcRates, setAtcRates] = useState<any[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -105,6 +111,18 @@ export default function App() {
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+    const handleCreatePayable = async (p: Payable) => {
+      try {
+        const created = await dataService.createPayable({ ...p, orgId: currentOrgId });
+        setPayables(prev => [...prev, created]);
+        handleNotify({ type: 'success', message: 'Payable posted with withholding.' });
+      } catch (err) {
+        console.error('Failed to create payable:', err);
+        // Optimistic fallback
+        setPayables(prev => [...prev, { ...p, orgId: currentOrgId }]);
+        handleNotify({ type: 'warning', message: 'Payable saved locally (Supabase unavailable).' });
+      }
+    };
   const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
@@ -153,6 +171,10 @@ export default function App() {
         setPurchaseOrders(data.purchaseOrders);
         setPayments(data.paymentHistories);
         setFixedAssets(data.fixedAssets);
+        setVendorTaxSettings(data.vendorTaxSettings || []);
+        setAtcCategories(data.atcCategories || []);
+        setAtcItems(data.atcItems || []);
+        setAtcRates(data.atcRates || []);
         
         if (data.organizations.length > 0) {
           // Get the restored session to check user's orgId
@@ -829,6 +851,52 @@ export default function App() {
   };
 
   // ============================================================================
+  // BANK ACCOUNT CRUD HANDLERS
+  // ============================================================================
+
+  const handleAddBankAccount = async (bank: Partial<BankAccount>) => {
+    try {
+      console.info('[App] Creating bank account:', bank.bankName);
+      const bankWithOrg = { ...bank, orgId: currentOrgId, id: `bank-${Date.now()}` } as BankAccount;
+      const created = await dataService.createBankAccount(bankWithOrg);
+      setBankAccounts(prev => [...prev, created]);
+      handleNotify('success', `Bank account "${created.bankName}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating bank account:', error);
+      handleNotify('error', 'Failed to create bank account. Falling back to memory storage.');
+      setBankAccounts(prev => [...prev, { ...bank, orgId: currentOrgId, id: `bank-${Date.now()}` } as BankAccount]);
+    }
+  };
+
+  const handleUpdateBankAccount = async (id: string, updates: Partial<BankAccount>) => {
+    try {
+      console.info('[App] Updating bank account:', id, updates);
+      const updated = await dataService.updateBankAccount(id, updates);
+      setBankAccounts(prev => prev.map(b => b.id === id ? updated : b));
+      handleNotify('success', 'Bank account updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating bank account:', error);
+      handleNotify('error', 'Failed to update bank account. Falling back to memory storage.');
+      setBankAccounts(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    }
+  };
+
+  const handleDeleteBankAccount = async (id: string) => {
+    try {
+      console.info('[App] Deleting bank account:', id);
+      await dataService.deleteBankAccount(id);
+      setBankAccounts(prev => prev.filter(b => b.id !== id));
+      handleNotify('success', 'Bank account deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting bank account:', error);
+      handleNotify('error', 'Failed to delete bank account. Falling back to memory storage.');
+      setBankAccounts(prev => prev.filter(b => b.id !== id));
+      return true;
+    }
+  };
+
+  // ============================================================================
   // FIXED ASSET CRUD HANDLERS
   // ============================================================================
 
@@ -1002,26 +1070,26 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
-        <div className="p-8 flex items-center justify-between border-b border-white/5 bg-slate-900/50">
+        <div className="p-6 flex items-center justify-center border-b border-white/5 bg-slate-900/50">
            {sidebarOpen ? (
-             <div className="flex items-center gap-3 flex-1 min-w-0">
+             <div className="flex flex-col items-center gap-3 w-full">
                 <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
                   style={{ backgroundColor: brandColor }}
                 >
-                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={20} />}
+                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
                 </div>
-                <div className="min-w-0 flex-1">
-                   <h1 className="text-sm font-black text-white uppercase tracking-tighter truncate">{currentOrg?.name || 'No Organization'}</h1>
-                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{currentUser.role.replace('_', ' ')}</p>
+                <div className="w-full text-center">
+                   <h1 className="text-sm font-black text-white uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
+                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
            ) : (
              <div 
-               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto text-white shadow-xl"
+               className="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-white shadow-xl"
                style={{ backgroundColor: brandColor }}
              >
-               <Terminal size={20} />
+               <Building2 size={20} />
              </div>
            )}
         </div>
@@ -1051,6 +1119,7 @@ export default function App() {
                <NavItem icon={<Landmark size={20}/>} label="Treasury" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'ap'} onClick={() => setActiveTab('ap')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<Calculator size={20}/>} label="Payables & Tax" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
                <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -1200,6 +1269,7 @@ export default function App() {
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView vendors={vendors} entries={activeJournalEntries} lines={filteredLines} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostBill={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} vendorTaxSettings={vendorTaxSettings.filter(s => s.orgId === currentOrgId)} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} onCreatePayable={handleCreatePayable} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
           
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
@@ -1207,7 +1277,7 @@ export default function App() {
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
           {activeTab === 'vendors' && <VendorsView vendors={vendors} accounts={filteredAccounts} lines={filteredLines} onAddVendor={v => setVendors(p => [...p, v])} onUpdateVendor={v => setVendors(p => p.map(x => x.id === v.id ? v : x))} onDeleteVendor={id => setVendors(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
-          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={b => setBankAccounts(prev => [...prev, {...b, orgId: currentOrgId} as BankAccount])} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={handleAddBankAccount} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
@@ -1229,7 +1299,7 @@ export default function App() {
             onDeleteEmployee={(id) => setEmployees(p => p.map(x => x.id === id ? { ...x, isDeleted: true, deletedAt: new Date().toISOString() } : x))} 
           />}
           {activeTab === 'users' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={handleAddUser} onDeleteUser={handleDeleteUser} />}
-          {activeTab === 'audit' && <AuditTrail logs={auditLogs} />}
+          {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'schema' && <SchemaManualView />}

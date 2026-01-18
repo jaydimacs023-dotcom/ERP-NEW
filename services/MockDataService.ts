@@ -30,7 +30,10 @@ export class MockDataService implements IDataService {
       auditLogs: [],
       purchaseOrders: [],
       paymentHistories: db.INITIAL_PAYMENTS,
-      fixedAssets: db.INITIAL_FIXED_ASSETS
+      fixedAssets: db.INITIAL_FIXED_ASSETS,
+      atcCategories: [],
+      atcItems: [],
+      atcRates: []
     };
   }
 
@@ -231,5 +234,31 @@ export class MockDataService implements IDataService {
 
   async deleteItem(id: string): Promise<void> {
     console.warn('[MockDataService] Items persist to memory only; changes lost on refresh');
+  }
+
+  // Payables CRUD (mock)
+  async createPayable(payable: any): Promise<any> {
+    console.warn('[MockDataService] createPayable is memory-only.');
+    return { ...payable };
+  }
+  async updatePayable(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updatePayable is memory-only.');
+    return { id, ...updates };
+  }
+  async deletePayable(id: string): Promise<void> {
+    console.warn('[MockDataService] deletePayable is memory-only.');
+  }
+
+  // Bank Account CRUD (mock)
+  async createBankAccount(account: any): Promise<any> {
+    console.warn('[MockDataService] createBankAccount is memory-only.');
+    return { ...account };
+  }
+  async updateBankAccount(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateBankAccount is memory-only.');
+    return { id, ...updates };
+  }
+  async deleteBankAccount(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteBankAccount is memory-only.');
   }
 }

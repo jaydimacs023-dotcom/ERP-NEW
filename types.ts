@@ -195,6 +195,9 @@ export interface Vendor extends BaseEntity {
   contactNumber: string;
   address: string;
   apAccountId?: string;
+  // Tax configuration
+  taxpayerType?: 'INDIVIDUAL' | 'CORPORATE';
+  isTaxable?: boolean;
   createdAt: string;
 }
 
@@ -218,6 +221,28 @@ export interface PurchaseOrder extends BaseEntity {
   totalAmount: number;
   memo?: string;
   createdAt: string;
+}
+
+export type WithholdingType = 'EXPANDED' | 'FINAL';
+
+export interface Payable extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  refNo?: string;
+  billDate: string;
+  dueDate?: string;
+  currency?: string;
+  grossAmount: number;
+  withholdingType?: WithholdingType;
+  atcItemId?: string;
+  atcRateId?: string;
+  appliedRatePercent?: number;
+  withholdingAmount: number;
+  netPayable: number;
+  status?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface FixedAsset extends BaseEntity {
@@ -353,14 +378,15 @@ export interface TransactionSummary {
 
 export interface AuditLog {
   id: string;
-  timestamp: string;
+  orgId: string;
   userId: string;
   action: string;
   entityType: string;
   entityId: string;
   details: string;
-  previousState?: any;
-  newState?: any;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
 }
 
 export interface Budget extends BaseEntity {
@@ -420,4 +446,44 @@ export interface PayrollLine {
   deductionsPagibig: number;
   deductionsOther: number;
   netPay: number;
+}
+
+export interface VendorTaxSetting extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  atcItemId?: string;
+  atcRateId?: string;
+  withholdingType?: WithholdingType;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ATCCategory extends BaseEntity {
+  id: string;
+  code: string; // 'A', 'B', 'C'
+  name: string; // Category name
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCItem extends BaseEntity {
+  id: string;
+  categoryId: string | number; // References atc_categories.id
+  atcCode: string; // e.g., 'WI010'
+  description: string;
+  taxpayerType?: 'Individual' | 'Corporation' | 'Both';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCRate extends BaseEntity {
+  id: string;
+  atcItemId: string | number; // References atc_items.id
+  rate: number; // e.g., 5.00 for 5%
+  rateLabel?: string; // e.g., '5%'
+  createdAt?: string;
+  updatedAt?: string;
 }

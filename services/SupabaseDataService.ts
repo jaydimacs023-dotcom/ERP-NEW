@@ -112,6 +112,10 @@ export class SupabaseDataService implements IDataService {
         purchaseOrders,
         paymentHistories,
         fixedAssets,
+        vendorTaxSettings,
+        atcCategories,
+        atcItems,
+        atcRates,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -135,6 +139,10 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('purchase_orders'),
         this.fetchFromSupabase('payment_histories'),
         this.fetchFromSupabase('fixed_assets'),
+        this.fetchFromSupabase('vendor_tax_settings'),
+        this.fetchFromSupabase('atc_categories'),
+        this.fetchFromSupabase('atc_items'),
+        this.fetchFromSupabase('atc_rates'),
       ]);
 
       // Check if we got any real data
@@ -171,6 +179,10 @@ export class SupabaseDataService implements IDataService {
         purchaseOrders: this.snakeToCamel(purchaseOrders as any) || [],
         paymentHistories: this.snakeToCamel(paymentHistories as any) || [],
         fixedAssets: this.snakeToCamel(fixedAssets as any) || [],
+        vendorTaxSettings: this.snakeToCamel(vendorTaxSettings as any) || [],
+        atcCategories: this.snakeToCamel(atcCategories as any) || [],
+        atcItems: this.snakeToCamel(atcItems as any) || [],
+        atcRates: this.snakeToCamel(atcRates as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -364,12 +376,14 @@ export class SupabaseDataService implements IDataService {
       batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
       fixed_assets: ['id', 'org_id', 'code', 'name', 'description', 'category', 'purchase_date', 'purchase_cost', 'accumulated_depreciation', 'depreciation_method', 'useful_life_years', 'gl_account_id', 'created_at', 'updated_at'],
       items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'created_at', 'updated_at'],
+      payables: ['id', 'org_id', 'vendor_id', 'ref_no', 'bill_date', 'due_date', 'currency', 'gross_amount', 'withholding_type', 'atc_item_id', 'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable', 'status', 'created_at', 'updated_at', 'is_deleted'],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
     const generatedColumns: Record<string, string[]> = {
       fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
-      items: ['created_at', 'updated_at']
+      items: ['created_at', 'updated_at'],
+      payables: ['created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -1273,5 +1287,53 @@ export class SupabaseDataService implements IDataService {
 
   async deleteItem(id: string): Promise<void> {
     return this.deleteFromSupabase('items', id);
+  }
+
+  /**
+   * Payables CRUD Operations
+   */
+  async createPayable(payable: any): Promise<any> {
+    const snake = this.camelToSnake(payable);
+    // Exclude generated columns on insert
+    const filtered = this.filterToTableSchema('payables', snake, true);
+    if ((filtered as any).id && !this.isValidUUID((filtered as any).id)) {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('payables', filtered);
+  }
+
+  async updatePayable(id: string, updates: Partial<any>): Promise<any> {
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('payables', snake);
+    return this.updateInSupabaseRaw('payables', id, filtered);
+  }
+
+  async deletePayable(id: string): Promise<void> {
+    return this.deleteFromSupabase('payables', id);
+  }
+
+  // ============================================================================
+  // BANK ACCOUNT CRUD
+  // ============================================================================
+  async createBankAccount(account: any): Promise<any> {
+    console.debug('[Supabase] createBankAccount called with:', account);
+    const snake = this.camelToSnake(account);
+    const filtered = this.filterToTableSchema('bank_accounts', snake);
+    if (filtered.id === undefined) {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('bank_accounts', filtered);
+  }
+
+  async updateBankAccount(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateBankAccount called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('bank_accounts', snake);
+    return this.updateInSupabaseRaw('bank_accounts', id, filtered);
+  }
+
+  async deleteBankAccount(id: string): Promise<void> {
+    console.debug('[Supabase] deleteBankAccount called with:', id);
+    return this.deleteFromSupabase('bank_accounts', id);
   }
 }
