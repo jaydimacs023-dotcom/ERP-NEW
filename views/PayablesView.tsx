@@ -1,18 +1,23 @@
-import React, { useMemo, useState } from 'react';
-import { Vendor, Payable, WithholdingType } from '../types';
-import { Search, Calculator, Building, Coins, AlertCircle, Calendar, Link as LinkIcon, X, Plus } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Vendor, Payable, WithholdingType, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass } from '../types';
+import { AccountingService } from '../accountingService';
+import { Search, Calculator, Building, Coins, AlertCircle, Calendar, Link as LinkIcon, X, Plus, FileText } from 'lucide-react';
 
 interface PayablesViewProps {
   orgId: string;
   vendors: Vendor[];
+  accounts: ChartOfAccount[];
+  entries: JournalEntry[];
   vendorTaxSettings?: any[];
   atcCategories?: any[];
   atcItems?: any[];
   atcRates?: any[];
   onCreatePayable: (payable: Payable) => void;
+  onPostJournal: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSettings = [], atcCategories = [], atcItems = [], atcRates = [], onCreatePayable }) => {
+const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, accounts, entries, vendorTaxSettings = [], atcCategories = [], atcItems = [], atcRates = [], onCreatePayable, onPostJournal, onNotify }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [vendorId, setVendorId] = useState<string>('');
@@ -21,8 +26,47 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
   const [appliedRatePercent, setAppliedRatePercent] = useState<number>(0);
   const [refNo, setRefNo] = useState<string>('');
   const [billDate, setBillDate] = useState<string>(new Date().toISOString().slice(0,10));
+  const [expenseAccountId, setExpenseAccountId] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
 
-  const vendor = useMemo(() => vendors.find(v => v.id === vendorId), [vendors, vendorId]);
+  // ============================================================================
+  // MULTI-TENANT FILTERING - Filter all data by current organization
+  // ============================================================================
+  const orgVendors = useMemo(() => 
+    vendors.filter(v => v.orgId === orgId && !v.isDeleted), 
+    [vendors, orgId]
+  );
+
+  const orgAccounts = useMemo(() => 
+    accounts.filter(a => a.orgId === orgId && !a.isDeleted), 
+    [accounts, orgId]
+  );
+
+  const orgEntries = useMemo(() => 
+    entries.filter(e => e.orgId === orgId && e.status !== 'REVERSED'), 
+    [entries, orgId]
+  );
+
+  const orgVendorTaxSettings = useMemo(() => 
+    vendorTaxSettings.filter((s: any) => s.orgId === orgId), 
+    [vendorTaxSettings, orgId]
+  );
+
+  // Get expense accounts for dropdown (filtered by org)
+  const expenseAccounts = useMemo(() => 
+    orgAccounts.filter(a => a.class === AccountClass.EXPENSE), 
+    [orgAccounts]
+  );
+
+  // Auto-generate reference number (using org-filtered entries)
+  useEffect(() => {
+    if (showModal && !refNo) {
+      setRefNo(AccountingService.getNextReference(orgEntries, 'PAY'));
+    }
+  }, [showModal, orgEntries, refNo]);
+
+  const vendor = useMemo(() => orgVendors.find(v => v.id === vendorId), [orgVendors, vendorId]);
+  
   // Auto-resolve withholding type and rate from vendor tax settings
   React.useEffect(() => {
     if (!vendorId) {
@@ -30,7 +74,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
       setAppliedRatePercent(0);
       return;
     }
-    const setting = vendorTaxSettings.find((s: any) => s.vendorId === vendorId && s.isActive);
+    const setting = orgVendorTaxSettings.find((s: any) => s.vendorId === vendorId && s.isActive);
     if (!setting) {
       setWithholdingType(undefined);
       setAppliedRatePercent(0);
@@ -48,12 +92,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
       rateRow = candidates[0];
     }
     setAppliedRatePercent(rateRow?.ratePercent ?? 0);
-  }, [vendorId, vendorTaxSettings, atcRates]);
+  }, [vendorId, orgVendorTaxSettings, atcRates]);
 
   const withholdingAmount = useMemo(() => Number((grossAmount * (appliedRatePercent || 0)).toFixed(2)), [grossAmount, appliedRatePercent]);
   const netPayable = useMemo(() => Number((grossAmount - withholdingAmount).toFixed(2)), [grossAmount, withholdingAmount]);
 
-  const filteredVendors = vendors.filter(v => 
+  // Search filter on org-filtered vendors
+  const filteredVendors = orgVendors.filter(v => 
     v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.tin?.includes(searchTerm)
   );
@@ -65,28 +110,117 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
     setAppliedRatePercent(0);
     setRefNo('');
     setBillDate(new Date().toISOString().slice(0,10));
+    setExpenseAccountId('');
+    setDescription('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vendorId || !grossAmount) return;
+    if (!vendorId || !grossAmount) {
+      onNotify('error', 'Vendor and gross amount are required.');
+      return;
+    }
+    if (!expenseAccountId) {
+      onNotify('error', 'Please select an expense account for this payable.');
+      return;
+    }
 
+    const selectedVendor = orgVendors.find(v => v.id === vendorId);
+    if (!selectedVendor) {
+      onNotify('error', 'Selected vendor not found in this organization.');
+      return;
+    }
+
+    // Get AP account (from vendor or default) - use org-filtered accounts
+    const apAccountId = selectedVendor.apAccountId || orgAccounts.find(a => a.code?.startsWith('2100'))?.id;
+    const ewtPayableId = orgAccounts.find(a => a.code?.startsWith('2300'))?.id;
+
+    if (!apAccountId) {
+      onNotify('error', 'Accounts Payable G/L account not found. Please configure Chart of Accounts.');
+      return;
+    }
+
+    // Create journal entry ID
+    const entryId = `je-pay-${Date.now()}`;
+
+    // Build journal entry lines
+    const journalLines: JournalEntryLine[] = [];
+
+    // Debit: Expense Account (gross amount)
+    journalLines.push({
+      id: `l-exp-${Date.now()}`,
+      journalEntryId: entryId,
+      accountId: expenseAccountId,
+      debit: grossAmount,
+      credit: 0,
+      memo: description || `Payable ${refNo} from ${selectedVendor.name}`,
+      contactId: vendorId,
+      contactType: 'VENDOR'
+    });
+
+    // Credit: EWT Payable (if withholding applies)
+    if (withholdingAmount > 0 && ewtPayableId) {
+      journalLines.push({
+        id: `l-ewt-${Date.now()}`,
+        journalEntryId: entryId,
+        accountId: ewtPayableId,
+        debit: 0,
+        credit: withholdingAmount,
+        memo: `${withholdingType} WHT from ${refNo}`,
+        contactId: vendorId,
+        contactType: 'VENDOR'
+      });
+    }
+
+    // Credit: Accounts Payable (net payable)
+    journalLines.push({
+      id: `l-ap-${Date.now()}`,
+      journalEntryId: entryId,
+      accountId: apAccountId,
+      debit: 0,
+      credit: netPayable,
+      memo: `Payable ${refNo} to ${selectedVendor.name}`,
+      contactId: vendorId,
+      contactType: 'VENDOR'
+    });
+
+    // Post the journal entry (orgId will be added by App.tsx handler)
+    onPostJournal({
+      id: entryId,
+      date: billDate,
+      reference: refNo,
+      description: `Payable: ${selectedVendor.name} - ${description || refNo}`,
+      sourceType: 'PAYABLE',
+      status: 'POSTED'
+    }, journalLines);
+
+    // Create the payable record with explicit orgId
     const payable: Payable = {
       id: `pay-${Date.now()}`,
-      orgId,
+      orgId,  // Multi-tenant: explicitly set organization ID
       vendorId,
-      refNo,
+      payableNumber: refNo,
+      category: 'general',
+      description: description || `Payable ${refNo} from ${selectedVendor.name}`,
+      amount: grossAmount,
       billDate,
-      grossAmount,
+      dueDate: billDate,
+      currency: 'PHP',
+      status: 'for_approval',
+      referenceDocument: refNo,
+      journalEntryId: entryId,
+      glAccountId: apAccountId,
+      notes: description,
       withholdingType,
       appliedRatePercent,
       withholdingAmount,
       netPayable,
-      status: 'OPEN',
       createdAt: new Date().toISOString(),
+      isDeleted: false
     };
 
     onCreatePayable(payable);
+    onNotify('success', `Payable ${refNo} created and posted to ledger.`);
     setShowModal(false);
     resetForm();
   };
@@ -155,7 +289,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Reference No.</label>
-                    <input placeholder="BILL-2026-00001" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    <input placeholder="PAY-2026-00001" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
                       value={refNo} onChange={e => setRefNo(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
@@ -163,6 +297,29 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
                     <input type="date" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
                       value={billDate} onChange={e => setBillDate(e.target.value)} />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <FileText size={12} /> Expense Account
+                  </label>
+                  <select 
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+                    value={expenseAccountId}
+                    onChange={e => setExpenseAccountId(e.target.value)}
+                  >
+                    <option value="">Select Expense Account...</option>
+                    {expenseAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Description / Memo</label>
+                  <input placeholder="Brief description of the expense..." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    value={description} onChange={e => setDescription(e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -204,10 +361,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({ orgId, vendors, vendorTaxSe
                 </div>
               </div>
 
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3">
-                 <AlertCircle className="text-amber-600 shrink-0" size={20} />
-                 <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                   For now, select withholding type and rate manually. In the next step, we'll auto-resolve ATC & rate from the vendor's tax settings.
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex gap-3">
+                 <AlertCircle className="text-emerald-600 shrink-0" size={20} />
+                 <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
+                   This payable will automatically create a journal entry: <strong>Debit</strong> Expense Account, <strong>Credit</strong> Accounts Payable (and EWT Payable if withholding applies).
                  </p>
               </div>
 

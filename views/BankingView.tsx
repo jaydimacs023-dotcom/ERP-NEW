@@ -17,6 +17,8 @@ interface BankingViewProps {
   entries: JournalEntry[];
   lines: JournalEntryLine[];
   onAddBankAccount: (bank: Partial<BankAccount>) => void;
+  onUpdateBankAccount?: (id: string, bank: Partial<BankAccount>) => void;
+  onDeleteBankAccount?: (id: string) => void;
   onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onToggleClearLine: (lineId: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -25,9 +27,11 @@ interface BankingViewProps {
 type BankingTab = 'ledger' | 'reconcile';
 
 const BankingView: React.FC<BankingViewProps> = ({ 
-  bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onPostTransfer, onToggleClearLine, onNotify 
+  bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onUpdateBankAccount, onDeleteBankAccount, onPostTransfer, onToggleClearLine, onNotify 
 }) => {
   const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
   const [activeTab, setActiveTab] = useState<BankingTab>('ledger');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -49,15 +53,58 @@ const BankingView: React.FC<BankingViewProps> = ({
     accountNumber: '',
     type: 'SAVINGS',
     glAccountId: '',
-    currency: 'PHP'
+    currency: 'PHP',
+    balance: 0
   });
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBank.bankName || !newBank.glAccountId) return;
-    onAddBankAccount({ ...newBank, id: `bank-${Date.now()}` });
+    if (!newBank.bankName || !newBank.glAccountId) {
+      return onNotify('error', 'Validation Error: Bank name and GL account are required.');
+    }
+    onAddBankAccount({ 
+      ...newBank, 
+      id: `bank-${Date.now()}`,
+      balance: Number(newBank.balance) || 0,
+      createdAt: new Date().toISOString()
+    });
     setShowAddModal(false);
-    setNewBank({ bankName: '', accountNumber: '', type: 'SAVINGS', glAccountId: '', currency: 'PHP' });
+    setNewBank({ bankName: '', accountNumber: '', type: 'SAVINGS', glAccountId: '', currency: 'PHP', balance: 0 });
+    onNotify('success', 'Bank account linked successfully.');
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBank || !onUpdateBankAccount) return;
+    if (!editingBank.bankName || !editingBank.glAccountId) {
+      return onNotify('error', 'Validation Error: Bank name and GL account are required.');
+    }
+    onUpdateBankAccount(editingBank.id, {
+      bankName: editingBank.bankName,
+      accountNumber: editingBank.accountNumber,
+      type: editingBank.type,
+      glAccountId: editingBank.glAccountId,
+      currency: editingBank.currency,
+      balance: Number(editingBank.balance),
+      updatedAt: new Date().toISOString()
+    });
+    setShowEditModal(false);
+    setEditingBank(null);
+    onNotify('success', 'Bank account updated successfully.');
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    if (!onDeleteBankAccount) return;
+    if (confirm('Are you sure you want to delete this bank account? This action cannot be undone.')) {
+      onDeleteBankAccount(id);
+      setSelectedBank(null);
+      onNotify('success', 'Bank account deleted successfully.');
+    }
+  };
+
+  const openEditModal = (bank: BankAccount) => {
+    setEditingBank({ ...bank });
+    setShowEditModal(true);
   };
 
   const handleDirectEntrySubmit = (e: React.FormEvent) => {
@@ -259,19 +306,37 @@ const BankingView: React.FC<BankingViewProps> = ({
               </div>
               Exit Console
             </button>
-            <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 w-full sm:w-auto">
-               <button 
-                onClick={() => setActiveTab('ledger')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-               >
-                 <History size={14} /> Account History
-               </button>
-               <button 
-                onClick={() => setActiveTab('reconcile')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-               >
-                 <Scale size={14} /> Reconciliation
-               </button>
+            <div className="flex gap-2 items-center no-print">
+              {selectedBank && (
+                <>
+                  <button 
+                    onClick={() => openEditModal(selectedBank)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 transition-all font-bold text-xs"
+                  >
+                    <Save size={14} /> Edit Account
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteAccount(selectedBank.id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-100 transition-all font-bold text-xs"
+                  >
+                    <X size={14} /> Delete
+                  </button>
+                </>
+              )}
+              <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
+                 <button 
+                  onClick={() => setActiveTab('ledger')}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   <History size={14} /> Account History
+                 </button>
+                 <button 
+                  onClick={() => setActiveTab('reconcile')}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   <Scale size={14} /> Reconciliation
+                 </button>
+              </div>
             </div>
           </div>
           
@@ -684,6 +749,77 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
                 <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 transition-all active:scale-95">Link Ledger</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingBank && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-xl">
+                  <Save size={24} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Edit Account</h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"><X size={28} /></button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-10 space-y-8">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Bank Title</label>
+                  <input required placeholder="e.g. Metrobank Corporate" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm text-slate-800"
+                    value={editingBank.bankName} onChange={e => setEditingBank({...editingBank, bankName: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Acc # / Identifier</label>
+                    <input placeholder="Optional Ref" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-mono text-xs font-bold"
+                      value={editingBank.accountNumber} onChange={e => setEditingBank({...editingBank, accountNumber: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Liquidity Type</label>
+                    <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-black text-xs"
+                      value={editingBank.type} onChange={e => setEditingBank({...editingBank, type: e.target.value as any})}>
+                      <option value="SAVINGS">Savings</option>
+                      <option value="CHECKING">Checking</option>
+                      <option value="CASH">Physical Cash</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Currency</label>
+                    <input placeholder="PHP" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-mono text-xs font-bold uppercase"
+                      value={editingBank.currency} onChange={e => setEditingBank({...editingBank, currency: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Current Balance</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-mono text-xs font-bold"
+                      value={editingBank.balance} onChange={e => setEditingBank({...editingBank, balance: Number(e.target.value)})} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <BookOpen size={16} /> G/L Ledger Mapping
+                  </label>
+                  <select required className="w-full px-4 py-3 bg-indigo-50/50 border-2 border-indigo-100 rounded-2xl outline-none font-black text-sm text-indigo-700 appearance-none"
+                    value={editingBank.glAccountId} onChange={e => setEditingBank({...editingBank, glAccountId: e.target.value})}>
+                    <option value="">Select Asset Account...</option>
+                    {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
+                      <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-4">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
+                <button type="submit" className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-blue-100 transition-all active:scale-95">Save Changes</button>
               </div>
             </form>
           </div>

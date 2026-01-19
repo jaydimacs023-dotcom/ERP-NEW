@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
+import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable } from '../types';
 import { AccountingService } from '../accountingService';
 import { 
   Truck, Plus, Filter, Search, FileText, ChevronRight, Clock, 
@@ -16,18 +16,22 @@ interface APViewProps {
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
+  currentUserId?: string;
   onPostBill: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onCreatePayable: (payable: Payable) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 type APTab = 'bills' | 'payments' | 'aging';
 
 const APView: React.FC<APViewProps> = ({ 
-  vendors, entries, lines, items, accounts, bankAccounts, onPostBill, onNotify 
+  vendors, entries, lines, items, accounts, bankAccounts, currentUserId = 'system', onPostBill, onCreatePayable, onNotify 
 }) => {
   const [activeTab, setActiveTab] = useState<APTab>('bills');
   const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
 
@@ -178,7 +182,7 @@ const APView: React.FC<APViewProps> = ({
         finalizedLines.push({
           id: `l-exp-${idx}-${Date.now()}`,
           journalEntryId: entryId,
-          accountId: item.defaultAccountId,
+          accountId: item.expenseAccountId,
           debit: bl.qty * bl.price,
           credit: 0,
           memo: `${item.name} from ${vendor?.name}`,
@@ -193,6 +197,7 @@ const APView: React.FC<APViewProps> = ({
     if (totalEwt > 0) finalizedLines.push({ id: `l-ewt-${Date.now()}`, journalEntryId: entryId, accountId: ewtPayableId, debit: 0, credit: totalEwt, memo: `Expanded WHT from ${billRef}`, contactId: vendorId, contactType: 'VENDOR' });
     finalizedLines.push({ id: `l-ap-${Date.now()}`, journalEntryId: entryId, accountId: apAccountId, debit: 0, credit: netPayableToVendor, memo: `Bill ${billRef} from ${vendor?.name}`, contactId: vendorId, contactType: 'VENDOR' });
 
+    // Post the journal entry
     onPostBill({
       id: entryId,
       date: billDate,
@@ -201,6 +206,33 @@ const APView: React.FC<APViewProps> = ({
       sourceType: 'BILL',
       status: 'POSTED'
     }, finalizedLines);
+
+    // Create the payable record
+    const payable: Payable = {
+      id: `pay-${Date.now()}`,
+      orgId: '',  // Will be set in App.tsx
+      vendorId: vendorId,
+      payableNumber: billRef,
+      category: 'supplies',  // Default category
+      description: `Bill ${billRef} from ${vendor?.name}`,
+      amount: vatablePurchases + nonVatPurchases,
+      billDate: billDate,
+      dueDate: billDate,  // Same as bill date; can be adjusted in payables view
+      paymentDate: undefined,
+      currency: 'PHP',
+      status: 'for_approval',
+      referenceDocument: billRef,
+      journalEntryId: entryId,
+      glAccountId: apAccountId,
+      notes: `Posted from Bill ${billRef}`,
+      withholdingType: totalEwt > 0 ? 'EXPANDED' : undefined,
+      withholdingAmount: totalEwt,
+      netPayable: netPayableToVendor,
+      createdBy: currentUserId,
+      createdAt: new Date().toISOString(),
+      isDeleted: false
+    };
+    onCreatePayable(payable);
     
     setShowModal(false);
     resetForm();
@@ -327,7 +359,15 @@ const APView: React.FC<APViewProps> = ({
                       <td className="px-6 py-5 text-center">
                         <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-bold uppercase rounded-full border border-amber-100">Unpaid</span>
                       </td>
-                      <td className="px-6 py-5 text-right"><button className="p-2 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors"><MoreVertical size={16} /></button></td>
+                      <td className="px-6 py-5 text-right">
+                        <button 
+                          onClick={() => { setSelectedJournalId(bill.id); setShowJournalModal(true); }}
+                          className="p-2 hover:bg-slate-100 rounded-lg text-indigo-500 transition-colors opacity-0 group-hover:opacity-100"
+                          title="View Journal Entry"
+                        >
+                          <FileText size={16} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 }) : (
@@ -546,6 +586,89 @@ const APView: React.FC<APViewProps> = ({
                 <div className="flex flex-col justify-end gap-3"><button type="button" onClick={() => setShowModal(false)} className="py-3.5 text-sm font-bold text-slate-500 hover:bg-white rounded-2xl border border-transparent hover:border-slate-200 transition-all">Discard</button><button type="submit" disabled={netPayableToVendor <= 0 || !vendorId} className="py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"><Save size={18} /> Post to Payables</button></div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Journal Entry Details Modal */}
+      {showJournalModal && selectedJournalId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-96 overflow-auto">
+            {(() => {
+              const entry = entries.find(e => e.id === selectedJournalId);
+              const entryLines = lines.filter(l => l.journalEntryId === selectedJournalId);
+              return (
+                <>
+                  <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center sticky top-0">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800">Journal Entry Details</h3>
+                      <p className="text-xs text-slate-500 mt-1">Reference: {entry?.reference} | Date: {entry?.date}</p>
+                    </div>
+                    <button 
+                      onClick={() => { setShowJournalModal(false); setSelectedJournalId(null); }}
+                      className="p-2 hover:bg-white rounded-lg transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-200">
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">Description</p>
+                        <p className="text-sm font-semibold text-slate-800 mt-1">{entry?.description}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold">Source Type</p>
+                        <p className="text-sm font-semibold text-indigo-600 mt-1">{entry?.sourceType}</p>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-bold text-slate-500">Account</th>
+                            <th className="text-right px-3 py-2 font-bold text-slate-500">Debit</th>
+                            <th className="text-right px-3 py-2 font-bold text-slate-500">Credit</th>
+                            <th className="text-left px-3 py-2 font-bold text-slate-500">Memo</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {entryLines.map(line => {
+                            const acc = accounts.find(a => a.id === line.accountId);
+                            return (
+                              <tr key={line.id} className="hover:bg-slate-50">
+                                <td className="px-3 py-2">
+                                  <div className="font-semibold text-slate-700">{acc?.name}</div>
+                                  <div className="text-[9px] text-slate-400 font-mono">{acc?.code}</div>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {line.debit > 0 && <span className="font-mono font-semibold text-slate-800">{line.debit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {line.credit > 0 && <span className="font-mono font-semibold text-slate-800">{line.credit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>}
+                                </td>
+                                <td className="px-3 py-2 text-slate-600">{line.memo}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-200 flex justify-end gap-2">
+                      <button 
+                        onClick={() => { setShowJournalModal(false); setSelectedJournalId(null); }}
+                        className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -190,15 +190,39 @@ export interface Vendor extends BaseEntity {
   orgId: string;
   name: string;
   category: string;
-  tin?: string;
   email: string;
   contactNumber: string;
   address: string;
   apAccountId?: string;
-  // Tax configuration
-  taxpayerType?: 'INDIVIDUAL' | 'CORPORATE';
-  isTaxable?: boolean;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCCategory extends BaseEntity {
+  id: string;
+  code: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCItem extends BaseEntity {
+  id: string;
+  categoryId: string;
+  atcCode: string;
+  description: string;
+  taxpayerType: 'Individual' | 'Corporation' | 'Both';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ATCRate extends BaseEntity {
+  id: string;
+  atcItemId: string;
+  rate: number;
+  rateLabel: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PurchaseOrderLine {
@@ -225,24 +249,57 @@ export interface PurchaseOrder extends BaseEntity {
 
 export type WithholdingType = 'EXPANDED' | 'FINAL';
 
+export interface Bill extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  reference: string;
+  billDate: string;
+  dueDate?: string;
+  currency?: string;
+  lines: Array<{ itemId: string; description: string; qty: number; price: number; total: number }>;
+  vatPurchases: number;
+  inputVat: number;
+  nonVatPurchases: number;
+  totalEwt: number;
+  grossAmount: number;
+  netPayable: number;
+  status: 'DRAFT' | 'POSTED' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
+  journalEntryId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Payable extends BaseEntity {
   id: string;
   orgId: string;
   vendorId: string;
-  refNo?: string;
+  payableNumber: string;
+  category: 'utilities' | 'supplies' | 'training_materials' | 'contractor_services' | 'assessments' | 'insurance' | 'government_obligations' | 'scholarship_advances' | 'employee_reimbursements' | 'other';
+  description: string;
+  amount: number;
   billDate: string;
-  dueDate?: string;
+  dueDate: string;
+  paymentDate?: string;
   currency?: string;
-  grossAmount: number;
+  status: 'for_approval' | 'approved' | 'paid' | 'partially_paid' | 'cancelled';
+  referenceDocument?: string;
+  journalEntryId?: string;
+  glAccountId?: string;
+  notes?: string;
   withholdingType?: WithholdingType;
   atcItemId?: string;
   atcRateId?: string;
   appliedRatePercent?: number;
-  withholdingAmount: number;
-  netPayable: number;
-  status?: string;
+  withholdingAmount?: number;
+  netPayable?: number;
+  createdBy: string;
+  approvedBy?: string;
+  paidBy?: string;
   createdAt: string;
   updatedAt?: string;
+  approvedAt?: string;
+  paidAt?: string;
 }
 
 export interface FixedAsset extends BaseEntity {
@@ -271,6 +328,9 @@ export interface BankAccount extends BaseEntity {
   type: 'SAVINGS' | 'CHECKING' | 'CREDIT' | 'CASH';
   glAccountId: string; 
   currency: string;
+  balance: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface NonStockItem extends BaseEntity {

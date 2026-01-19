@@ -3,7 +3,7 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch, 
   Sponsor, NonStockItem, Vendor, BankAccount, Location, 
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
-  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable
+  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -48,6 +48,8 @@ export interface InitialData {
   accounts: any[]; // ChartOfAccount[]
   journalEntries: JournalEntry[];
   journalLines: JournalEntryLine[];
+  bills: Bill[];
+  payables: Payable[];
   payrollRuns: PayrollRun[];
   payrollLines: PayrollLine[];
   auditLogs: AuditLog[];
@@ -128,6 +130,16 @@ export interface IDataService {
   createItem(item: NonStockItem): Promise<NonStockItem>;
   updateItem(id: string, updates: Partial<NonStockItem>): Promise<NonStockItem>;
   deleteItem(id: string): Promise<void>;
+
+  // Vendor CRUD
+  createVendor(vendor: Vendor): Promise<Vendor>;
+  updateVendor(id: string, updates: Partial<Vendor>): Promise<Vendor>;
+  deleteVendor(id: string): Promise<void>;
+
+  // Bills CRUD
+  createBill(bill: Bill): Promise<Bill>;
+  updateBill(id: string, updates: Partial<Bill>): Promise<Bill>;
+  deleteBill(id: string): Promise<void>;
 
   // Payables CRUD
   createPayable(payable: Payable): Promise<Payable>;

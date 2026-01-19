@@ -3,37 +3,36 @@ import { Vendor, ChartOfAccount, JournalEntryLine, AccountClass } from '../types
 import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
-  ShieldCheck, Globe, Building, Filter, FileText, 
-  Link as LinkIcon, AlertCircle, Fingerprint, MapPin
+  Edit, AlertCircle, MapPin, Building, Filter, Link as LinkIcon
 } from 'lucide-react';
 
 interface VendorsViewProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
   lines: JournalEntryLine[];
-  onAddVendor: (vendor: Vendor) => void;
-  onUpdateVendor: (vendor: Vendor) => void;
-  onDeleteVendor: (id: string) => void;
+  onAddVendor?: (vendor: Vendor) => void;
+  onUpdateVendor?: (id: string, updates: Partial<Vendor>) => void;
+  onDeleteVendor?: (id: string) => void;
+  onNotify?: (type: 'success' | 'error', message: string) => void;
 }
 
 const VendorsView: React.FC<VendorsViewProps> = ({ 
-  vendors, accounts, lines, onAddVendor, onUpdateVendor, onDeleteVendor 
+  vendors, accounts, lines, onAddVendor, onUpdateVendor, onDeleteVendor, onNotify 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [editingVendor, setEditingVendor] = useState<Partial<Vendor> | null>(null);
 
   const [formData, setFormData] = useState<Partial<Vendor>>({
     name: '',
     category: 'Supplies',
-    tin: '',
     email: '',
     contactNumber: '',
     address: '',
     apAccountId: ''
   });
-  const [taxpayerType, setTaxpayerType] = useState('CORPORATE');
-  const [isTaxable, setIsTaxable] = useState(false);
 
   const filteredVendors = vendors.filter(v => 
     v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,26 +65,60 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) return;
+    if (!formData.name || !formData.email || !formData.apAccountId) {
+      onNotify?.('error', 'Validation Error: Name, email, and AP account are required.');
+      return;
+    }
 
     const newVendor: Vendor = {
-      id: `ven-${Date.now()}`,
+      id: '',
       orgId: 'temp',
-      name: formData.name,
+      name: formData.name || '',
       category: formData.category || 'Other',
-      tin: formData.tin,
-      email: formData.email,
+      email: formData.email || '',
       contactNumber: formData.contactNumber || '',
       address: formData.address || '',
-      apAccountId: formData.apAccountId || undefined,
+      apAccountId: formData.apAccountId,
       createdAt: new Date().toISOString()
     };
 
-    newVendor.taxpayerType = taxpayerType;
-    newVendor.isTaxable = isTaxable;
-    onAddVendor(newVendor);
+    onAddVendor?.(newVendor);
     setShowModal(false);
-    setFormData({ category: 'Supplies', apAccountId: '', taxpayerType: 'CORPORATE', isTaxable: false });
+    setFormData({ category: 'Supplies', email: '', contactNumber: '', address: '', apAccountId: '', name: '' });
+    onNotify?.('success', 'Vendor created successfully.');
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor || !onUpdateVendor) return;
+    if (!editingVendor.name || !editingVendor.email || !editingVendor.apAccountId) {
+      onNotify?.('error', 'Validation Error: Name, email, and AP account are required.');
+      return;
+    }
+
+    onUpdateVendor(editingVendor.id!, {
+      name: editingVendor.name,
+      category: editingVendor.category,
+      email: editingVendor.email,
+      contactNumber: editingVendor.contactNumber,
+      address: editingVendor.address,
+      apAccountId: editingVendor.apAccountId,
+      updatedAt: new Date().toISOString()
+    });
+    setShowEditModal(false);
+    setEditingVendor(null);
+    onNotify?.('success', 'Vendor updated successfully.');
+  };
+
+  const handleDeleteVendor = (id: string) => {
+    onDeleteVendor?.(id);
+    setConfirmDelete(null);
+    onNotify?.('success', 'Vendor deleted successfully.');
+  };
+
+  const openEditModal = (vendor: Vendor) => {
+    setEditingVendor({...vendor});
+    setShowEditModal(true);
   };
 
   return (
@@ -155,9 +188,6 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1">
-                       <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                          <Fingerprint size={10} /> {vendor.tin || 'No TIN'}
-                       </div>
                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-1.5 py-0.5 rounded w-fit border border-slate-200">
                          {vendor.category}
                        </span>
@@ -176,16 +206,24 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                     </div>
                   </td>
                   <td className="px-6 py-5 text-right">
-                    {confirmDelete === vendor.id ? (
-                      <div className="flex items-center justify-end gap-2 animate-in slide-in-from-right-1">
-                         <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-400">Cancel</button>
-                         <button onClick={() => { onDeleteVendor(vendor.id); setConfirmDelete(null); }} className="px-2 py-1 text-[10px] font-semibold uppercase text-rose-600 bg-rose-50 rounded">Confirm</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setConfirmDelete(vendor.id)} className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-colors">
-                        <Trash2 size={16} />
+                    <div className="flex items-center justify-end gap-2">
+                      <button 
+                        onClick={() => openEditModal(vendor)}
+                        className="p-2 hover:bg-indigo-50 text-slate-300 hover:text-indigo-600 rounded-lg transition-colors"
+                        title="Edit vendor">
+                        <Edit size={16} />
                       </button>
-                    )}
+                      {confirmDelete === vendor.id ? (
+                        <div className="flex items-center justify-end gap-2 animate-in slide-in-from-right-1">
+                           <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-400">Cancel</button>
+                           <button onClick={() => handleDeleteVendor(vendor.id)} className="px-2 py-1 text-[10px] font-semibold uppercase text-rose-600 bg-rose-50 rounded">Confirm</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(vendor.id)} className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-lg transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -225,11 +263,6 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Fingerprint size={12} /> Tax ID (TIN)</label>
-                    <input placeholder="000-000-000-000" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-mono font-medium"
-                      value={formData.tin} onChange={e => setFormData({...formData, tin: e.target.value})} />
-                  </div>
-                  <div className="space-y-1.5">
                     <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Category</label>
                     <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
                       value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
@@ -242,23 +275,19 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Taxpayer Type</label>
-                    <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
-                      value={taxpayerType}
-                      onChange={e => setTaxpayerType(e.target.value)}>
-                      <option value="INDIVIDUAL">Individual</option>
-                      <option value="CORPORATE">Corporate</option>
-                    </select>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Billing Email</label>
+                    <input required type="email" placeholder="billing@vendor.com" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 text-indigo-600">
-                    <LinkIcon size={12} /> Default G/L Payables Account
+                  <label className="text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
+                    Default G/L Payables Account
                   </label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-indigo-700 appearance-none"
+                    className="w-full px-4 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-indigo-700"
                     value={formData.apAccountId} 
                     onChange={e => setFormData({...formData, apAccountId: e.target.value})}
                   >
@@ -269,31 +298,10 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   </select>
                 </div>
 
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold uppercase tracking-widest flex items-center gap-1.5 text-emerald-600">
-                      <ShieldCheck size={12} /> Subject to Withholding Tax (EWT / Final)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <button type="button"
-                        onClick={() => setIsTaxable(!isTaxable)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${isTaxable ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                        {isTaxable ? 'Taxable: Yes' : 'Taxable: No'}
-                      </button>
-                      <span className="text-[10px] text-slate-400">If Yes, configure ATC in Tax Settings later.</span>
-                    </div>
-                  </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Billing Email</label>
-                    <input required type="email" placeholder="billing@vendor.com" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
-                      value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Contact Number</label>
-                    <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
-                      value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Contact Number</label>
+                  <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -306,13 +314,91 @@ const VendorsView: React.FC<VendorsViewProps> = ({
               <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3">
                  <AlertCircle className="text-amber-600 shrink-0" size={20} />
                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                   Proper TIN documentation is critical for withholding tax (EWT) reporting. Ensure the address matches the BIR Certificate of Registration (COR).
+                   Ensure vendor details are accurate for proper AP accounting and withholding tax compliance.
                  </p>
               </div>
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Onboard Supplier</button>
+                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Create Vendor</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingVendor && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Edit size={20} /></div>
+                <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">Edit Vendor</h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Business Name / Legal Entity</label>
+                  <input required placeholder="e.g. Acme Office Supplies Inc." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-slate-800"
+                    value={editingVendor.name} onChange={e => setEditingVendor({...editingVendor, name: e.target.value})} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Category</label>
+                    <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      value={editingVendor.category} onChange={e => setEditingVendor({...editingVendor, category: e.target.value})}>
+                      <option value="Supplies">Supplies</option>
+                      <option value="Utilities">Utilities</option>
+                      <option value="Services">Services</option>
+                      <option value="Hardware">Hardware</option>
+                      <option value="Rent">Rent</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Billing Email</label>
+                    <input required type="email" placeholder="billing@vendor.com" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      value={editingVendor.email} onChange={e => setEditingVendor({...editingVendor, email: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase tracking-widest text-indigo-600">
+                    Default G/L Payables Account
+                  </label>
+                  <select 
+                    required
+                    className="w-full px-4 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-indigo-700"
+                    value={editingVendor.apAccountId} 
+                    onChange={e => setEditingVendor({...editingVendor, apAccountId: e.target.value})}
+                  >
+                    <option value="">Select AP Account...</option>
+                    {apAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>[{acc.code}] {acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Contact Number</label>
+                  <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    value={editingVendor.contactNumber} onChange={e => setEditingVendor({...editingVendor, contactNumber: e.target.value})} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MapPin size={12} /> Business Address</label>
+                  <textarea rows={2} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium resize-none"
+                    value={editingVendor.address} onChange={e => setEditingVendor({...editingVendor, address: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Save Changes</button>
               </div>
             </form>
           </div>

@@ -1,6 +1,5 @@
 
 import { IDataService, InitialData } from './IDataService';
-import { MockDataService } from './MockDataService';
 import { config } from '../config/app';
 
 /**
@@ -8,10 +7,9 @@ import { config } from '../config/app';
  * 
  * Connects to Supabase for cloud-based data persistence.
  * Fetches data from Supabase tables matching entity names.
- * Falls back to MockDataService if credentials are missing.
+ * Throws an error if credentials are not configured.
  */
 export class SupabaseDataService implements IDataService {
-  private mockFallback = new MockDataService();
   private supabaseUrl: string;
   private supabaseKey: string;
 
@@ -40,7 +38,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async fetchFromSupabase<T>(table: string): Promise<T[]> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', falling back to mock data`);
+      console.warn(`[Supabase] Missing credentials for table '${table}', returning empty array`);
       return [] as T[];
     }
 
@@ -81,8 +79,8 @@ export class SupabaseDataService implements IDataService {
     console.info("[Supabase] ☁️ Fetching data from Supabase...");
 
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn("[Supabase] ⚠️ Credentials not configured. Using mock data as fallback.");
-      return this.mockFallback.getInitialData();
+      console.error("[Supabase] ❌ Credentials not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      throw new Error('Supabase credentials not configured');
     }
 
     try {
@@ -116,6 +114,8 @@ export class SupabaseDataService implements IDataService {
         atcCategories,
         atcItems,
         atcRates,
+        payables,
+        bills,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -143,17 +143,18 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('atc_categories'),
         this.fetchFromSupabase('atc_items'),
         this.fetchFromSupabase('atc_rates'),
+        this.fetchFromSupabase('payables'),
+        this.fetchFromSupabase('bills'),
       ]);
 
-      // Check if we got any real data
+      // Log data status
       const hasData = organizations && organizations.length > 0;
       
       if (!hasData) {
-        console.warn("[Supabase] ⚠️ No data received from Supabase, using mock data as fallback");
-        return this.mockFallback.getInitialData();
+        console.warn("[Supabase] ⚠️ No organizations found in Supabase. Database may be empty.");
       }
 
-      console.info("[Supabase] ✅ Data loaded successfully from Supabase");
+      console.info("[Supabase] ✅ Data loaded from Supabase");
 
       // Convert all snake_case data from Supabase to camelCase for the app
       return {
@@ -183,6 +184,8 @@ export class SupabaseDataService implements IDataService {
         atcCategories: this.snakeToCamel(atcCategories as any) || [],
         atcItems: this.snakeToCamel(atcItems as any) || [],
         atcRates: this.snakeToCamel(atcRates as any) || [],
+        payables: this.snakeToCamel(payables as any) || [],
+        bills: this.snakeToCamel(bills as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -190,8 +193,7 @@ export class SupabaseDataService implements IDataService {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      console.info("[Supabase] 🔄 Falling back to mock data");
-      return this.mockFallback.getInitialData();
+      throw error;
     }
   }
 
@@ -240,8 +242,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async insertToSupabase<T>(table: string, data: T): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', delegating to mock`);
-      return data;
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
     }
 
     try {
@@ -283,8 +284,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async updateInSupabase<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', delegating to mock`);
-      return updates as T;
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
     }
 
     try {
@@ -324,8 +324,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async deleteFromSupabase(table: string, id: string): Promise<void> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', delegating to mock`);
-      return;
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
     }
 
     try {
@@ -347,6 +346,78 @@ export class SupabaseDataService implements IDataService {
       console.info(`[Supabase] ✅ Deleted from ${table} (id: ${id})`);
     } catch (error) {
       console.error(`[Supabase] Network error deleting from ${table}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Raw INSERT to Supabase - with schema filtering and conversion
+   * Converts camelCase to snake_case, filters to valid columns, and returns camelCase result
+   */
+  private async insertToSupabaseRaw<T>(table: string, data: any): Promise<T> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      console.warn(`[Supabase] Missing credentials for table '${table}', falling back`);
+      throw new Error(`Supabase not configured for ${table}`);
+    }
+
+    try {
+      const url = `${this.baseUrl}/${table}`;
+      console.debug(`[Supabase] 📝 Inserting into ${table}:`, data);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(`[Supabase] ❌ Insert failed: ${response.status} ${response.statusText}`, error);
+        throw new Error(`Failed to insert into ${table}: ${error}`);
+      }
+
+      const result = await response.json();
+      const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
+      console.info(`[Supabase] ✅ Inserted into ${table}:`, camelResult);
+      return camelResult as T;
+    } catch (error) {
+      console.error(`[Supabase] Network error inserting into ${table}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Raw UPDATE to Supabase - with schema filtering and conversion
+   * Converts camelCase to snake_case, filters to valid columns, and returns camelCase result
+   */
+  private async updateInSupabaseRaw<T>(table: string, id: string, data: any): Promise<T> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      console.warn(`[Supabase] Missing credentials for table '${table}', falling back`);
+      throw new Error(`Supabase not configured for ${table}`);
+    }
+
+    try {
+      const url = `${this.baseUrl}/${table}?id=eq.${id}`;
+      console.debug(`[Supabase] ✏️ Updating ${table} (${id}):`, data);
+      
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(`[Supabase] ❌ Update failed: ${response.status} ${response.statusText}`, error);
+        throw new Error(`Failed to update ${table}: ${error}`);
+      }
+
+      const result = await response.json();
+      const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
+      console.info(`[Supabase] ✅ Updated ${table}:`, camelResult);
+      return camelResult as T;
+    } catch (error) {
+      console.error(`[Supabase] Network error updating ${table}:`, error);
       throw error;
     }
   }
@@ -374,16 +445,30 @@ export class SupabaseDataService implements IDataService {
       schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
       sponsors: ['id', 'org_id', 'name', 'contact_person', 'email', 'phone', 'address', 'created_at', 'updated_at'],
       batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
+      vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'created_at', 'updated_at'],
+      atc_categories: ['id', 'code', 'name', 'created_at', 'updated_at'],
+      atc_items: ['id', 'category_id', 'atc_code', 'description', 'taxpayer_type', 'created_at', 'updated_at'],
+      atc_rates: ['id', 'atc_item_id', 'rate', 'rate_label', 'created_at', 'updated_at'],
+      bank_accounts: ['id', 'org_id', 'bank_name', 'account_number', 'type', 'gl_account_id', 'currency', 'balance', 'created_at', 'updated_at'],
       fixed_assets: ['id', 'org_id', 'code', 'name', 'description', 'category', 'purchase_date', 'purchase_cost', 'accumulated_depreciation', 'depreciation_method', 'useful_life_years', 'gl_account_id', 'created_at', 'updated_at'],
       items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'created_at', 'updated_at'],
-      payables: ['id', 'org_id', 'vendor_id', 'ref_no', 'bill_date', 'due_date', 'currency', 'gross_amount', 'withholding_type', 'atc_item_id', 'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable', 'status', 'created_at', 'updated_at', 'is_deleted'],
+      payables: [
+        'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'description', 'amount',
+        'bill_date', 'due_date', 'payment_date', 'currency', 'status', 'reference_document',
+        'journal_entry_id', 'gl_account_id', 'notes', 'withholding_type', 'atc_item_id',
+        'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable',
+        'created_by', 'approved_by', 'paid_by', 'created_at', 'updated_at', 'approved_at',
+        'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
     const generatedColumns: Record<string, string[]> = {
+      vendors: ['id', 'created_at', 'updated_at'],
+      bank_accounts: ['id', 'created_at', 'updated_at'],
       fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
       items: ['created_at', 'updated_at'],
-      payables: ['created_at', 'updated_at']
+      payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -513,8 +598,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async insertToSupabaseRaw<T>(table: string, data: T): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', delegating to mock`);
-      return data;
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
     }
 
     try {
@@ -589,8 +673,7 @@ export class SupabaseDataService implements IDataService {
    */
   private async updateInSupabaseRaw<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
-      console.warn(`[Supabase] Missing credentials for table '${table}', delegating to mock`);
-      return updates as T;
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
     }
 
     try {
@@ -1319,7 +1402,8 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createBankAccount called with:', account);
     const snake = this.camelToSnake(account);
     const filtered = this.filterToTableSchema('bank_accounts', snake);
-    if (filtered.id === undefined) {
+    // Remove id if it's undefined or empty string - let Supabase auto-generate UUID
+    if (!filtered.id || filtered.id === '') {
       delete (filtered as any).id;
     }
     return this.insertToSupabaseRaw('bank_accounts', filtered);
@@ -1335,5 +1419,79 @@ export class SupabaseDataService implements IDataService {
   async deleteBankAccount(id: string): Promise<void> {
     console.debug('[Supabase] deleteBankAccount called with:', id);
     return this.deleteFromSupabase('bank_accounts', id);
+  }
+
+  /**
+   * Vendor CRUD Operations
+   */
+  async createVendor(vendor: any): Promise<any> {
+    console.debug('[Supabase] createVendor called with:', vendor);
+    const snakeCaseVendor = this.camelToSnake(vendor);
+    const filtered = this.filterToTableSchema('vendors', snakeCaseVendor, true);
+    // Remove id if it's undefined, null, or empty string
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('vendors', filtered);
+  }
+
+  async updateVendor(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateVendor called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('vendors', snake);
+    return this.updateInSupabaseRaw('vendors', id, filtered);
+  }
+
+  async deleteVendor(id: string): Promise<void> {
+    console.debug('[Supabase] deleteVendor called with:', id);
+    return this.deleteFromSupabase('vendors', id);
+  }
+
+  /**
+   * ATC Tax Category Lookups
+   */
+  async getATCCategories(): Promise<any[]> {
+    console.debug('[Supabase] getATCCategories called');
+    const url = `${this.baseUrl}/atc_categories?order=code.asc`;
+    try {
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch ATC categories');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching ATC categories:', error);
+      return [];
+    }
+  }
+
+  async getATCItems(categoryId?: string): Promise<any[]> {
+    console.debug('[Supabase] getATCItems called with categoryId:', categoryId);
+    const query = categoryId 
+      ? `?category_id=eq.${categoryId}&order=atc_code.asc`
+      : '?order=atc_code.asc';
+    const url = `${this.baseUrl}/atc_items${query}`;
+    try {
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch ATC items');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching ATC items:', error);
+      return [];
+    }
+  }
+
+  async getATCRates(atcItemId: string): Promise<any[]> {
+    console.debug('[Supabase] getATCRates called with atcItemId:', atcItemId);
+    const url = `${this.baseUrl}/atc_rates?atc_item_id=eq.${atcItemId}`;
+    try {
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch ATC rates');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching ATC rates:', error);
+      return [];
+    }
   }
 }

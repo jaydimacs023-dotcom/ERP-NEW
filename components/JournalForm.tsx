@@ -71,8 +71,9 @@ const JournalForm: React.FC<JournalFormProps> = ({
       if (updates.itemId) {
         const item = items.find(i => i.id === updates.itemId);
         if (item) {
-          newLine.accountId = item.defaultAccountId;
-          const acc = accounts.find(a => a.id === item.defaultAccountId);
+          // Use expenseAccountId for debits (expenses/purchases), incomeAccountId for credits (revenue)
+          newLine.accountId = newLine.debit > 0 ? item.expenseAccountId : item.incomeAccountId;
+          const acc = accounts.find(a => a.id === newLine.accountId);
           if (acc?.class === AccountClass.REVENUE) {
             newLine.credit = item.unitPrice;
             newLine.debit = 0;

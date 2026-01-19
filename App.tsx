@@ -26,7 +26,6 @@ import AssetsView from './views/AssetsView';
 import APView from './views/APView';
 import ARView from './views/ARView';
 import VendorsView from './views/VendorsView';
-import PayablesView from './views/PayablesView';
 import SchedulesView from './views/SchedulesView';
 import PurchaseOrdersView from './views/PurchaseOrdersView';
 import AuditTrail from './views/AuditTrail';
@@ -99,7 +98,6 @@ export default function App() {
   const [atcCategories, setAtcCategories] = useState<any[]>([]);
   const [atcItems, setAtcItems] = useState<any[]>([]);
   const [atcRates, setAtcRates] = useState<any[]>([]);
-  const [payables, setPayables] = useState<Payable[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -108,21 +106,10 @@ export default function App() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-    const handleCreatePayable = async (p: Payable) => {
-      try {
-        const created = await dataService.createPayable({ ...p, orgId: currentOrgId });
-        setPayables(prev => [...prev, created]);
-        handleNotify({ type: 'success', message: 'Payable posted with withholding.' });
-      } catch (err) {
-        console.error('Failed to create payable:', err);
-        // Optimistic fallback
-        setPayables(prev => [...prev, { ...p, orgId: currentOrgId }]);
-        handleNotify({ type: 'warning', message: 'Payable saved locally (Supabase unavailable).' });
-      }
-    };
   const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
@@ -171,6 +158,7 @@ export default function App() {
         setPurchaseOrders(data.purchaseOrders);
         setPayments(data.paymentHistories);
         setFixedAssets(data.fixedAssets);
+        setPayables(data.payables || []);
         setVendorTaxSettings(data.vendorTaxSettings || []);
         setAtcCategories(data.atcCategories || []);
         setAtcItems(data.atcItems || []);
@@ -312,6 +300,57 @@ export default function App() {
   const handleConvertToBill = (po: PurchaseOrder) => {
     setActiveTab('ap');
     handleNotify('info', `PO ${po.reference} converted for Bill processing.`);
+  };
+
+  const handleAddPayable = async (payable: Payable) => {
+    try {
+      const fullPayable = {
+        ...payable,
+        orgId: currentOrgId,
+        createdBy: currentUser?.id || 'system'
+      } as Payable;
+      const savedPayable = await dataService.createPayable(fullPayable);
+      setPayables(prev => [...prev, savedPayable]);
+      handleNotify('success', `Payable ${payable.payableNumber} created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating payable:', error);
+      handleNotify('error', 'Failed to create payable. Falling back to memory storage.');
+      // Fallback to memory storage if Supabase fails
+      const fullPayable = {
+        ...payable,
+        orgId: currentOrgId,
+        createdBy: currentUser?.id || 'system'
+      } as Payable;
+      setPayables(prev => [...prev, fullPayable]);
+    }
+  };
+
+  const handleUpdatePayable = async (id: string, updates: Partial<Payable>) => {
+    try {
+      console.info('[App] Updating payable:', id);
+      const updated = await dataService.updatePayable(id, updates);
+      setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+      handleNotify('success', 'Payable updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating payable:', error);
+      handleNotify('error', 'Failed to update payable. Falling back to memory storage.');
+      // Fallback to memory storage
+      setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    }
+  };
+
+  const handleDeletePayable = async (id: string) => {
+    try {
+      console.info('[App] Deleting payable:', id);
+      await dataService.deletePayable(id);
+      setPayables(prev => prev.filter(p => p.id !== id));
+      handleNotify('success', 'Payable deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting payable:', error);
+      handleNotify('error', 'Failed to delete payable. Falling back to memory storage.');
+      // Fallback to memory storage (soft delete)
+      setPayables(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
+    }
   };
 
   // ============================================================================
@@ -857,7 +896,7 @@ export default function App() {
   const handleAddBankAccount = async (bank: Partial<BankAccount>) => {
     try {
       console.info('[App] Creating bank account:', bank.bankName);
-      const bankWithOrg = { ...bank, orgId: currentOrgId, id: `bank-${Date.now()}` } as BankAccount;
+      const bankWithOrg = { ...bank, orgId: currentOrgId } as BankAccount;
       const created = await dataService.createBankAccount(bankWithOrg);
       setBankAccounts(prev => [...prev, created]);
       handleNotify('success', `Bank account "${created.bankName}" created successfully`);
@@ -892,6 +931,48 @@ export default function App() {
       console.error('[App] Error deleting bank account:', error);
       handleNotify('error', 'Failed to delete bank account. Falling back to memory storage.');
       setBankAccounts(prev => prev.filter(b => b.id !== id));
+      return true;
+    }
+  };
+
+  const handleAddVendor = async (vendor: Partial<Vendor>) => {
+    try {
+      console.info('[App] Creating vendor:', vendor.name);
+      const vendorWithOrg = { ...vendor, orgId: currentOrgId } as Vendor;
+      const created = await dataService.createVendor(vendorWithOrg);
+      setVendors(prev => [...prev, created]);
+      handleNotify('success', `Vendor "${created.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating vendor:', error);
+      handleNotify('error', 'Failed to create vendor. Falling back to memory storage.');
+      setVendors(prev => [...prev, { ...vendor, orgId: currentOrgId, id: `ven-${Date.now()}` } as Vendor]);
+    }
+  };
+
+  const handleUpdateVendor = async (id: string, updates: Partial<Vendor>) => {
+    try {
+      console.info('[App] Updating vendor:', id, updates);
+      const updated = await dataService.updateVendor(id, updates);
+      setVendors(prev => prev.map(v => v.id === id ? updated : v));
+      handleNotify('success', 'Vendor updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating vendor:', error);
+      handleNotify('error', 'Failed to update vendor. Falling back to memory storage.');
+      setVendors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+    }
+  };
+
+  const handleDeleteVendor = async (id: string) => {
+    try {
+      console.info('[App] Deleting vendor:', id);
+      await dataService.deleteVendor(id);
+      setVendors(prev => prev.filter(v => v.id !== id));
+      handleNotify('success', 'Vendor deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting vendor:', error);
+      handleNotify('error', 'Failed to delete vendor. Falling back to memory storage.');
+      setVendors(prev => prev.filter(v => v.id !== id));
       return true;
     }
   };
@@ -1119,7 +1200,6 @@ export default function App() {
                <NavItem icon={<Landmark size={20}/>} label="Treasury" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'ap'} onClick={() => setActiveTab('ap')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<Calculator size={20}/>} label="Payables & Tax" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
                <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -1268,16 +1348,15 @@ export default function App() {
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'ap' && <APView vendors={vendors} entries={activeJournalEntries} lines={filteredLines} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostBill={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} vendorTaxSettings={vendorTaxSettings.filter(s => s.orgId === currentOrgId)} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} onCreatePayable={handleCreatePayable} />}
+          {activeTab === 'ap' && <APView vendors={vendors} entries={activeJournalEntries} lines={filteredLines} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} currentUserId={currentUser?.id} onPostBill={handlePostJournal} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
           
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
-          {activeTab === 'vendors' && <VendorsView vendors={vendors} accounts={filteredAccounts} lines={filteredLines} onAddVendor={v => setVendors(p => [...p, v])} onUpdateVendor={v => setVendors(p => p.map(x => x.id === v.id ? v : x))} onDeleteVendor={id => setVendors(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
-          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={handleAddBankAccount} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}

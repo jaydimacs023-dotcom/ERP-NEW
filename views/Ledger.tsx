@@ -1,16 +1,31 @@
+
 import React, { useState } from 'react';
-import { ChartOfAccount, JournalEntry, JournalEntryLine } from '../types';
-import { Search, Filter, RotateCcw, BookText } from 'lucide-react';
+import { 
+  ChartOfAccount, JournalEntry, JournalEntryLine, Student, 
+  Trainer, Sponsor, Batch, NonStockItem 
+} from '../types';
+import { Search, Filter, RotateCcw, BookText, Plus, Database, ArrowRight } from 'lucide-react';
+import JournalForm from '../components/JournalForm';
 
 interface LedgerProps {
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
   lines: JournalEntryLine[];
+  students: Student[];
+  sponsors: Sponsor[];
+  trainers: Trainer[];
+  batches: Batch[];
+  items: NonStockItem[];
+  onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onReverseJournal?: (entryId: string) => void;
 }
 
-const Ledger: React.FC<LedgerProps> = ({ accounts, entries, lines, onReverseJournal }) => {
+const Ledger: React.FC<LedgerProps> = ({ 
+  accounts, entries, lines, students, sponsors, trainers, batches, items, 
+  onPostEntry, onReverseJournal 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showEntryForm, setShowEntryForm] = useState(false);
 
   const filteredEntries = entries.filter(e => 
     e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -21,58 +36,66 @@ const Ledger: React.FC<LedgerProps> = ({ accounts, entries, lines, onReverseJour
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
-          <h2 className="text-2xl font-medium text-slate-800">General Ledger</h2>
-          <p className="text-sm text-slate-400">Complete transactional audit history.</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Journal Entries</h2>
+          <p className="text-sm text-slate-400 font-medium">Complete transactional audit history and manual double-entry postings.</p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
-              placeholder="Search history..." 
-              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="Filter by ref or memo..." 
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="p-2 text-slate-400 hover:text-slate-600 border rounded-lg bg-white transition-colors"><Filter size={18} /></button>
+          <button 
+            onClick={() => setShowEntryForm(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 shrink-0"
+          >
+            <Plus size={18} /> New Entry
+          </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50/50">
+          <table className="min-w-full divide-y divide-slate-100">
+            <thead className="bg-slate-50/80">
               <tr>
-                <th className="px-6 py-3 text-left text-[11px] font-normal text-slate-400 uppercase tracking-wider">Date / Ref</th>
-                <th className="px-6 py-3 text-left text-[11px] font-normal text-slate-400 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-[11px] font-normal text-slate-400 uppercase tracking-wider">Accounts</th>
-                <th className="px-6 py-3 text-right text-[11px] font-normal text-slate-400 uppercase tracking-wider">Debit</th>
-                <th className="px-6 py-3 text-right text-[11px] font-normal text-slate-400 uppercase tracking-wider">Credit</th>
-                <th className="px-6 py-3 text-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-[11px] font-normal text-slate-400 uppercase tracking-wider">Action</th>
+                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Transaction Anchor</th>
+                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Memo / Source</th>
+                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Account Detail</th>
+                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Debit</th>
+                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Credit</th>
+                <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Audit</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[...filteredEntries].reverse().map(entry => {
+            <tbody className="divide-y divide-slate-50">
+              {filteredEntries.map(entry => {
                 const entryLines = lines.filter(l => l.journalEntryId === entry.id);
                 return (
-                  <tr key={entry.id} className="hover:bg-slate-50/30 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-normal text-slate-700">{entry.date}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{entry.reference}</div>
+                  <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-8 py-6 whitespace-nowrap align-top">
+                      <div className="text-sm font-black text-slate-700">{entry.date}</div>
+                      <div className="text-[10px] text-indigo-600 font-mono font-black mt-1 uppercase tracking-tighter">{entry.reference}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-600 max-w-xs truncate">{entry.description}</div>
-                      <div className="text-[9px] text-slate-400 uppercase mt-0.5">{entry.sourceType}</div>
+                    <td className="px-8 py-6 align-top">
+                      <div className="text-sm font-bold text-slate-800 line-clamp-1">{entry.description}</div>
+                      <div className="text-[9px] text-slate-400 font-black uppercase mt-1.5 flex items-center gap-1.5">
+                         <div className="w-1 h-1 bg-slate-300 rounded-full"></div>
+                         {entry.sourceType}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1.5">
+                    <td className="px-8 py-6">
+                      <div className="space-y-2">
                         {entryLines.map(line => {
                           const acc = accounts.find(a => a.id === line.accountId);
                           return (
-                            <div key={line.id} className="text-xs font-normal">
-                              <span className={line.credit > 0 ? 'pl-4 text-slate-400' : 'text-slate-600'}>
+                            <div key={line.id} className="text-xs font-bold flex items-center gap-2">
+                              {line.credit > 0 && <ArrowRight size={10} className="text-slate-300 ml-4" />}
+                              <span className={line.credit > 0 ? 'text-slate-500 italic' : 'text-slate-700'}>
                                 {acc?.name}
                               </span>
                             </div>
@@ -80,36 +103,37 @@ const Ledger: React.FC<LedgerProps> = ({ accounts, entries, lines, onReverseJour
                         })}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right align-top">
+                    <td className="px-8 py-6 text-right align-top">
                       {entryLines.map(line => (
-                        <div key={line.id} className="text-xs h-4 mb-1.5 text-slate-500 font-normal">
+                        <div key={line.id} className="text-xs font-mono h-4 mb-2 text-slate-600 font-black">
                           {line.debit > 0 ? line.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}
                         </div>
                       ))}
                     </td>
-                    <td className="px-6 py-4 text-right align-top">
+                    <td className="px-8 py-6 text-right align-top">
                       {entryLines.map(line => (
-                        <div key={line.id} className="text-xs h-4 mb-1.5 text-slate-500 font-normal">
+                        <div key={line.id} className="text-xs font-mono h-4 mb-2 text-slate-600 font-black">
                           {line.credit > 0 ? line.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}
                         </div>
                       ))}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-2 py-0.5 text-[9px] font-normal rounded border ${
-                        entry.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
-                      }`}>
-                        {entry.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (
-                        <button 
-                          onClick={() => onReverseJournal?.(entry.id)}
-                          className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <RotateCcw size={14} />
-                        </button>
-                      )}
+                    <td className="px-8 py-6 text-center align-top">
+                      <div className="flex flex-col items-center gap-2">
+                        <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase border tracking-widest ${
+                          entry.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                        }`}>
+                          {entry.status}
+                        </span>
+                        {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (
+                          <button 
+                            onClick={() => onReverseJournal?.(entry.id)}
+                            className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Post Reversal"
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -117,13 +141,40 @@ const Ledger: React.FC<LedgerProps> = ({ accounts, entries, lines, onReverseJour
             </tbody>
           </table>
         </div>
+
         {filteredEntries.length === 0 && (
-          <div className="py-16 text-center">
-            <BookText size={32} className="mx-auto text-slate-200 mb-2" />
-            <p className="text-sm text-slate-400 italic">No entries match your search.</p>
+          <div className="py-32 text-center bg-slate-50/50">
+            <div className="p-6 bg-white rounded-[2rem] shadow-xl inline-block mb-6 border border-slate-100">
+               <BookText size={48} className="text-slate-200" />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">No Journal Records</h3>
+            <p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto italic font-medium">The ledger is currently empty. Direct manual entries or system-generated receipts will appear here once posted.</p>
+            <button 
+              onClick={() => setShowEntryForm(true)}
+              className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all"
+            >
+               Create First Entry
+            </button>
           </div>
         )}
       </div>
+
+      {showEntryForm && (
+        <JournalForm 
+          accounts={accounts}
+          students={students}
+          trainers={trainers}
+          sponsors={sponsors}
+          batches={batches}
+          items={items}
+          entries={entries}
+          onClose={() => setShowEntryForm(false)}
+          onSubmit={(entry, lines) => {
+            onPostEntry?.(entry, lines);
+            setShowEntryForm(false);
+          }}
+        />
+      )}
     </div>
   );
 };
