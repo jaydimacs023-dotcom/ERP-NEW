@@ -95,7 +95,7 @@ export interface User extends BaseEntity {
   name: string;
   email: string;
   password?: string;
-  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'STUDENT' | 'TRAINER' | 'AP_SPECIALIST' | 'AR_SPECIALIST' | 'FINANCE_MANAGER' | 'PRESIDENT';
+  role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'STUDENT' | 'TRAINER' | 'AP_SPECIALIST' | 'AR_SPECIALIST' | 'FINANCE_MANAGER' | 'PRESIDENT' | 'TREASURY' | 'AUDITOR' | 'AP_CLERK' | 'AP_SUPERVISOR';
   orgId: string;
   studentId?: string; 
   trainerId?: string; 
@@ -185,6 +185,9 @@ export interface Sponsor extends BaseEntity {
   updatedAt?: string;
 }
 
+export type VendorType = 'local' | 'foreign';
+export type VendorStatus = 'active' | 'blocked' | 'archived';
+
 export interface Vendor extends BaseEntity {
   id: string;
   orgId: string;
@@ -194,6 +197,15 @@ export interface Vendor extends BaseEntity {
   contactNumber: string;
   address: string;
   apAccountId?: string;
+  // Enhanced fields
+  tin?: string;
+  vendorType?: VendorType;
+  currency?: string;
+  status?: VendorStatus;
+  paymentTermsDays?: number; // Net days for payment
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -270,19 +282,27 @@ export interface Bill extends BaseEntity {
   updatedAt?: string;
 }
 
+export type PayableCategory = 'utilities' | 'supplies' | 'training_materials' | 'contractor_services' | 'assessments' | 'insurance' | 'government_obligations' | 'scholarship_advances' | 'employee_reimbursements' | 'general' | 'other';
+
+export type PayableStatus = 'for_approval' | 'approved' | 'paid' | 'partially_paid' | 'cancelled';
+
+export type InvoiceType = 'standard' | 'prepayment' | 'credit_memo' | 'debit_memo';
+
+export type PaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_debit' | 'ewallet';
+
 export interface Payable extends BaseEntity {
   id: string;
   orgId: string;
   vendorId: string;
   payableNumber: string;
-  category: 'utilities' | 'supplies' | 'training_materials' | 'contractor_services' | 'assessments' | 'insurance' | 'government_obligations' | 'scholarship_advances' | 'employee_reimbursements' | 'other';
+  category: PayableCategory;
   description: string;
   amount: number;
   billDate: string;
   dueDate: string;
   paymentDate?: string;
   currency?: string;
-  status: 'for_approval' | 'approved' | 'paid' | 'partially_paid' | 'cancelled';
+  status: PayableStatus;
   referenceDocument?: string;
   journalEntryId?: string;
   glAccountId?: string;
@@ -293,13 +313,39 @@ export interface Payable extends BaseEntity {
   appliedRatePercent?: number;
   withholdingAmount?: number;
   netPayable?: number;
-  createdBy: string;
+  createdBy?: string;
   approvedBy?: string;
   paidBy?: string;
   createdAt: string;
   updatedAt?: string;
   approvedAt?: string;
   paidAt?: string;
+  // Enhanced fields
+  invoiceType?: InvoiceType;
+  purchaseOrderId?: string;
+  goodsReceiptId?: string;
+  expenseAccountId?: string;
+  inputVatAmount?: number;
+  inputVatAccountId?: string;
+  departmentId?: string;
+  costCenterId?: string;
+  paidAmount?: number;
+  // Payment tracking
+  paymentMethod?: PaymentMethod;
+  paymentBankAccountId?: string;
+  checkNumber?: string;
+  checkDate?: string;
+  checkVoucherId?: string;
+  eftBatchId?: string;
+  // Enhanced audit fields
+  postedBy?: string;
+  postedAt?: string;
+  reversedBy?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+  reversalJournalId?: string;
+  // Period control
+  periodId?: string;
 }
 
 export interface FixedAsset extends BaseEntity {
@@ -409,7 +455,20 @@ export interface JournalEntry extends BaseEntity {
   status: 'DRAFT' | 'POSTED' | 'REVERSED';
   createdBy: string;
   createdAt: string;
-  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL';
+  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL';
+  // Enhanced audit fields
+  postedBy?: string;
+  postedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  reversedBy?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+  originalEntryId?: string; // For reversal entries, link to original
+  // Integration
+  payableId?: string;
+  receivableId?: string;
+  goodsReceiptId?: string;
 }
 
 export interface JournalEntryLine {
@@ -419,12 +478,18 @@ export interface JournalEntryLine {
   debit: number;
   credit: number;
   memo?: string;
+  description?: string; // Alias for memo
   contactId?: string; 
   contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
   batchId?: string; 
   itemId?: string;
   assetId?: string;
-  isCleared?: boolean; 
+  isCleared?: boolean;
+  // GR/IR Clearing support
+  goodsReceiptId?: string;
+  goodsReceiptLineId?: string;
+  purchaseOrderId?: string;
+  purchaseOrderLineId?: string;
 }
 
 export interface TransactionSummary {
@@ -547,3 +612,225 @@ export interface ATCRate extends BaseEntity {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// ============================================================================
+// ACCOUNTING PERIOD & CLOSING
+// ============================================================================
+
+export type PeriodStatus = 'OPEN' | 'SOFT_CLOSE' | 'HARD_CLOSE' | 'LOCKED';
+
+export interface AccountingPeriod extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string; // e.g., "January 2026", "Q1 2026"
+  periodType: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  fiscalYear: number;
+  periodNumber: number; // 1-12 for monthly, 1-4 for quarterly
+  startDate: string;
+  endDate: string;
+  status: PeriodStatus;
+  // Closing workflow
+  apClosed: boolean;
+  apClosedBy?: string;
+  apClosedAt?: string;
+  arClosed: boolean;
+  arClosedBy?: string;
+  arClosedAt?: string;
+  glClosed: boolean;
+  glClosedBy?: string;
+  glClosedAt?: string;
+  // Lock controls
+  lockedBy?: string;
+  lockedAt?: string;
+  // Metadata
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PeriodCloseChecklist {
+  periodId: string;
+  step: string;
+  description: string;
+  isComplete: boolean;
+  completedBy?: string;
+  completedAt?: string;
+}
+
+// ============================================================================
+// GOODS RECEIPT & GR/IR CLEARING
+// ============================================================================
+
+export type GoodsReceiptStatus = 'DRAFT' | 'POSTED' | 'CANCELLED';
+
+export interface GoodsReceipt extends BaseEntity {
+  id: string;
+  orgId: string;
+  grNumber: string;
+  purchaseOrderId: string;
+  vendorId: string;
+  receiptDate: string;
+  status: GoodsReceiptStatus;
+  // GR/IR Clearing
+  grirClearingAccountId?: string;
+  inventoryAccountId?: string;
+  journalEntryId?: string;
+  // Amounts
+  totalAmount: number;
+  // Audit
+  createdBy?: string;
+  createdAt: string;
+  postedBy?: string;
+  postedAt?: string;
+  updatedAt?: string;
+  notes?: string;
+}
+
+export interface GoodsReceiptLine {
+  id: string;
+  goodsReceiptId: string;
+  purchaseOrderLineId?: string;
+  itemId?: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
+// ============================================================================
+// CHECK PRINTING & EFT
+// ============================================================================
+
+export type CheckStatus = 'DRAFT' | 'PRINTED' | 'RELEASED' | 'CLEARED' | 'VOIDED' | 'STALE';
+
+export interface CheckVoucher extends BaseEntity {
+  id: string;
+  orgId: string;
+  checkNumber: string;
+  bankAccountId: string;
+  payeeId: string;
+  payeeType: 'VENDOR' | 'EMPLOYEE' | 'OTHER';
+  payeeName: string;
+  checkDate: string;
+  amount: number;
+  amountInWords?: string;
+  status: CheckStatus;
+  // Linked documents
+  payableIds?: string[];
+  journalEntryId?: string;
+  // Audit
+  preparedBy?: string;
+  preparedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  printedBy?: string;
+  printedAt?: string;
+  releasedBy?: string;
+  releasedAt?: string;
+  voidedBy?: string;
+  voidedAt?: string;
+  voidReason?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface EFTBatch extends BaseEntity {
+  id: string;
+  orgId: string;
+  batchNumber: string;
+  bankAccountId: string;
+  fileFormat: 'ISO20022' | 'SEPA' | 'NACHA' | 'CUSTOM';
+  status: 'DRAFT' | 'GENERATED' | 'UPLOADED' | 'PROCESSED' | 'REJECTED';
+  totalAmount: number;
+  transactionCount: number;
+  // File info
+  fileName?: string;
+  fileContent?: string;
+  generatedAt?: string;
+  generatedBy?: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  processedAt?: string;
+  // Audit
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface EFTTransaction {
+  id: string;
+  batchId: string;
+  payableId?: string;
+  payeeId: string;
+  payeeType: 'VENDOR' | 'EMPLOYEE';
+  payeeName: string;
+  payeeBankName?: string;
+  payeeBankAccount?: string;
+  payeeBankRoutingCode?: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  status: 'PENDING' | 'PROCESSED' | 'REJECTED';
+  rejectionReason?: string;
+}
+
+// ============================================================================
+// ENHANCED PERMISSIONS
+// ============================================================================
+
+export type Permission = 
+  | 'ap:view' | 'ap:create' | 'ap:edit' | 'ap:delete' | 'ap:approve' | 'ap:pay' | 'ap:post'
+  | 'ar:view' | 'ar:create' | 'ar:edit' | 'ar:delete' | 'ar:approve' | 'ar:receive'
+  | 'gl:view' | 'gl:create' | 'gl:edit' | 'gl:post' | 'gl:reverse'
+  | 'treasury:view' | 'treasury:transfer' | 'treasury:reconcile' | 'treasury:check_print'
+  | 'period:view' | 'period:close' | 'period:lock' | 'period:unlock'
+  | 'reports:view' | 'reports:export'
+  | 'master:view' | 'master:create' | 'master:edit' | 'master:delete'
+  | 'admin:users' | 'admin:settings' | 'admin:audit';
+
+export interface RolePermissions {
+  role: string;
+  permissions: Permission[];
+}
+
+export const DEFAULT_ROLE_PERMISSIONS: RolePermissions[] = [
+  {
+    role: 'AP_CLERK',
+    permissions: ['ap:view', 'ap:create', 'ap:edit', 'master:view']
+  },
+  {
+    role: 'AP_SUPERVISOR',
+    permissions: ['ap:view', 'ap:create', 'ap:edit', 'ap:delete', 'ap:approve', 'ap:post', 'master:view', 'reports:view']
+  },
+  {
+    role: 'TREASURY',
+    permissions: ['treasury:view', 'treasury:transfer', 'treasury:reconcile', 'treasury:check_print', 'ap:pay', 'reports:view']
+  },
+  {
+    role: 'AUDITOR',
+    permissions: ['ap:view', 'ar:view', 'gl:view', 'treasury:view', 'reports:view', 'reports:export', 'admin:audit']
+  },
+  {
+    role: 'FINANCE_MANAGER',
+    permissions: [
+      'ap:view', 'ap:create', 'ap:edit', 'ap:delete', 'ap:approve', 'ap:pay', 'ap:post',
+      'ar:view', 'ar:create', 'ar:edit', 'ar:delete', 'ar:approve', 'ar:receive',
+      'gl:view', 'gl:create', 'gl:edit', 'gl:post', 'gl:reverse',
+      'treasury:view', 'treasury:transfer', 'treasury:reconcile', 'treasury:check_print',
+      'period:view', 'period:close',
+      'reports:view', 'reports:export',
+      'master:view', 'master:create', 'master:edit'
+    ]
+  },
+  {
+    role: 'ADMIN',
+    permissions: [
+      'ap:view', 'ap:create', 'ap:edit', 'ap:delete', 'ap:approve', 'ap:pay', 'ap:post',
+      'ar:view', 'ar:create', 'ar:edit', 'ar:delete', 'ar:approve', 'ar:receive',
+      'gl:view', 'gl:create', 'gl:edit', 'gl:post', 'gl:reverse',
+      'treasury:view', 'treasury:transfer', 'treasury:reconcile', 'treasury:check_print',
+      'period:view', 'period:close', 'period:lock', 'period:unlock',
+      'reports:view', 'reports:export',
+      'master:view', 'master:create', 'master:edit', 'master:delete',
+      'admin:users', 'admin:settings', 'admin:audit'
+    ]
+  }
+];

@@ -3,7 +3,8 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch, 
   Sponsor, NonStockItem, Vendor, BankAccount, Location, 
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
-  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill
+  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
+  CheckVoucher
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -145,6 +146,12 @@ export interface IDataService {
   createPayable(payable: Payable): Promise<Payable>;
   updatePayable(id: string, updates: Partial<Payable>): Promise<Payable>;
   deletePayable(id: string): Promise<void>;
+
+  // Check Voucher CRUD
+  createCheckVoucher(check: CheckVoucher): Promise<CheckVoucher>;
+  updateCheckVoucher(id: string, updates: Partial<CheckVoucher>): Promise<CheckVoucher>;
+  deleteCheckVoucher(id: string): Promise<void>;
+  getNextCheckNumber(orgId: string, bankAccountId: string): Promise<string>;
   
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;

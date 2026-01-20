@@ -29,6 +29,9 @@ type BankingTab = 'ledger' | 'reconcile';
 const BankingView: React.FC<BankingViewProps> = ({ 
   bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onUpdateBankAccount, onDeleteBankAccount, onPostTransfer, onToggleClearLine, onNotify 
 }) => {
+  // Utility function - defined first so it can be used in handlers
+  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
@@ -64,9 +67,7 @@ const BankingView: React.FC<BankingViewProps> = ({
     }
     onAddBankAccount({ 
       ...newBank, 
-      id: `bank-${Date.now()}`,
-      balance: Number(newBank.balance) || 0,
-      createdAt: new Date().toISOString()
+      balance: Number(newBank.balance) || 0
     });
     setShowAddModal(false);
     setNewBank({ bankName: '', accountNumber: '', type: 'SAVINGS', glAccountId: '', currency: 'PHP', balance: 0 });
@@ -136,6 +137,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
     setShowEntryModal(null);
     resetEntryForm();
+    onNotify('success', `${showEntryModal === 'IN' ? 'Receipt' : 'Payment'} of ${formatCurrency(entryAmount)} posted successfully.`);
   };
 
   const handleTransferSubmit = (e: React.FormEvent) => {
@@ -163,6 +165,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
     setShowTransferModal(false);
     resetEntryForm();
+    onNotify('success', `Transfer of ${formatCurrency(entryAmount)} from ${fromBank.bankName} to ${toBank.bankName} posted successfully.`);
   };
 
   const resetEntryForm = () => {
@@ -192,8 +195,6 @@ const BankingView: React.FC<BankingViewProps> = ({
     reconciliationData.unclearedLines.forEach(l => onToggleClearLine(l.id));
     onNotify('success', `Cleared ${reconciliationData.unclearedLines.length} transactions.`);
   };
-
-  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

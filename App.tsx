@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -23,8 +23,8 @@ import SponsorsView from './views/SponsorsView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
-import APView from './views/APView';
 import ARView from './views/ARView';
+import PayablesView from './views/PayablesView';
 import VendorsView from './views/VendorsView';
 import SchedulesView from './views/SchedulesView';
 import PurchaseOrdersView from './views/PurchaseOrdersView';
@@ -43,6 +43,10 @@ import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
 import MaintenanceView from './views/MaintenanceView';
+import PeriodClosingView from './views/PeriodClosingView';
+import CheckPrintingView from './views/CheckPrintingView';
+import EFTBatchView from './views/EFTBatchView';
+import GoodsReceiptView from './views/GoodsReceiptView';
 
 // Lucide Icons
 import { 
@@ -53,7 +57,8 @@ import {
   Binary, Terminal, Receipt, Calculator, Briefcase, 
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
-  Cloud, BarChart2
+  Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
+  CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 export default function App() {
@@ -108,6 +113,12 @@ export default function App() {
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
 
+  // Advanced AP Features State
+  const [accountingPeriods, setAccountingPeriods] = useState<AccountingPeriod[]>([]);
+  const [checkVouchers, setCheckVouchers] = useState<CheckVoucher[]>([]);
+  const [eftBatches, setEftBatches] = useState<EFTBatch[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceipt[]>([]);
+
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
@@ -118,6 +129,8 @@ export default function App() {
   // Modals
   const [showJournalForm, setShowJournalForm] = useState(false);
 
+  // Toast Notification State
+  const [toasts, setToasts] = useState<Array<{id: number; type: 'success' | 'error' | 'info'; message: string}>>([]);
   // Data Loading Logic
   useEffect(() => {
     async function loadData() {
@@ -249,6 +262,12 @@ export default function App() {
 
   const handleNotify = (type: 'success' | 'error' | 'info', message: string) => {
     console.log(`[ERP Notification: ${type.toUpperCase()}]`, message);
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, message }]);
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
   };
 
   const handleLogin = (user: User) => {
@@ -298,7 +317,7 @@ export default function App() {
   };
 
   const handleConvertToBill = (po: PurchaseOrder) => {
-    setActiveTab('ap');
+    setActiveTab('payables');
     handleNotify('info', `PO ${po.reference} converted for Bill processing.`);
   };
 
@@ -902,8 +921,7 @@ export default function App() {
       handleNotify('success', `Bank account "${created.bankName}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating bank account:', error);
-      handleNotify('error', 'Failed to create bank account. Falling back to memory storage.');
-      setBankAccounts(prev => [...prev, { ...bank, orgId: currentOrgId, id: `bank-${Date.now()}` } as BankAccount]);
+      handleNotify('error', `Failed to create bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -915,8 +933,7 @@ export default function App() {
       handleNotify('success', 'Bank account updated successfully');
     } catch (error) {
       console.error('[App] Error updating bank account:', error);
-      handleNotify('error', 'Failed to update bank account. Falling back to memory storage.');
-      setBankAccounts(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+      handleNotify('error', `Failed to update bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -929,9 +946,52 @@ export default function App() {
       return true;
     } catch (error) {
       console.error('[App] Error deleting bank account:', error);
-      handleNotify('error', 'Failed to delete bank account. Falling back to memory storage.');
-      setBankAccounts(prev => prev.filter(b => b.id !== id));
+      handleNotify('error', `Failed to delete bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
+    }
+  };
+
+  // Check Voucher CRUD Handlers
+  const handleAddCheckVoucher = async (check: Partial<CheckVoucher>) => {
+    try {
+      console.info('[App] Creating check voucher:', check.checkNumber);
+      const checkWithOrg = { ...check, orgId: currentOrgId } as CheckVoucher;
+      const created = await dataService.createCheckVoucher(checkWithOrg);
+      setCheckVouchers(prev => [...prev, created]);
+      handleNotify('success', `Check #${created.checkNumber} created successfully`);
+      return created;
+    } catch (error) {
+      console.error('[App] Error creating check voucher:', error);
+      handleNotify('error', `Failed to create check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
+    }
+  };
+
+  const handleUpdateCheckVoucher = async (id: string, updates: Partial<CheckVoucher>) => {
+    try {
+      console.info('[App] Updating check voucher:', id, updates);
+      const updated = await dataService.updateCheckVoucher(id, updates);
+      setCheckVouchers(prev => prev.map(c => c.id === id ? updated : c));
+      handleNotify('success', 'Check voucher updated successfully');
+      return updated;
+    } catch (error) {
+      console.error('[App] Error updating check voucher:', error);
+      handleNotify('error', `Failed to update check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
+    }
+  };
+
+  const handleDeleteCheckVoucher = async (id: string) => {
+    try {
+      console.info('[App] Deleting check voucher:', id);
+      await dataService.deleteCheckVoucher(id);
+      setCheckVouchers(prev => prev.filter(c => c.id !== id));
+      handleNotify('success', 'Check voucher deleted successfully');
       return true;
+    } catch (error) {
+      console.error('[App] Error deleting check voucher:', error);
+      handleNotify('error', `Failed to delete check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
   };
 
@@ -1150,6 +1210,31 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
+        {toasts.map(toast => (
+          <div 
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${
+              toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+              toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+              'bg-blue-50 border-blue-200 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="text-blue-500 shrink-0" />}
+            <span className="text-sm font-medium">{toast.message}</span>
+            <button 
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-current opacity-50 hover:opacity-100"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
         <div className="p-6 flex items-center justify-center border-b border-white/5 bg-slate-900/50">
            {sidebarOpen ? (
@@ -1198,9 +1283,12 @@ export default function App() {
                <NavItem icon={<BookText size={20}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<PieChart size={20}/>} label="Reporting Hub" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Landmark size={20}/>} label="Treasury" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Printer size={20}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Zap size={20}/>} label="EFT Batches" active={activeTab === 'eft'} onClick={() => setActiveTab('eft')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'ap'} onClick={() => setActiveTab('ap')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<Package size={20}/>} label="Goods Receipt (GR)" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
                <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
@@ -1233,6 +1321,7 @@ export default function App() {
                {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
                <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<CalendarCheck size={20}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
                <div className="relative">
@@ -1348,15 +1437,19 @@ export default function App() {
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'ap' && <APView vendors={vendors} entries={activeJournalEntries} lines={filteredLines} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} currentUserId={currentUser?.id} onPostBill={handlePostJournal} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
+          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
+          {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={gr => setGoodsReceipts(p => [...p, gr])} onUpdateGoodsReceipt={(id, u) => setGoodsReceipts(p => p.map(g => g.id === id ? {...g, ...u} : g))} onDeleteGoodsReceipt={id => setGoodsReceipts(p => p.filter(g => g.id !== id))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={p => setAccountingPeriods(prev => [...prev, p])} onUpdatePeriod={(id, u) => setAccountingPeriods(prev => prev.map(p => p.id === id ? {...p, ...u} : p))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
           {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+          {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'eft' && <EFTBatchView orgId={currentOrgId} batches={eftBatches} bankAccounts={bankAccounts} vendors={vendors} payables={payables} currentUserId={currentUser?.id} onCreateBatch={b => setEftBatches(p => [...p, b])} onUpdateBatch={(id, u) => setEftBatches(p => p.map(b => b.id === id ? {...b, ...u} : b))} onDeleteBatch={id => setEftBatches(p => p.filter(b => b.id !== id))} onNotify={handleNotify} />}
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}

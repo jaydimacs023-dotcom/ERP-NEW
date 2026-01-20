@@ -460,6 +460,13 @@ export class SupabaseDataService implements IDataService {
         'created_by', 'approved_by', 'paid_by', 'created_at', 'updated_at', 'approved_at',
         'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
       ],
+      check_vouchers: [
+        'id', 'org_id', 'check_number', 'bank_account_id', 'payee_id', 'payee_type', 'payee_name',
+        'check_date', 'amount', 'amount_in_words', 'status', 'payable_ids', 'journal_entry_id',
+        'prepared_by', 'prepared_at', 'approved_by', 'approved_at', 'printed_by', 'printed_at',
+        'released_by', 'released_at', 'voided_by', 'voided_at', 'void_reason',
+        'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
@@ -468,7 +475,8 @@ export class SupabaseDataService implements IDataService {
       bank_accounts: ['id', 'created_at', 'updated_at'],
       fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
       items: ['created_at', 'updated_at'],
-      payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at']
+      payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
+      check_vouchers: ['id', 'created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -592,55 +600,6 @@ export class SupabaseDataService implements IDataService {
     // We need to call the API directly to avoid double-conversion
     return this.insertToSupabaseRaw('students', filteredStudent);
   }
-  
-  /**
-   * Insert data that's already in snake_case (no conversion applied)
-   */
-  private async insertToSupabaseRaw<T>(table: string, data: T): Promise<T> {
-    if (!this.supabaseUrl || !this.supabaseKey) {
-      throw new Error(`Supabase credentials not configured for table '${table}'`);
-    }
-
-    try {
-      const url = `${this.supabaseUrl}/rest/v1/${table}`;
-      const jsonBody = JSON.stringify(data);
-      
-      console.debug(`[Supabase] POST to ${url}`, {
-        bodyLength: jsonBody.length,
-        bodyPreview: jsonBody.substring(0, 200),
-        keys: Object.keys(data as any),
-        hasAge: 'age' in (data as any),
-      });
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'apikey': this.supabaseKey,
-          'Authorization': `Bearer ${this.supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: jsonBody,  // Data is already snake_case, no conversion needed
-      });
-
-      if (!response.ok) {
-        console.error(`[Supabase] Error inserting into ${table}: ${response.status} ${response.statusText}`);
-        const error = await response.text();
-        console.error(`[Supabase] Full Request Body:`, jsonBody);
-        console.error(`[Supabase] Response: ${error}`);
-        throw new Error(`Failed to insert into ${table}`);
-      }
-
-      const result = await response.json();
-      console.info(`[Supabase] ✅ Inserted into ${table}:`, result);
-      // Convert response back to camelCase
-      const camelCaseResult = this.snakeToCamel(result[0] || result);
-      return camelCaseResult;
-    } catch (error) {
-      console.error(`[Supabase] Network error inserting into ${table}:`, error);
-      throw error;
-    }
-  }
 
   async updateStudent(id: string, updates: Partial<any>): Promise<any> {
     // Convert updates to snake_case first so filtering works correctly
@@ -666,46 +625,6 @@ export class SupabaseDataService implements IDataService {
     });
     
     return this.updateInSupabaseRaw('students', id, filteredUpdates);
-  }
-  
-  /**
-   * Update data that's already in snake_case (no conversion applied)
-   */
-  private async updateInSupabaseRaw<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
-    if (!this.supabaseUrl || !this.supabaseKey) {
-      throw new Error(`Supabase credentials not configured for table '${table}'`);
-    }
-
-    try {
-      const url = `${this.supabaseUrl}/rest/v1/${table}?id=eq.${id}`;
-      
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'apikey': this.supabaseKey,
-          'Authorization': `Bearer ${this.supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify(updates),  // Data is already snake_case, no conversion needed
-      });
-
-      if (!response.ok) {
-        console.error(`[Supabase] Error updating ${table}: ${response.status} ${response.statusText}`);
-        const error = await response.text();
-        console.error(`[Supabase] Response: ${error}`);
-        throw new Error(`Failed to update ${table}`);
-      }
-
-      const result = await response.json();
-      console.info(`[Supabase] ✅ Updated ${table}:`, result);
-      // Convert response back to camelCase
-      const camelCaseResult = this.snakeToCamel(result[0] || result);
-      return camelCaseResult;
-    } catch (error) {
-      console.error(`[Supabase] Network error updating ${table}:`, error);
-      throw error;
-    }
   }
 
   async deleteStudent(id: string): Promise<void> {
@@ -1445,6 +1364,54 @@ export class SupabaseDataService implements IDataService {
   async deleteVendor(id: string): Promise<void> {
     console.debug('[Supabase] deleteVendor called with:', id);
     return this.deleteFromSupabase('vendors', id);
+  }
+
+  // ============================================================================
+  // CHECK VOUCHER CRUD
+  // ============================================================================
+  async createCheckVoucher(check: any): Promise<any> {
+    console.debug('[Supabase] createCheckVoucher called with:', check);
+    const snake = this.camelToSnake(check);
+    const filtered = this.filterToTableSchema('check_vouchers', snake, true);
+    // Remove id if empty - let Supabase auto-generate UUID
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('check_vouchers', filtered);
+  }
+
+  async updateCheckVoucher(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateCheckVoucher called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('check_vouchers', snake);
+    return this.updateInSupabaseRaw('check_vouchers', id, filtered);
+  }
+
+  async deleteCheckVoucher(id: string): Promise<void> {
+    console.debug('[Supabase] deleteCheckVoucher called with:', id);
+    return this.deleteFromSupabase('check_vouchers', id);
+  }
+
+  async getNextCheckNumber(orgId: string, bankAccountId: string): Promise<string> {
+    console.debug('[Supabase] getNextCheckNumber called for bank:', bankAccountId);
+    try {
+      // Get the max check number for this bank account
+      const url = `${this.baseUrl}/check_vouchers?org_id=eq.${orgId}&bank_account_id=eq.${bankAccountId}&select=check_number&order=check_number.desc&limit=1`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch check numbers');
+      
+      const data = await response.json();
+      if (data.length === 0) {
+        return '000001'; // Start from 1 if no checks exist
+      }
+      
+      const lastNumber = data[0].check_number;
+      const numericPart = parseInt(lastNumber.replace(/\D/g, '')) || 0;
+      return String(numericPart + 1).padStart(6, '0');
+    } catch (error) {
+      console.error('[Supabase] Error getting next check number:', error);
+      return '000001';
+    }
   }
 
   /**

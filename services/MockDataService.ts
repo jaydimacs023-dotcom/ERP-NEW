@@ -265,4 +265,20 @@ export class MockDataService implements IDataService {
   async deleteBankAccount(id: string): Promise<void> {
     console.warn('[MockDataService] deleteBankAccount is memory-only.');
   }
+
+  // Check Voucher CRUD (mock)
+  async createCheckVoucher(check: any): Promise<any> {
+    console.warn('[MockDataService] createCheckVoucher is memory-only.');
+    return { ...check, id: `chk-${Date.now()}` };
+  }
+  async updateCheckVoucher(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateCheckVoucher is memory-only.');
+    return { id, ...updates };
+  }
+  async deleteCheckVoucher(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteCheckVoucher is memory-only.');
+  }
+  async getNextCheckNumber(orgId: string, bankAccountId: string): Promise<string> {
+    return '000001';
+  }
 }
