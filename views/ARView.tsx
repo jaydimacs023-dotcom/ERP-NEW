@@ -140,7 +140,7 @@ const ARView: React.FC<ARViewProps> = ({
 
   const vatableSales = useMemo(() => invoiceLines.reduce((sum, l) => {
     const item = items.find(i => i.id === l.itemId);
-    return (item?.taxCategory === TaxCategory.VAT) ? sum + (l.qty * l.price) : sum;
+    return (item?.taxCategoryId) ? sum + (l.qty * l.price) : sum;
   }, 0), [invoiceLines, items]);
   const totalVat = vatableSales * 0.12;
   const grossInvoiceAmount = invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0) + totalVat;

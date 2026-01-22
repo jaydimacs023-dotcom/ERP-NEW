@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { BankAccount, TransactionSummary, ChartOfAccount, JournalEntryLine, JournalEntry, AccountClass } from '../types';
+import { BankReconciliationService, ReconciliationResult } from '../services/BankReconciliationService';
 import { 
   Landmark, CreditCard, Wallet, ArrowRightLeft, History, Plus, 
   X, Save, ShieldCheck, AlertCircle, ChevronRight, 
@@ -16,9 +17,13 @@ interface BankingViewProps {
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
   lines: JournalEntryLine[];
+  bankReconciliations?: any[];
   onAddBankAccount: (bank: Partial<BankAccount>) => void;
   onUpdateBankAccount?: (id: string, bank: Partial<BankAccount>) => void;
   onDeleteBankAccount?: (id: string) => void;
+  onAddBankReconciliation?: (reconciliation: any) => void;
+  onUpdateBankReconciliation?: (id: string, reconciliation: any) => void;
+  onDeleteBankReconciliation?: (id: string) => void;
   onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onToggleClearLine: (lineId: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -27,7 +32,7 @@ interface BankingViewProps {
 type BankingTab = 'ledger' | 'reconcile';
 
 const BankingView: React.FC<BankingViewProps> = ({ 
-  bankAccounts, summaries, accounts, entries, lines, onAddBankAccount, onUpdateBankAccount, onDeleteBankAccount, onPostTransfer, onToggleClearLine, onNotify 
+  bankAccounts, summaries, accounts, entries, lines, bankReconciliations, onAddBankAccount, onUpdateBankAccount, onDeleteBankAccount, onAddBankReconciliation, onUpdateBankReconciliation, onDeleteBankReconciliation, onPostTransfer, onToggleClearLine, onNotify 
 }) => {
   // Utility function - defined first so it can be used in handlers
   const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -179,21 +184,41 @@ const BankingView: React.FC<BankingViewProps> = ({
   // Reconciliation Logic
   const reconciliationData = useMemo(() => {
     if (!selectedBank) return null;
-    const bankLines = lines.filter(l => l.accountId === selectedBank.glAccountId);
-    const clearedLines = bankLines.filter(l => l.isCleared);
-    const unclearedLines = bankLines.filter(l => !l.isCleared);
-
-    const bookBalance = bankLines.reduce((sum, l) => sum + (l.debit - l.credit), 0);
-    const clearedBalance = clearedLines.reduce((sum, l) => sum + (l.debit - l.credit), 0);
-    const difference = statementBalance - clearedBalance;
-
-    return { bankLines, clearedLines, unclearedLines, bookBalance, clearedBalance, difference };
-  }, [selectedBank, lines, statementBalance]);
+    const result = BankReconciliationService.performReconciliation(
+      selectedBank,
+      statementBalance,
+      lines,
+      reconcileAsOf
+    );
+    return result;
+  }, [selectedBank, lines, statementBalance, reconcileAsOf]);
 
   const handleBulkClear = () => {
     if (!reconciliationData) return;
     reconciliationData.unclearedLines.forEach(l => onToggleClearLine(l.id));
     onNotify('success', `Cleared ${reconciliationData.unclearedLines.length} transactions.`);
+  };
+
+  const handleSaveReconciliation = async () => {
+    if (!selectedBank || !reconciliationData || !onAddBankReconciliation) return;
+    
+    if (BankReconciliationService.isReconciled(reconciliationData.difference)) {
+      try {
+        const reconciliationRecord = BankReconciliationService.createReconciliationRecord(
+          selectedBank.orgId,
+          reconciliationData,
+          `Bank reconciliation completed for ${selectedBank.bankName} as of ${reconcileAsOf}`
+        );
+        
+        await onAddBankReconciliation(reconciliationRecord);
+        onNotify('success', `✅ Bank reconciliation locked and saved for ${reconcileAsOf}`);
+      } catch (error) {
+        console.error('Error saving reconciliation:', error);
+        onNotify('error', 'Failed to save reconciliation');
+      }
+    } else {
+      onNotify('error', `Cannot lock reconciliation with variance of ${formatCurrency(reconciliationData.difference)}`);
+    }
   };
 
   return (
@@ -381,11 +406,11 @@ const BankingView: React.FC<BankingViewProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {reconciliationData?.bankLines.length === 0 ? (
+                        {!reconciliationData || reconciliationData.clearedLines.length === 0 ? (
                            <tr>
                               <td colSpan={5} className="py-20 text-center text-slate-300 italic font-medium">No ledger activity found for this account.</td>
                            </tr>
-                        ) : reconciliationData?.bankLines.slice().reverse().map(line => {
+                        ) : reconciliationData.clearedLines.slice().reverse().map(line => {
                           const entry = entries.find(e => e.id === line.journalEntryId);
                           return (
                             <tr key={line.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -536,6 +561,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                            </div>
                            <div className="flex flex-col items-end gap-3 shrink-0">
                               <button 
+                                onClick={handleSaveReconciliation}
                                 disabled={Math.abs(reconciliationData?.difference || 0) > 0.01}
                                 className="px-12 py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
                               >

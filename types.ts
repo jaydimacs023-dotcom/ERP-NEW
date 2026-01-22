@@ -53,6 +53,23 @@ export enum PurchaseOrderStatus {
   CLOSED = 'CLOSED'
 }
 
+export enum InventoryTransactionType {
+  PURCHASE = 'PURCHASE',
+  SALE = 'SALE',
+  ADJUSTMENT = 'ADJUSTMENT',
+  TRANSFER = 'TRANSFER',
+  RETURN = 'RETURN',
+  DAMAGE = 'DAMAGE',
+  WRITEOFF = 'WRITEOFF'
+}
+
+export enum InventoryValuationMethod {
+  FIFO = 'FIFO',
+  LIFO = 'LIFO',
+  WEIGHTED_AVERAGE = 'WEIGHTED_AVERAGE',
+  STANDARD_COST = 'STANDARD_COST'
+}
+
 export type SubscriptionStatus = 'ACTIVE' | 'TRIAL' | 'SUSPENDED' | 'EXPIRED' | 'PENDING';
 export type PlanType = 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
 
@@ -380,6 +397,27 @@ export interface BankAccount extends BaseEntity {
   updatedAt?: string;
 }
 
+export interface BankReconciliation extends BaseEntity {
+  id: string;
+  orgId: string;
+  bankAccountId: string;
+  asOfDate: string;
+  statementBalance: number;
+  bookBalance: number;
+  clearedBalance: number;
+  difference: number;
+  status: 'IN_PROGRESS' | 'RECONCILED' | 'LOCKED';
+  reconciliationDetails?: string;
+  // Audit
+  reconciliationDetails_?: string;
+  reconciliedBy?: string;
+  reconciliedAt?: string;
+  lockedBy?: string;
+  lockedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface NonStockItem extends BaseEntity {
   id: string;
   orgId: string;
@@ -389,6 +427,94 @@ export interface NonStockItem extends BaseEntity {
   unitPrice: number;
   incomeAccountId: string;  // Maps to income_account_id
   expenseAccountId: string; // Maps to expense_account_id
+  taxCategoryId?: string;   // Maps to atc_categories(id) - optional tax classification
+  createdAt: string;
+}
+
+export interface WarehouseLocation extends BaseEntity {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;
+  description?: string;
+  address?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface StockItem extends BaseEntity {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;
+  description?: string;
+  unitPrice: number;
+  costPrice: number;
+  warehouseLocationId: string;  // Physical location
+  incomeAccountId?: string;  // Revenue account
+  cogsAccountId?: string;    // Cost of goods sold account
+  expenseAccountId?: string; // Expense account
+  taxCategoryId?: string;    // Tax classification (like NonStockItem)
+  valuationMethod: InventoryValuationMethod;
+  minStockLevel: number;
+  maxStockLevel: number;
+  reorderQuantity: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface InventoryLevel extends BaseEntity {
+  id: string;
+  orgId: string;
+  stockItemId: string;
+  warehouseLocationId: string;
+  quantityOnHand: number;
+  quantityReserved: number;
+  quantityAvailable: number;  // onHand - reserved
+  lastCounted: string;
+  updatedAt: string;
+}
+
+export interface InventoryTransaction extends BaseEntity {
+  id: string;
+  orgId: string;
+  referenceNumber: string;
+  stockItemId: string;
+  transactionType: InventoryTransactionType;
+  fromLocationId?: string;
+  toLocationId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface StockAdjustment extends BaseEntity {
+  id: string;
+  orgId: string;
+  adjustmentNumber: string;
+  stockItemId: string;
+  warehouseLocationId: string;
+  quantityChange: number;  // Positive or negative
+  reason: string;  // Variance, Damage, Count Difference, etc.
+  approvedBy?: string;
+  approvalDate?: string;
+  journalEntryId?: string;  // Links to GL entry
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface ReorderPoint extends BaseEntity {
+  id: string;
+  orgId: string;
+  stockItemId: string;
+  minLevel: number;
+  maxLevel: number;
+  reorderQuantity: number;
+  leadTimeDays: number;
+  lastReorderDate?: string;
   createdAt: string;
 }
 
@@ -470,6 +596,42 @@ export interface JournalEntry extends BaseEntity {
   payableId?: string;
   receivableId?: string;
   goodsReceiptId?: string;
+  recurringEntryId?: string; // Links to recurring template
+}
+
+export type RecurrenceFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM';
+
+export interface RecurringJournalEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string;
+  description?: string;
+  frequency: RecurrenceFrequency;
+  customDayInterval?: number; // For CUSTOM frequency (e.g., every 7 days)
+  startDate: string;
+  endDate?: string; // Optional end date for recurring series
+  nextRunDate: string;
+  lastRunDate?: string;
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'INACTIVE';
+  templateEntry: Omit<JournalEntry, 'id' | 'orgId' | 'createdAt' | 'createdBy' | 'date' | 'reference'> & {
+    lineTemplate: Omit<JournalEntryLine, 'id' | 'journalEntryId'>[]
+  };
+  
+  // Execution tracking
+  timesRun: number;
+  maxRuns?: number; // Maximum number of executions
+  runCount?: number; // Alias for timesRun
+  
+  // Configuration
+  autoPost: boolean; // Auto-post generated entries
+  description_?: string; // Duplicate for description
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  
+  // Audit
+  lastGeneratedEntryId?: string;
+  nextScheduledRun?: string;
 }
 
 export interface JournalEntryLine {
@@ -835,3 +997,42 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions[] = [
     ]
   }
 ];
+
+// ============================================================================
+// FOREIGN CURRENCY & EXCHANGE RATES
+// ============================================================================
+
+export interface ExchangeRate extends BaseEntity {
+  id: string;
+  orgId: string;
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  effectiveDate: string;
+  source: string;
+  isManual: boolean;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface CurrencyConversion {
+  originalAmount: number;
+  originalCurrency: string;
+  targetCurrency: string;
+  rate: number;
+  convertedAmount: number;
+  rateDate: string;
+}
+
+export interface MulticurrencyBalance {
+  accountId: string;
+  accountName: string;
+  balances: {
+    [currency: string]: number;
+  };
+  functionalBalance: number;
+  functionalCurrency: string;
+}

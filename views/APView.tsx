@@ -144,18 +144,18 @@ const APView: React.FC<APViewProps> = ({
 
   const vatablePurchases = useMemo(() => billLines.reduce((sum, l) => {
     const item = items.find(i => i.id === l.itemId);
-    return (item?.taxCategory === TaxCategory.VAT) ? sum + (l.qty * l.price) : sum;
+    return (item?.taxCategoryId) ? sum + (l.qty * l.price) : sum;
   }, 0), [billLines, items]);
 
   const totalInputVat = vatablePurchases * 0.12;
   const nonVatPurchases = useMemo(() => billLines.reduce((sum, l) => {
     const item = items.find(i => i.id === l.itemId);
-    return (item?.taxCategory === TaxCategory.NON_VAT) ? sum + (l.qty * l.price) : sum;
+    return (!item?.taxCategoryId) ? sum + (l.qty * l.price) : sum;
   }, 0), [billLines, items]);
 
   const totalEwt = useMemo(() => billLines.reduce((sum, l) => {
     const item = items.find(i => i.id === l.itemId);
-    return sum + (l.qty * l.price * (item?.whtRate || 0));
+    return sum + (l.qty * l.price * (item?.taxCategoryId ? 0.02 : 0));
   }, 0), [billLines, items]);
 
   const netPayableToVendor = (vatablePurchases + totalInputVat + nonVatPurchases) - totalEwt;
@@ -569,7 +569,7 @@ const APView: React.FC<APViewProps> = ({
                   return (
                     <div key={idx} className="grid grid-cols-12 gap-3 items-center p-3 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 shadow-sm">
                       <div className="col-span-4"><select required className="w-full px-3 py-2 bg-indigo-50/50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-700 outline-none" value={line.itemId} onChange={e => updateBillLine(idx, { itemId: e.target.value })}><option value="">Select Item...</option>{items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
-                      <div className="col-span-2 text-center"><div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest inline-block ${item?.taxCategory === TaxCategory.VAT ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>{item?.taxCategory || 'N/A'}</div></div>
+                      <div className="col-span-2 text-center"><div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest inline-block ${item?.taxCategoryId ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>{item?.taxCategoryId ? 'VAT' : 'NO-VAT'}</div></div>
                       <div className="col-span-1"><input type="number" min="1" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-bold" value={line.qty} onChange={e => updateBillLine(idx, { qty: Number(e.target.value) })} /></div>
                       <div className="col-span-2"><input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-right text-xs font-mono font-medium" value={line.price} onChange={e => updateBillLine(idx, { price: Number(e.target.value) })} /></div>
                       <div className="col-span-2 text-right text-xs font-mono font-bold text-slate-800">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>

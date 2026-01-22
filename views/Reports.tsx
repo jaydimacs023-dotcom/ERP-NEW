@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { TransactionSummary, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
-import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2 } from 'lucide-react';
+import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2, BarChart } from 'lucide-react';
 
 interface ReportsProps {
   summaries: TransactionSummary[];
@@ -269,6 +269,16 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
         </div>
 
         <div className="p-16 flex-1 bg-white print:p-8">
+          {(!reportSummariesBS || reportSummariesBS.length === 0) && (!reportSummariesIS || reportSummariesIS.length === 0) ? (
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center">
+              <div className="p-4 bg-slate-100 rounded-full">
+                <BarChart size={32} className="text-slate-400" />
+              </div>
+              <h3 className="text-lg font-black text-slate-700 uppercase tracking-widest">No Report Data Available</h3>
+              <p className="text-sm text-slate-500 max-w-sm">There are no transactions recorded for the selected period. Please check your date range or create some journal entries to generate reports.</p>
+            </div>
+          ) : (
+            <>
           {reportType === 'BS' && (
             <div className="space-y-12 max-w-3xl mx-auto">
               <FinancialSection title="I. ASSETS" items={bs.assets} total={bs.totalAssets} symbol={currencySymbol} />
@@ -413,6 +423,8 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                 </tbody>
               </table>
             </div>
+          )}
+            </>
           )}
         </div>
 

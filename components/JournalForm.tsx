@@ -20,7 +20,7 @@ interface JournalFormProps {
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({ 
-  accounts, students, trainers, sponsors, batches, items, entries, onSubmit, onClose 
+  accounts, students, trainers, sponsors, batches, items = [], entries, onSubmit, onClose 
 }) => {
   const [entry, setEntry] = useState<Partial<JournalEntry>>({
     date: new Date().toISOString().split('T')[0],

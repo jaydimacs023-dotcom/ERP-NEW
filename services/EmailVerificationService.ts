@@ -1,4 +1,4 @@
-import { randomBytes } from '../utils/uuid';
+import { generateUUID } from '../utils/uuid';
 
 export interface EmailVerificationToken {
   token: string;
@@ -11,6 +11,11 @@ export interface EmailVerificationToken {
 
 const TOKEN_EXPIRY_MS = 1000 * 60 * 60 * 24; // 24 hours
 const STORAGE_KEY = 'AT_ERP_EMAIL_VERIFICATION_TOKENS';
+
+// Generate a random token string
+function generateToken(): string {
+  return `${generateUUID()}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 export class EmailVerificationService {
   private tokens: EmailVerificationToken[] = [];
@@ -37,7 +42,7 @@ export class EmailVerificationService {
   }
 
   generateToken(userId: string, email: string): EmailVerificationToken {
-    const token = randomBytes(32);
+    const token = generateToken();
     const now = Date.now();
     const expiresAt = now + TOKEN_EXPIRY_MS;
     const entry: EmailVerificationToken = {

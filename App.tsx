@@ -1,13 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
 import { AuditService } from './services/AuditService';
 import { config } from './config/app';
+import { useNotifications } from './components/NotificationContext';
 
 // View Imports
 import Dashboard from './views/Dashboard';
@@ -49,6 +50,13 @@ import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
 import EFTBatchView from './views/EFTBatchView';
 import GoodsReceiptView from './views/GoodsReceiptView';
+import WarehouseLocationsView from './views/WarehouseLocationsView';
+import StockItemsView from './views/StockItemsView';
+import InventoryView from './views/InventoryView';
+import StockAdjustmentsView from './views/StockAdjustmentsView';
+import ReorderView from './views/ReorderView';
+import InventoryTransactionsView from './views/InventoryTransactionsView';
+import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 
 // Lucide Icons
 import { 
@@ -146,18 +154,29 @@ export default function App() {
   const [atcCategories, setAtcCategories] = useState<any[]>([]);
   const [atcItems, setAtcItems] = useState<any[]>([]);
   const [atcRates, setAtcRates] = useState<any[]>([]);
+  const [exchangeRates, setExchangeRates] = useState<any[]>([]);
+  const [accountingPeriods, setAccountingPeriods] = useState<any[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankReconciliations, setBankReconciliations] = useState<any[]>([]);
+  const [recurringJournalEntries, setRecurringJournalEntries] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
 
+  // Inventory Management State
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [inventoryLevels, setInventoryLevels] = useState<InventoryLevel[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>([]);
+  const [reorderPoints, setReorderPoints] = useState<ReorderPoint[]>([]);
+
   // Advanced AP Features State
-  const [accountingPeriods, setAccountingPeriods] = useState<AccountingPeriod[]>([]);
   const [checkVouchers, setCheckVouchers] = useState<CheckVoucher[]>([]);
   const [eftBatches, setEftBatches] = useState<EFTBatch[]>([]);
   const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceipt[]>([]);
@@ -212,6 +231,8 @@ export default function App() {
         setSchedules(data.schedules);
         setEmployees(data.employees);
         setBankAccounts(data.bankAccounts);
+        setBankReconciliations(data.bankReconciliations);
+        setRecurringJournalEntries(data.recurringJournalEntries || []);
         setAccounts(data.accounts);
         setJournalEntries(data.journalEntries);
         setJournalLines(data.journalLines);
@@ -226,6 +247,14 @@ export default function App() {
         setAtcCategories(data.atcCategories || []);
         setAtcItems(data.atcItems || []);
         setAtcRates(data.atcRates || []);
+        
+        // Load Inventory Data
+        setWarehouseLocations(data.warehouseLocations || []);
+        setStockItems(data.stockItems || []);
+        setInventoryLevels(data.inventoryLevels || []);
+        setInventoryTransactions(data.inventoryTransactions || []);
+        setStockAdjustments(data.stockAdjustments || []);
+        setReorderPoints(data.reorderPoints || []);
         
         if (data.organizations.length > 0) {
           // Get the restored session to check user's orgId
@@ -272,6 +301,29 @@ export default function App() {
     }
     loadData();
   }, []);
+
+  // Fetch Accounting Periods when organization changes
+  useEffect(() => {
+    if (!currentOrgId) {
+      setAccountingPeriods([]);
+      return;
+    }
+
+    async function loadPeriods() {
+      try {
+        console.log('[App] Fetching accounting periods for org:', currentOrgId);
+        const service = DataServiceFactory.getService();
+        const periods = await service.getAccountingPeriodsByOrg(currentOrgId);
+        console.log('[App] Loaded periods:', periods.length);
+        setAccountingPeriods(periods);
+      } catch (error) {
+        console.error('[App] Error loading periods:', error);
+        setAccountingPeriods([]);
+      }
+    }
+
+    loadPeriods();
+  }, [currentOrgId]);
 
   // Derived Accounting Context
   const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
@@ -362,7 +414,7 @@ export default function App() {
       currentUser?.name || 'System',
       'JOURNAL_ENTRY',
       fullEntry.id,
-      fullEntry.referenceNumber,
+      fullEntry.id,
       `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
     );
   };
@@ -1187,6 +1239,163 @@ export default function App() {
     }
   };
 
+  // Bank Reconciliation CRUD Handlers
+  const handleAddBankReconciliation = async (reconciliation: any) => {
+    try {
+      console.info('[App] Creating bank reconciliation:', reconciliation.bankAccountId, reconciliation.asOfDate);
+      const reconciliationWithOrg = { ...reconciliation, orgId: currentOrgId };
+      const created = await dataService.createBankReconciliation(reconciliationWithOrg);
+      setBankReconciliations(prev => [...prev, created]);
+      
+      // Audit: Bank reconciliation created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', created.id, `Reconciliation as of ${created.asOfDate}`);
+      
+      handleNotify('success', 'Bank reconciliation saved successfully');
+    } catch (error) {
+      console.error('[App] Error creating bank reconciliation:', error);
+      handleNotify('error', `Failed to save reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleUpdateBankReconciliation = async (id: string, updates: any) => {
+    try {
+      console.info('[App] Updating bank reconciliation:', id, updates);
+      const existing = bankReconciliations.find(r => r.id === id);
+      const updated = await dataService.updateBankReconciliation(id, updates);
+      setBankReconciliations(prev => prev.map(r => r.id === id ? updated : r));
+      
+      // Audit: Bank reconciliation updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', id, existing?.asOfDate, existing, { ...existing, ...updates });
+      
+      handleNotify('success', 'Bank reconciliation updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating bank reconciliation:', error);
+      handleNotify('error', `Failed to update reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteBankReconciliation = async (id: string) => {
+    try {
+      console.info('[App] Deleting bank reconciliation:', id);
+      const existing = bankReconciliations.find(r => r.id === id);
+      await dataService.deleteBankReconciliation(id);
+      setBankReconciliations(prev => prev.filter(r => r.id !== id));
+      
+      // Audit: Bank reconciliation deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', id, existing?.asOfDate);
+      
+      handleNotify('success', 'Bank reconciliation deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting bank reconciliation:', error);
+      handleNotify('error', `Failed to delete reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Recurring Journal Entry CRUD Handlers
+  const handleAddRecurringJournalEntry = async (entry: any) => {
+    try {
+      console.info('[App] Creating recurring journal entry:', entry.name);
+      const entryWithOrg = { ...entry, orgId: currentOrgId };
+      const created = await dataService.createRecurringJournalEntry(entryWithOrg);
+      setRecurringJournalEntries(prev => [...prev, created]);
+      
+      // Audit: Recurring journal entry created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', created.id, `Recurring entry: ${created.name}`);
+      
+      handleNotify('success', 'Recurring journal entry created successfully');
+    } catch (error) {
+      console.error('[App] Error creating recurring journal entry:', error);
+      handleNotify('error', `Failed to create recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleUpdateRecurringJournalEntry = async (id: string, updates: any) => {
+    try {
+      console.info('[App] Updating recurring journal entry:', id);
+      const existing = recurringJournalEntries.find(e => e.id === id);
+      const updated = await dataService.updateRecurringJournalEntry(id, updates);
+      setRecurringJournalEntries(prev => prev.map(e => e.id === id ? updated : e));
+      
+      // Audit: Recurring journal entry updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', id, existing?.name, existing, { ...existing, ...updates });
+      
+      handleNotify('success', 'Recurring journal entry updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating recurring journal entry:', error);
+      handleNotify('error', `Failed to update recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteRecurringJournalEntry = async (id: string) => {
+    try {
+      console.info('[App] Deleting recurring journal entry:', id);
+      const existing = recurringJournalEntries.find(e => e.id === id);
+      await dataService.deleteRecurringJournalEntry(id);
+      setRecurringJournalEntries(prev => prev.filter(e => e.id !== id));
+      
+      // Audit: Recurring journal entry deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', id, existing?.name);
+      
+      handleNotify('success', 'Recurring journal entry deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting recurring journal entry:', error);
+      handleNotify('error', `Failed to delete recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleRunRecurringEntry = async (id: string) => {
+    try {
+      console.info('[App] Running recurring journal entry:', id);
+      const entry = recurringJournalEntries.find(e => e.id === id);
+      if (!entry) {
+        handleNotify('error', 'Recurring entry not found');
+        return;
+      }
+
+      // Import RecurringJournalEntryService to use its logic
+      const { RecurringJournalEntryService } = await import('./services/RecurringJournalEntryService');
+      
+      // Check if entry is due
+      if (!RecurringJournalEntryService.isDueToRun(entry)) {
+        handleNotify('warning', 'This recurring entry is not due to run yet');
+        return;
+      }
+
+      // Generate journal entry from template
+      const entryDate = new Date().toISOString().split('T')[0];
+      const generatedId = crypto.randomUUID();
+      const { entry: journalEntryData, lines: journalLineData } = RecurringJournalEntryService.generateEntryFromTemplate(
+        entry,
+        entryDate,
+        generatedId
+      );
+      
+      // Create journal entry with lines
+      const newJournalEntry: Partial<JournalEntry> = {
+        ...journalEntryData,
+        orgId: currentOrgId,
+        createdBy: currentUser?.id || 'system',
+        createdAt: new Date().toISOString()
+      };
+      
+      const created = await dataService.createJournalEntry(newJournalEntry as JournalEntry);
+      setJournalEntries(prev => [...prev, created]);
+
+      // Update the recurring entry with execution info
+      const updatedEntry = RecurringJournalEntryService.updateAfterExecution(entry, created.id);
+      const updated = await dataService.updateRecurringJournalEntry(id, updatedEntry);
+      setRecurringJournalEntries(prev => prev.map(e => e.id === id ? updated : e));
+
+      // Audit
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'JOURNAL_ENTRY', created.id, `Auto-generated from recurring entry: ${entry.name}`);
+      
+      handleNotify('success', 'Recurring journal entry executed and posted successfully');
+    } catch (error) {
+      console.error('[App] Error running recurring journal entry:', error);
+      handleNotify('error', `Failed to execute recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Check Voucher CRUD Handlers
   const handleAddCheckVoucher = async (check: Partial<CheckVoucher>) => {
     try {
@@ -1305,6 +1514,215 @@ export default function App() {
   };
 
   // ============================================================================
+  // INVENTORY MANAGEMENT CRUD HANDLERS
+  // ============================================================================
+
+  // Warehouse Locations CRUD
+  const handleAddWarehouseLocation = async (location: Omit<WarehouseLocation, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.info('[App] Creating warehouse location:', location.name);
+      const newLocation = await dataService.createWarehouseLocation({ ...location, orgId: currentOrgId } as WarehouseLocation);
+      setWarehouseLocations([...warehouseLocations, newLocation]);
+      handleNotify('success', `Location "${location.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error adding warehouse location:', error);
+      handleNotify('error', 'Failed to create location. Falling back to memory storage.');
+      const locWithId: WarehouseLocation = { ...location, orgId: currentOrgId, id: `loc-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      setWarehouseLocations([...warehouseLocations, locWithId]);
+    }
+  };
+
+  const handleUpdateWarehouseLocation = async (id: string, updates: Partial<WarehouseLocation>) => {
+    try {
+      console.info('[App] Updating warehouse location:', id);
+      const updated = await dataService.updateWarehouseLocation(id, updates);
+      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? updated : l));
+      handleNotify('success', 'Location updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating warehouse location:', error);
+      handleNotify('error', 'Failed to update location. Falling back to memory storage.');
+      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, ...updates } : l));
+    }
+  };
+
+  const handleDeleteWarehouseLocation = async (id: string) => {
+    try {
+      console.info('[App] Deleting warehouse location:', id);
+      await dataService.deleteWarehouseLocation(id);
+      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      handleNotify('success', 'Location deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting warehouse location:', error);
+      handleNotify('error', 'Failed to delete location. Falling back to memory storage.');
+      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+    }
+  };
+
+  // Stock Items CRUD
+  const handleAddStockItem = async (item: Omit<StockItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.info('[App] Creating stock item:', item.name);
+      const newItem = await dataService.createStockItem({ ...item, orgId: currentOrgId } as StockItem);
+      setStockItems([...stockItems, newItem]);
+      handleNotify('success', `Item "${item.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error adding stock item:', error);
+      handleNotify('error', 'Failed to create item. Falling back to memory storage.');
+      const itemWithId: StockItem = { ...item, orgId: currentOrgId, id: `item-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      setStockItems([...stockItems, itemWithId]);
+    }
+  };
+
+  const handleUpdateStockItem = async (id: string, updates: Partial<StockItem>) => {
+    try {
+      console.info('[App] Updating stock item:', id);
+      const updated = await dataService.updateStockItem(id, updates);
+      setStockItems(stockItems.map(i => i.id === id ? updated : i));
+      handleNotify('success', 'Item updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating stock item:', error);
+      handleNotify('error', 'Failed to update item. Falling back to memory storage.');
+      setStockItems(stockItems.map(i => i.id === id ? { ...i, ...updates } : i));
+    }
+  };
+
+  const handleDeleteStockItem = async (id: string) => {
+    try {
+      console.info('[App] Deleting stock item:', id);
+      await dataService.deleteStockItem(id);
+      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
+      handleNotify('success', 'Item deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting stock item:', error);
+      handleNotify('error', 'Failed to delete item. Falling back to memory storage.');
+      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
+    }
+  };
+
+  // Inventory Levels CRUD
+  const handleAddInventoryLevel = async (level: Omit<InventoryLevel, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.info('[App] Creating inventory level');
+      const newLevel = await dataService.createInventoryLevel({ ...level, orgId: currentOrgId } as InventoryLevel);
+      setInventoryLevels([...inventoryLevels, newLevel]);
+      handleNotify('success', 'Inventory level created successfully');
+    } catch (error) {
+      console.error('[App] Error adding inventory level:', error);
+      handleNotify('error', 'Failed to create inventory level. Falling back to memory storage.');
+      const levelWithId: InventoryLevel = { ...level, orgId: currentOrgId, id: `level-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      setInventoryLevels([...inventoryLevels, levelWithId]);
+    }
+  };
+
+  const handleUpdateInventoryLevel = async (id: string, updates: Partial<InventoryLevel>) => {
+    try {
+      console.info('[App] Updating inventory level:', id);
+      const updated = await dataService.updateInventoryLevel(id, updates);
+      setInventoryLevels(inventoryLevels.map(l => l.id === id ? updated : l));
+      handleNotify('success', 'Inventory level updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating inventory level:', error);
+      handleNotify('error', 'Failed to update inventory level. Falling back to memory storage.');
+      setInventoryLevels(inventoryLevels.map(l => l.id === id ? { ...l, ...updates } : l));
+    }
+  };
+
+  const handleDeleteInventoryLevel = async (id: string) => {
+    try {
+      console.info('[App] Deleting inventory level:', id);
+      await dataService.deleteInventoryLevel(id);
+      setInventoryLevels(inventoryLevels.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      handleNotify('success', 'Inventory level deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting inventory level:', error);
+      handleNotify('error', 'Failed to delete inventory level. Falling back to memory storage.');
+      setInventoryLevels(inventoryLevels.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+    }
+  };
+
+  // Stock Adjustments CRUD
+  const handleAddStockAdjustment = async (adjustment: Omit<StockAdjustment, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.info('[App] Creating stock adjustment');
+      const newAdjustment = await dataService.createStockAdjustment({ ...adjustment, orgId: currentOrgId } as StockAdjustment);
+      setStockAdjustments([...stockAdjustments, newAdjustment]);
+      handleNotify('success', 'Stock adjustment created successfully');
+    } catch (error) {
+      console.error('[App] Error adding stock adjustment:', error);
+      handleNotify('error', 'Failed to create adjustment. Falling back to memory storage.');
+      const adjWithId: StockAdjustment = { ...adjustment, orgId: currentOrgId, id: `adj-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      setStockAdjustments([...stockAdjustments, adjWithId]);
+    }
+  };
+
+  const handleUpdateStockAdjustment = async (id: string, updates: Partial<StockAdjustment>) => {
+    try {
+      console.info('[App] Updating stock adjustment:', id);
+      const updated = await dataService.updateStockAdjustment(id, updates);
+      setStockAdjustments(stockAdjustments.map(a => a.id === id ? updated : a));
+      handleNotify('success', 'Stock adjustment updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating stock adjustment:', error);
+      handleNotify('error', 'Failed to update adjustment. Falling back to memory storage.');
+      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, ...updates } : a));
+    }
+  };
+
+  const handleDeleteStockAdjustment = async (id: string) => {
+    try {
+      console.info('[App] Deleting stock adjustment:', id);
+      await dataService.deleteStockAdjustment(id);
+      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+      handleNotify('success', 'Stock adjustment deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting stock adjustment:', error);
+      handleNotify('error', 'Failed to delete adjustment. Falling back to memory storage.');
+      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+    }
+  };
+
+  // Reorder Points CRUD
+  const handleAddReorderPoint = async (point: Omit<ReorderPoint, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      console.info('[App] Creating reorder point');
+      const newPoint = await dataService.createReorderPoint({ ...point, orgId: currentOrgId } as ReorderPoint);
+      setReorderPoints([...reorderPoints, newPoint]);
+      handleNotify('success', 'Reorder point created successfully');
+    } catch (error) {
+      console.error('[App] Error adding reorder point:', error);
+      handleNotify('error', 'Failed to create reorder point. Falling back to memory storage.');
+      const pointWithId: ReorderPoint = { ...point, orgId: currentOrgId, id: `reorder-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      setReorderPoints([...reorderPoints, pointWithId]);
+    }
+  };
+
+  const handleUpdateReorderPoint = async (id: string, updates: Partial<ReorderPoint>) => {
+    try {
+      console.info('[App] Updating reorder point:', id);
+      const updated = await dataService.updateReorderPoint(id, updates);
+      setReorderPoints(reorderPoints.map(p => p.id === id ? updated : p));
+      handleNotify('success', 'Reorder point updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating reorder point:', error);
+      handleNotify('error', 'Failed to update reorder point. Falling back to memory storage.');
+      setReorderPoints(reorderPoints.map(p => p.id === id ? { ...p, ...updates } : p));
+    }
+  };
+
+  const handleDeleteReorderPoint = async (id: string) => {
+    try {
+      console.info('[App] Deleting reorder point:', id);
+      await dataService.deleteReorderPoint(id);
+      setReorderPoints(reorderPoints.map(p => p.id === id ? { ...p, isDeleted: true } : p));
+      handleNotify('success', 'Reorder point deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting reorder point:', error);
+      handleNotify('error', 'Failed to delete reorder point. Falling back to memory storage.');
+      setReorderPoints(reorderPoints.map(p => p.id === id ? { ...p, isDeleted: true } : p));
+    }
+  };
+
+  // ============================================================================
   // FIXED ASSET CRUD HANDLERS
   // ============================================================================
 
@@ -1403,19 +1821,26 @@ export default function App() {
       const newEntry: JournalEntry = {
         id: entryId,
         orgId: currentOrgId,
-        entryDate: new Date().toISOString().split('T')[0],
-        referenceNumber: `DEP-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`,
+        periodId: '', // Will need period context
+        date: new Date().toISOString().split('T')[0],
         description: `Monthly depreciation for ${asset.name}`,
+        reference: `DEP-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`,
+        status: 'POSTED',
+        createdBy: currentUser?.id || 'system',
         sourceType: 'DEPRECIATION',
-        isPosted: true,
-        lines: deprLines,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
         isDeleted: false
       };
 
+      // Add journal entry lines separately
+      const newLines: JournalEntryLine[] = deprLines.map(line => ({
+        ...line,
+        journalEntryId: entryId
+      }));
+
       // Add to journal entries and lines
       setJournalEntries(prev => [...prev, newEntry]);
+      setJournalLines(prev => [...prev, ...newLines]);
 
       // Update accumulated depreciation on the asset
       const newAccumulated = (asset.accumulatedDepreciation || 0) + monthlyDepreciation;
@@ -1645,6 +2070,20 @@ export default function App() {
              </div>
            )}
 
+           {isFinance && (
+             <div className="mb-8">
+               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Inventory Management</p>}
+               <NavItem icon={<Package size={20}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<MapPin size={20}/>} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Box size={20}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Layers size={20}/>} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<AlertCircle size={20}/>} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Zap size={20}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<History size={20}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<TrendingUp size={20}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+             </div>
+           )}
+
            {isTenantAdmin && (
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
@@ -1762,7 +2201,7 @@ export default function App() {
           )}
 
           {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
@@ -1771,12 +2210,22 @@ export default function App() {
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={gr => setGoodsReceipts(p => [...p, gr])} onUpdateGoodsReceipt={(id, u) => setGoodsReceipts(p => p.map(g => g.id === id ? {...g, ...u} : g))} onDeleteGoodsReceipt={id => setGoodsReceipts(p => p.filter(g => g.id !== id))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
-          {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={p => setAccountingPeriods(prev => [...prev, p])} onUpdatePeriod={(id, u) => setAccountingPeriods(prev => prev.map(p => p.id === id ? {...p, ...u} : p))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? {...p, ...updated} : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
           {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
-          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+
+          {/* Inventory Management Views */}
+          {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} />}
+          {activeTab === 'warehouse-locations' && <WarehouseLocationsView locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
+          {activeTab === 'stock-items' && <StockItemsView items={stockItems.filter(i => !i.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
+          {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} />}
+          {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} onPostGL={handlePostJournal} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} />}
+          {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
+          {activeTab === 'inventory-transactions' && <InventoryTransactionsView transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
+          {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} />}
+          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'eft' && <EFTBatchView orgId={currentOrgId} batches={eftBatches} bankAccounts={bankAccounts} vendors={vendors} payables={payables} currentUserId={currentUser?.id} onCreateBatch={b => setEftBatches(p => [...p, b])} onUpdateBatch={(id, u) => setEftBatches(p => p.map(b => b.id === id ? {...b, ...u} : b))} onDeleteBatch={id => setEftBatches(p => p.filter(b => b.id !== id))} onNotify={handleNotify} />}
           

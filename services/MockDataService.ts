@@ -24,6 +24,8 @@ export class MockDataService implements IDataService {
       schedules: [],
       employees: [],
       bankAccounts: [],
+      bankReconciliations: [],
+      recurringJournalEntries: [],
       accounts: [],
       journalEntries: [],
       journalLines: [],
@@ -37,7 +39,14 @@ export class MockDataService implements IDataService {
       fixedAssets: [],
       atcCategories: [],
       atcItems: [],
-      atcRates: []
+      atcRates: [],
+      // Inventory system
+      warehouseLocations: [],
+      stockItems: [],
+      inventoryLevels: [],
+      inventoryTransactions: [],
+      stockAdjustments: [],
+      reorderPoints: []
     };
   }
 
@@ -280,6 +289,48 @@ export class MockDataService implements IDataService {
     console.warn('[MockDataService] deleteBankAccount is memory-only.');
   }
 
+  // Bank Reconciliation CRUD (mock)
+  async createBankReconciliation(reconciliation: any): Promise<any> {
+    console.warn('[MockDataService] createBankReconciliation is memory-only; changes lost on refresh.');
+    return { ...reconciliation };
+  }
+  async updateBankReconciliation(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateBankReconciliation is memory-only; changes lost on refresh.');
+    return { id, ...updates };
+  }
+  async deleteBankReconciliation(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteBankReconciliation is memory-only; changes lost on refresh.');
+  }
+  async getBankReconciliationsByAccount(bankAccountId: string): Promise<any[]> {
+    console.warn('[MockDataService] getBankReconciliationsByAccount returning empty array.');
+    return [];
+  }
+  async getLatestBankReconciliation(bankAccountId: string): Promise<any | null> {
+    console.warn('[MockDataService] getLatestBankReconciliation returning null.');
+    return null;
+  }
+
+  // Recurring Journal Entry CRUD (mock)
+  async createRecurringJournalEntry(entry: any): Promise<any> {
+    console.warn('[MockDataService] createRecurringJournalEntry is memory-only; changes lost on refresh.');
+    return { ...entry };
+  }
+  async updateRecurringJournalEntry(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateRecurringJournalEntry is memory-only; changes lost on refresh.');
+    return { id, ...updates };
+  }
+  async deleteRecurringJournalEntry(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteRecurringJournalEntry is memory-only; changes lost on refresh.');
+  }
+  async getRecurringJournalEntriesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRecurringJournalEntriesByOrg returning empty array.');
+    return [];
+  }
+  async getRecurringJournalEntryById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getRecurringJournalEntryById returning null.');
+    return null;
+  }
+
   // Check Voucher CRUD (mock)
   async createCheckVoucher(check: any): Promise<any> {
     console.warn('[MockDataService] createCheckVoucher is memory-only.');
@@ -294,5 +345,206 @@ export class MockDataService implements IDataService {
   }
   async getNextCheckNumber(orgId: string, bankAccountId: string): Promise<string> {
     return '000001';
+  }
+
+  // Exchange Rate CRUD (mock)
+  async createExchangeRate(rate: any): Promise<any> {
+    console.warn('[MockDataService] createExchangeRate is memory-only; changes lost on refresh.');
+    return { ...rate, id: `rate-${Date.now()}` };
+  }
+  async updateExchangeRate(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateExchangeRate is memory-only; changes lost on refresh.');
+    return { id, ...updates };
+  }
+  async deleteExchangeRate(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteExchangeRate is memory-only; changes lost on refresh.');
+  }
+  async getExchangeRatesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getExchangeRatesByOrg returning empty array.');
+    return [];
+  }
+  async getExchangeRateById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getExchangeRateById returning null.');
+    return null;
+  }
+
+  // Accounting Period CRUD
+  async createAccountingPeriod(period: any): Promise<any> {
+    console.warn('[MockDataService] createAccountingPeriod is memory-only; changes lost on refresh.');
+    return { id: `period-${Date.now()}`, ...period };
+  }
+  async updateAccountingPeriod(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateAccountingPeriod is memory-only; changes lost on refresh.');
+    return { id, ...updates };
+  }
+  async deleteAccountingPeriod(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteAccountingPeriod is memory-only; changes lost on refresh.');
+  }
+  async getAccountingPeriodsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getAccountingPeriodsByOrg returning empty array.');
+    return [];
+  }
+  async getAccountingPeriodById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getAccountingPeriodById returning null.');
+    return null;
+  }
+  async getAccountingPeriodsByYear(orgId: string, fiscalYear: number): Promise<any[]> {
+    console.warn('[MockDataService] getAccountingPeriodsByYear returning empty array.');
+    return [];
+  }
+
+  // ==================== INVENTORY MANAGEMENT ====================
+  
+  async createWarehouseLocation(location: any): Promise<any> {
+    console.warn('[MockDataService] createWarehouseLocation - data not persisted.');
+    return { ...location, id: `loc-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateWarehouseLocation(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateWarehouseLocation - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteWarehouseLocation(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteWarehouseLocation - data not persisted.');
+  }
+  async getWarehouseLocationsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getWarehouseLocationsByOrg returning empty array.');
+    return [];
+  }
+  async getWarehouseLocationById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getWarehouseLocationById returning null.');
+    return null;
+  }
+
+  async createStockItem(item: any): Promise<any> {
+    console.warn('[MockDataService] createStockItem - data not persisted.');
+    return { ...item, id: `si-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateStockItem(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateStockItem - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteStockItem(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteStockItem - data not persisted.');
+  }
+  async getStockItemsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getStockItemsByOrg returning empty array.');
+    return [];
+  }
+  async getStockItemById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getStockItemById returning null.');
+    return null;
+  }
+  async getStockItemsByLocation(orgId: string, locationId: string): Promise<any[]> {
+    console.warn('[MockDataService] getStockItemsByLocation returning empty array.');
+    return [];
+  }
+
+  async createInventoryLevel(level: any): Promise<any> {
+    console.warn('[MockDataService] createInventoryLevel - data not persisted.');
+    return { ...level, id: `il-${Date.now()}` };
+  }
+  async updateInventoryLevel(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateInventoryLevel - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteInventoryLevel(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteInventoryLevel - data not persisted.');
+  }
+  async getInventoryLevelsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getInventoryLevelsByOrg returning empty array.');
+    return [];
+  }
+  async getInventoryLevelByItemAndLocation(orgId: string, stockItemId: string, locationId: string): Promise<any | null> {
+    console.warn('[MockDataService] getInventoryLevelByItemAndLocation returning null.');
+    return null;
+  }
+  async getStockStatusView(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getStockStatusView returning empty array.');
+    return [];
+  }
+
+  async createInventoryTransaction(transaction: any): Promise<any> {
+    console.warn('[MockDataService] createInventoryTransaction - data not persisted.');
+    return { ...transaction, id: `it-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateInventoryTransaction(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateInventoryTransaction - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteInventoryTransaction(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteInventoryTransaction - data not persisted.');
+  }
+  async getInventoryTransactionsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getInventoryTransactionsByOrg returning empty array.');
+    return [];
+  }
+  async getInventoryTransactionById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getInventoryTransactionById returning null.');
+    return null;
+  }
+  async getInventoryTransactionsByItem(orgId: string, stockItemId: string): Promise<any[]> {
+    console.warn('[MockDataService] getInventoryTransactionsByItem returning empty array.');
+    return [];
+  }
+
+  async createStockAdjustment(adjustment: any): Promise<any> {
+    console.warn('[MockDataService] createStockAdjustment - data not persisted.');
+    return { ...adjustment, id: `sa-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateStockAdjustment(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateStockAdjustment - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteStockAdjustment(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteStockAdjustment - data not persisted.');
+  }
+  async getStockAdjustmentsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getStockAdjustmentsByOrg returning empty array.');
+    return [];
+  }
+  async getStockAdjustmentById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getStockAdjustmentById returning null.');
+    return null;
+  }
+  async getStockAdjustmentsByItem(orgId: string, stockItemId: string): Promise<any[]> {
+    console.warn('[MockDataService] getStockAdjustmentsByItem returning empty array.');
+    return [];
+  }
+
+  async createReorderPoint(reorder: any): Promise<any> {
+    console.warn('[MockDataService] createReorderPoint - data not persisted.');
+    return { ...reorder, id: `rp-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateReorderPoint(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateReorderPoint - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteReorderPoint(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteReorderPoint - data not persisted.');
+  }
+  async getReorderPointsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getReorderPointsByOrg returning empty array.');
+    return [];
+  }
+  async getReorderPointByItem(orgId: string, stockItemId: string): Promise<any | null> {
+    console.warn('[MockDataService] getReorderPointByItem returning null.');
+    return null;
+  }
+  async getItemsNeedingReorder(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getItemsNeedingReorder returning empty array.');
+    return [];
+  }
+
+  // Generic Entity CRUD
+  async createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T> {
+    console.warn(`[MockDataService] createEntity for ${table} is memory-only.`);
+    return { ...entity, id: `${table}-${Date.now()}` };
+  }
+  async updateEntity<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
+    console.warn(`[MockDataService] updateEntity for ${table} is memory-only.`);
+    return { id, ...updates } as T;
+  }
+  async deleteEntity(table: string, id: string): Promise<void> {
+    console.warn(`[MockDataService] deleteEntity for ${table} is memory-only.`);
   }
 }

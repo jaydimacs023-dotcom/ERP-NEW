@@ -79,7 +79,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
         if (item) {
           newLine.description = item.name;
           newLine.unitPrice = item.unitPrice;
-          newLine.taxAmount = item.taxCategory === TaxCategory.VAT ? (item.unitPrice * 0.12) : 0;
+          newLine.taxAmount = item.taxCategoryId ? (item.unitPrice * 0.12) : 0; // VAT if tax category assigned
         }
       }
       return newLine;

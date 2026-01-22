@@ -101,6 +101,8 @@ export class SupabaseDataService implements IDataService {
         schedules,
         employees,
         bankAccounts,
+        bankReconciliations,
+        recurringJournalEntries,
         accounts,
         journalEntries,
         journalLines,
@@ -116,6 +118,12 @@ export class SupabaseDataService implements IDataService {
         atcRates,
         payables,
         bills,
+        warehouseLocations,
+        stockItems,
+        inventoryLevels,
+        inventoryTransactions,
+        stockAdjustments,
+        reorderPoints,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -130,6 +138,8 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('schedules'),
         this.fetchFromSupabase('employees'),
         this.fetchFromSupabase('bank_accounts'),
+        this.fetchFromSupabase('bank_reconciliations'),
+        this.fetchFromSupabase('recurring_journal_entries'),
         this.fetchFromSupabase('chart_of_accounts'),
         this.fetchFromSupabase('journal_entries'),
         this.fetchFromSupabase('journal_entry_lines'),
@@ -145,6 +155,12 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('atc_rates'),
         this.fetchFromSupabase('payables'),
         this.fetchFromSupabase('bills'),
+        this.fetchFromSupabase('warehouse_locations'),
+        this.fetchFromSupabase('stock_items'),
+        this.fetchFromSupabase('inventory_levels'),
+        this.fetchFromSupabase('inventory_transactions'),
+        this.fetchFromSupabase('stock_adjustments'),
+        this.fetchFromSupabase('reorder_points'),
       ]);
 
       // Log data status
@@ -171,6 +187,8 @@ export class SupabaseDataService implements IDataService {
         schedules: this.snakeToCamel(schedules as any) || [],
         employees: this.snakeToCamel(employees as any) || [],
         bankAccounts: this.snakeToCamel(bankAccounts as any) || [],
+        bankReconciliations: this.snakeToCamel(bankReconciliations as any) || [],
+        recurringJournalEntries: this.snakeToCamel(recurringJournalEntries as any) || [],
         accounts: this.snakeToCamel(accounts as any) || [],
         journalEntries: this.snakeToCamel(journalEntries as any) || [],
         journalLines: this.snakeToCamel(journalLines as any) || [],
@@ -186,6 +204,12 @@ export class SupabaseDataService implements IDataService {
         atcRates: this.snakeToCamel(atcRates as any) || [],
         payables: this.snakeToCamel(payables as any) || [],
         bills: this.snakeToCamel(bills as any) || [],
+        warehouseLocations: this.snakeToCamel(warehouseLocations as any) || [],
+        stockItems: this.snakeToCamel(stockItems as any) || [],
+        inventoryLevels: this.snakeToCamel(inventoryLevels as any) || [],
+        inventoryTransactions: this.snakeToCamel(inventoryTransactions as any) || [],
+        stockAdjustments: this.snakeToCamel(stockAdjustments as any) || [],
+        reorderPoints: this.snakeToCamel(reorderPoints as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -1394,6 +1418,133 @@ export class SupabaseDataService implements IDataService {
     return this.deleteFromSupabase('bank_accounts', id);
   }
 
+  // ============================================================================
+  // BANK RECONCILIATION CRUD
+  // ============================================================================
+  async createBankReconciliation(reconciliation: any): Promise<any> {
+    console.debug('[Supabase] createBankReconciliation called with:', reconciliation);
+    const snake = this.camelToSnake(reconciliation);
+    const filtered = this.filterToTableSchema('bank_reconciliations', snake);
+    // Remove id if it's undefined or empty string - let Supabase auto-generate UUID
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('bank_reconciliations', filtered);
+  }
+
+  async updateBankReconciliation(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateBankReconciliation called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('bank_reconciliations', snake);
+    return this.updateInSupabaseRaw('bank_reconciliations', id, filtered);
+  }
+
+  async deleteBankReconciliation(id: string): Promise<void> {
+    console.debug('[Supabase] deleteBankReconciliation called with:', id);
+    return this.deleteFromSupabase('bank_reconciliations', id);
+  }
+
+  async getBankReconciliationsByAccount(bankAccountId: string): Promise<any[]> {
+    console.debug('[Supabase] getBankReconciliationsByAccount called with:', bankAccountId);
+    try {
+      const url = `${this.baseUrl}/bank_reconciliations?bank_account_id=eq.${bankAccountId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        throw new Error('Failed to fetch reconciliations');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching reconciliations:', error);
+      return [];
+    }
+  }
+
+  async getLatestBankReconciliation(bankAccountId: string): Promise<any | null> {
+    console.debug('[Supabase] getLatestBankReconciliation called with:', bankAccountId);
+    try {
+      const url = `${this.baseUrl}/bank_reconciliations?bank_account_id=eq.${bankAccountId}&order=created_at.desc&limit=1`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch latest reconciliation');
+      }
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching latest reconciliation:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // RECURRING JOURNAL ENTRY CRUD
+  // ============================================================================
+  async createRecurringJournalEntry(entry: any): Promise<any> {
+    console.debug('[Supabase] createRecurringJournalEntry called with:', entry);
+    const snake = this.camelToSnake(entry);
+    const filtered = this.filterToTableSchema('recurring_journal_entries', snake);
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('recurring_journal_entries', filtered);
+  }
+
+  async updateRecurringJournalEntry(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateRecurringJournalEntry called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('recurring_journal_entries', snake);
+    return this.updateInSupabaseRaw('recurring_journal_entries', id, filtered);
+  }
+
+  async deleteRecurringJournalEntry(id: string): Promise<void> {
+    console.debug('[Supabase] deleteRecurringJournalEntry called with:', id);
+    return this.deleteFromSupabase('recurring_journal_entries', id);
+  }
+
+  async getRecurringJournalEntriesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getRecurringJournalEntriesByOrg called with:', orgId);
+    try {
+      const url = `${this.baseUrl}/recurring_journal_entries?org_id=eq.${orgId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        throw new Error('Failed to fetch recurring entries');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring entries:', error);
+      return [];
+    }
+  }
+
+  async getRecurringJournalEntryById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getRecurringJournalEntryById called with:', id);
+    try {
+      const url = `${this.baseUrl}/recurring_journal_entries?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch recurring entry');
+      }
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring entry:', error);
+      return null;
+    }
+  }
+
   /**
    * Vendor CRUD Operations
    */
@@ -1515,4 +1666,780 @@ export class SupabaseDataService implements IDataService {
       return [];
     }
   }
+
+  /**
+   * Exchange Rate CRUD Operations
+   */
+  async createExchangeRate(rate: any): Promise<any> {
+    console.debug('[Supabase] createExchangeRate called with:', rate);
+    const snakeCaseRate = this.camelToSnake(rate);
+    const filtered = this.filterToTableSchema('exchange_rates', snakeCaseRate, true);
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('exchange_rates', filtered);
+  }
+
+  async updateExchangeRate(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateExchangeRate called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('exchange_rates', snake);
+    return this.updateInSupabaseRaw('exchange_rates', id, filtered);
+  }
+
+  async deleteExchangeRate(id: string): Promise<void> {
+    console.debug('[Supabase] deleteExchangeRate called with:', id);
+    await this.deleteInSupabaseRaw('exchange_rates', id);
+  }
+
+  async getExchangeRatesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getExchangeRatesByOrg called with orgId:', orgId);
+    const url = `${this.baseUrl}/exchange_rates?org_id=eq.${orgId}&is_deleted=eq.false&order=effective_date.desc`;
+    try {
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch exchange rates');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching exchange rates:', error);
+      return [];
+    }
+  }
+
+  async getExchangeRateById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getExchangeRateById called with:', id);
+    try {
+      const url = `${this.baseUrl}/exchange_rates?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch exchange rate');
+      }
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching exchange rate:', error);
+      return null;
+    }
+  }
+
+  // Accounting Period CRUD
+  async createAccountingPeriod(period: any): Promise<any> {
+    console.debug('[Supabase] createAccountingPeriod called with:', period);
+    try {
+      const payload = this.camelToSnake(period);
+      // Remove id field - let Supabase generate it as UUID
+      delete payload.id;
+      console.debug('[Supabase] Converted payload (id removed):', payload);
+      const url = `${this.baseUrl}/accounting_periods`;
+      const headers = {
+        ...this.getHeaders(),
+        'Prefer': 'return=representation'
+      };
+      console.debug('[Supabase] Posting to:', url);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Supabase] Create failed with status:', response.status, 'Error:', errorText);
+        throw new Error(`Failed to create accounting period: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      console.debug('[Supabase] Create response:', data);
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating accounting period:', error);
+      throw error;
+    }
+  }
+
+  async updateAccountingPeriod(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateAccountingPeriod called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      console.debug('[Supabase] Converted payload:', payload);
+      const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
+      const headers = {
+        ...this.getHeaders(),
+        'Prefer': 'return=representation'
+      };
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Supabase] Update failed with status:', response.status, 'Error:', errorText);
+        throw new Error(`Failed to update accounting period: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      console.debug('[Supabase] Update response:', data);
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating accounting period:', error);
+      throw error;
+    }
+  }
+
+  async deleteAccountingPeriod(id: string): Promise<void> {
+    console.debug('[Supabase] deleteAccountingPeriod called with id:', id);
+    try {
+      const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete accounting period');
+    } catch (error) {
+      console.error('[Supabase] Error deleting accounting period:', error);
+      throw error;
+    }
+  }
+
+  async getAccountingPeriodsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getAccountingPeriodsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/accounting_periods?org_id=eq.${orgId}&is_deleted=eq.false&order=start_date.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch accounting periods');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching accounting periods:', error);
+      return [];
+    }
+  }
+
+  async getAccountingPeriodById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getAccountingPeriodById called with:', id);
+    try {
+      const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error('Failed to fetch accounting period');
+      }
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching accounting period:', error);
+      return null;
+    }
+  }
+
+  async getAccountingPeriodsByYear(orgId: string, fiscalYear: number): Promise<any[]> {
+    console.debug('[Supabase] getAccountingPeriodsByYear called with orgId:', orgId, 'year:', fiscalYear);
+    try {
+      const url = `${this.baseUrl}/accounting_periods?org_id=eq.${orgId}&fiscal_year=eq.${fiscalYear}&is_deleted=eq.false&order=period_number.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) throw new Error('Failed to fetch accounting periods by year');
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching accounting periods by year:', error);
+      return [];
+    }
+  }
+
+  // ============================================================================
+  // INVENTORY MANAGEMENT CRUD
+  // ============================================================================
+
+  // Warehouse Location CRUD
+  async createWarehouseLocation(location: any): Promise<any> {
+    console.debug('[Supabase] createWarehouseLocation called with:', location);
+    try {
+      const payload = this.camelToSnake(location);
+      delete payload.id;
+      const url = `${this.baseUrl}/warehouse_locations`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create warehouse location: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating warehouse location:', error);
+      throw error;
+    }
+  }
+
+  async updateWarehouseLocation(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateWarehouseLocation called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update warehouse location');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating warehouse location:', error);
+      throw error;
+    }
+  }
+
+  async deleteWarehouseLocation(id: string): Promise<void> {
+    console.debug('[Supabase] deleteWarehouseLocation called with id:', id);
+    try {
+      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting warehouse location:', error);
+      throw error;
+    }
+  }
+
+  async getWarehouseLocationsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getWarehouseLocationsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/warehouse_locations?org_id=eq.${orgId}&is_deleted=eq.false&order=name.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching warehouse locations:', error);
+      return [];
+    }
+  }
+
+  async getWarehouseLocationById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getWarehouseLocationById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching warehouse location:', error);
+      return null;
+    }
+  }
+
+  // Stock Item CRUD
+  async createStockItem(item: any): Promise<any> {
+    console.debug('[Supabase] createStockItem called with:', item);
+    try {
+      const payload = this.camelToSnake(item);
+      delete payload.id;
+      const url = `${this.baseUrl}/stock_items`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create stock item: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating stock item:', error);
+      throw error;
+    }
+  }
+
+  async updateStockItem(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateStockItem called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update stock item');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating stock item:', error);
+      throw error;
+    }
+  }
+
+  async deleteStockItem(id: string): Promise<void> {
+    console.debug('[Supabase] deleteStockItem called with id:', id);
+    try {
+      const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting stock item:', error);
+      throw error;
+    }
+  }
+
+  async getStockItemsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getStockItemsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock items:', error);
+      return [];
+    }
+  }
+
+  async getStockItemById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getStockItemById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock item:', error);
+      return null;
+    }
+  }
+
+  async getStockItemsByLocation(orgId: string, locationId: string): Promise<any[]> {
+    console.debug('[Supabase] getStockItemsByLocation called with orgId:', orgId, 'locationId:', locationId);
+    try {
+      const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&warehouse_location_id=eq.${locationId}&is_deleted=eq.false&order=code.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock items by location:', error);
+      return [];
+    }
+  }
+
+  // Inventory Level CRUD
+  async createInventoryLevel(level: any): Promise<any> {
+    console.debug('[Supabase] createInventoryLevel called with:', level);
+    try {
+      const payload = this.camelToSnake(level);
+      delete payload.id;
+      const url = `${this.baseUrl}/inventory_levels`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create inventory level: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating inventory level:', error);
+      throw error;
+    }
+  }
+
+  async updateInventoryLevel(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateInventoryLevel called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/inventory_levels?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update inventory level');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating inventory level:', error);
+      throw error;
+    }
+  }
+
+  async deleteInventoryLevel(id: string): Promise<void> {
+    console.debug('[Supabase] deleteInventoryLevel called with id:', id);
+    try {
+      const url = `${this.baseUrl}/inventory_levels?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting inventory level:', error);
+      throw error;
+    }
+  }
+
+  async getInventoryLevelsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getInventoryLevelsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/inventory_levels?org_id=eq.${orgId}&is_deleted=eq.false&order=updated_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory levels:', error);
+      return [];
+    }
+  }
+
+  async getInventoryLevelByItemAndLocation(orgId: string, stockItemId: string, locationId: string): Promise<any | null> {
+    console.debug('[Supabase] getInventoryLevelByItemAndLocation called');
+    try {
+      const url = `${this.baseUrl}/inventory_levels?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&warehouse_location_id=eq.${locationId}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory level:', error);
+      return null;
+    }
+  }
+
+  async getStockStatusView(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getStockStatusView called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/v_inventory_status?org_id=eq.${orgId}&order=stock_status.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock status view:', error);
+      return [];
+    }
+  }
+
+  // Inventory Transaction CRUD
+  async createInventoryTransaction(transaction: any): Promise<any> {
+    console.debug('[Supabase] createInventoryTransaction called with:', transaction);
+    try {
+      const payload = this.camelToSnake(transaction);
+      delete payload.id;
+      const url = `${this.baseUrl}/inventory_transactions`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create inventory transaction: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating inventory transaction:', error);
+      throw error;
+    }
+  }
+
+  async updateInventoryTransaction(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateInventoryTransaction called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update inventory transaction');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating inventory transaction:', error);
+      throw error;
+    }
+  }
+
+  async deleteInventoryTransaction(id: string): Promise<void> {
+    console.debug('[Supabase] deleteInventoryTransaction called with id:', id);
+    try {
+      const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting inventory transaction:', error);
+      throw error;
+    }
+  }
+
+  async getInventoryTransactionsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getInventoryTransactionsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/inventory_transactions?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory transactions:', error);
+      return [];
+    }
+  }
+
+  async getInventoryTransactionById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getInventoryTransactionById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory transaction:', error);
+      return null;
+    }
+  }
+
+  async getInventoryTransactionsByItem(orgId: string, stockItemId: string): Promise<any[]> {
+    console.debug('[Supabase] getInventoryTransactionsByItem called with stockItemId:', stockItemId);
+    try {
+      const url = `${this.baseUrl}/inventory_transactions?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory transactions by item:', error);
+      return [];
+    }
+  }
+
+  // Stock Adjustment CRUD
+  async createStockAdjustment(adjustment: any): Promise<any> {
+    console.debug('[Supabase] createStockAdjustment called with:', adjustment);
+    try {
+      const payload = this.camelToSnake(adjustment);
+      delete payload.id;
+      const url = `${this.baseUrl}/stock_adjustments`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create stock adjustment: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating stock adjustment:', error);
+      throw error;
+    }
+  }
+
+  async updateStockAdjustment(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateStockAdjustment called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update stock adjustment');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating stock adjustment:', error);
+      throw error;
+    }
+  }
+
+  async deleteStockAdjustment(id: string): Promise<void> {
+    console.debug('[Supabase] deleteStockAdjustment called with id:', id);
+    try {
+      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting stock adjustment:', error);
+      throw error;
+    }
+  }
+
+  async getStockAdjustmentsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getStockAdjustmentsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock adjustments:', error);
+      return [];
+    }
+  }
+
+  async getStockAdjustmentById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getStockAdjustmentById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock adjustment:', error);
+      return null;
+    }
+  }
+
+  async getStockAdjustmentsByItem(orgId: string, stockItemId: string): Promise<any[]> {
+    console.debug('[Supabase] getStockAdjustmentsByItem called with stockItemId:', stockItemId);
+    try {
+      const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching stock adjustments by item:', error);
+      return [];
+    }
+  }
+
+  // Reorder Point CRUD
+  async createReorderPoint(reorder: any): Promise<any> {
+    console.debug('[Supabase] createReorderPoint called with:', reorder);
+    try {
+      const payload = this.camelToSnake(reorder);
+      delete payload.id;
+      const url = `${this.baseUrl}/reorder_points`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create reorder point: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating reorder point:', error);
+      throw error;
+    }
+  }
+
+  async updateReorderPoint(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateReorderPoint called with id:', id);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/reorder_points?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Failed to update reorder point');
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating reorder point:', error);
+      throw error;
+    }
+  }
+
+  async deleteReorderPoint(id: string): Promise<void> {
+    console.debug('[Supabase] deleteReorderPoint called with id:', id);
+    try {
+      const url = `${this.baseUrl}/reorder_points?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+    } catch (error) {
+      console.error('[Supabase] Error deleting reorder point:', error);
+      throw error;
+    }
+  }
+
+  async getReorderPointsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getReorderPointsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/reorder_points?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching reorder points:', error);
+      return [];
+    }
+  }
+
+  async getReorderPointByItem(orgId: string, stockItemId: string): Promise<any | null> {
+    console.debug('[Supabase] getReorderPointByItem called with stockItemId:', stockItemId);
+    try {
+      const url = `${this.baseUrl}/reorder_points?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching reorder point:', error);
+      return null;
+    }
+  }
+
+  async getItemsNeedingReorder(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getItemsNeedingReorder called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      // Note: Actual filtering logic should be in the service layer
+      // This returns stock items; filter by comparing inventory vs reorder points in code
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching items needing reorder:', error);
+      return [];
+    }
+  }
 }
+
