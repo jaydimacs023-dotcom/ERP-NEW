@@ -79,16 +79,37 @@ export default function App() {
   // Data service reference for CRUD operations
   const [dataService] = useState(() => DataServiceFactory.getService());
 
-  // Check for password reset token in URL on mount
+
+  // Check for password reset or email verification token in URL on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('reset_token');
-    if (token) {
-      setResetToken(token);
+    const resetToken = urlParams.get('reset_token');
+    if (resetToken) {
+      setResetToken(resetToken);
       setShowPasswordReset(true);
       console.info('[App] Password reset token detected in URL');
+      return;
+    }
+    const verifyToken = urlParams.get('verify_email_token');
+    if (verifyToken) {
+      handleVerifyEmailToken(verifyToken);
     }
   }, []);
+
+  // Email verification handler
+  const handleVerifyEmailToken = async (token: string) => {
+    const { emailVerificationService } = await import('./services/EmailVerificationService');
+    const entry = emailVerificationService.validateToken(token);
+    if (entry) {
+      emailVerificationService.markTokenUsed(token);
+      // Mark user as verified in users state and persist
+      setUsers(prev => prev.map(u => u.id === entry.userId ? { ...u, isEmailVerified: true } : u));
+      await dataService.updateUser(entry.userId, { isEmailVerified: true });
+      handleNotify('success', 'Email verified successfully! You may now log in.');
+    } else {
+      handleNotify('error', 'Invalid or expired verification link.');
+    }
+  };
 
   // Check for existing session on mount
   useEffect(() => {
@@ -289,14 +310,10 @@ export default function App() {
   const isAR = ['AR_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
   const isAP = ['AP_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
 
-  const handleNotify = (type: 'success' | 'error' | 'info', message: string) => {
-    console.log(`[ERP Notification: ${type.toUpperCase()}]`, message);
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, type, message }]);
-    // Auto-dismiss after 4 seconds
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+  // Persistent notification handler
+  const { addNotification } = useNotifications();
+  const handleNotify = (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
+    addNotification(type, message);
   };
 
   const handleLogin = (user: User) => {
@@ -486,22 +503,45 @@ export default function App() {
   // ============================================================================
 
   const handleAddUser = async (user: User) => {
+    // Require authenticated Supabase session
+    const session = authService.getSession();
+    if (!session || !session.user) {
+      handleNotify('error', 'You must be logged in with a valid Supabase account to create users.');
+      return;
+    }
+    // RBAC: SYSTEM_ADMIN can create for any org, ADMIN only for their own org, others denied
+    const isSysAdmin = session.user.role === 'SYSTEM_ADMIN';
+    const isAdmin = session.user.role === 'ADMIN';
+    const creatingForOwnOrg = user.orgId === session.user.orgId || !user.orgId || user.orgId === currentOrgId;
+    if (!isSysAdmin && !(isAdmin && creatingForOwnOrg)) {
+      handleNotify('error', 'You do not have permission to create users for this organization.');
+      return;
+    }
+    // Use session user for audit
+    const auditUserId = session.user.id;
+    const auditUserName = session.user.name;
     try {
       console.info('[App] Creating user:', user.email);
-      // Ensure user has orgId set
-      const userWithOrg = { ...user, orgId: currentOrgId };
+      // SYSTEM_ADMIN can set any orgId, ADMIN is forced to their own org
+      const userWithOrg = isSysAdmin ? { ...user } : { ...user, orgId: session.user.orgId };
       const savedUser = await dataService.createUser(userWithOrg);
       setUsers(prev => [...prev, savedUser]);
-      
       // Audit: User created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'USER', savedUser.id, user.name);
-      
+      AuditService.create(currentOrgId, auditUserId, auditUserName, 'USER', savedUser.id, user.name);
+      // Email Verification: Send verification email if not verified
+      if (!savedUser.isEmailVerified) {
+        const { emailVerificationService } = await import('./services/EmailVerificationService');
+        const { emailSenderService } = await import('./services/EmailSenderService');
+        const tokenEntry = emailVerificationService.generateToken(savedUser.id, savedUser.email);
+        await emailSenderService.sendVerificationEmail(savedUser.email, tokenEntry.token);
+        handleNotify('info', `Verification email sent to ${savedUser.email}`);
+      }
       handleNotify('success', `User "${user.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating user:', error);
       handleNotify('error', 'Failed to create user. Falling back to memory storage.');
       // Fallback to memory storage
-      const userWithOrg = { ...user, orgId: currentOrgId };
+      const userWithOrg = isSysAdmin ? { ...user } : { ...user, orgId: session.user.orgId };
       setUsers(prev => [...prev, userWithOrg]);
     }
   };

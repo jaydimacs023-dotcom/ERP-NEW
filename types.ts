@@ -99,6 +99,7 @@ export interface User extends BaseEntity {
   orgId: string;
   studentId?: string; 
   trainerId?: string; 
+  isEmailVerified?: boolean; // Added for email verification
 }
 
 export interface StudentDocument {

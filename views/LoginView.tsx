@@ -49,7 +49,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
       
       if (result) {
         const user = result.user;
-        // User's org is already stored in their Supabase record (org_id column)
+        // Block login if not email verified
+        if (user.isEmailVerified === false) {
+          setError('Email not verified. Please check your inbox for a verification link.');
+          setLoading(false);
+          return;
+        }
         onLogin(user);
       } else {
         setError('Invalid email or password. Please try again.');
