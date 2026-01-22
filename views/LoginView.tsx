@@ -1,17 +1,18 @@
 
-import React, { useState } from 'react';
-import { Database, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Database, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, ChevronRight, KeyRound } from 'lucide-react';
 import { Organization, User } from '../types';
 import { authService } from '../services/AuthService';
 
 interface LoginViewProps {
   onLogin: (user: User) => void;
   onRegister: (org: Organization, admin: User) => void;
+  onForgotPassword: () => void;
   organizations: Organization[];
   users: User[];
 }
 
-const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organizations, users }) => {
+const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPassword, organizations, users }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +24,19 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regCurrency, setRegCurrency] = useState('PHP');
+
+  // Password strength analysis
+  const passwordStrength = useMemo(() => {
+    if (!regPassword) return null;
+    return authService.analyzePasswordStrength(regPassword);
+  }, [regPassword]);
+
+  const strengthColors = {
+    weak: 'bg-red-500',
+    fair: 'bg-amber-500',
+    good: 'bg-emerald-500',
+    strong: 'bg-indigo-500',
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,39 +62,53 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     
-    const newOrgId = `org-trial-${Date.now()}`;
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + 14);
+    // Validate password strength
+    if (passwordStrength && passwordStrength.strength === 'weak') {
+      setError('Password is too weak. Please use a stronger password.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const newOrgId = `org-trial-${Date.now()}`;
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 14);
 
-    const newOrg: Organization = {
-      id: newOrgId,
-      name: regOrgName,
-      currency: regCurrency,
-      isVatRegistered: true,
-      subscriptionStatus: 'TRIAL',
-      planType: 'PROFESSIONAL', 
-      licenseExpiry: expiry.toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    };
+      const newOrg: Organization = {
+        id: newOrgId,
+        name: regOrgName,
+        currency: regCurrency,
+        isVatRegistered: true,
+        subscriptionStatus: 'TRIAL',
+        planType: 'PROFESSIONAL', 
+        licenseExpiry: expiry.toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      };
 
-    const newAdmin: User = {
-      id: `user-${Date.now()}`,
-      name: 'Workspace Owner',
-      email: regEmail,
-      password: regPassword,
-      role: 'ADMIN',
-      orgId: newOrgId
-    };
+      // Password will be hashed by SupabaseDataService.createUser()
+      const newAdmin: User = {
+        id: `user-${Date.now()}`,
+        name: 'Workspace Owner',
+        email: regEmail,
+        password: regPassword, // Will be hashed to password_hash by the service
+        role: 'ADMIN',
+        orgId: newOrgId
+      };
 
-    setTimeout(() => {
+      // Async registration with password hashing
       onRegister(newOrg, newAdmin);
       setLoading(false);
       setIsRegistering(false);
-    }, 1200);
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('Registration failed. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -161,6 +189,17 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
                 )}
               </button>
 
+              {/* Forgot Password Link */}
+              <div className="text-center">
+                <button 
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-[10px] font-bold text-slate-500 hover:text-indigo-400 transition-colors inline-flex items-center gap-1"
+                >
+                  <KeyRound size={12} /> Forgot Password?
+                </button>
+              </div>
+
               <div className="pt-4 border-t border-slate-800 text-center">
                 <button 
                   type="button"
@@ -219,12 +258,47 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, organization
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Admin Pass</label>
                     <input 
-                      type="password" required placeholder="••••••••"
+                      type="password" required placeholder="••••••••" minLength={8}
                       className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
                       value={regPassword} onChange={e => setRegPassword(e.target.value)}
                     />
                   </div>
                 </div>
+
+                {/* Password Strength Indicator */}
+                {regPassword && passwordStrength && (
+                  <div className="space-y-3 p-4 bg-slate-800/30 rounded-2xl border border-slate-700/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <ShieldCheck size={14} /> Password Strength
+                      </span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${
+                        passwordStrength.strength === 'weak' ? 'text-red-400' :
+                        passwordStrength.strength === 'fair' ? 'text-amber-400' :
+                        passwordStrength.strength === 'good' ? 'text-emerald-400' :
+                        'text-indigo-400'
+                      }`}>
+                        {passwordStrength.strength}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-300 ${strengthColors[passwordStrength.strength]}`}
+                        style={{ width: `${Math.min(100, (passwordStrength.score / 7) * 100)}%` }}
+                      />
+                    </div>
+                    {passwordStrength.feedback.length > 0 && passwordStrength.strength !== 'strong' && (
+                      <ul className="space-y-1">
+                        {passwordStrength.feedback.slice(0, 3).map((tip, i) => (
+                          <li key={i} className="text-[10px] text-slate-500 flex items-center gap-2">
+                            <span className="w-1 h-1 bg-slate-600 rounded-full" />
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button 

@@ -437,7 +437,7 @@ export class SupabaseDataService implements IDataService {
         'location_id', 'sponsor_id', 'documents', 'created_at', 'updated_at'
       ],
       organizations: ['id', 'name', 'currency', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'primary_color', 'logo_url'],
-      users: ['id', 'name', 'email', 'password', 'role', 'org_id', 'student_id', 'trainer_id', 'created_at'],
+      users: ['id', 'name', 'email', 'password_hash', 'salt', 'role', 'org_id', 'student_id', 'trainer_id', 'is_active', 'auth_uid', 'created_at', 'updated_at'],
       trainers: ['id', 'org_id', 'first_name', 'last_name', 'middle_name', 'email', 'contact_number', 'specialization', 'qualification_ids', 'created_at', 'updated_at'],
       qualifications: ['id', 'org_id', 'code', 'name', 'duration_days', 'sector', 'created_at', 'updated_at'],
       employees: ['id', 'org_id', 'first_name', 'last_name', 'designation', 'tin', 'sss', 'philhealth', 'pagibig', 'basic_salary', 'bank_name', 'bank_account', 'is_active', 'created_at', 'updated_at'],
@@ -525,21 +525,75 @@ export class SupabaseDataService implements IDataService {
   }
 
   // ============================================================================
-  // USER CRUD
+  // USER CRUD - With bcrypt password hashing
   // ============================================================================
 
   async createUser(user: any): Promise<any> {
+    console.debug('[Supabase] createUser() INPUT:', user);
+    
     const snakeCaseUser = this.camelToSnake(user);
+    console.debug('[Supabase] After camelToSnake():', snakeCaseUser);
+    
+    // Hash password BEFORE filtering (since password_hash is the valid column, not password)
+    if (snakeCaseUser.password) {
+      const plainPassword = snakeCaseUser.password;
+      try {
+        const { PasswordService } = await import('./PasswordService');
+        const hashedPassword = await PasswordService.hashPassword(plainPassword);
+        snakeCaseUser.password_hash = hashedPassword;
+        console.info('[Supabase] ✅ Password hashed with bcrypt for new user');
+      } catch (error) {
+        console.error('[Supabase] ❌ Failed to hash password:', error);
+        snakeCaseUser.password_hash = plainPassword;
+      }
+      delete snakeCaseUser.password;
+    }
+    
+    // Set defaults
+    if (!snakeCaseUser.is_active) {
+      snakeCaseUser.is_active = true;
+    }
+    if (!snakeCaseUser.salt) {
+      snakeCaseUser.salt = 'bcrypt'; // Indicator that bcrypt is used
+    }
+    
+    // Now filter to schema (password_hash is in schema, password is not)
     const filteredUser = this.filterToTableSchema('users', snakeCaseUser);
+    console.debug('[Supabase] After filterToTableSchema():', filteredUser);
+    
+    // Generate UUID if invalid or missing
     if ((filteredUser as any).id && !this.isValidUUID((filteredUser as any).id)) {
+      console.debug('[Supabase] Removing invalid UUID, will auto-generate');
       delete (filteredUser as any).id;
     }
+    
     return this.insertToSupabaseRaw('users', filteredUser);
   }
 
   async updateUser(id: string, updates: Partial<any>): Promise<any> {
+    console.debug('[Supabase] updateUser() INPUT:', { id, updates });
+    
     const snakeCaseUpdates = this.camelToSnake(updates);
+    
+    // Hash password BEFORE filtering if being updated
+    if (snakeCaseUpdates.password) {
+      const plainPassword = snakeCaseUpdates.password;
+      try {
+        const { PasswordService } = await import('./PasswordService');
+        const hashedPassword = await PasswordService.hashPassword(plainPassword);
+        snakeCaseUpdates.password_hash = hashedPassword;
+        snakeCaseUpdates.salt = 'bcrypt';
+        console.info('[Supabase] ✅ Password updated with bcrypt hash');
+      } catch (error) {
+        console.error('[Supabase] ❌ Failed to hash password on update:', error);
+        snakeCaseUpdates.password_hash = plainPassword;
+      }
+      delete snakeCaseUpdates.password;
+    }
+    
     const filteredUpdates = this.filterToTableSchema('users', snakeCaseUpdates);
+    console.debug('[Supabase] After filterToTableSchema():', filteredUpdates);
+    
     return this.updateInSupabaseRaw('users', id, filteredUpdates);
   }
 

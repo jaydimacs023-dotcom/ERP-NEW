@@ -6,6 +6,7 @@ import {
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
+import { AuditService } from './services/AuditService';
 import { config } from './config/app';
 
 // View Imports
@@ -14,6 +15,7 @@ import Ledger from './views/Ledger';
 import Reports from './views/Reports';
 import ChartOfAccounts from './views/ChartOfAccounts';
 import LoginView from './views/LoginView';
+import PasswordResetView from './views/PasswordResetView';
 import StudentsView from './views/StudentsView';
 import QualificationsView from './views/QualificationsView';
 import TrainersView from './views/TrainersView';
@@ -70,8 +72,23 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
+  // Password Reset State
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  
   // Data service reference for CRUD operations
   const [dataService] = useState(() => DataServiceFactory.getService());
+
+  // Check for password reset token in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('reset_token');
+    if (token) {
+      setResetToken(token);
+      setShowPasswordReset(true);
+      console.info('[App] Password reset token detected in URL');
+    }
+  }, []);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -84,11 +101,16 @@ export default function App() {
   }, []);
 
   // Logout handler
-  const handleLogout = () => {
-    authService.logout();
+  const handleLogout = async () => {
+    // Audit: Logout event (log before clearing user)
+    if (currentUser) {
+      AuditService.logout(currentOrgId, currentUser.id, currentUser.name);
+    }
+    
+    await authService.logout();
     setCurrentUser(null);
     setCurrentOrgId('');
-    console.info('[App] User logged out');
+    console.info('[App] User logged out - JWT tokens revoked');
   };
 
   // Master Data State
@@ -125,6 +147,13 @@ export default function App() {
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Initialize AuditService callback to add logs to state
+  useEffect(() => {
+    AuditService.setCallback((log: AuditLog) => {
+      setAuditLogs(prev => [...prev, log]);
+    });
+  }, []);
 
   // Modals
   const [showJournalForm, setShowJournalForm] = useState(false);
@@ -287,6 +316,10 @@ export default function App() {
     const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
     localStorage.setItem('at_erp_session', JSON.stringify(session));
     console.info('[App] User session stored:', user.email);
+    
+    // Audit: User login
+    AuditService.login(user.orgId || '', user.id, user.name);
+    
     if (user.role === 'STUDENT') setActiveTab('student-portal');
     else if (user.role === 'TRAINER') setActiveTab('trainer-portal');
     else setActiveTab('dashboard');
@@ -305,15 +338,16 @@ export default function App() {
     setJournalEntries(prev => [...prev, fullEntry]);
     setJournalLines(prev => [...prev, ...lines]);
     
-    setAuditLogs(prev => [...prev, {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      userId: currentUser?.name || 'System',
-      action: 'POST',
-      entityType: 'JOURNAL_ENTRY',
-      entityId: fullEntry.id,
-      details: `Posted ${fullEntry.sourceType}: ${fullEntry.description}`
-    }]);
+    // Audit: Journal entry posted
+    AuditService.post(
+      currentOrgId,
+      currentUser?.id || 'system',
+      currentUser?.name || 'System',
+      'JOURNAL_ENTRY',
+      fullEntry.id,
+      fullEntry.referenceNumber,
+      `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
+    );
   };
 
   const handleConvertToBill = (po: PurchaseOrder) => {
@@ -330,6 +364,10 @@ export default function App() {
       } as Payable;
       const savedPayable = await dataService.createPayable(fullPayable);
       setPayables(prev => [...prev, savedPayable]);
+      
+      // Audit: Payable created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', savedPayable.id, payable.payableNumber);
+      
       handleNotify('success', `Payable ${payable.payableNumber} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payable:', error);
@@ -341,14 +379,20 @@ export default function App() {
         createdBy: currentUser?.id || 'system'
       } as Payable;
       setPayables(prev => [...prev, fullPayable]);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', fullPayable.id, payable.payableNumber);
     }
   };
 
   const handleUpdatePayable = async (id: string, updates: Partial<Payable>) => {
     try {
       console.info('[App] Updating payable:', id);
+      const existing = payables.find(p => p.id === id);
       const updated = await dataService.updatePayable(id, updates);
       setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+      
+      // Audit: Payable updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', id, existing?.payableNumber, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Payable updated successfully');
     } catch (error) {
       console.error('[App] Error updating payable:', error);
@@ -361,8 +405,13 @@ export default function App() {
   const handleDeletePayable = async (id: string) => {
     try {
       console.info('[App] Deleting payable:', id);
+      const existing = payables.find(p => p.id === id);
       await dataService.deletePayable(id);
       setPayables(prev => prev.filter(p => p.id !== id));
+      
+      // Audit: Payable deleted
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', id, existing?.payableNumber);
+      
       handleNotify('success', 'Payable deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting payable:', error);
@@ -381,6 +430,10 @@ export default function App() {
       console.info('[App] Creating organization:', org.name);
       const savedOrg = await dataService.createOrganization(org);
       setOrganizations(prev => [...prev, savedOrg]);
+      
+      // Audit: Organization created
+      AuditService.create(savedOrg.id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', savedOrg.id, org.name);
+      
       handleNotify('success', `Organization "${org.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating organization:', error);
@@ -393,8 +446,13 @@ export default function App() {
   const handleUpdateOrganization = async (id: string, updates: Partial<Organization>) => {
     try {
       console.info('[App] Updating organization:', id);
+      const existing = organizations.find(o => o.id === id);
       const updated = await dataService.updateOrganization(id, updates);
       setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updated } : o));
+      
+      // Audit: Organization updated
+      AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Organization updated successfully');
     } catch (error) {
       console.error('[App] Error updating organization:', error);
@@ -407,8 +465,13 @@ export default function App() {
   const handleDeleteOrganization = async (id: string) => {
     try {
       console.info('[App] Deleting organization:', id);
+      const existing = organizations.find(o => o.id === id);
       await dataService.deleteOrganization(id);
       setOrganizations(prev => prev.filter(o => o.id !== id));
+      
+      // Audit: Organization deleted
+      AuditService.hardDelete(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name);
+      
       handleNotify('success', 'Organization deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting organization:', error);
@@ -429,6 +492,10 @@ export default function App() {
       const userWithOrg = { ...user, orgId: currentOrgId };
       const savedUser = await dataService.createUser(userWithOrg);
       setUsers(prev => [...prev, savedUser]);
+      
+      // Audit: User created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'USER', savedUser.id, user.name);
+      
       handleNotify('success', `User "${user.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating user:', error);
@@ -442,8 +509,13 @@ export default function App() {
   const handleDeleteUser = async (id: string) => {
     try {
       console.info('[App] Deleting user:', id);
+      const existing = users.find(u => u.id === id);
       await dataService.deleteUser(id);
       setUsers(prev => prev.filter(u => u.id !== id));
+      
+      // Audit: User deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'USER', id, existing?.name);
+      
       handleNotify('success', 'User deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting user:', error);
@@ -469,6 +541,18 @@ export default function App() {
       setCurrentOrgId(savedOrg.id);
       setActiveTab('dashboard');
       
+      // Audit: New organization registered
+      AuditService.log({
+        orgId: savedOrg.id,
+        userId: savedAdmin.id,
+        userName: savedAdmin.name,
+        action: 'CREATE',
+        entityType: 'ORGANIZATION',
+        entityId: savedOrg.id,
+        entityName: savedOrg.name,
+        details: `New organization registered with admin user: ${savedAdmin.name}`
+      });
+      
       handleNotify('success', `Welcome! Organization "${org.name}" registered successfully`);
       console.info('[App] Registration complete');
     } catch (error) {
@@ -493,20 +577,30 @@ export default function App() {
       const studentWithOrg = { ...student, orgId: currentOrgId };
       const savedStudent = await dataService.createStudent(studentWithOrg);
       setStudents(prev => [...prev, savedStudent]);
+      
+      // Audit: Student created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', savedStudent.id, `${student.firstName} ${student.lastName}`);
+      
       handleNotify('success', `Student "${student.firstName} ${student.lastName}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating student:', error);
       handleNotify('error', 'Failed to create student. Falling back to memory storage.');
       const studentWithOrg = { ...student, orgId: currentOrgId };
       setStudents(prev => [...prev, studentWithOrg]);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName}`);
     }
   };
 
   const handleUpdateStudent = async (student: Student) => {
     try {
       console.info('[App] Updating student:', student.id);
+      const existing = students.find(s => s.id === student.id);
       const updated = await dataService.updateStudent(student.id, student);
       setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
+      
+      // Audit: Student updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName}`, existing, student);
+      
       handleNotify('success', 'Student record updated successfully');
     } catch (error) {
       console.error('[App] Error updating student:', error);
@@ -518,6 +612,7 @@ export default function App() {
   const handleDeleteStudent = async (id: string) => {
     try {
       console.info('[App] Checking student usage before deletion:', id);
+      const existing = students.find(s => s.id === id);
       
       // Check if student is used in other modules
       const usage = await dataService.checkStudentUsage(id);
@@ -531,6 +626,10 @@ export default function App() {
       console.info('[App] Deleting student:', id);
       await dataService.deleteStudent(id);
       setStudents(prev => prev.filter(s => s.id !== id));
+      
+      // Audit: Student deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
+      
       handleNotify('success', 'Student record deleted successfully');
       return true; // Return true to indicate successful deletion
     } catch (error) {
@@ -573,6 +672,10 @@ export default function App() {
       const trainerWithOrg = { ...trainer, orgId: currentOrgId };
       const savedTrainer = await dataService.createTrainer(trainerWithOrg);
       setTrainers(prev => [...prev, savedTrainer]);
+      
+      // Audit: Trainer created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', savedTrainer.id, `${trainer.firstName} ${trainer.lastName}`);
+      
       handleNotify('success', `Trainer "${trainer.firstName} ${trainer.lastName}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating trainer:', error);
@@ -585,8 +688,13 @@ export default function App() {
   const handleUpdateTrainer = async (trainer: Trainer) => {
     try {
       console.info('[App] Updating trainer:', trainer.id);
+      const existing = trainers.find(t => t.id === trainer.id);
       const updated = await dataService.updateTrainer(trainer.id, trainer);
       setTrainers(prev => prev.map(t => t.id === trainer.id ? updated : t));
+      
+      // Audit: Trainer updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', trainer.id, `${trainer.firstName} ${trainer.lastName}`, existing, trainer);
+      
       handleNotify('success', 'Trainer record updated successfully');
     } catch (error) {
       console.error('[App] Error updating trainer:', error);
@@ -598,6 +706,7 @@ export default function App() {
   const handleDeleteTrainer = async (id: string) => {
     try {
       console.info('[App] Checking trainer usage before deletion:', id);
+      const existing = trainers.find(t => t.id === id);
       
       // Check if trainer is used in other modules
       const usage = await dataService.checkTrainerUsage(id);
@@ -611,6 +720,10 @@ export default function App() {
       console.info('[App] Deleting trainer:', id);
       await dataService.deleteTrainer(id);
       setTrainers(prev => prev.filter(t => t.id !== id));
+      
+      // Audit: Trainer deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
+      
       handleNotify('success', 'Trainer record deleted successfully');
       return true; // Return true to indicate successful deletion
     } catch (error) {
@@ -632,6 +745,10 @@ export default function App() {
       const qualWithOrg = { ...qualification, orgId: currentOrgId };
       const savedQual = await dataService.createQualification(qualWithOrg);
       setQualifications(prev => [...prev, savedQual]);
+      
+      // Audit: Qualification created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', savedQual.id, qualification.name);
+      
       handleNotify('success', `Qualification "${qualification.name}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating qualification:', error);
@@ -644,8 +761,13 @@ export default function App() {
   const handleUpdateQualification = async (qualification: Qualification) => {
     try {
       console.info('[App] Updating qualification:', qualification.id);
+      const existing = qualifications.find(q => q.id === qualification.id);
       const updated = await dataService.updateQualification(qualification.id, qualification);
       setQualifications(prev => prev.map(q => q.id === qualification.id ? updated : q));
+      
+      // Audit: Qualification updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', qualification.id, qualification.name, existing, qualification);
+      
       handleNotify('success', 'Qualification record updated successfully');
     } catch (error) {
       console.error('[App] Error updating qualification:', error);
@@ -657,6 +779,7 @@ export default function App() {
   const handleDeleteQualification = async (id: string) => {
     try {
       console.info('[App] Checking qualification usage before deletion:', id);
+      const existing = qualifications.find(q => q.id === id);
       
       // Check if qualification is used in other modules
       const usage = await dataService.checkQualificationUsage(id);
@@ -670,6 +793,10 @@ export default function App() {
       console.info('[App] Deleting qualification:', id);
       await dataService.deleteQualification(id);
       setQualifications(prev => prev.filter(q => q.id !== id));
+      
+      // Audit: Qualification deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', id, existing?.name);
+      
       handleNotify('success', 'Qualification record deleted successfully');
       return true;
     } catch (error) {
@@ -691,6 +818,10 @@ export default function App() {
       const created = await dataService.createLocation(location);
       console.info('[App] Location created successfully:', created);
       setLocations(prev => [...prev, created]);
+      
+      // Audit: Location created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', created.id, location.name);
+      
       handleNotify('success', 'Location registered successfully');
     } catch (error) {
       console.error('[App] Error creating location:', error);
@@ -704,9 +835,14 @@ export default function App() {
   const handleUpdateLocation = async (location: Location) => {
     try {
       console.info('[App] Updating location:', location);
+      const existing = locations.find(l => l.id === location.id);
       const updated = await dataService.updateLocation(location.id, location);
       console.info('[App] Location updated successfully:', updated);
       setLocations(prev => prev.map(l => l.id === location.id ? location : l));
+      
+      // Audit: Location updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', location.id, location.name, existing, location);
+      
       handleNotify('success', 'Location updated successfully');
     } catch (error) {
       console.error('[App] Error updating location:', error);
@@ -718,6 +854,7 @@ export default function App() {
   const handleDeleteLocation = async (id: string) => {
     try {
       console.info('[App] Checking location usage before deletion:', id);
+      const existing = locations.find(l => l.id === id);
       
       // Check if location is used in other modules
       const usage = await dataService.checkLocationUsage(id);
@@ -731,6 +868,10 @@ export default function App() {
       console.info('[App] Deleting location:', id);
       await dataService.deleteLocation(id);
       setLocations(prev => prev.filter(l => l.id !== id));
+      
+      // Audit: Location deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', id, existing?.name);
+      
       handleNotify('success', 'Location deleted successfully');
       return true;
     } catch (error) {
@@ -752,6 +893,10 @@ export default function App() {
       const created = await dataService.createSchedule(schedule);
       console.info('[App] Schedule created successfully:', created);
       setSchedules(prev => [...prev, created]);
+      
+      // Audit: Schedule created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', created.id);
+      
       handleNotify('success', 'Schedule registered successfully');
     } catch (error) {
       console.error('[App] Error creating schedule:', error);
@@ -765,9 +910,14 @@ export default function App() {
   const handleUpdateSchedule = async (schedule: TrainerSchedule) => {
     try {
       console.info('[App] Updating schedule:', schedule);
+      const existing = schedules.find(s => s.id === schedule.id);
       const updated = await dataService.updateSchedule(schedule.id, schedule);
       console.info('[App] Schedule updated successfully:', updated);
       setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
+      
+      // Audit: Schedule updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', schedule.id, undefined, existing, schedule);
+      
       handleNotify('success', 'Schedule updated successfully');
     } catch (error) {
       console.error('[App] Error updating schedule:', error);
@@ -792,6 +942,10 @@ export default function App() {
       console.info('[App] Deleting schedule:', id);
       await dataService.deleteSchedule(id);
       setSchedules(prev => prev.filter(s => s.id !== id));
+      
+      // Audit: Schedule deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', id);
+      
       handleNotify('success', 'Schedule deleted successfully');
       return true;
     } catch (error) {
@@ -813,6 +967,10 @@ export default function App() {
       const created = await dataService.createBatch(batchWithOrg);
       console.info('[App] Batch created successfully:', created);
       setBatches(prev => [...prev, created]);
+      
+      // Audit: Batch created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', created.id, batch.name || batch.batchCode);
+      
       handleNotify('success', 'Batch created successfully');
     } catch (error) {
       console.error('[App] Error creating batch:', error);
@@ -825,9 +983,14 @@ export default function App() {
   const handleUpdateBatch = async (batch: Batch) => {
     try {
       console.info('[App] Updating batch:', batch);
+      const existing = batches.find(b => b.id === batch.id);
       const updated = await dataService.updateBatch(batch.id, batch);
       console.info('[App] Batch updated successfully:', updated);
       setBatches(prev => prev.map(b => b.id === batch.id ? batch : b));
+      
+      // Audit: Batch updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', batch.id, batch.name || batch.batchCode, existing, batch);
+      
       handleNotify('success', 'Batch updated successfully');
     } catch (error) {
       console.error('[App] Error updating batch:', error);
@@ -839,8 +1002,13 @@ export default function App() {
   const handleDeleteBatch = async (id: string) => {
     try {
       console.info('[App] Deleting batch:', id);
+      const existing = batches.find(b => b.id === id);
       await dataService.deleteBatch(id);
       setBatches(prev => prev.filter(b => b.id !== id));
+      
+      // Audit: Batch deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', id, existing?.name || existing?.batchCode);
+      
       handleNotify('success', 'Batch deleted successfully');
       return true;
     } catch (error) {
@@ -861,6 +1029,10 @@ export default function App() {
       console.info('[App] Creating sponsor:', sponsorWithOrg);
       const created = await dataService.createSponsor(sponsorWithOrg);
       setSponsors(prev => [...prev, created]);
+      
+      // Audit: Sponsor created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', created.id, sponsor.name);
+      
       handleNotify('success', `Sponsor "${created.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating sponsor:', error);
@@ -872,8 +1044,13 @@ export default function App() {
   const handleUpdateSponsor = async (sponsor: Sponsor) => {
     try {
       console.info('[App] Updating sponsor:', sponsor);
+      const existing = sponsors.find(s => s.id === sponsor.id);
       const updated = await dataService.updateSponsor(sponsor.id, sponsor);
       setSponsors(prev => prev.map(s => s.id === sponsor.id ? updated : s));
+      
+      // Audit: Sponsor updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', sponsor.id, sponsor.name, existing, sponsor);
+      
       handleNotify('success', `Sponsor "${updated.name}" updated successfully`);
     } catch (error) {
       console.error('[App] Error updating sponsor:', error);
@@ -885,6 +1062,7 @@ export default function App() {
   const handleDeleteSponsor = async (id: string) => {
     try {
       console.info('[App] Checking sponsor usage before deletion:', id);
+      const existing = sponsors.find(s => s.id === id);
       
       // Check if sponsor is used in other modules
       const usage = await dataService.checkSponsorUsage(id);
@@ -898,6 +1076,10 @@ export default function App() {
       console.info('[App] Deleting sponsor:', id);
       await dataService.deleteSponsor(id);
       setSponsors(prev => prev.filter(s => s.id !== id));
+      
+      // Audit: Sponsor deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', id, existing?.name);
+      
       handleNotify('success', 'Sponsor deleted successfully');
       return true;
     } catch (error) {
@@ -918,6 +1100,10 @@ export default function App() {
       const bankWithOrg = { ...bank, orgId: currentOrgId } as BankAccount;
       const created = await dataService.createBankAccount(bankWithOrg);
       setBankAccounts(prev => [...prev, created]);
+      
+      // Audit: Bank account created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', created.id, `${bank.bankName} - ${bank.accountNumber}`);
+      
       handleNotify('success', `Bank account "${created.bankName}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating bank account:', error);
@@ -928,8 +1114,13 @@ export default function App() {
   const handleUpdateBankAccount = async (id: string, updates: Partial<BankAccount>) => {
     try {
       console.info('[App] Updating bank account:', id, updates);
+      const existing = bankAccounts.find(b => b.id === id);
       const updated = await dataService.updateBankAccount(id, updates);
       setBankAccounts(prev => prev.map(b => b.id === id ? updated : b));
+      
+      // Audit: Bank account updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', id, existing?.bankName, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Bank account updated successfully');
     } catch (error) {
       console.error('[App] Error updating bank account:', error);
@@ -940,8 +1131,13 @@ export default function App() {
   const handleDeleteBankAccount = async (id: string) => {
     try {
       console.info('[App] Deleting bank account:', id);
+      const existing = bankAccounts.find(b => b.id === id);
       await dataService.deleteBankAccount(id);
       setBankAccounts(prev => prev.filter(b => b.id !== id));
+      
+      // Audit: Bank account deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', id, existing?.bankName);
+      
       handleNotify('success', 'Bank account deleted successfully');
       return true;
     } catch (error) {
@@ -958,6 +1154,10 @@ export default function App() {
       const checkWithOrg = { ...check, orgId: currentOrgId } as CheckVoucher;
       const created = await dataService.createCheckVoucher(checkWithOrg);
       setCheckVouchers(prev => [...prev, created]);
+      
+      // Audit: Check voucher created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', created.id, `Check #${check.checkNumber}`);
+      
       handleNotify('success', `Check #${created.checkNumber} created successfully`);
       return created;
     } catch (error) {
@@ -970,8 +1170,16 @@ export default function App() {
   const handleUpdateCheckVoucher = async (id: string, updates: Partial<CheckVoucher>) => {
     try {
       console.info('[App] Updating check voucher:', id, updates);
+      const existing = checkVouchers.find(c => c.id === id);
       const updated = await dataService.updateCheckVoucher(id, updates);
       setCheckVouchers(prev => prev.map(c => c.id === id ? updated : c));
+      
+      // Audit: Check voucher updated (include status changes)
+      const statusChange = updates.status && existing?.status !== updates.status 
+        ? `Status: ${existing?.status} → ${updates.status}` 
+        : undefined;
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber}`, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Check voucher updated successfully');
       return updated;
     } catch (error) {
@@ -984,8 +1192,13 @@ export default function App() {
   const handleDeleteCheckVoucher = async (id: string) => {
     try {
       console.info('[App] Deleting check voucher:', id);
+      const existing = checkVouchers.find(c => c.id === id);
       await dataService.deleteCheckVoucher(id);
       setCheckVouchers(prev => prev.filter(c => c.id !== id));
+      
+      // Audit: Check voucher deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber}`);
+      
       handleNotify('success', 'Check voucher deleted successfully');
       return true;
     } catch (error) {
@@ -1001,6 +1214,10 @@ export default function App() {
       const vendorWithOrg = { ...vendor, orgId: currentOrgId } as Vendor;
       const created = await dataService.createVendor(vendorWithOrg);
       setVendors(prev => [...prev, created]);
+      
+      // Audit: Vendor created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', created.id, vendor.name);
+      
       handleNotify('success', `Vendor "${created.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating vendor:', error);
@@ -1012,8 +1229,13 @@ export default function App() {
   const handleUpdateVendor = async (id: string, updates: Partial<Vendor>) => {
     try {
       console.info('[App] Updating vendor:', id, updates);
+      const existing = vendors.find(v => v.id === id);
       const updated = await dataService.updateVendor(id, updates);
       setVendors(prev => prev.map(v => v.id === id ? updated : v));
+      
+      // Audit: Vendor updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Vendor updated successfully');
     } catch (error) {
       console.error('[App] Error updating vendor:', error);
@@ -1025,8 +1247,13 @@ export default function App() {
   const handleDeleteVendor = async (id: string) => {
     try {
       console.info('[App] Deleting vendor:', id);
+      const existing = vendors.find(v => v.id === id);
       await dataService.deleteVendor(id);
       setVendors(prev => prev.filter(v => v.id !== id));
+      
+      // Audit: Vendor deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name);
+      
       handleNotify('success', 'Vendor deleted successfully');
       return true;
     } catch (error) {
@@ -1047,6 +1274,10 @@ export default function App() {
       const assetWithOrg = { ...asset, orgId: currentOrgId };
       const savedAsset = await dataService.createFixedAsset(assetWithOrg);
       setFixedAssets(prev => [...prev, savedAsset]);
+      
+      // Audit: Fixed asset created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', savedAsset.id, `${asset.code} - ${asset.name}`);
+      
       handleNotify('success', `Fixed asset "${asset.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating fixed asset:', error);
@@ -1059,8 +1290,13 @@ export default function App() {
   const handleUpdateFixedAsset = async (id: string, updates: Partial<FixedAsset>) => {
     try {
       console.info('[App] Updating fixed asset:', id);
+      const existing = fixedAssets.find(a => a.id === id);
       const updated = await dataService.updateFixedAsset(id, updates);
       setFixedAssets(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+      
+      // Audit: Fixed asset updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', id, existing?.name, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Fixed asset updated successfully');
     } catch (error) {
       console.error('[App] Error updating fixed asset:', error);
@@ -1072,8 +1308,13 @@ export default function App() {
   const handleDeleteFixedAsset = async (id: string) => {
     try {
       console.info('[App] Deleting fixed asset:', id);
+      const existing = fixedAssets.find(a => a.id === id);
       await dataService.deleteFixedAsset(id);
       setFixedAssets(prev => prev.filter(a => a.id !== id));
+      
+      // Audit: Fixed asset deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', id, existing?.name);
+      
       handleNotify('success', 'Fixed asset deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting fixed asset:', error);
@@ -1135,11 +1376,22 @@ export default function App() {
 
       // Add to journal entries and lines
       setJournalEntries(prev => [...prev, newEntry]);
-      setJournalEntryLines(prev => [...prev, ...deprLines]);
 
       // Update accumulated depreciation on the asset
       const newAccumulated = (asset.accumulatedDepreciation || 0) + monthlyDepreciation;
       await handleUpdateFixedAsset(assetId, { accumulatedDepreciation: newAccumulated });
+      
+      // Audit: Depreciation recorded
+      AuditService.log({
+        orgId: currentOrgId,
+        userId: currentUser?.id || 'system',
+        userName: currentUser?.name || 'System',
+        action: 'POST',
+        entityType: 'FIXED_ASSET',
+        entityId: assetId,
+        entityName: asset.name,
+        details: `Depreciation: ${monthlyDepreciation.toFixed(2)} | New Accumulated: ${newAccumulated.toFixed(2)}`
+      });
 
       handleNotify('success', `Depreciation of ${monthlyDepreciation.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully`);
     } catch (error) {
@@ -1155,6 +1407,10 @@ export default function App() {
       const itemWithOrg = { ...item, orgId: currentOrgId };
       const savedItem = await dataService.createItem(itemWithOrg);
       setItems(prev => [...prev, savedItem]);
+      
+      // Audit: Item created
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', savedItem.id, `${item.code} - ${item.name}`);
+      
       handleNotify('success', `Item "${item.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating item:', error);
@@ -1167,8 +1423,13 @@ export default function App() {
   const handleUpdateItem = async (id: string, updates: Partial<NonStockItem>) => {
     try {
       console.info('[App] Updating item:', id);
+      const existing = items.find(i => i.id === id);
       const updated = await dataService.updateItem(id, updates);
       setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+      
+      // Audit: Item updated
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', id, existing?.name, existing, { ...existing, ...updates });
+      
       handleNotify('success', 'Item updated successfully');
     } catch (error) {
       console.error('[App] Error updating item:', error);
@@ -1180,8 +1441,13 @@ export default function App() {
   const handleDeleteItem = async (id: string) => {
     try {
       console.info('[App] Deleting item:', id);
+      const existing = items.find(i => i.id === id);
       await dataService.deleteItem(id);
       setItems(prev => prev.filter(i => i.id !== id));
+      
+      // Audit: Item deleted
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', id, existing?.name);
+      
       handleNotify('success', 'Item deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting item:', error);
@@ -1204,8 +1470,31 @@ export default function App() {
     );
   }
 
+  // Show Password Reset View
+  if (showPasswordReset) {
+    return (
+      <PasswordResetView 
+        onBackToLogin={() => {
+          setShowPasswordReset(false);
+          setResetToken(null);
+          // Clear URL parameter
+          window.history.replaceState({}, '', window.location.pathname);
+        }}
+        resetToken={resetToken}
+      />
+    );
+  }
+
   if (!currentUser) {
-    return <LoginView onLogin={handleLogin} onRegister={handleRegisterWithPersistence} organizations={organizations} users={users} />;
+    return (
+      <LoginView 
+        onLogin={handleLogin} 
+        onRegister={handleRegisterWithPersistence} 
+        onForgotPassword={() => setShowPasswordReset(true)}
+        organizations={organizations} 
+        users={users} 
+      />
+    );
   }
 
   return (
@@ -1470,7 +1759,13 @@ export default function App() {
             onUpdateEmployee={(emp) => setEmployees(p => p.map(x => x.id === emp.id ? emp : x))} 
             onDeleteEmployee={(id) => setEmployees(p => p.map(x => x.id === id ? { ...x, isDeleted: true, deletedAt: new Date().toISOString() } : x))} 
           />}
-          {activeTab === 'users' && <UsersManagementView users={users.filter(u => u.orgId === currentOrgId)} onAddUser={handleAddUser} onDeleteUser={handleDeleteUser} />}
+          {activeTab === 'users' && <UsersManagementView 
+            users={users.filter(u => u.orgId === currentOrgId)} 
+            students={students.filter(s => s.orgId === currentOrgId)}
+            trainers={trainers.filter(t => t.orgId === currentOrgId)}
+            onAddUser={handleAddUser} 
+            onDeleteUser={handleDeleteUser} 
+          />}
           {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}

@@ -57,6 +57,20 @@ export class MockDataService implements IDataService {
 
   async createUser(user: User): Promise<User> {
     console.warn('[MockDataService] Users persist to memory only; changes lost on refresh');
+    
+    // Hash password if provided (for consistency with SupabaseDataService)
+    if ((user as any).password) {
+      try {
+        const { PasswordService } = await import('./PasswordService');
+        const hashedPassword = await PasswordService.hashPassword((user as any).password);
+        console.info('[MockDataService] ✅ Password hashed with bcrypt');
+        // Store hash but keep original structure for mock
+        return { ...user, password: hashedPassword };
+      } catch (error) {
+        console.warn('[MockDataService] Password hashing skipped in mock mode');
+      }
+    }
+    
     return user;
   }
 
