@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
 import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalEntryLine } from '../types';
 import { InventoryService } from '../services/InventoryService';
 import { InventoryGLService } from '../services/InventoryGLService';
+import { DataExportService } from '../services/DataExportService';
 
 interface StockAdjustmentsViewProps {
   adjustments: StockAdjustment[];
@@ -437,6 +438,37 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
 
       {/* List */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        {filteredAdjustments.length > 0 && (
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Stock Adjustments</h3>
+              <p className="text-xs text-gray-600 mt-1">Showing {filteredAdjustments.length} of {activeAdjustments.length} adjustment{activeAdjustments.length !== 1 ? 's' : ''}</p>
+            </div>
+            <button
+              onClick={() => {
+                const exportData = filteredAdjustments.map(adj => {
+                  const item = items.find(i => i.id === adj.stockItemId);
+                  return {
+                    referenceNumber: `ADJ-${adj.id.slice(0, 8)}`,
+                    itemName: item?.name || 'N/A',
+                    warehouse: adj.warehouseLocationId,
+                    type: adj.adjustmentType,
+                    quantity: adj.quantityChange,
+                    reason: adj.reason,
+                    notes: adj.notes || '',
+                    status: adj.isApproved ? 'Approved' : 'Pending',
+                    glStatus: adj.journalEntryId ? 'Posted' : 'Ready',
+                    createdAt: new Date(adj.createdAt || Date.now()).toLocaleDateString()
+                  };
+                });
+                DataExportService.exportStockAdjustments(exportData, currency);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+        )}
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>

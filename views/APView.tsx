@@ -1,12 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable } from '../types';
+import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher } from '../types';
 import { AccountingService } from '../accountingService';
+import MatchingDashboard from './MatchingDashboard';
+import CheckRegisterView from './CheckRegisterView';
 import { 
   Truck, Plus, Filter, Search, FileText, ChevronRight, Clock, 
   X, Save, Trash2, AlertCircle, Calculator, Percent, History,
   Calendar, BarChart3, Download, Printer, MoreVertical, CreditCard,
-  CheckCircle, Landmark, Receipt
+  CheckCircle, Landmark, Receipt, GitCompare
 } from 'lucide-react';
 
 interface APViewProps {
@@ -16,16 +18,23 @@ interface APViewProps {
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
+  payables: Payable[];
+  checks: CheckVoucher[];
+  purchaseOrders: PurchaseOrder[];
+  purchaseOrderLines: PurchaseOrderLine[];
+  goodsReceipts: GoodsReceipt[];
+  goodsReceiptLines: GoodsReceiptLine[];
   currentUserId?: string;
   onPostBill: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onCreatePayable: (payable: Payable) => void;
+  onApproveException?: (payableId: string, notes: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-type APTab = 'bills' | 'payments' | 'aging';
+type APTab = 'bills' | 'payments' | 'aging' | 'matching' | 'checks';
 
 const APView: React.FC<APViewProps> = ({ 
-  vendors, entries, lines, items, accounts, bankAccounts, currentUserId = 'system', onPostBill, onCreatePayable, onNotify 
+  vendors, entries, lines, items, accounts, bankAccounts, payables = [], checks = [], purchaseOrders = [], purchaseOrderLines = [], goodsReceipts = [], goodsReceiptLines = [], currentUserId = 'system', onPostBill, onCreatePayable, onApproveException, onNotify 
 }) => {
   const [activeTab, setActiveTab] = useState<APTab>('bills');
   const [showModal, setShowModal] = useState(false);
@@ -286,12 +295,18 @@ const APView: React.FC<APViewProps> = ({
           <p className="text-sm text-slate-500 font-normal italic">Manage supplier liabilities and monitor procurement credit cycles.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 flex-wrap">
              <button onClick={() => setActiveTab('bills')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'bills' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <FileText size={14} className="inline mr-1.5" /> Bills
              </button>
+             <button onClick={() => setActiveTab('matching')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'matching' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+               <GitCompare size={14} className="inline mr-1.5" /> 3-Way Match
+             </button>
              <button onClick={() => setActiveTab('payments')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'payments' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <CreditCard size={14} className="inline mr-1.5" /> Payments
+             </button>
+             <button onClick={() => setActiveTab('checks')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'checks' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+               <Printer size={14} className="inline mr-1.5" /> Check Register
              </button>
              <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging
@@ -426,6 +441,30 @@ const APView: React.FC<APViewProps> = ({
             </tbody>
           </table>
         </div>
+      )}
+
+      {activeTab === 'matching' && (
+        <MatchingDashboard
+          payables={payables}
+          purchaseOrders={purchaseOrders}
+          goodsReceipts={goodsReceipts}
+          poLines={purchaseOrderLines}
+          grLines={goodsReceiptLines}
+          vendors={vendors}
+          accounts={accounts}
+          onApproveException={onApproveException}
+          onNotify={onNotify}
+        />
+      )}
+
+      {activeTab === 'checks' && (
+        <CheckRegisterView
+          checks={checks}
+          bankAccounts={bankAccounts}
+          vendors={vendors}
+          payables={payables}
+          onNotify={onNotify}
+        />
       )}
 
       {activeTab === 'aging' && (

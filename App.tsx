@@ -50,6 +50,7 @@ import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
 import EFTBatchView from './views/EFTBatchView';
 import GoodsReceiptView from './views/GoodsReceiptView';
+import APView from './views/APView';
 import WarehouseLocationsView from './views/WarehouseLocationsView';
 import StockItemsView from './views/StockItemsView';
 import InventoryView from './views/InventoryView';
@@ -57,6 +58,7 @@ import StockAdjustmentsView from './views/StockAdjustmentsView';
 import ReorderView from './views/ReorderView';
 import InventoryTransactionsView from './views/InventoryTransactionsView';
 import AdvancedInventoryReports from './views/AdvancedInventoryReports';
+import BackupRestoreView from './views/BackupRestoreView';
 
 // Lucide Icons
 import { 
@@ -68,7 +70,7 @@ import {
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
-  CheckCircle2, AlertCircle
+  CheckCircle2, AlertCircle, HardDrive
 } from 'lucide-react';
 
 export default function App() {
@@ -490,6 +492,43 @@ export default function App() {
     }
   };
 
+  const handleApproveException = async (payableId: string, notes: string) => {
+    try {
+      console.info('[App] Approving 3-way match exception for payable:', payableId, 'Notes:', notes);
+      const payable = payables.find(p => p.id === payableId);
+      if (!payable) {
+        handleNotify('error', 'Payable not found');
+        return;
+      }
+      
+      // Update payable status to approved with exception notes
+      const exceptionNotes = `3-Way Match Exception Approved: ${notes}`;
+      const updates: Partial<Payable> = {
+        status: 'approved',
+        notes: exceptionNotes,
+        approvedBy: currentUser?.id || 'system',
+        approvedAt: new Date().toISOString()
+      };
+      
+      await handleUpdatePayable(payableId, updates);
+      
+      // Log audit action for exception approval
+      AuditService.logAction(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'PAYABLE_EXCEPTION_APPROVED',
+        payableId,
+        `3-Way Match Exception: ${notes}`
+      );
+      
+      handleNotify('success', '3-Way Match exception approved successfully');
+    } catch (error) {
+      console.error('[App] Error approving exception:', error);
+      handleNotify('error', 'Failed to approve exception. Please try again.');
+    }
+  };
+
   // ============================================================================
   // ORGANIZATION & USER HANDLERS WITH SUPABASE PERSISTENCE
   // ============================================================================
@@ -547,6 +586,65 @@ export default function App() {
       handleNotify('error', 'Failed to delete organization. Falling back to memory storage.');
       // Fallback to memory storage
       setOrganizations(prev => prev.filter(o => o.id !== id));
+    }
+  };
+
+  // ============================================================================
+  // BACKUP & RESTORE HANDLER
+  // ============================================================================
+
+  const handleRestoreBackup = async (backupData: any) => {
+    try {
+      console.info('[App] Restoring backup for organization:', backupData.metadata?.orgId);
+      
+      // Update all state with restored data
+      if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations);
+      if (backupData.data.users?.length) setUsers(backupData.data.users);
+      if (backupData.data.students?.length) setStudents(backupData.data.students);
+      if (backupData.data.qualifications?.length) setQualifications(backupData.data.qualifications);
+      if (backupData.data.trainers?.length) setTrainers(backupData.data.trainers);
+      if (backupData.data.batches?.length) setBatches(backupData.data.batches);
+      if (backupData.data.sponsors?.length) setSponsors(backupData.data.sponsors);
+      if (backupData.data.vendors?.length) setVendors(backupData.data.vendors);
+      if (backupData.data.employees?.length) setEmployees(backupData.data.employees);
+      if (backupData.data.payrollRuns?.length) setPayrollRuns(backupData.data.payrollRuns);
+      if (backupData.data.journalEntries?.length) setJournalEntries(backupData.data.journalEntries);
+      if (backupData.data.journalEntryLines?.length) setJournalLines(backupData.data.journalEntryLines);
+      if (backupData.data.auditLogs?.length) setAuditLogs(backupData.data.auditLogs);
+      if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets);
+      if (backupData.data.accounts?.length) setAccounts(backupData.data.accounts);
+      if (backupData.data.purchaseOrders?.length) setPurchaseOrders(backupData.data.purchaseOrders);
+      if (backupData.data.paymentHistory?.length) setPaymentHistory(backupData.data.paymentHistory);
+      if (backupData.data.payables?.length) setPayables(backupData.data.payables);
+      if (backupData.data.accountingPeriods?.length) setAccountingPeriods(backupData.data.accountingPeriods);
+      if (backupData.data.checkVouchers?.length) setCheckVouchers(backupData.data.checkVouchers);
+      if (backupData.data.eftBatches?.length) setEFTBatches(backupData.data.eftBatches);
+      if (backupData.data.goodsReceipts?.length) setGoodsReceipts(backupData.data.goodsReceipts);
+      if (backupData.data.bankReconciliations?.length) setBankReconciliations(backupData.data.bankReconciliations);
+      if (backupData.data.warehouseLocations?.length) setWarehouseLocations(backupData.data.warehouseLocations);
+      if (backupData.data.stockItems?.length) setStockItems(backupData.data.stockItems);
+      if (backupData.data.inventoryLevels?.length) setInventoryLevels(backupData.data.inventoryLevels);
+      if (backupData.data.inventoryTransactions?.length) setInventoryTransactions(backupData.data.inventoryTransactions);
+      if (backupData.data.stockAdjustments?.length) setStockAdjustments(backupData.data.stockAdjustments);
+      if (backupData.data.nonStockItems?.length) setNonStockItems(backupData.data.nonStockItems);
+      if (backupData.data.fixedAssets?.length) setFixedAssets(backupData.data.fixedAssets);
+      if (backupData.data.bankAccounts?.length) setBankAccounts(backupData.data.bankAccounts);
+      if (backupData.data.locations?.length) setLocations(backupData.data.locations);
+
+      // Audit: Backup restored
+      AuditService.logAction(
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'BACKUP_RESTORED',
+        'BACKUP',
+        currentOrgId,
+        { backupTimestamp: backupData.metadata?.createdAt, recordCount: backupData.metadata?.recordCounts }
+      );
+
+      handleNotify('success', `Backup restored successfully. ${Object.values(backupData.metadata?.recordCounts || {}).reduce((a: number, b: number) => a + b, 0)} records restored.`);
+    } catch (error) {
+      console.error('[App] Error restoring backup:', error);
+      handleNotify('error', `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -2109,6 +2207,7 @@ export default function App() {
              <div className="mb-8">
                {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
                <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<HardDrive size={20}/>} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<BarChart2 size={20}/>} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -2205,6 +2304,7 @@ export default function App() {
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={gr => setGoodsReceipts(p => [...p, gr])} onUpdateGoodsReceipt={(id, u) => setGoodsReceipts(p => p.map(g => g.id === id ? {...g, ...u} : g))} onDeleteGoodsReceipt={id => setGoodsReceipts(p => p.filter(g => g.id !== id))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
@@ -2257,6 +2357,25 @@ export default function App() {
           />}
           {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
+          {activeTab === 'backup-restore' && (
+            <BackupRestoreView 
+              organizations={organizations}
+              currentOrgId={currentOrgId}
+              currentUserId={currentUser?.id || ''}
+              currentUserName={currentUser?.email || 'System'}
+              allData={{
+                organizations, users, students, qualifications, trainers, batches, sponsors,
+                vendors, employees, payrollRuns, journalEntries, journalEntryLines, auditLogs,
+                budgets, accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
+                checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
+                stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems,
+                fixedAssets, bankAccounts, locations
+              }}
+              onRestore={handleRestoreBackup}
+              onNotify={notify}
+              currency={currentOrg?.currency || 'USD'}
+            />
+          )}
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'schema' && <SchemaManualView />}
           {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}

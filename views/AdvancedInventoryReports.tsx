@@ -11,6 +11,7 @@ import {
   VarianceData,
   ABCAnalysisData,
 } from '../services/InventoryReportingService';
+import { DataExportService } from '../services/DataExportService';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -18,7 +19,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, AlertTriangle, Package, Zap, Users, TrendingDown,
-  Clock, DollarSign, Activity, CheckCircle
+  Clock, DollarSign, Activity, CheckCircle, Download
 } from 'lucide-react';
 
 interface AdvancedInventoryReportsProps {
@@ -188,7 +189,25 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
       {activeTab === 'aging' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Stock Age Distribution</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Stock Age Distribution</h2>
+              <button
+                onClick={() => {
+                  const exportData = sortedAging.map(item => ({
+                    itemCode: item.itemCode,
+                    itemName: item.itemName,
+                    quantity: item.currentQuantity,
+                    daysInStock: item.daysInStock,
+                    value: item.value,
+                    ageCategory: item.ageCategory
+                  }));
+                  DataExportService.exportAgingReport(exportData);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -266,7 +285,26 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
       {activeTab === 'valuation' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Valuation Method Comparison</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Valuation Method Comparison</h2>
+              <button
+                onClick={() => {
+                  const exportData = valuationReport.map(item => ({
+                    itemCode: item.itemCode,
+                    itemName: item.itemName,
+                    quantity: item.quantity,
+                    fifoValue: item.fifoValue,
+                    lifoValue: item.lifoValue,
+                    wacValue: item.weightedAvgValue,
+                    variance: item.fifoValue - item.lifoValue
+                  }));
+                  DataExportService.exportValuationComparison(exportData);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-100 border-b border-slate-200">
@@ -300,7 +338,24 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
       {activeTab === 'trends' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">12-Month Movement Trends</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">12-Month Movement Trends</h2>
+              <button
+                onClick={() => {
+                  const exportData = trendsReport.map(item => ({
+                    itemName: item.itemCode,
+                    period: item.period,
+                    quantity: item.quantity,
+                    value: item.value,
+                    trend: item.trend
+                  }));
+                  DataExportService.exportMovementTrends(exportData);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={trendsReport.slice(0, 24)}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -319,7 +374,24 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
       {activeTab === 'variance' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Variance by Severity</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Variance by Severity</h2>
+              <button
+                onClick={() => {
+                  const exportData = varianceReport.map(item => ({
+                    itemName: item.itemCode,
+                    expectedQuantity: item.expectedQuantity,
+                    actualQuantity: item.actualQuantity,
+                    variance: item.variance,
+                    variancePercent: item.variancePercent
+                  }));
+                  DataExportService.exportVarianceAnalysis(exportData);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -385,7 +457,25 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
       {activeTab === 'abc' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">ABC Classification by Annual Consumption Value</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">ABC Classification by Annual Consumption Value</h2>
+              <button
+                onClick={() => {
+                  const exportData = abcReport.map(item => ({
+                    itemName: item.itemCode,
+                    classification: item.classification,
+                    annualValue: item.annualValue,
+                    quantity: item.quantity,
+                    valuePercentage: item.valuePercentage,
+                    priority: item.priority
+                  }));
+                  DataExportService.exportABCAnalysis(exportData);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -476,10 +566,31 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
 
           {lowStockReport.length > 0 && (
             <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <AlertTriangle size={20} className="text-orange-500" />
-                Low Stock Items ({lowStockReport.length})
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-orange-500" />
+                  Low Stock Items ({lowStockReport.length})
+                </h2>
+                <button
+                  onClick={() => {
+                    const exportData = lowStockReport.map(item => ({
+                      itemCode: item.itemCode,
+                      itemName: item.itemName,
+                      currentQty: item.currentQuantity,
+                      minLevel: item.minimumLevel,
+                      deficit: item.quantityBelow,
+                      reorderPoint: item.reorderPoint
+                    }));
+                    DataExportService.exportTableData('Low_Stock_Items', exportData, 
+                      ['itemCode', 'itemName', 'currentQty', 'minLevel', 'deficit', 'reorderPoint'],
+                      ['Code', 'Item', 'Current Qty', 'Min Level', 'Deficit', 'Reorder Point']
+                    );
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                >
+                  <Download size={14} /> Export CSV
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 border-b border-slate-200">
