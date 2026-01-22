@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher } from '../types';
+import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher, RecurringBill, RecurringBillHistory } from '../types';
 import { AccountingService } from '../accountingService';
 import MatchingDashboard from './MatchingDashboard';
 import CheckRegisterView from './CheckRegisterView';
+import RecurringBillsView from './RecurringBillsView';
 import { 
   Truck, Plus, Filter, Search, FileText, ChevronRight, Clock, 
   X, Save, Trash2, AlertCircle, Calculator, Percent, History,
@@ -20,6 +21,8 @@ interface APViewProps {
   bankAccounts: BankAccount[];
   payables: Payable[];
   checks: CheckVoucher[];
+  recurringBills: RecurringBill[];
+  recurringBillHistory: RecurringBillHistory[];
   purchaseOrders: PurchaseOrder[];
   purchaseOrderLines: PurchaseOrderLine[];
   goodsReceipts: GoodsReceipt[];
@@ -28,13 +31,16 @@ interface APViewProps {
   onPostBill: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
   onCreatePayable: (payable: Payable) => void;
   onApproveException?: (payableId: string, notes: string) => void;
+  onCreateRecurringBill?: (bill: Partial<RecurringBill>) => void;
+  onUpdateRecurringBill?: (id: string, updates: Partial<RecurringBill>) => void;
+  onDeleteRecurringBill?: (id: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-type APTab = 'bills' | 'payments' | 'aging' | 'matching' | 'checks';
+type APTab = 'bills' | 'payments' | 'aging' | 'matching' | 'checks' | 'recurring';
 
 const APView: React.FC<APViewProps> = ({ 
-  vendors, entries, lines, items, accounts, bankAccounts, payables = [], checks = [], purchaseOrders = [], purchaseOrderLines = [], goodsReceipts = [], goodsReceiptLines = [], currentUserId = 'system', onPostBill, onCreatePayable, onApproveException, onNotify 
+  vendors, entries, lines, items, accounts, bankAccounts, payables = [], checks = [], recurringBills = [], recurringBillHistory = [], purchaseOrders = [], purchaseOrderLines = [], goodsReceipts = [], goodsReceiptLines = [], currentUserId = 'system', onPostBill, onCreatePayable, onApproveException, onNotify, onCreateRecurringBill, onUpdateRecurringBill, onDeleteRecurringBill 
 }) => {
   const [activeTab, setActiveTab] = useState<APTab>('bills');
   const [showModal, setShowModal] = useState(false);
@@ -308,6 +314,9 @@ const APView: React.FC<APViewProps> = ({
              <button onClick={() => setActiveTab('checks')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'checks' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <Printer size={14} className="inline mr-1.5" /> Check Register
              </button>
+             <button onClick={() => setActiveTab('recurring')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'recurring' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+               <Clock size={14} className="inline mr-1.5" /> Recurring Bills
+             </button>
              <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging
              </button>
@@ -453,6 +462,20 @@ const APView: React.FC<APViewProps> = ({
           vendors={vendors}
           accounts={accounts}
           onApproveException={onApproveException}
+          onNotify={onNotify}
+        />
+      )}
+
+      {activeTab === 'recurring' && (
+        <RecurringBillsView
+          recurringBills={recurringBills}
+          history={recurringBillHistory}
+          vendors={vendors}
+          accounts={accounts}
+          bankAccounts={bankAccounts}
+          onCreateBill={onCreateRecurringBill || ((bill) => {})}
+          onUpdateBill={onUpdateRecurringBill || ((id, updates) => {})}
+          onDeleteBill={onDeleteRecurringBill || ((id) => {})}
           onNotify={onNotify}
         />
       )}

@@ -1036,3 +1036,56 @@ export interface MulticurrencyBalance {
   functionalBalance: number;
   functionalCurrency: string;
 }
+
+export type RecurrenceFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL';
+export type RecurringBillStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+
+export interface RecurringBill extends BaseEntity {
+  id: string;
+  orgId: string;
+  vendorId: string;
+  billName: string;
+  description: string;
+  amount: number;
+  currency?: string;
+  frequency: RecurrenceFrequency;
+  startDate: string;
+  endDate?: string;
+  nextBillDate: string;
+  lastBillDate?: string;
+  billDaysAfterMonth?: number; // Day of month to generate bill (1-31)
+  status: RecurringBillStatus;
+  // Account mapping
+  glAccountId?: string;
+  expenseAccountId?: string;
+  departmentId?: string;
+  costCenterId?: string;
+  // Bill configuration
+  category?: PayableCategory;
+  paymentTermsDays?: number;
+  withholdingType?: WithholdingType;
+  atcItemId?: string;
+  atcRateId?: string;
+  appliedRatePercent?: number;
+  includeWithholding?: boolean;
+  // Tracking
+  totalBillsGenerated: number;
+  autoCreatePayable: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  lastModifiedBy?: string;
+  notes?: string;
+}
+
+export interface RecurringBillHistory extends BaseEntity {
+  id: string;
+  orgId: string;
+  recurringBillId: string;
+  payableId?: string;
+  billDate: string;
+  amount: number;
+  status: 'GENERATED' | 'CREATED' | 'SKIPPED' | 'FAILED';
+  notes?: string;
+  createdAt: string;
+}
