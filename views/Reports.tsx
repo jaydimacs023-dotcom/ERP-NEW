@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { TransactionSummary, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
-import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2, BarChart } from 'lucide-react';
+import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2, BarChart, Wrench } from 'lucide-react';
+import CustomReportBuilder from './CustomReportBuilder';
 
 interface ReportsProps {
   summaries: TransactionSummary[];
@@ -15,7 +16,7 @@ interface ReportsProps {
   logoUrl?: string;
 }
 
-type ReportType = 'BS' | 'IS' | 'TB' | 'CFS';
+type ReportType = 'BS' | 'IS' | 'TB' | 'CFS' | 'CUSTOM';
 
 const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualifications, batches, orgName = 'Institution Ledger', currency = 'USD', logoUrl }) => {
   const [reportType, setReportType] = useState<ReportType>('BS');
@@ -165,28 +166,32 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
       <div className="flex flex-col gap-6 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div className="flex bg-slate-100 rounded-2xl p-1.5 border border-slate-200">
+          <div className="flex bg-slate-100 rounded-2xl p-1.5 border border-slate-200 flex-wrap">
             <ReportTab active={reportType === 'BS'} onClick={() => { setReportType('BS'); setSelectedQualificationId(''); }} label="Balance Sheet" />
             <ReportTab active={reportType === 'IS'} onClick={() => setReportType('IS')} label="Profit & Loss" />
             <ReportTab active={reportType === 'CFS'} onClick={() => { setReportType('CFS'); setSelectedQualificationId(''); }} label="Cash Flow" />
             <ReportTab active={reportType === 'TB'} onClick={() => { setReportType('TB'); setSelectedQualificationId(''); }} label="Trial Balance" />
+            <ReportTab active={reportType === 'CUSTOM'} onClick={() => { setReportType('CUSTOM'); setSelectedQualificationId(''); }} label="Custom Builder" icon={<Wrench size={12} />} />
           </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-5 py-2.5 text-slate-600 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              <Printer size={16} /> Print Report
-            </button>
-            <button 
-              onClick={handleExport}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg"
-            >
-              <Download size={16} /> Export Data
-            </button>
-          </div>
+          {reportType !== 'CUSTOM' && (
+            <div className="flex gap-2">
+              <button 
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-5 py-2.5 text-slate-600 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                <Printer size={16} /> Print Report
+              </button>
+              <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg"
+              >
+                <Download size={16} /> Export Data
+              </button>
+            </div>
+          )}
         </div>
 
+        {reportType !== 'CUSTOM' && (
         <div className="flex flex-wrap items-center gap-10 pt-6 border-t border-slate-100">
            <div className="flex items-center gap-3">
              <div className="p-2 bg-slate-50 rounded-lg"><Calendar size={18} className="text-slate-400" /></div>
@@ -236,8 +241,21 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               )}
            </div>
         </div>
+        )}
       </div>
 
+      {/* Custom Report Builder - Full width, outside the standard controls box */}
+      {reportType === 'CUSTOM' && (
+        <CustomReportBuilder
+          accounts={accounts}
+          entries={entries}
+          lines={lines}
+          currency={currency}
+        />
+      )}
+
+      {/* Standard Reports Container */}
+      {reportType !== 'CUSTOM' && (
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
         <div className="p-16 border-b border-slate-50 bg-slate-50/20 text-center print:bg-white print:p-8">
           <div className="flex items-center justify-center gap-2 mb-4 no-print">
@@ -463,16 +481,17 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
 
-const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void }> = ({ active, label, onClick }) => (
+const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void, icon?: React.ReactNode }> = ({ active, label, onClick, icon }) => (
   <button 
     onClick={onClick}
-    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-indigo-600 shadow-md shadow-indigo-50 border border-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+    className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-indigo-600 shadow-md shadow-indigo-50 border border-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
   >
-    {label}
+    {icon}{label}
   </button>
 );
 

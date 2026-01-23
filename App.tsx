@@ -8,6 +8,7 @@ import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
 import { AuditService } from './services/AuditService';
 import { config } from './config/app';
+import { canAccess, canAccessGroup, MODULE_GROUPS, isSystemAdmin as checkSysAdmin, isTenantAdmin as checkTenantAdmin, getDefaultTab, hasFinanceAccess, hasARAccess, hasAPAccess, hasOperationsAccess } from './config/permissions';
 import { useNotifications } from './components/NotificationContext';
 
 // View Imports
@@ -544,10 +545,17 @@ export default function App() {
   const filteredLines = useMemo(() => journalLines.filter(l => activeEntryIds.has(l.journalEntryId)), [journalLines, activeEntryIds]);
   const summaries = useMemo(() => AccountingService.getLedgerSummaries(filteredAccounts, filteredLines), [filteredAccounts, filteredLines]);
 
-  // RBAC Controls
-  const isSysAdmin = currentUser?.role === 'SYSTEM_ADMIN';
+  // RBAC Controls - Using centralized permissions config
+  const isSysAdmin = checkSysAdmin(currentUser?.role);
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PRESIDENT' || isSysAdmin;
-  const isTenantAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'PRESIDENT'; // Excludes SYSTEM_ADMIN
+  const isTenantAdmin = checkTenantAdmin(currentUser?.role);
+  const isFinance = hasFinanceAccess(currentUser?.role);
+  const isRegistrar = hasOperationsAccess(currentUser?.role);
+  const isAR = hasARAccess(currentUser?.role);
+  const isAP = hasAPAccess(currentUser?.role);
+  
+  // Helper to check if user can access specific tab
+  const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
 
   // ============================================================================
   // PAYMENT DUE NOTIFICATION FOR TENANT ADMIN (5 days before due)
@@ -566,10 +574,6 @@ export default function App() {
              dueDate <= fiveDaysFromNow;
     });
   }, [payments, currentOrgId, isTenantAdmin]);
-  const isFinance = ['ACCOUNTANT', 'FINANCE_MANAGER', 'AR_SPECIALIST', 'AP_SPECIALIST', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
-  const isRegistrar = ['REGISTRAR', 'ADMIN'].includes(currentUser?.role || '');
-  const isAR = ['AR_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
-  const isAP = ['AP_SPECIALIST', 'ACCOUNTANT', 'FINANCE_MANAGER', 'ADMIN', 'PRESIDENT'].includes(currentUser?.role || '');
 
   // Persistent notification handler
   const { addNotification } = useNotifications();
@@ -598,9 +602,8 @@ export default function App() {
     // Audit: User login
     AuditService.login(user.orgId || '', user.id, user.name);
     
-    if (user.role === 'STUDENT') setActiveTab('student-portal');
-    else if (user.role === 'TRAINER') setActiveTab('trainer-portal');
-    else setActiveTab('dashboard');
+    // Set default tab based on role
+    setActiveTab(getDefaultTab(user.role));
   };
 
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
