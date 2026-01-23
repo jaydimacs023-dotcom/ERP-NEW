@@ -656,6 +656,184 @@ export class MockDataService implements IDataService {
     return [];
   }
 
+  // Employee CRUD
+  async createEmployee(employee: any): Promise<any> {
+    console.warn('[MockDataService] createEmployee - data not persisted.');
+    return { ...employee, id: employee.id || `emp-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateEmployee(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateEmployee - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteEmployee(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteEmployee - data not persisted.');
+  }
+  async getEmployeesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getEmployeesByOrg returning empty array.');
+    return [];
+  }
+  async getEmployeeById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getEmployeeById returning null.');
+    return null;
+  }
+
+  // Chart of Account CRUD
+  async createAccount(account: any): Promise<any> {
+    console.warn('[MockDataService] createAccount - data not persisted.');
+    return { ...account, id: account.id || `acct-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateAccount(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateAccount - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteAccount(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteAccount - data not persisted.');
+  }
+  async getAccountsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getAccountsByOrg returning empty array.');
+    return [];
+  }
+  async getAccountById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getAccountById returning null.');
+    return null;
+  }
+
+  // Journal Entry CRUD
+  async createJournalEntry(entry: any): Promise<any> {
+    console.warn('[MockDataService] createJournalEntry - data not persisted.');
+    return { ...entry, id: entry.id || `je-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateJournalEntry(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateJournalEntry - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteJournalEntry(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteJournalEntry - data not persisted.');
+  }
+  async getJournalEntriesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getJournalEntriesByOrg returning empty array.');
+    return [];
+  }
+  async getJournalEntryById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getJournalEntryById returning null.');
+    return null;
+  }
+
+  // Journal Entry Line CRUD
+  async createJournalLine(line: any): Promise<any> {
+    console.warn('[MockDataService] createJournalLine - data not persisted.');
+    return { ...line, id: line.id || `jel-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async createJournalLines(lines: any[]): Promise<any[]> {
+    console.warn('[MockDataService] createJournalLines - data not persisted.');
+    return lines.map((line, i) => ({ ...line, id: line.id || `jel-${Date.now()}-${i}` }));
+  }
+  async updateJournalLine(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateJournalLine - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteJournalLine(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteJournalLine - data not persisted.');
+  }
+  async getJournalLinesByEntry(entryId: string): Promise<any[]> {
+    console.warn('[MockDataService] getJournalLinesByEntry returning empty array.');
+    return [];
+  }
+
+  // Audit Log CRUD
+  async createAuditLog(log: any): Promise<any> {
+    console.warn('[MockDataService] createAuditLog - data not persisted.');
+    return { ...log, id: log.id || `audit-${Date.now()}`, timestamp: new Date().toISOString() };
+  }
+  async getAuditLogsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getAuditLogsByOrg returning empty array.');
+    return [];
+  }
+
+  // Purchase Order CRUD
+  async createPurchaseOrder(order: any): Promise<any> {
+    console.warn('[MockDataService] createPurchaseOrder - data not persisted.');
+    return { ...order, id: order.id || `po-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updatePurchaseOrder(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updatePurchaseOrder - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deletePurchaseOrder(id: string): Promise<void> {
+    console.warn('[MockDataService] deletePurchaseOrder - data not persisted.');
+  }
+  async getPurchaseOrdersByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getPurchaseOrdersByOrg returning empty array.');
+    return [];
+  }
+  async getPurchaseOrderById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getPurchaseOrderById returning null.');
+    return null;
+  }
+
+  // Goods Receipt CRUD
+  async createGoodsReceipt(receipt: any): Promise<any> {
+    console.warn('[MockDataService] createGoodsReceipt - data not persisted.');
+    return { ...receipt, id: receipt.id || `gr-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateGoodsReceipt(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateGoodsReceipt - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteGoodsReceipt(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteGoodsReceipt - data not persisted.');
+  }
+  async getGoodsReceiptsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getGoodsReceiptsByOrg returning empty array.');
+    return [];
+  }
+  async getGoodsReceiptById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getGoodsReceiptById returning null.');
+    return null;
+  }
+
+  // Recurring Bill CRUD
+  async createRecurringBill(bill: any): Promise<any> {
+    console.warn('[MockDataService] createRecurringBill - data not persisted.');
+    return { ...bill, id: bill.id || `rb-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateRecurringBill(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateRecurringBill - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteRecurringBill(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteRecurringBill - data not persisted.');
+  }
+  async getRecurringBillsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRecurringBillsByOrg returning empty array.');
+    return [];
+  }
+  async getRecurringBillById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getRecurringBillById returning null.');
+    return null;
+  }
+
+  // EFT Batch CRUD
+  async createEFTBatch(batch: any): Promise<any> {
+    console.warn('[MockDataService] createEFTBatch - data not persisted.');
+    return { ...batch, id: batch.id || `eft-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateEFTBatch(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateEFTBatch - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteEFTBatch(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteEFTBatch - data not persisted.');
+  }
+  async getEFTBatchesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getEFTBatchesByOrg returning empty array.');
+    return [];
+  }
+  async getEFTBatchById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getEFTBatchById returning null.');
+    return null;
+  }
+
   // Generic Entity CRUD
   async createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T> {
     console.warn(`[MockDataService] createEntity for ${table} is memory-only.`);

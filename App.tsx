@@ -603,7 +603,7 @@ export default function App() {
     else setActiveTab('dashboard');
   };
 
-  const handlePostJournal = (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
+  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
     const fullEntry = {
       ...entry,
       id: entry.id || `je-${Date.now()}`,
@@ -613,19 +613,40 @@ export default function App() {
       createdAt: new Date().toISOString()
     } as JournalEntry;
 
-    setJournalEntries(prev => [...prev, fullEntry]);
-    setJournalLines(prev => [...prev, ...lines]);
-    
-    // Audit: Journal entry posted
-    AuditService.post(
-      currentOrgId,
-      currentUser?.id || 'system',
-      currentUser?.name || 'System',
-      'JOURNAL_ENTRY',
-      fullEntry.id,
-      fullEntry.id,
-      `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
-    );
+    try {
+      console.info('[App] Posting journal entry:', fullEntry.id);
+      const savedEntry = await dataService.createJournalEntry(fullEntry);
+      const savedLines = await dataService.createJournalLines(lines);
+      
+      setJournalEntries(prev => [...prev, savedEntry]);
+      setJournalLines(prev => [...prev, ...savedLines]);
+      
+      // Audit: Journal entry posted
+      AuditService.post(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        savedEntry.id,
+        savedEntry.id,
+        `Posted ${savedEntry.sourceType}: ${savedEntry.description} (${savedLines.length} lines)`
+      );
+    } catch (error) {
+      console.error('[App] Error posting journal entry:', error);
+      // Fallback to memory storage
+      setJournalEntries(prev => [...prev, fullEntry]);
+      setJournalLines(prev => [...prev, ...lines]);
+      
+      AuditService.post(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        fullEntry.id,
+        fullEntry.id,
+        `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
+      );
+    }
   };
 
   const handleConvertToBill = (po: PurchaseOrder) => {
@@ -2226,6 +2247,240 @@ export default function App() {
     }
   };
 
+  // ===== Employee CRUD Handlers =====
+  const handleAddEmployee = async (employee: Employee) => {
+    try {
+      console.info('[App] Creating employee:', employee.lastName);
+      const empWithOrg = { ...employee, orgId: currentOrgId };
+      const savedEmployee = await dataService.createEmployee(empWithOrg);
+      setEmployees(prev => [...prev, savedEmployee]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', savedEmployee.id, `${employee.firstName} ${employee.lastName}`);
+      handleNotify('success', `Employee "${employee.firstName} ${employee.lastName}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating employee:', error);
+      handleNotify('error', 'Failed to create employee. Falling back to memory storage.');
+      const empWithOrg = { ...employee, orgId: currentOrgId };
+      setEmployees(prev => [...prev, empWithOrg]);
+    }
+  };
+
+  const handleUpdateEmployee = async (employee: Employee) => {
+    try {
+      console.info('[App] Updating employee:', employee.id);
+      const existing = employees.find(e => e.id === employee.id);
+      const updated = await dataService.updateEmployee(employee.id, employee);
+      setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, ...updated } : e));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', employee.id, `${employee.firstName} ${employee.lastName}`, existing, updated);
+      handleNotify('success', 'Employee updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating employee:', error);
+      handleNotify('error', 'Failed to update employee. Falling back to memory storage.');
+      setEmployees(prev => prev.map(e => e.id === employee.id ? employee : e));
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      console.info('[App] Deleting employee:', id);
+      const existing = employees.find(e => e.id === id);
+      await dataService.deleteEmployee(id);
+      setEmployees(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString() } : e));
+      
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', id, `${existing?.firstName} ${existing?.lastName}`);
+      handleNotify('success', 'Employee deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting employee:', error);
+      handleNotify('error', 'Failed to delete employee. Falling back to memory storage.');
+      setEmployees(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString() } : e));
+    }
+  };
+
+  // ===== Chart of Accounts CRUD Handlers =====
+  const handleAddAccount = async (account: ChartOfAccount) => {
+    try {
+      console.info('[App] Creating account:', account.name);
+      const acctWithOrg = { ...account, orgId: currentOrgId };
+      const savedAccount = await dataService.createAccount(acctWithOrg);
+      setAccounts(prev => [...prev, savedAccount]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', savedAccount.id, `${account.code} - ${account.name}`);
+      handleNotify('success', `Account "${account.code} - ${account.name}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating account:', error);
+      handleNotify('error', 'Failed to create account. Falling back to memory storage.');
+      const acctWithOrg = { ...account, orgId: currentOrgId };
+      setAccounts(prev => [...prev, acctWithOrg]);
+    }
+  };
+
+  const handleUpdateAccount = async (account: ChartOfAccount) => {
+    try {
+      console.info('[App] Updating account:', account.id);
+      const existing = accounts.find(a => a.id === account.id);
+      const updated = await dataService.updateAccount(account.id, account);
+      setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, ...updated } : a));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', account.id, `${account.code} - ${account.name}`, existing, updated);
+      handleNotify('success', 'Account updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating account:', error);
+      handleNotify('error', 'Failed to update account. Falling back to memory storage.');
+      setAccounts(prev => prev.map(a => a.id === account.id ? account : a));
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      console.info('[App] Deleting account:', id);
+      const existing = accounts.find(a => a.id === id);
+      await dataService.deleteAccount(id);
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', id, existing?.name);
+      handleNotify('success', 'Account deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting account:', error);
+      handleNotify('error', 'Failed to delete account. Falling back to memory storage.');
+      setAccounts(prev => prev.filter(a => a.id !== id));
+    }
+  };
+
+  // ===== Purchase Order CRUD Handlers =====
+  const handleAddPurchaseOrder = async (po: PurchaseOrder) => {
+    try {
+      console.info('[App] Creating purchase order:', po.reference);
+      const poWithOrg = { ...po, orgId: currentOrgId };
+      const savedPO = await dataService.createPurchaseOrder(poWithOrg);
+      setPurchaseOrders(prev => [...prev, savedPO]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PURCHASE_ORDER', savedPO.id, po.reference);
+      handleNotify('success', `Purchase Order "${po.reference}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating purchase order:', error);
+      handleNotify('error', 'Failed to create purchase order. Falling back to memory storage.');
+      const poWithOrg = { ...po, orgId: currentOrgId };
+      setPurchaseOrders(prev => [...prev, poWithOrg]);
+    }
+  };
+
+  const handleUpdatePurchaseOrderStatus = async (id: string, status: string) => {
+    try {
+      console.info('[App] Updating purchase order status:', id, status);
+      const existing = purchaseOrders.find(p => p.id === id);
+      const updated = await dataService.updatePurchaseOrder(id, { status: status as any });
+      setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, status: updated.status } : p));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PURCHASE_ORDER', id, existing?.reference, { status: existing?.status }, { status });
+      handleNotify('success', 'Purchase order status updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating purchase order:', error);
+      handleNotify('error', 'Failed to update purchase order. Falling back to memory storage.');
+      setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, status: status as any } : p));
+    }
+  };
+
+  // ===== Goods Receipt CRUD Handlers =====
+  const handleAddGoodsReceipt = async (gr: GoodsReceipt) => {
+    try {
+      console.info('[App] Creating goods receipt:', gr.receiptNumber);
+      const grWithOrg = { ...gr, orgId: currentOrgId };
+      const savedGR = await dataService.createGoodsReceipt(grWithOrg);
+      setGoodsReceipts(prev => [...prev, savedGR]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', savedGR.id, gr.receiptNumber);
+      handleNotify('success', `Goods Receipt "${gr.receiptNumber}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating goods receipt:', error);
+      handleNotify('error', 'Failed to create goods receipt. Falling back to memory storage.');
+      const grWithOrg = { ...gr, orgId: currentOrgId };
+      setGoodsReceipts(prev => [...prev, grWithOrg]);
+    }
+  };
+
+  const handleUpdateGoodsReceipt = async (id: string, updates: Partial<GoodsReceipt>) => {
+    try {
+      console.info('[App] Updating goods receipt:', id);
+      const existing = goodsReceipts.find(g => g.id === id);
+      const updated = await dataService.updateGoodsReceipt(id, updates);
+      setGoodsReceipts(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.receiptNumber, existing, { ...existing, ...updates });
+      handleNotify('success', 'Goods receipt updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating goods receipt:', error);
+      handleNotify('error', 'Failed to update goods receipt. Falling back to memory storage.');
+      setGoodsReceipts(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
+    }
+  };
+
+  const handleDeleteGoodsReceipt = async (id: string) => {
+    try {
+      console.info('[App] Deleting goods receipt:', id);
+      const existing = goodsReceipts.find(g => g.id === id);
+      await dataService.deleteGoodsReceipt(id);
+      setGoodsReceipts(prev => prev.filter(g => g.id !== id));
+      
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.receiptNumber);
+      handleNotify('success', 'Goods receipt deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting goods receipt:', error);
+      handleNotify('error', 'Failed to delete goods receipt. Falling back to memory storage.');
+      setGoodsReceipts(prev => prev.filter(g => g.id !== id));
+    }
+  };
+
+  // ===== EFT Batch CRUD Handlers =====
+  const handleAddEFTBatch = async (batch: EFTBatch) => {
+    try {
+      console.info('[App] Creating EFT batch:', batch.batchNumber);
+      const batchWithOrg = { ...batch, orgId: currentOrgId };
+      const savedBatch = await dataService.createEFTBatch(batchWithOrg);
+      setEftBatches(prev => [...prev, savedBatch]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', savedBatch.id, batch.batchNumber);
+      handleNotify('success', `EFT Batch "${batch.batchNumber}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating EFT batch:', error);
+      handleNotify('error', 'Failed to create EFT batch. Falling back to memory storage.');
+      const batchWithOrg = { ...batch, orgId: currentOrgId };
+      setEftBatches(prev => [...prev, batchWithOrg]);
+    }
+  };
+
+  const handleUpdateEFTBatch = async (id: string, updates: Partial<EFTBatch>) => {
+    try {
+      console.info('[App] Updating EFT batch:', id);
+      const existing = eftBatches.find(b => b.id === id);
+      const updated = await dataService.updateEFTBatch(id, updates);
+      setEftBatches(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', id, existing?.batchNumber, existing, { ...existing, ...updates });
+      handleNotify('success', 'EFT batch updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating EFT batch:', error);
+      handleNotify('error', 'Failed to update EFT batch. Falling back to memory storage.');
+      setEftBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    }
+  };
+
+  const handleDeleteEFTBatch = async (id: string) => {
+    try {
+      console.info('[App] Deleting EFT batch:', id);
+      const existing = eftBatches.find(b => b.id === id);
+      await dataService.deleteEFTBatch(id);
+      setEftBatches(prev => prev.filter(b => b.id !== id));
+      
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', id, existing?.batchNumber);
+      handleNotify('success', 'EFT batch deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting EFT batch:', error);
+      handleNotify('error', 'Failed to delete EFT batch. Falling back to memory storage.');
+      setEftBatches(prev => prev.filter(b => b.id !== id));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
@@ -2517,10 +2772,10 @@ export default function App() {
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
-          {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={gr => setGoodsReceipts(p => [...p, gr])} onUpdateGoodsReceipt={(id, u) => setGoodsReceipts(p => p.map(g => g.id === id ? {...g, ...u} : g))} onDeleteGoodsReceipt={id => setGoodsReceipts(p => p.filter(g => g.id !== id))} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
+          {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           
-          {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={a => setAccounts(p => [...p, a])} onUpdateAccount={a => setAccounts(p => p.map(x => x.id === a.id ? a : x))} onDeleteAccount={id => setAccounts(p => p.filter(x => x.id !== id))} />}
+          {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? {...p, ...updated} : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
@@ -2538,7 +2793,7 @@ export default function App() {
           {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'eft' && <EFTBatchView orgId={currentOrgId} batches={eftBatches} bankAccounts={bankAccounts} vendors={vendors} payables={payables} currentUserId={currentUser?.id} onCreateBatch={b => setEftBatches(p => [...p, b])} onUpdateBatch={(id, u) => setEftBatches(p => p.map(b => b.id === id ? {...b, ...u} : b))} onDeleteBatch={id => setEftBatches(p => p.filter(b => b.id !== id))} onNotify={handleNotify} />}
+          {activeTab === 'eft' && <EFTBatchView orgId={currentOrgId} batches={eftBatches} bankAccounts={bankAccounts} vendors={vendors} payables={payables} currentUserId={currentUser?.id} onCreateBatch={handleAddEFTBatch} onUpdateBatch={handleUpdateEFTBatch} onDeleteBatch={handleDeleteEFTBatch} onNotify={handleNotify} />}
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
@@ -2555,9 +2810,9 @@ export default function App() {
           
           {activeTab === 'employees' && <EmployeesView 
             employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} 
-            onAddEmployee={(emp) => { emp.orgId = currentOrgId; setEmployees(p => [...p, emp]); }} 
-            onUpdateEmployee={(emp) => setEmployees(p => p.map(x => x.id === emp.id ? emp : x))} 
-            onDeleteEmployee={(id) => setEmployees(p => p.map(x => x.id === id ? { ...x, isDeleted: true, deletedAt: new Date().toISOString() } : x))} 
+            onAddEmployee={handleAddEmployee} 
+            onUpdateEmployee={handleUpdateEmployee} 
+            onDeleteEmployee={handleDeleteEmployee} 
           />}
           {activeTab === 'users' && <UsersManagementView 
             users={users.filter(u => u.orgId === currentOrgId)} 

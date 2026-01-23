@@ -2917,5 +2917,799 @@ export class SupabaseDataService implements IDataService {
       return [];
     }
   }
+
+  // ============================================================================
+  // EMPLOYEE CRUD
+  // ============================================================================
+
+  async createEmployee(employee: any): Promise<any> {
+    console.debug('[Supabase] createEmployee called with:', employee);
+    try {
+      const payload = this.camelToSnake(employee);
+      delete payload.id;
+      const url = `${this.baseUrl}/employees`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create employee: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating employee:', error);
+      throw error;
+    }
+  }
+
+  async updateEmployee(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateEmployee called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/employees?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update employee: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating employee:', error);
+      throw error;
+    }
+  }
+
+  async deleteEmployee(id: string): Promise<void> {
+    console.debug('[Supabase] deleteEmployee called with id:', id);
+    try {
+      const url = `${this.baseUrl}/employees?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete employee');
+    } catch (error) {
+      console.error('[Supabase] Error deleting employee:', error);
+      throw error;
+    }
+  }
+
+  async getEmployeesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getEmployeesByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/employees?org_id=eq.${orgId}&is_deleted=eq.false&order=last_name.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching employees:', error);
+      return [];
+    }
+  }
+
+  async getEmployeeById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getEmployeeById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/employees?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching employee:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // CHART OF ACCOUNT CRUD
+  // ============================================================================
+
+  async createAccount(account: any): Promise<any> {
+    console.debug('[Supabase] createAccount called with:', account);
+    try {
+      const payload = this.camelToSnake(account);
+      delete payload.id;
+      const url = `${this.baseUrl}/accounts`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create account: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating account:', error);
+      throw error;
+    }
+  }
+
+  async updateAccount(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateAccount called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update account: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating account:', error);
+      throw error;
+    }
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    console.debug('[Supabase] deleteAccount called with id:', id);
+    try {
+      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete account');
+    } catch (error) {
+      console.error('[Supabase] Error deleting account:', error);
+      throw error;
+    }
+  }
+
+  async getAccountsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getAccountsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/accounts?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching accounts:', error);
+      return [];
+    }
+  }
+
+  async getAccountById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getAccountById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching account:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // JOURNAL ENTRY CRUD
+  // ============================================================================
+
+  async createJournalEntry(entry: any): Promise<any> {
+    console.debug('[Supabase] createJournalEntry called with:', entry);
+    try {
+      const payload = this.camelToSnake(entry);
+      delete payload.id;
+      const url = `${this.baseUrl}/journal_entries`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create journal entry: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating journal entry:', error);
+      throw error;
+    }
+  }
+
+  async updateJournalEntry(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateJournalEntry called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update journal entry: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating journal entry:', error);
+      throw error;
+    }
+  }
+
+  async deleteJournalEntry(id: string): Promise<void> {
+    console.debug('[Supabase] deleteJournalEntry called with id:', id);
+    try {
+      const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete journal entry');
+    } catch (error) {
+      console.error('[Supabase] Error deleting journal entry:', error);
+      throw error;
+    }
+  }
+
+  async getJournalEntriesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getJournalEntriesByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/journal_entries?org_id=eq.${orgId}&is_deleted=eq.false&order=date.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching journal entries:', error);
+      return [];
+    }
+  }
+
+  async getJournalEntryById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getJournalEntryById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching journal entry:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // JOURNAL ENTRY LINE CRUD
+  // ============================================================================
+
+  async createJournalLine(line: any): Promise<any> {
+    console.debug('[Supabase] createJournalLine called with:', line);
+    try {
+      const payload = this.camelToSnake(line);
+      delete payload.id;
+      const url = `${this.baseUrl}/journal_lines`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create journal line: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating journal line:', error);
+      throw error;
+    }
+  }
+
+  async createJournalLines(lines: any[]): Promise<any[]> {
+    console.debug('[Supabase] createJournalLines called with:', lines.length, 'lines');
+    try {
+      const payloads = lines.map(line => {
+        const payload = this.camelToSnake(line);
+        delete payload.id;
+        return payload;
+      });
+      const url = `${this.baseUrl}/journal_lines`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payloads)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create journal lines: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [this.snakeToCamel(data)];
+    } catch (error) {
+      console.error('[Supabase] Error creating journal lines:', error);
+      throw error;
+    }
+  }
+
+  async updateJournalLine(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateJournalLine called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update journal line: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating journal line:', error);
+      throw error;
+    }
+  }
+
+  async deleteJournalLine(id: string): Promise<void> {
+    console.debug('[Supabase] deleteJournalLine called with id:', id);
+    try {
+      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete journal line');
+    } catch (error) {
+      console.error('[Supabase] Error deleting journal line:', error);
+      throw error;
+    }
+  }
+
+  async getJournalLinesByEntry(entryId: string): Promise<any[]> {
+    console.debug('[Supabase] getJournalLinesByEntry called with entryId:', entryId);
+    try {
+      const url = `${this.baseUrl}/journal_lines?entry_id=eq.${entryId}&order=id.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching journal lines:', error);
+      return [];
+    }
+  }
+
+  // ============================================================================
+  // AUDIT LOG CRUD
+  // ============================================================================
+
+  async createAuditLog(log: any): Promise<any> {
+    console.debug('[Supabase] createAuditLog called with:', log);
+    try {
+      const payload = this.camelToSnake(log);
+      delete payload.id;
+      const url = `${this.baseUrl}/audit_logs`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create audit log: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating audit log:', error);
+      throw error;
+    }
+  }
+
+  async getAuditLogsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getAuditLogsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/audit_logs?org_id=eq.${orgId}&order=timestamp.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching audit logs:', error);
+      return [];
+    }
+  }
+
+  // ============================================================================
+  // PURCHASE ORDER CRUD
+  // ============================================================================
+
+  async createPurchaseOrder(order: any): Promise<any> {
+    console.debug('[Supabase] createPurchaseOrder called with:', order);
+    try {
+      const payload = this.camelToSnake(order);
+      delete payload.id;
+      const url = `${this.baseUrl}/purchase_orders`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create purchase order: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating purchase order:', error);
+      throw error;
+    }
+  }
+
+  async updatePurchaseOrder(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updatePurchaseOrder called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update purchase order: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating purchase order:', error);
+      throw error;
+    }
+  }
+
+  async deletePurchaseOrder(id: string): Promise<void> {
+    console.debug('[Supabase] deletePurchaseOrder called with id:', id);
+    try {
+      const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete purchase order');
+    } catch (error) {
+      console.error('[Supabase] Error deleting purchase order:', error);
+      throw error;
+    }
+  }
+
+  async getPurchaseOrdersByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getPurchaseOrdersByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/purchase_orders?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching purchase orders:', error);
+      return [];
+    }
+  }
+
+  async getPurchaseOrderById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getPurchaseOrderById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching purchase order:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // GOODS RECEIPT CRUD
+  // ============================================================================
+
+  async createGoodsReceipt(receipt: any): Promise<any> {
+    console.debug('[Supabase] createGoodsReceipt called with:', receipt);
+    try {
+      const payload = this.camelToSnake(receipt);
+      delete payload.id;
+      const url = `${this.baseUrl}/goods_receipts`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create goods receipt: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating goods receipt:', error);
+      throw error;
+    }
+  }
+
+  async updateGoodsReceipt(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateGoodsReceipt called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update goods receipt: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating goods receipt:', error);
+      throw error;
+    }
+  }
+
+  async deleteGoodsReceipt(id: string): Promise<void> {
+    console.debug('[Supabase] deleteGoodsReceipt called with id:', id);
+    try {
+      const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete goods receipt');
+    } catch (error) {
+      console.error('[Supabase] Error deleting goods receipt:', error);
+      throw error;
+    }
+  }
+
+  async getGoodsReceiptsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getGoodsReceiptsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/goods_receipts?org_id=eq.${orgId}&is_deleted=eq.false&order=receipt_date.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching goods receipts:', error);
+      return [];
+    }
+  }
+
+  async getGoodsReceiptById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getGoodsReceiptById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching goods receipt:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // RECURRING BILL CRUD
+  // ============================================================================
+
+  async createRecurringBill(bill: any): Promise<any> {
+    console.debug('[Supabase] createRecurringBill called with:', bill);
+    try {
+      const payload = this.camelToSnake(bill);
+      delete payload.id;
+      const url = `${this.baseUrl}/recurring_bills`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create recurring bill: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating recurring bill:', error);
+      throw error;
+    }
+  }
+
+  async updateRecurringBill(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateRecurringBill called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update recurring bill: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating recurring bill:', error);
+      throw error;
+    }
+  }
+
+  async deleteRecurringBill(id: string): Promise<void> {
+    console.debug('[Supabase] deleteRecurringBill called with id:', id);
+    try {
+      const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete recurring bill');
+    } catch (error) {
+      console.error('[Supabase] Error deleting recurring bill:', error);
+      throw error;
+    }
+  }
+
+  async getRecurringBillsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getRecurringBillsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/recurring_bills?org_id=eq.${orgId}&order=next_due_date.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring bills:', error);
+      return [];
+    }
+  }
+
+  async getRecurringBillById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getRecurringBillById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring bill:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // EFT BATCH CRUD
+  // ============================================================================
+
+  async createEFTBatch(batch: any): Promise<any> {
+    console.debug('[Supabase] createEFTBatch called with:', batch);
+    try {
+      const payload = this.camelToSnake(batch);
+      delete payload.id;
+      const url = `${this.baseUrl}/eft_batches`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create EFT batch: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating EFT batch:', error);
+      throw error;
+    }
+  }
+
+  async updateEFTBatch(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateEFTBatch called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update EFT batch: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating EFT batch:', error);
+      throw error;
+    }
+  }
+
+  async deleteEFTBatch(id: string): Promise<void> {
+    console.debug('[Supabase] deleteEFTBatch called with id:', id);
+    try {
+      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete EFT batch');
+    } catch (error) {
+      console.error('[Supabase] Error deleting EFT batch:', error);
+      throw error;
+    }
+  }
+
+  async getEFTBatchesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getEFTBatchesByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/eft_batches?org_id=eq.${orgId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching EFT batches:', error);
+      return [];
+    }
+  }
+
+  async getEFTBatchById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getEFTBatchById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching EFT batch:', error);
+      return null;
+    }
+  }
 }
 
