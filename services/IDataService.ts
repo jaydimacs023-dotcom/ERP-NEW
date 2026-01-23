@@ -4,8 +4,9 @@ import {
   Sponsor, NonStockItem, Vendor, BankAccount, Location, 
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
   JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
-  CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod,
-  StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint
+  CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
+  StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
+  RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, EFTBatch
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -145,6 +146,13 @@ export interface IDataService {
   deleteRecurringJournalEntry(id: string): Promise<void>;
   getRecurringJournalEntriesByOrg(orgId: string): Promise<RecurringJournalEntry[]>;
   getRecurringJournalEntryById(id: string): Promise<RecurringJournalEntry | null>;
+
+  // Recurring Invoice CRUD
+  createRecurringInvoice(invoice: RecurringInvoice): Promise<RecurringInvoice>;
+  updateRecurringInvoice(id: string, updates: Partial<RecurringInvoice>): Promise<RecurringInvoice>;
+  deleteRecurringInvoice(id: string): Promise<void>;
+  getRecurringInvoicesByOrg(orgId: string): Promise<RecurringInvoice[]>;
+  getRecurringInvoiceById(id: string): Promise<RecurringInvoice | null>;
   
   // Fixed Asset CRUD
   createFixedAsset(asset: FixedAsset): Promise<FixedAsset>;
@@ -238,6 +246,95 @@ export interface IDataService {
   getReorderPointsByOrg(orgId: string): Promise<ReorderPoint[]>;
   getReorderPointByItem(orgId: string, stockItemId: string): Promise<ReorderPoint | null>;
   getItemsNeedingReorder(orgId: string): Promise<StockItem[]>;
+
+  // Revenue Schedule CRUD (Deferred Revenue)
+  createRevenueSchedule(schedule: RevenueSchedule): Promise<RevenueSchedule>;
+  updateRevenueSchedule(id: string, updates: Partial<RevenueSchedule>): Promise<RevenueSchedule>;
+  deleteRevenueSchedule(id: string): Promise<void>;
+  getRevenueSchedulesByOrg(orgId: string): Promise<RevenueSchedule[]>;
+  getRevenueScheduleById(id: string): Promise<RevenueSchedule | null>;
+  getRevenueSchedulesByCustomer(orgId: string, customerId: string): Promise<RevenueSchedule[]>;
+
+  // Revenue Recognition Entry CRUD
+  createRevenueRecognitionEntry(entry: RevenueRecognitionEntry): Promise<RevenueRecognitionEntry>;
+  updateRevenueRecognitionEntry(id: string, updates: Partial<RevenueRecognitionEntry>): Promise<RevenueRecognitionEntry>;
+  deleteRevenueRecognitionEntry(id: string): Promise<void>;
+  getRevenueRecognitionEntriesByOrg(orgId: string): Promise<RevenueRecognitionEntry[]>;
+  getRevenueRecognitionEntriesBySchedule(scheduleId: string): Promise<RevenueRecognitionEntry[]>;
+
+  // Payroll Run CRUD
+  createPayrollRun(run: PayrollRun): Promise<PayrollRun>;
+  updatePayrollRun(id: string, updates: Partial<PayrollRun>): Promise<PayrollRun>;
+  deletePayrollRun(id: string): Promise<void>;
+  getPayrollRunsByOrg(orgId: string): Promise<PayrollRun[]>;
+  getPayrollRunById(id: string): Promise<PayrollRun | null>;
+
+  // Payroll Line CRUD
+  createPayrollLine(line: PayrollLine): Promise<PayrollLine>;
+  updatePayrollLine(id: string, updates: Partial<PayrollLine>): Promise<PayrollLine>;
+  deletePayrollLine(id: string): Promise<void>;
+  getPayrollLinesByRun(runId: string): Promise<PayrollLine[]>;
+  getPayrollLinesByEmployee(employeeId: string): Promise<PayrollLine[]>;
+
+  // Employee CRUD
+  createEmployee(employee: Employee): Promise<Employee>;
+  updateEmployee(id: string, updates: Partial<Employee>): Promise<Employee>;
+  deleteEmployee(id: string): Promise<void>;
+  getEmployeesByOrg(orgId: string): Promise<Employee[]>;
+  getEmployeeById(id: string): Promise<Employee | null>;
+
+  // Chart of Account CRUD
+  createAccount(account: ChartOfAccount): Promise<ChartOfAccount>;
+  updateAccount(id: string, updates: Partial<ChartOfAccount>): Promise<ChartOfAccount>;
+  deleteAccount(id: string): Promise<void>;
+  getAccountsByOrg(orgId: string): Promise<ChartOfAccount[]>;
+  getAccountById(id: string): Promise<ChartOfAccount | null>;
+
+  // Journal Entry CRUD
+  createJournalEntry(entry: JournalEntry): Promise<JournalEntry>;
+  updateJournalEntry(id: string, updates: Partial<JournalEntry>): Promise<JournalEntry>;
+  deleteJournalEntry(id: string): Promise<void>;
+  getJournalEntriesByOrg(orgId: string): Promise<JournalEntry[]>;
+  getJournalEntryById(id: string): Promise<JournalEntry | null>;
+
+  // Journal Entry Line CRUD
+  createJournalLine(line: JournalEntryLine): Promise<JournalEntryLine>;
+  updateJournalLine(id: string, updates: Partial<JournalEntryLine>): Promise<JournalEntryLine>;
+  deleteJournalLine(id: string): Promise<void>;
+  getJournalLinesByEntry(entryId: string): Promise<JournalEntryLine[]>;
+  createJournalLines(lines: JournalEntryLine[]): Promise<JournalEntryLine[]>;
+
+  // Audit Log CRUD
+  createAuditLog(log: AuditLog): Promise<AuditLog>;
+  getAuditLogsByOrg(orgId: string): Promise<AuditLog[]>;
+
+  // Purchase Order CRUD
+  createPurchaseOrder(order: PurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: string, updates: Partial<PurchaseOrder>): Promise<PurchaseOrder>;
+  deletePurchaseOrder(id: string): Promise<void>;
+  getPurchaseOrdersByOrg(orgId: string): Promise<PurchaseOrder[]>;
+  getPurchaseOrderById(id: string): Promise<PurchaseOrder | null>;
+
+  // Goods Receipt CRUD
+  createGoodsReceipt(receipt: GoodsReceipt): Promise<GoodsReceipt>;
+  updateGoodsReceipt(id: string, updates: Partial<GoodsReceipt>): Promise<GoodsReceipt>;
+  deleteGoodsReceipt(id: string): Promise<void>;
+  getGoodsReceiptsByOrg(orgId: string): Promise<GoodsReceipt[]>;
+  getGoodsReceiptById(id: string): Promise<GoodsReceipt | null>;
+
+  // Recurring Bill CRUD
+  createRecurringBill(bill: RecurringBill): Promise<RecurringBill>;
+  updateRecurringBill(id: string, updates: Partial<RecurringBill>): Promise<RecurringBill>;
+  deleteRecurringBill(id: string): Promise<void>;
+  getRecurringBillsByOrg(orgId: string): Promise<RecurringBill[]>;
+  getRecurringBillById(id: string): Promise<RecurringBill | null>;
+
+  // EFT Batch CRUD
+  createEFTBatch(batch: EFTBatch): Promise<EFTBatch>;
+  updateEFTBatch(id: string, updates: Partial<EFTBatch>): Promise<EFTBatch>;
+  deleteEFTBatch(id: string): Promise<void>;
+  getEFTBatchesByOrg(orgId: string): Promise<EFTBatch[]>;
+  getEFTBatchById(id: string): Promise<EFTBatch | null>;
 
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;

@@ -1,7 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Employee, PayrollRun, PayrollLine, ChartOfAccount, BankAccount, JournalEntry, JournalEntryLine } from '../types';
+import { Employee, PayrollRun, PayrollLine, ChartOfAccount, BankAccount, JournalEntry, JournalEntryLine, PayFrequency, OvertimeType } from '../types';
 import { AccountingService } from '../accountingService';
+import { TaxBracketService } from '../services/TaxBracketService';
+import { ContributionService } from '../services/ContributionService';
+import { PayrollCalculationService } from '../services/PayrollCalculationService';
 import { 
   UserCheck, Plus, Search, Calendar, ChevronRight, X, Play,
   ShieldCheck, Calculator, AlertCircle, TrendingUp, DollarSign,
@@ -53,13 +56,36 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
     const lines = activeEmployees.map(emp => {
       const basic = emp.basicSalary;
-      const adj = adjustments[emp.id] || { ot: 0, other: 0 };
-      const empGross = basic + adj.ot + adj.other;
+      const adj = adjustments[emp.id] || { ot: 0, other: 0, otHours: 0, otType: 'REGULAR_OT' as OvertimeType };
       
-      const sss = empGross > 20000 ? 1125 : empGross * 0.045;
-      const ph = empGross * 0.025;
-      const pi = 100;
-      const tax = empGross > 20833 ? (empGross - 20833) * 0.20 : 0;
+      // Calculate daily and hourly rates using PayrollCalculationService
+      const dailyRate = PayrollCalculationService.calculateDailyRate(basic);
+      const hourlyRate = PayrollCalculationService.calculateHourlyRate(dailyRate);
+      
+      // Calculate overtime pay using DOLE-mandated rates
+      let overtimePay = adj.ot; // Use direct amount if provided
+      if ((adj as any).otHours && (adj as any).otHours > 0) {
+        const otResult = PayrollCalculationService.calculateOvertimePay(
+          hourlyRate,
+          (adj as any).otHours,
+          (adj as any).otType || 'REGULAR_OT'
+        );
+        overtimePay = otResult.amount;
+      }
+      
+      const empGross = basic + overtimePay + adj.other;
+      
+      // Statutory deductions using 2024 contribution tables
+      const contributions = ContributionService.calculateAllContributions(empGross);
+      const sss = contributions.sssEmployeeShare;
+      const ph = contributions.philHealthEmployeeShare;
+      const pi = contributions.pagIBIGEmployeeShare;
+      
+      // BIR withholding tax using configurable brackets
+      // Default: Monthly pay frequency with BIR 2024 tax table
+      const payFrequency: PayFrequency = 'MONTHLY';
+      const taxResult = TaxBracketService.calculateWithDefault(empGross, payFrequency);
+      const tax = taxResult.totalWithholdingTax;
       
       const empDeductions = sss + ph + pi + tax;
       const empNet = empGross - empDeductions;
@@ -68,7 +94,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
       depr += empDeductions;
       net += empNet;
 
-      return { emp, empGross, empDeductions, empNet, sss, ph, pi, tax };
+      return { emp, empGross, empDeductions, empNet, sss, ph, pi, tax, overtimePay, dailyRate, hourlyRate };
     });
 
     return { lines, gross, depr, net };

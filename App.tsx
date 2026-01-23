@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -59,6 +59,8 @@ import ReorderView from './views/ReorderView';
 import InventoryTransactionsView from './views/InventoryTransactionsView';
 import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import BackupRestoreView from './views/BackupRestoreView';
+import RecurringInvoicesView from './views/RecurringInvoicesView';
+import RevenueRecognitionView from './views/RevenueRecognitionView';
 
 // Lucide Icons
 import { 
@@ -70,7 +72,7 @@ import {
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
-  CheckCircle2, AlertCircle, HardDrive
+  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp
 } from 'lucide-react';
 
 export default function App() {
@@ -118,6 +120,201 @@ export default function App() {
       handleNotify('success', 'Email verified successfully! You may now log in.');
     } else {
       handleNotify('error', 'Invalid or expired verification link.');
+    }
+  };
+
+    // Recurring Invoice CRUD Handlers
+    const handleAddRecurringInvoice = async (invoice: any) => {
+      try {
+        console.info('[App] Creating recurring invoice:', invoice.invoiceName);
+        const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
+        const created = await dataService.createRecurringInvoice(invoiceWithOrg);
+        setRecurringInvoices(prev => [...prev, created]);
+        // Audit: Recurring invoice created
+        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', created.id, `Recurring invoice: ${created.invoiceName}`);
+        handleNotify('success', 'Recurring invoice created successfully');
+      } catch (error) {
+        console.error('[App] Error creating recurring invoice:', error);
+        handleNotify('error', `Failed to create recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleUpdateRecurringInvoice = async (id: string, updates: any) => {
+      try {
+        console.info('[App] Updating recurring invoice:', id);
+        const existing = recurringInvoices.find(e => e.id === id);
+        const updated = await dataService.updateRecurringInvoice(id, updates);
+        setRecurringInvoices(prev => prev.map(e => e.id === id ? updated : e));
+        // Audit: Recurring invoice updated
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', id, existing?.invoiceName, existing, { ...existing, ...updates });
+        handleNotify('success', 'Recurring invoice updated successfully');
+      } catch (error) {
+        console.error('[App] Error updating recurring invoice:', error);
+        handleNotify('error', `Failed to update recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleDeleteRecurringInvoice = async (id: string) => {
+      try {
+        console.info('[App] Deleting recurring invoice:', id);
+        const existing = recurringInvoices.find(e => e.id === id);
+        await dataService.deleteRecurringInvoice(id);
+        setRecurringInvoices(prev => prev.filter(e => e.id !== id));
+        // Audit: Recurring invoice deleted
+        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', id, existing?.invoiceName);
+        handleNotify('success', 'Recurring invoice deleted successfully');
+      } catch (error) {
+        console.error('[App] Error deleting recurring invoice:', error);
+        handleNotify('error', `Failed to delete recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleRunRecurringInvoice = async (id: string) => {
+      try {
+        console.info('[App] Running recurring invoice:', id);
+        const invoice = recurringInvoices.find(e => e.id === id);
+        if (!invoice) {
+          handleNotify('error', 'Recurring invoice not found');
+          return;
+        }
+        // Import RecurringInvoiceService to use its logic
+        const { RecurringInvoiceService } = await import('./services/RecurringInvoiceService');
+        // Check if invoice is due
+        if (!RecurringInvoiceService.isDueToRun(invoice)) {
+          handleNotify('warning', 'This recurring invoice is not due to run yet');
+          return;
+        }
+        // Generate invoice from template
+        const invoiceDate = new Date().toISOString().split('T')[0];
+        const generatedId = crypto.randomUUID();
+        const { invoice: invoiceData, lines: invoiceLineData } = RecurringInvoiceService.generateInvoiceFromTemplate(
+          invoice,
+          invoiceDate,
+          generatedId
+        );
+        // Create invoice with lines
+        const newInvoice: Partial<any> = {
+          ...invoiceData,
+          orgId: currentOrgId,
+          createdBy: currentUser?.id || 'system',
+          createdAt: new Date().toISOString()
+        };
+        const created = await dataService.createInvoice(newInvoice);
+        // Update the recurring invoice with execution info
+        const updatedInvoice = RecurringInvoiceService.updateAfterExecution(invoice, created.id);
+        const updated = await dataService.updateRecurringInvoice(id, updatedInvoice);
+        setRecurringInvoices(prev => prev.map(e => e.id === id ? updated : e));
+        // Audit
+        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', created.id, `Auto-generated from recurring invoice: ${invoice.invoiceName}`);
+        handleNotify('success', 'Recurring invoice executed and posted successfully');
+      } catch (error) {
+        console.error('[App] Error running recurring invoice:', error);
+        handleNotify('error', `Failed to execute recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    // Revenue Schedule (Deferred Revenue) CRUD Handlers
+    const handleAddRevenueSchedule = async (schedule: any) => {
+      try {
+        console.info('[App] Creating revenue schedule:', schedule.description);
+        const scheduleWithOrg = { ...schedule, orgId: currentOrgId };
+        const created = await dataService.createRevenueSchedule(scheduleWithOrg);
+        setRevenueSchedules(prev => [...prev, created]);
+        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', created.id, `Revenue schedule: ${created.description}`);
+        handleNotify('success', 'Revenue schedule created successfully');
+      } catch (error) {
+        console.error('[App] Error creating revenue schedule:', error);
+        handleNotify('error', `Failed to create revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleUpdateRevenueSchedule = async (id: string, updates: any) => {
+      try {
+        console.info('[App] Updating revenue schedule:', id);
+        const existing = revenueSchedules.find(e => e.id === id);
+        const updated = await dataService.updateRevenueSchedule(id, updates);
+        setRevenueSchedules(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description, existing, { ...existing, ...updates });
+        handleNotify('success', 'Revenue schedule updated successfully');
+      } catch (error) {
+        console.error('[App] Error updating revenue schedule:', error);
+        handleNotify('error', `Failed to update revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleDeleteRevenueSchedule = async (id: string) => {
+      try {
+        console.info('[App] Deleting revenue schedule:', id);
+        const existing = revenueSchedules.find(e => e.id === id);
+        await dataService.deleteRevenueSchedule(id);
+        setRevenueSchedules(prev => prev.filter(e => e.id !== id));
+        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description);
+        handleNotify('success', 'Revenue schedule deleted successfully');
+      } catch (error) {
+        console.error('[App] Error deleting revenue schedule:', error);
+        handleNotify('error', `Failed to delete revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    // Revenue Recognition Entry Handlers
+    const handleAddRevenueRecognitionEntry = async (entry: any) => {
+      try {
+        console.info('[App] Creating revenue recognition entry');
+        const entryWithOrg = { ...entry, orgId: currentOrgId };
+        const created = await dataService.createRevenueRecognitionEntry(entryWithOrg);
+        setRevenueRecognitionEntries(prev => [...prev, created]);
+      } catch (error) {
+        console.error('[App] Error creating revenue recognition entry:', error);
+        handleNotify('error', `Failed to create recognition entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    const handleUpdateRevenueRecognitionEntry = async (id: string, updates: any) => {
+      try {
+        console.info('[App] Updating revenue recognition entry:', id);
+        const updated = await dataService.updateRevenueRecognitionEntry(id, updates);
+        setRevenueRecognitionEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+      } catch (error) {
+        console.error('[App] Error updating revenue recognition entry:', error);
+      }
+    };
+
+  // ============================================================================
+  // PAYROLL PERSISTENCE HANDLERS
+  // ============================================================================
+  
+  const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalEntryLine[]) => {
+    try {
+      console.info('[App] Posting payroll run:', run.id);
+      
+      // 1. Persist payroll run to Supabase
+      const savedRun = await dataService.createPayrollRun(run);
+      console.info('[App] Saved payroll run:', savedRun.id);
+      
+      // 2. Persist all payroll lines
+      const savedLines: PayrollLine[] = [];
+      for (const line of lines) {
+        const savedLine = await dataService.createPayrollLine({ ...line, runId: savedRun.id });
+        savedLines.push(savedLine);
+      }
+      console.info('[App] Saved', savedLines.length, 'payroll lines');
+      
+      // 3. Update local state
+      setPayrollRuns(prev => [...prev, savedRun as PayrollRun]);
+      setPayrollLines(prev => [...prev, ...savedLines as PayrollLine[]]);
+      
+      // 4. Post journal entry for GL integration
+      handlePostJournal(entry, entryLines);
+      
+      handleNotify('success', `Payroll run ${run.id} posted successfully with ${savedLines.length} employee lines`);
+    } catch (error) {
+      console.error('[App] Error posting payroll:', error);
+      handleNotify('error', `Failed to post payroll: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Fallback: At least update local state even if Supabase fails
+      setPayrollRuns(prev => [...prev, run as PayrollRun]);
+      setPayrollLines(prev => [...prev, ...lines as PayrollLine[]]);
+      handlePostJournal(entry, entryLines);
     }
   };
 
@@ -171,6 +368,14 @@ export default function App() {
   const [payables, setPayables] = useState<Payable[]>([]);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
   const [recurringBillHistory, setRecurringBillHistory] = useState<RecurringBillHistory[]>([]);
+
+  // Recurring Invoices (AR)
+  const [recurringInvoices, setRecurringInvoices] = useState<RecurringInvoice[]>([]);
+  const [recurringInvoiceHistory, setRecurringInvoiceHistory] = useState<RecurringInvoiceHistory[]>([]);
+
+  // Revenue Recognition & Deferred Revenue
+  const [revenueSchedules, setRevenueSchedules] = useState<RevenueSchedule[]>([]);
+  const [revenueRecognitionEntries, setRevenueRecognitionEntries] = useState<RevenueRecognitionEntry[]>([]);
 
   // Inventory Management State
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
@@ -2140,6 +2345,8 @@ export default function App() {
                <NavItem icon={<Printer size={20}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Zap size={20}/>} label="EFT Batches" active={activeTab === 'eft'} onClick={() => setActiveTab('eft')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<RefreshCw size={20}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<TrendingUp size={20}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<Package size={20}/>} label="Goods Receipt (GR)" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -2306,6 +2513,8 @@ export default function App() {
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'recurring-invoices' && <RecurringInvoicesView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} recurringInvoices={recurringInvoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} recurringInvoiceHistory={recurringInvoiceHistory.filter(h => h.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} onCreateRecurringInvoice={handleAddRecurringInvoice} onUpdateRecurringInvoice={handleUpdateRecurringInvoice} onDeleteRecurringInvoice={handleDeleteRecurringInvoice} onRunRecurringInvoice={handleRunRecurringInvoice} onNotify={handleNotify} />}
+          {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={po => setPurchaseOrders(p => [...p, po])} onUpdateStatus={(id, s) => setPurchaseOrders(p => p.map(x => x.id === id ? {...x, status: s} : x))} onConvertToBill={handleConvertToBill} />}
@@ -2335,7 +2544,7 @@ export default function App() {
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={payments.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} />}
           
-          {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={(r, l, e, el) => { setPayrollRuns(prev => [...prev, r as PayrollRun]); setPayrollLines(prev => [...prev, ...l as PayrollLine[]]); handlePostJournal(e, el); }} />}
+          {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
           {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}

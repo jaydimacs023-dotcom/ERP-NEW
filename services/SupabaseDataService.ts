@@ -1393,6 +1393,31 @@ export class SupabaseDataService implements IDataService {
   }
 
   // ============================================================================
+  // BILL CRUD
+  // ============================================================================
+  async createBill(bill: any): Promise<any> {
+    console.debug('[Supabase] createBill called with:', bill);
+    const snake = this.camelToSnake(bill);
+    const filtered = this.filterToTableSchema('bills', snake);
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('bills', filtered);
+  }
+
+  async updateBill(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateBill called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('bills', snake);
+    return this.updateInSupabaseRaw('bills', id, filtered);
+  }
+
+  async deleteBill(id: string): Promise<void> {
+    console.debug('[Supabase] deleteBill called with:', id);
+    return this.deleteFromSupabase('bills', id);
+  }
+
+  // ============================================================================
   // BANK ACCOUNT CRUD
   // ============================================================================
   async createBankAccount(account: any): Promise<any> {
@@ -1544,6 +1569,69 @@ export class SupabaseDataService implements IDataService {
       return null;
     }
   }
+
+    // ============================================================================
+    // RECURRING INVOICE CRUD
+    // ============================================================================
+    async createRecurringInvoice(invoice: any): Promise<any> {
+      console.debug('[Supabase] createRecurringInvoice called with:', invoice);
+      const snake = this.camelToSnake(invoice);
+      const filtered = this.filterToTableSchema('recurring_invoices', snake);
+      if (!filtered.id || filtered.id === '') {
+        delete (filtered as any).id;
+      }
+      return this.insertToSupabaseRaw('recurring_invoices', filtered);
+    }
+
+    async updateRecurringInvoice(id: string, updates: any): Promise<any> {
+      console.debug('[Supabase] updateRecurringInvoice called with:', id, updates);
+      const snake = this.camelToSnake(updates);
+      const filtered = this.filterToTableSchema('recurring_invoices', snake);
+      return this.updateInSupabaseRaw('recurring_invoices', id, filtered);
+    }
+
+    async deleteRecurringInvoice(id: string): Promise<void> {
+      console.debug('[Supabase] deleteRecurringInvoice called with:', id);
+      return this.deleteFromSupabase('recurring_invoices', id);
+    }
+
+    async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
+      console.debug('[Supabase] getRecurringInvoicesByOrg called with:', orgId);
+      try {
+        const url = `${this.baseUrl}/recurring_invoices?org_id=eq.${orgId}&order=created_at.desc`;
+        const response = await fetch(url, { headers: this.getHeaders() });
+        if (!response.ok) {
+          if (response.status === 404) {
+            return [];
+          }
+          throw new Error('Failed to fetch recurring invoices');
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+      } catch (error) {
+        console.error('[Supabase] Error fetching recurring invoices:', error);
+        return [];
+      }
+    }
+
+    async getRecurringInvoiceById(id: string): Promise<any | null> {
+      console.debug('[Supabase] getRecurringInvoiceById called with:', id);
+      try {
+        const url = `${this.baseUrl}/recurring_invoices?id=eq.${id}`;
+        const response = await fetch(url, { headers: this.getHeaders() });
+        if (!response.ok) {
+          if (response.status === 404) {
+            return null;
+          }
+          throw new Error('Failed to fetch recurring invoice');
+        }
+        const data = await response.json();
+        return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+      } catch (error) {
+        console.error('[Supabase] Error fetching recurring invoice:', error);
+        return null;
+      }
+    }
 
   /**
    * Vendor CRUD Operations
@@ -2438,6 +2526,394 @@ export class SupabaseDataService implements IDataService {
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching items needing reorder:', error);
+      return [];
+    }
+  }
+
+  // ============================================
+  // Revenue Schedule CRUD (Deferred Revenue)
+  // ============================================
+
+  async createRevenueSchedule(schedule: any): Promise<any> {
+    console.debug('[Supabase] createRevenueSchedule called');
+    try {
+      const snakeSchedule = this.camelToSnake(schedule);
+      const url = `${this.baseUrl}/revenue_schedules`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(snakeSchedule)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create revenue schedule: ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
+    } catch (error) {
+      console.error('[Supabase] Error creating revenue schedule:', error);
+      throw error;
+    }
+  }
+
+  async updateRevenueSchedule(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateRevenueSchedule called with id:', id);
+    try {
+      const snakeUpdates = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(snakeUpdates)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update revenue schedule: ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
+    } catch (error) {
+      console.error('[Supabase] Error updating revenue schedule:', error);
+      throw error;
+    }
+  }
+
+  async deleteRevenueSchedule(id: string): Promise<void> {
+    console.debug('[Supabase] deleteRevenueSchedule called with id:', id);
+    try {
+      const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete revenue schedule: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error deleting revenue schedule:', error);
+      throw error;
+    }
+  }
+
+  async getRevenueSchedulesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getRevenueSchedulesByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/revenue_schedules?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching revenue schedules:', error);
+      return [];
+    }
+  }
+
+  async getRevenueScheduleById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getRevenueScheduleById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}&is_deleted=eq.false`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching revenue schedule by id:', error);
+      return null;
+    }
+  }
+
+  async getRevenueSchedulesByCustomer(orgId: string, customerId: string): Promise<any[]> {
+    console.debug('[Supabase] getRevenueSchedulesByCustomer called');
+    try {
+      const url = `${this.baseUrl}/revenue_schedules?org_id=eq.${orgId}&customer_id=eq.${customerId}&is_deleted=eq.false&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching revenue schedules by customer:', error);
+      return [];
+    }
+  }
+
+  // ============================================
+  // Revenue Recognition Entry CRUD
+  // ============================================
+
+  async createRevenueRecognitionEntry(entry: any): Promise<any> {
+    console.debug('[Supabase] createRevenueRecognitionEntry called');
+    try {
+      const snakeEntry = this.camelToSnake(entry);
+      const url = `${this.baseUrl}/revenue_recognition_entries`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(snakeEntry)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create revenue recognition entry: ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
+    } catch (error) {
+      console.error('[Supabase] Error creating revenue recognition entry:', error);
+      throw error;
+    }
+  }
+
+  async updateRevenueRecognitionEntry(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateRevenueRecognitionEntry called with id:', id);
+    try {
+      const snakeUpdates = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/revenue_recognition_entries?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(snakeUpdates)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update revenue recognition entry: ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
+    } catch (error) {
+      console.error('[Supabase] Error updating revenue recognition entry:', error);
+      throw error;
+    }
+  }
+
+  async deleteRevenueRecognitionEntry(id: string): Promise<void> {
+    console.debug('[Supabase] deleteRevenueRecognitionEntry called with id:', id);
+    try {
+      const url = `${this.baseUrl}/revenue_recognition_entries?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete revenue recognition entry: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error deleting revenue recognition entry:', error);
+      throw error;
+    }
+  }
+
+  async getRevenueRecognitionEntriesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getRevenueRecognitionEntriesByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/revenue_recognition_entries?org_id=eq.${orgId}&order=recognition_date.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching revenue recognition entries:', error);
+      return [];
+    }
+  }
+
+  async getRevenueRecognitionEntriesBySchedule(scheduleId: string): Promise<any[]> {
+    console.debug('[Supabase] getRevenueRecognitionEntriesBySchedule called with scheduleId:', scheduleId);
+    try {
+      const url = `${this.baseUrl}/revenue_recognition_entries?schedule_id=eq.${scheduleId}&order=recognition_date.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching revenue recognition entries by schedule:', error);
+      return [];
+    }
+  }
+
+  // ============================================================================
+  // PAYROLL RUN CRUD
+  // ============================================================================
+
+  async createPayrollRun(run: any): Promise<any> {
+    console.debug('[Supabase] createPayrollRun called with:', run);
+    try {
+      const payload = this.camelToSnake(run);
+      delete payload.id;
+      const url = `${this.baseUrl}/payroll_runs`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create payroll run: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating payroll run:', error);
+      throw error;
+    }
+  }
+
+  async updatePayrollRun(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updatePayrollRun called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update payroll run: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating payroll run:', error);
+      throw error;
+    }
+  }
+
+  async deletePayrollRun(id: string): Promise<void> {
+    console.debug('[Supabase] deletePayrollRun called with id:', id);
+    try {
+      const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+      });
+      if (!response.ok) throw new Error('Failed to delete payroll run');
+    } catch (error) {
+      console.error('[Supabase] Error deleting payroll run:', error);
+      throw error;
+    }
+  }
+
+  async getPayrollRunsByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getPayrollRunsByOrg called with orgId:', orgId);
+    try {
+      const url = `${this.baseUrl}/payroll_runs?org_id=eq.${orgId}&is_deleted=eq.false&order=run_date.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching payroll runs:', error);
+      return [];
+    }
+  }
+
+  async getPayrollRunById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getPayrollRunById called with id:', id);
+    try {
+      const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching payroll run:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // PAYROLL LINE CRUD
+  // ============================================================================
+
+  async createPayrollLine(line: any): Promise<any> {
+    console.debug('[Supabase] createPayrollLine called with:', line);
+    try {
+      const payload = this.camelToSnake(line);
+      delete payload.id;
+      const url = `${this.baseUrl}/payroll_lines`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create payroll line: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error creating payroll line:', error);
+      throw error;
+    }
+  }
+
+  async updatePayrollLine(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updatePayrollLine called with id:', id, 'updates:', updates);
+    try {
+      const payload = this.camelToSnake(updates);
+      const url = `${this.baseUrl}/payroll_lines?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update payroll line: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+    } catch (error) {
+      console.error('[Supabase] Error updating payroll line:', error);
+      throw error;
+    }
+  }
+
+  async deletePayrollLine(id: string): Promise<void> {
+    console.debug('[Supabase] deletePayrollLine called with id:', id);
+    try {
+      const url = `${this.baseUrl}/payroll_lines?id=eq.${id}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete payroll line');
+    } catch (error) {
+      console.error('[Supabase] Error deleting payroll line:', error);
+      throw error;
+    }
+  }
+
+  async getPayrollLinesByRun(runId: string): Promise<any[]> {
+    console.debug('[Supabase] getPayrollLinesByRun called with runId:', runId);
+    try {
+      const url = `${this.baseUrl}/payroll_lines?run_id=eq.${runId}&order=employee_id.asc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching payroll lines:', error);
+      return [];
+    }
+  }
+
+  async getPayrollLinesByEmployee(employeeId: string): Promise<any[]> {
+    console.debug('[Supabase] getPayrollLinesByEmployee called with employeeId:', employeeId);
+    try {
+      const url = `${this.baseUrl}/payroll_lines?employee_id=eq.${employeeId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: this.getHeaders() });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching payroll lines by employee:', error);
       return [];
     }
   }

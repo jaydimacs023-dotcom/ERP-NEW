@@ -220,18 +220,30 @@ export class MockDataService implements IDataService {
     return { isUsed: false, usedIn: [] };
   }
 
-  async createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T> {
-    console.warn(`[MockDataService] ${table} persist to memory only; changes lost on refresh`);
-    return entity;
+  // Vendor CRUD
+  async createVendor(vendor: any): Promise<any> {
+    console.warn('[MockDataService] createVendor - data not persisted.');
+    return { ...vendor, id: vendor.id || `vendor-${Date.now()}` };
+  }
+  async updateVendor(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateVendor - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteVendor(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteVendor - data not persisted.');
   }
 
-  async updateEntity<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
-    console.warn(`[MockDataService] ${table} persist to memory only; changes lost on refresh`);
-    return { ...updates } as T;
+  // Bill CRUD
+  async createBill(bill: any): Promise<any> {
+    console.warn('[MockDataService] createBill - data not persisted.');
+    return { ...bill, id: bill.id || `bill-${Date.now()}` };
   }
-
-  async deleteEntity(table: string, id: string): Promise<void> {
-    console.warn(`[MockDataService] ${table} persist to memory only; changes lost on refresh`);
+  async updateBill(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateBill - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteBill(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteBill - data not persisted.');
   }
 
   async createFixedAsset(asset: any): Promise<any> {
@@ -330,6 +342,27 @@ export class MockDataService implements IDataService {
     console.warn('[MockDataService] getRecurringJournalEntryById returning null.');
     return null;
   }
+
+    // Recurring Invoice CRUD (mock)
+    async createRecurringInvoice(invoice: any): Promise<any> {
+      console.warn('[MockDataService] createRecurringInvoice is memory-only; changes lost on refresh.');
+      return { ...invoice };
+    }
+    async updateRecurringInvoice(id: string, updates: Partial<any>): Promise<any> {
+      console.warn('[MockDataService] updateRecurringInvoice is memory-only; changes lost on refresh.');
+      return { id, ...updates };
+    }
+    async deleteRecurringInvoice(id: string): Promise<void> {
+      console.warn('[MockDataService] deleteRecurringInvoice is memory-only; changes lost on refresh.');
+    }
+    async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
+      console.warn('[MockDataService] getRecurringInvoicesByOrg returning empty array.');
+      return [];
+    }
+    async getRecurringInvoiceById(id: string): Promise<any | null> {
+      console.warn('[MockDataService] getRecurringInvoiceById returning null.');
+      return null;
+    }
 
   // Check Voucher CRUD (mock)
   async createCheckVoucher(check: any): Promise<any> {
@@ -532,6 +565,94 @@ export class MockDataService implements IDataService {
   }
   async getItemsNeedingReorder(orgId: string): Promise<any[]> {
     console.warn('[MockDataService] getItemsNeedingReorder returning empty array.');
+    return [];
+  }
+
+  // Revenue Schedule CRUD (Deferred Revenue)
+  async createRevenueSchedule(schedule: any): Promise<any> {
+    console.warn('[MockDataService] createRevenueSchedule - data not persisted.');
+    return { ...schedule, id: schedule.id || `rev-sched-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateRevenueSchedule(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateRevenueSchedule - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deleteRevenueSchedule(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteRevenueSchedule - data not persisted.');
+  }
+  async getRevenueSchedulesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRevenueSchedulesByOrg returning empty array.');
+    return [];
+  }
+  async getRevenueScheduleById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getRevenueScheduleById returning null.');
+    return null;
+  }
+  async getRevenueSchedulesByCustomer(orgId: string, customerId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRevenueSchedulesByCustomer returning empty array.');
+    return [];
+  }
+
+  // Revenue Recognition Entry CRUD
+  async createRevenueRecognitionEntry(entry: any): Promise<any> {
+    console.warn('[MockDataService] createRevenueRecognitionEntry - data not persisted.');
+    return { ...entry, id: entry.id || `rev-entry-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateRevenueRecognitionEntry(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updateRevenueRecognitionEntry - data not persisted.');
+    return { id, ...updates };
+  }
+  async deleteRevenueRecognitionEntry(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteRevenueRecognitionEntry - data not persisted.');
+  }
+  async getRevenueRecognitionEntriesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRevenueRecognitionEntriesByOrg returning empty array.');
+    return [];
+  }
+  async getRevenueRecognitionEntriesBySchedule(scheduleId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRevenueRecognitionEntriesBySchedule returning empty array.');
+    return [];
+  }
+
+  // Payroll Run CRUD
+  async createPayrollRun(run: any): Promise<any> {
+    console.warn('[MockDataService] createPayrollRun - data not persisted.');
+    return { ...run, id: run.id || `payroll-run-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updatePayrollRun(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updatePayrollRun - data not persisted.');
+    return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async deletePayrollRun(id: string): Promise<void> {
+    console.warn('[MockDataService] deletePayrollRun - data not persisted.');
+  }
+  async getPayrollRunsByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getPayrollRunsByOrg returning empty array.');
+    return [];
+  }
+  async getPayrollRunById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getPayrollRunById returning null.');
+    return null;
+  }
+
+  // Payroll Line CRUD
+  async createPayrollLine(line: any): Promise<any> {
+    console.warn('[MockDataService] createPayrollLine - data not persisted.');
+    return { ...line, id: line.id || `payroll-line-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updatePayrollLine(id: string, updates: any): Promise<any> {
+    console.warn('[MockDataService] updatePayrollLine - data not persisted.');
+    return { id, ...updates };
+  }
+  async deletePayrollLine(id: string): Promise<void> {
+    console.warn('[MockDataService] deletePayrollLine - data not persisted.');
+  }
+  async getPayrollLinesByRun(runId: string): Promise<any[]> {
+    console.warn('[MockDataService] getPayrollLinesByRun returning empty array.');
+    return [];
+  }
+  async getPayrollLinesByEmployee(employeeId: string): Promise<any[]> {
+    console.warn('[MockDataService] getPayrollLinesByEmployee returning empty array.');
     return [];
   }
 

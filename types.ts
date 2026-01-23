@@ -1089,3 +1089,885 @@ export interface RecurringBillHistory extends BaseEntity {
   notes?: string;
   createdAt: string;
 }
+
+export type RecurringInvoiceStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+
+export interface RecurringInvoiceLineItem {
+  itemId: string;
+  description?: string;
+  quantity: number;
+  unitPrice: number;
+  taxAmount?: number;
+}
+
+export interface RecurringInvoice extends BaseEntity {
+  id: string;
+  orgId: string;
+  customerId: string;
+  invoiceName: string;
+  description: string;
+  amount: number;
+  currency?: string;
+  frequency: RecurrenceFrequency;
+  startDate: string;
+  endDate?: string;
+  nextInvoiceDate: string;
+  lastInvoiceDate?: string;
+  invoiceDaysAfterMonth?: number; // Day of month to generate invoice (1-31)
+  status: RecurringInvoiceStatus;
+  // Line items (charge items)
+  lineItems?: RecurringInvoiceLineItem[];
+  // Account mapping
+  arAccountId?: string;
+  revenueAccountId?: string;
+  departmentId?: string;
+  costCenterId?: string;
+  // Invoice configuration
+  category?: string;
+  paymentTermsDays?: number;
+  // Tracking
+  totalInvoicesGenerated: number;
+  autoCreateReceivable: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  lastModifiedBy?: string;
+  notes?: string;
+}
+
+export interface RecurringInvoiceHistory extends BaseEntity {
+  id: string;
+  orgId: string;
+  recurringInvoiceId: string;
+  receivableId?: string;
+  invoiceDate: string;
+  amount: number;
+  status: 'GENERATED' | 'CREATED' | 'SKIPPED' | 'FAILED';
+  notes?: string;
+  createdAt: string;
+}
+
+// ============================================
+// Revenue Recognition & Deferred Revenue Types
+// ============================================
+
+/**
+ * Recognition Method defines how revenue is recognized over time
+ * - STRAIGHT_LINE: Equal amounts over the recognition period
+ * - PERCENTAGE_OF_COMPLETION: Based on milestones or % complete
+ * - POINT_IN_TIME: Recognized at a specific point (delivery/completion)
+ */
+export type RecognitionMethod = 'STRAIGHT_LINE' | 'PERCENTAGE_OF_COMPLETION' | 'POINT_IN_TIME';
+
+/**
+ * Recognition Period defines the time interval for straight-line recognition
+ */
+export type RecognitionPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY';
+
+/**
+ * Status of a revenue schedule
+ */
+export type RevenueScheduleStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+
+/**
+ * Revenue Schedule - Template for recognizing deferred revenue over time
+ * When payment is received upfront (e.g., tuition), create a schedule to
+ * recognize it as earned revenue over the service delivery period.
+ */
+export interface RevenueSchedule extends BaseEntity {
+  id: string;
+  orgId: string;
+  
+  // Source reference (what generated this deferred revenue)
+  sourceType: 'INVOICE' | 'RECEIVABLE' | 'MANUAL';
+  sourceId?: string; // Link to AR invoice/receivable
+  sourceReference?: string; // Invoice number or manual reference
+  
+  // Customer/Student
+  customerId: string;
+  customerName?: string;
+  
+  // Revenue details
+  description: string;
+  totalAmount: number; // Total amount to be recognized
+  currency?: string;
+  
+  // Recognition settings
+  recognitionMethod: RecognitionMethod;
+  recognitionPeriod?: RecognitionPeriod; // For straight-line
+  
+  // Schedule dates
+  startDate: string; // When recognition begins
+  endDate: string; // When recognition ends
+  
+  // Tracking
+  recognizedAmount: number; // Amount recognized so far
+  deferredBalance: number; // Remaining unrecognized amount
+  
+  // GL Account mapping
+  deferredRevenueAccountId: string; // Liability account (Deferred Revenue)
+  revenueAccountId: string; // Revenue account (Earned Revenue)
+  
+  // Status
+  status: RevenueScheduleStatus;
+  lastRecognitionDate?: string;
+  nextRecognitionDate?: string;
+  
+  // Audit
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  notes?: string;
+}
+
+/**
+ * Recognition Entry - Individual recognition transaction record
+ * Each entry represents a portion of deferred revenue being recognized as earned
+ */
+export interface RevenueRecognitionEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  scheduleId: string;
+  
+  // Recognition details
+  recognitionDate: string;
+  periodStart: string;
+  periodEnd: string;
+  amount: number;
+  
+  // GL posting
+  journalEntryId?: string; // Link to posted journal entry
+  
+  // Status
+  status: 'PENDING' | 'POSTED' | 'REVERSED';
+  postedDate?: string;
+  postedBy?: string;
+  
+  // For percentage-of-completion method
+  percentageComplete?: number;
+  milestone?: string;
+  
+  // Audit
+  createdAt: string;
+  notes?: string;
+}
+
+/**
+ * Deferred Revenue Summary - Aggregated view for reporting
+ */
+export interface DeferredRevenueSummary {
+  customerId: string;
+  customerName: string;
+  totalDeferred: number;
+  totalRecognized: number;
+  totalRemaining: number;
+  scheduleCount: number;
+  oldestScheduleDate: string;
+  newestScheduleDate: string;
+}
+
+// ============================================
+// Tax Bracket & Withholding Tax Types
+// ============================================
+
+/**
+ * Pay frequency for tax calculation
+ */
+export type PayFrequency = 'MONTHLY' | 'SEMI_MONTHLY' | 'WEEKLY' | 'DAILY';
+
+/**
+ * Individual tax bracket configuration
+ */
+export interface TaxBracket extends BaseEntity {
+  id: string;
+  orgId: string;
+  tableId: string; // Reference to parent TaxTable
+  bracketNumber: number; // Order/sequence (1, 2, 3...)
+  minAmount: number; // Minimum compensation for this bracket
+  maxAmount: number | null; // Maximum compensation (null = no upper limit)
+  baseTax: number; // Fixed tax amount at bracket start
+  rate: number; // Percentage rate (e.g., 0.15 for 15%)
+  overAmount: number; // Tax rate applies to amount over this threshold
+  description?: string;
+}
+
+/**
+ * Tax table containing multiple brackets
+ */
+export interface TaxTable extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string; // e.g., "BIR 2024 Monthly Withholding Tax"
+  description?: string;
+  frequency: PayFrequency;
+  effectiveFrom: string; // Date when this table becomes effective
+  effectiveTo?: string; // Date when this table expires (null = current)
+  isDefault: boolean; // Is this the default table for the frequency
+  country?: string; // e.g., "PH" for Philippines
+  version?: string; // e.g., "2024", "TRAIN Law"
+  brackets?: TaxBracket[]; // Loaded brackets
+}
+
+/**
+ * Result of tax calculation
+ */
+export interface TaxCalculationResult {
+  grossCompensation: number;
+  taxableIncome: number;
+  bracketNumber: number;
+  bracketDescription?: string;
+  baseTax: number;
+  excessAmount: number;
+  taxOnExcess: number;
+  totalWithholdingTax: number;
+}
+
+// ============================================================================
+// STATUTORY CONTRIBUTION TYPES (SSS, PhilHealth, PAGIBIG)
+// ============================================================================
+
+/**
+ * SSS Contribution bracket based on Monthly Salary Credit (MSC)
+ * Reference: SSS Contribution Table effective 2024
+ */
+export interface SSSBracket {
+  id?: string;
+  bracketNumber: number;
+  minCompensation: number; // Minimum monthly salary compensation
+  maxCompensation: number | null; // Maximum compensation (null = no upper limit)
+  monthlySalaryCredit: number; // MSC - basis for contribution
+  employeeShare: number; // Employee's contribution amount
+  employerShare: number; // Employer's contribution amount
+  totalContribution: number; // Total monthly contribution
+  ecEmployer?: number; // Employer EC contribution (if applicable)
+}
+
+/**
+ * SSS Contribution Table
+ */
+export interface SSSContributionTable extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  employeeRate: number; // e.g., 0.045 (4.5%)
+  employerRate: number; // e.g., 0.095 (9.5%)
+  minMSC: number; // Minimum Monthly Salary Credit
+  maxMSC: number; // Maximum Monthly Salary Credit
+  isDefault: boolean;
+  brackets: SSSBracket[];
+}
+
+/**
+ * PhilHealth contribution parameters
+ * Reference: PhilHealth Circular 2024
+ */
+export interface PhilHealthTable extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  premiumRate: number; // Total rate (e.g., 0.05 = 5%)
+  employeeShareRate: number; // Employee's share of premium (e.g., 0.025 = 2.5%)
+  employerShareRate: number; // Employer's share (e.g., 0.025 = 2.5%)
+  monthlyFloor: number; // Minimum monthly basic salary for contribution
+  monthlyCeiling: number; // Maximum monthly basic salary for contribution
+  minContribution: number; // Minimum monthly contribution
+  maxContribution: number; // Maximum monthly contribution
+  isDefault: boolean;
+}
+
+/**
+ * Pag-IBIG (HDMF) contribution parameters
+ * Reference: Pag-IBIG Circular 2024
+ */
+export interface PagIBIGTable extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  tier1MaxCompensation: number; // Threshold for tier 1 (e.g., 1500)
+  tier1EmployeeRate: number; // Rate for tier 1 (e.g., 0.01 = 1%)
+  tier1EmployerRate: number;
+  tier2EmployeeRate: number; // Rate for tier 2 (e.g., 0.02 = 2%)
+  tier2EmployerRate: number;
+  maxMonthlyCompensation: number; // Maximum compensation for contribution (e.g., 5000)
+  maxEmployeeContribution: number; // Maximum monthly employee contribution
+  maxEmployerContribution: number; // Maximum monthly employer contribution
+  isDefault: boolean;
+}
+
+/**
+ * Result of statutory contribution calculation
+ */
+export interface ContributionCalculationResult {
+  grossCompensation: number;
+  
+  // SSS
+  sssEmployeeShare: number;
+  sssEmployerShare: number;
+  sssMonthlySalaryCredit: number;
+  sssBracketNumber?: number;
+  
+  // PhilHealth
+  philHealthEmployeeShare: number;
+  philHealthEmployerShare: number;
+  philHealthBasis: number; // Actual salary used for computation
+  
+  // Pag-IBIG
+  pagIBIGEmployeeShare: number;
+  pagIBIGEmployerShare: number;
+  pagIBIGTier: 1 | 2;
+  
+  // Totals
+  totalEmployeeContributions: number;
+  totalEmployerContributions: number;
+  totalContributions: number;
+}
+
+// ============================================================================
+// OVERTIME TYPES
+// ============================================================================
+
+/**
+ * Philippine DOLE Overtime Types with multipliers
+ */
+export type OvertimeType = 
+  | 'REGULAR_OT'           // Regular day overtime (after 8 hrs)
+  | 'REST_DAY'             // Rest day work
+  | 'REST_DAY_OT'          // Rest day overtime
+  | 'SPECIAL_HOLIDAY'      // Special non-working holiday
+  | 'SPECIAL_HOLIDAY_OT'   // Special holiday overtime
+  | 'SPECIAL_HOLIDAY_REST' // Special holiday falling on rest day
+  | 'SPECIAL_HOLIDAY_REST_OT'
+  | 'REGULAR_HOLIDAY'      // Regular holiday
+  | 'REGULAR_HOLIDAY_OT'   // Regular holiday overtime
+  | 'REGULAR_HOLIDAY_REST' // Regular holiday on rest day
+  | 'REGULAR_HOLIDAY_REST_OT'
+  | 'DOUBLE_HOLIDAY'       // Two holidays on same day
+  | 'DOUBLE_HOLIDAY_OT'
+  | 'NIGHT_DIFF';          // Night differential (10pm-6am)
+
+/**
+ * Overtime rate multipliers per DOLE regulations
+ */
+export interface OvertimeRateTable extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  isDefault: boolean;
+  rates: Record<OvertimeType, number>; // Multiplier for each OT type
+}
+
+/**
+ * Overtime entry for an employee
+ */
+export interface OvertimeEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  payrollRunId?: string;
+  date: string;
+  overtimeType: OvertimeType;
+  hours: number;
+  hourlyRate: number; // Base hourly rate
+  multiplier: number;
+  amount: number;
+  approvedBy?: string;
+  approvedAt?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
+  remarks?: string;
+}
+
+// ============================================================================
+// LEAVE MANAGEMENT TYPES
+// ============================================================================
+
+export type LeaveType = 
+  | 'VACATION'
+  | 'SICK'
+  | 'MATERNITY'
+  | 'PATERNITY'
+  | 'SOLO_PARENT'
+  | 'BEREAVEMENT'
+  | 'EMERGENCY'
+  | 'UNPAID'
+  | 'SERVICE_INCENTIVE'
+  | 'SPECIAL_PRIVILEGE'
+  | 'STUDY'
+  | 'COMPENSATORY';
+
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'TAKEN';
+
+/**
+ * Leave type configuration
+ */
+export interface LeavePolicy extends BaseEntity {
+  id: string;
+  orgId: string;
+  leaveType: LeaveType;
+  name: string;
+  description?: string;
+  annualAllocation: number; // Days per year
+  maxCarryOver: number; // Max days that can be carried to next year
+  carryOverExpiry?: number; // Months after which carry-over expires
+  isPaid: boolean;
+  requiresDocumentation: boolean; // e.g., medical certificate for sick leave
+  minServiceMonths?: number; // Minimum months of service to be eligible
+  applicableGender?: 'MALE' | 'FEMALE' | 'ALL';
+  maxConsecutiveDays?: number;
+  advanceNoticeDays?: number; // Required days of advance notice
+  isActive: boolean;
+}
+
+/**
+ * Employee leave balance
+ */
+export interface LeaveBalance extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  leaveType: LeaveType;
+  year: number;
+  allocated: number; // Total days allocated for the year
+  used: number; // Days already used
+  pending: number; // Days in pending requests
+  carriedOver: number; // Days carried from previous year
+  forfeited: number; // Days forfeited (expired carry-over)
+  balance: number; // Remaining available days
+  asOfDate: string;
+}
+
+/**
+ * Leave request
+ */
+export interface LeaveRequest extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  halfDay?: 'AM' | 'PM'; // For half-day leaves
+  reason: string;
+  attachmentUrl?: string;
+  status: LeaveStatus;
+  appliedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewerRemarks?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
+}
+
+/**
+ * Leave accrual configuration
+ */
+export interface LeaveAccrualConfig extends BaseEntity {
+  id: string;
+  orgId: string;
+  leaveType: LeaveType;
+  accrualMethod: 'ANNUAL' | 'MONTHLY' | 'SEMI_MONTHLY' | 'PRORATED';
+  accrualRate: number; // Days per period
+  startMonth?: number; // 1-12, when annual accrual happens
+  vestingPeriodMonths?: number; // Months before accrual is vested
+  isActive: boolean;
+}
+
+// ============================================================================
+// 13TH MONTH PAY TYPES
+// ============================================================================
+
+/**
+ * 13th month pay calculation record
+ */
+export interface ThirteenthMonthPay extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  year: number;
+  
+  // Calculation details
+  totalBasicSalaryEarned: number; // Total basic pay for the year
+  monthsWorked: number;
+  averageMonthlyBasic: number;
+  thirteenthMonthAmount: number;
+  
+  // Payment details
+  paymentDate?: string;
+  payrollRunId?: string;
+  status: 'CALCULATED' | 'APPROVED' | 'PAID';
+  
+  // For separated employees
+  isSeparated: boolean;
+  separationDate?: string;
+  proRatedDays?: number;
+  
+  // Tax treatment
+  taxExemptPortion: number; // First ₱90,000 is tax-exempt
+  taxablePortion: number;
+  withholdingTax: number;
+  netAmount: number;
+}
+
+// ============================================================================
+// SEPARATION PAY TYPES
+// ============================================================================
+
+export type SeparationType = 
+  | 'RESIGNATION'          // Voluntary resignation
+  | 'RETIREMENT'           // Retirement (age or years of service)
+  | 'REDUNDANCY'           // Position abolished
+  | 'RETRENCHMENT'        // Cost-cutting layoff
+  | 'CLOSURE'              // Business closure
+  | 'DISEASE'              // Incurable disease
+  | 'DEATH'                // Death of employee
+  | 'AUTHORIZED_CAUSE'     // Other authorized causes
+  | 'JUST_CAUSE'           // Termination for just cause (no separation pay)
+  | 'CONSTRUCTIVE_DISMISSAL'
+  | 'END_OF_CONTRACT';     // Fixed-term contract end
+
+/**
+ * Separation pay calculation
+ */
+export interface SeparationPay extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  
+  // Separation details
+  separationType: SeparationType;
+  separationDate: string;
+  lastWorkingDay: string;
+  
+  // Service computation
+  hireDate: string;
+  yearsOfService: number;
+  monthsOfService: number;
+  
+  // Pay components
+  lastMonthlyBasic: number;
+  lastDailyRate: number;
+  
+  // Separation pay calculation
+  separationPayRate: number; // e.g., 0.5 for half month per year
+  separationPayBase: 'MONTHLY' | 'DAILY';
+  separationPayAmount: number;
+  
+  // Other final pay components
+  finalBasicPay: number; // Pro-rated pay for last period
+  leaveConversion: number; // Unused leave converted to cash
+  thirteenthMonthProRated: number;
+  otherBenefits: number;
+  
+  // Deductions
+  outstandingLoans: number;
+  otherDeductions: number;
+  
+  // Totals
+  grossFinalPay: number;
+  totalDeductions: number;
+  netFinalPay: number;
+  
+  // Tax
+  taxableAmount: number;
+  withholdingTax: number;
+  
+  // Processing
+  status: 'DRAFT' | 'CALCULATED' | 'APPROVED' | 'PAID';
+  processedBy?: string;
+  approvedBy?: string;
+  paidAt?: string;
+  payrollRunId?: string;
+  remarks?: string;
+}
+
+// ============================================================================
+// TIME & ATTENDANCE TYPES
+// ============================================================================
+
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'ON_LEAVE' | 'HOLIDAY' | 'REST_DAY';
+
+/**
+ * Work schedule definition
+ */
+export interface WorkSchedule extends BaseEntity {
+  id: string;
+  orgId: string;
+  name: string; // e.g., "Regular 8-5", "Night Shift"
+  description?: string;
+  
+  // Daily schedule
+  workDays: number[]; // 0=Sunday, 1=Monday, etc.
+  startTime: string; // HH:mm format
+  endTime: string;
+  breakStartTime?: string;
+  breakEndTime?: string;
+  breakDurationMinutes: number;
+  
+  // Calculations
+  regularHoursPerDay: number;
+  regularHoursPerWeek: number;
+  
+  // Grace period
+  gracePeriodMinutes: number;
+  
+  // Night differential window
+  nightDiffStart: string; // Default: "22:00"
+  nightDiffEnd: string;   // Default: "06:00"
+  
+  isDefault: boolean;
+  isActive: boolean;
+}
+
+/**
+ * Time entry record
+ */
+export interface TimeEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  scheduleId?: string;
+  date: string;
+  
+  // Clock times
+  clockIn?: string;
+  clockOut?: string;
+  breakStart?: string;
+  breakEnd?: string;
+  
+  // Computed hours
+  regularHours: number;
+  overtimeHours: number;
+  nightDiffHours: number;
+  undertimeMinutes: number;
+  tardyMinutes: number;
+  
+  // Status
+  status: AttendanceStatus;
+  isManualEntry: boolean;
+  adjustedBy?: string;
+  adjustmentReason?: string;
+  
+  // Location (for field employees)
+  clockInLocation?: { lat: number; lng: number; address?: string };
+  clockOutLocation?: { lat: number; lng: number; address?: string };
+  
+  // Approval
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+/**
+ * Attendance summary for payroll
+ */
+export interface AttendanceSummary {
+  employeeId: string;
+  periodStart: string;
+  periodEnd: string;
+  
+  // Days
+  workDays: number;
+  daysPresent: number;
+  daysAbsent: number;
+  daysOnLeave: number;
+  daysHoliday: number;
+  
+  // Hours
+  totalRegularHours: number;
+  totalOvertimeHours: number;
+  totalNightDiffHours: number;
+  totalUndertimeMinutes: number;
+  totalTardyMinutes: number;
+  
+  // Deductions
+  undertimeDeduction: number;
+  tardinessDeduction: number;
+  absenceDeduction: number;
+}
+
+/**
+ * Philippine holiday record
+ */
+export interface HolidayCalendar extends BaseEntity {
+  id: string;
+  orgId: string;
+  date: string;
+  name: string;
+  type: 'REGULAR' | 'SPECIAL_NON_WORKING' | 'SPECIAL_WORKING';
+  isNationwide: boolean;
+  locations?: string[]; // Specific locations if not nationwide
+  year: number;
+}
+
+// ============================================================================
+// BIR REPORT TYPES
+// ============================================================================
+
+export type BIRFormType = 
+  | 'ALPHALIST'        // Annual list of employees and compensation
+  | 'BIR_2316'         // Certificate of Compensation Payment/Tax Withheld
+  | 'BIR_1601_C'       // Monthly Remittance Return of Income Taxes Withheld
+  | 'BIR_1604_C'       // Annual Information Return of Income Tax Withheld
+  | 'BIR_2307'         // Certificate of Creditable Tax Withheld at Source
+  | 'BIR_1700'         // Annual Income Tax Return (Individuals)
+  | 'BIR_2306';        // Certificate of Final Tax Withheld at Source
+
+/**
+ * BIR Alphalist entry per employee
+ */
+export interface AlphalistEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  year: number;
+  quarter?: 1 | 2 | 3 | 4;
+  employeeId: string;
+  
+  // Employee info
+  tin: string;
+  lastName: string;
+  firstName: string;
+  middleName?: string;
+  
+  // Employment info
+  employmentStatus: 'R' | 'C' | 'S'; // Regular, Contractual, Seasonal
+  startDate: string;
+  terminationDate?: string;
+  reasonForTermination?: string;
+  
+  // Compensation
+  grossCompensation: number;
+  
+  // Non-taxable income
+  thirteenthMonthPay: number;
+  deMinimis: number;
+  otherNonTaxable: number;
+  totalNonTaxable: number;
+  
+  // Taxable income
+  taxableCompensation: number;
+  
+  // Statutory contributions (employee share)
+  sssContributions: number;
+  philHealthContributions: number;
+  pagIBIGContributions: number;
+  unionDues: number;
+  totalContributions: number;
+  
+  // Tax withheld
+  taxWithheld: number;
+  taxDue: number;
+  adjustment: number; // Over/under withholding adjustment
+  
+  // Substituted filing
+  qualifiesForSubstitutedFiling: boolean;
+}
+
+/**
+ * BIR 2316 form data (Certificate of Compensation)
+ */
+export interface BIR2316Data extends BaseEntity {
+  id: string;
+  orgId: string;
+  year: number;
+  employeeId: string;
+  
+  // Employer info
+  employerTIN: string;
+  employerName: string;
+  employerAddress: string;
+  
+  // Employee info
+  employeeTIN: string;
+  employeeName: string;
+  employeeAddress: string;
+  birthDate: string;
+  zipCode: string;
+  
+  // Employment period
+  periodFrom: string;
+  periodTo: string;
+  
+  // Gross compensation
+  grossCompensationPresent: number;
+  grossCompensationPrevious: number;
+  grossCompensationTotal: number;
+  
+  // Non-taxable compensation
+  basicSMW: number; // Statutory Minimum Wage
+  holidayOT: number;
+  nightDiff: number;
+  hazardPay: number;
+  thirteenthMonth: number;
+  deMinimis: number;
+  sssPhilPag: number;
+  otherNonTaxable: number;
+  totalNonTaxable: number;
+  
+  // Taxable compensation
+  taxableCompensationPresent: number;
+  taxableCompensationPrevious: number;
+  taxableCompensationTotal: number;
+  
+  // Tax withheld
+  taxWithheldPresent: number;
+  taxWithheldPrevious: number;
+  taxWithheldTotal: number;
+  
+  // Tax computation
+  taxDue: number;
+  taxWithheldAdjusted: number;
+  
+  status: 'DRAFT' | 'GENERATED' | 'SIGNED' | 'SUBMITTED';
+  generatedAt?: string;
+  signedAt?: string;
+}
+
+/**
+ * BIR 1601-C Monthly Remittance
+ */
+export interface BIR1601CData extends BaseEntity {
+  id: string;
+  orgId: string;
+  year: number;
+  month: number; // 1-12
+  
+  // Employer info
+  tin: string;
+  rdoCode: string;
+  employerName: string;
+  registeredAddress: string;
+  
+  // Compensation summary
+  totalEmployees: number;
+  totalCompensation: number;
+  
+  // Statutory contributions
+  sssTotal: number;
+  philHealthTotal: number;
+  pagIBIGTotal: number;
+  
+  // Tax computation
+  taxableCompensation: number;
+  taxWithheld: number;
+  adjustments: number;
+  taxRemittable: number;
+  
+  // Payment
+  surcharge?: number;
+  interest?: number;
+  compromise?: number;
+  totalAmountDue: number;
+  
+  status: 'DRAFT' | 'GENERATED' | 'FILED' | 'PAID';
+  filedAt?: string;
+  paidAt?: string;
+  confirmationNumber?: string;
+}
