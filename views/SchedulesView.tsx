@@ -163,52 +163,17 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
-                toast.type === 'success'
-                  ? 'bg-emerald-50 text-teal-800 border-teal-200'
-                  : toast.type === 'error'
-                  ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-teal-50 text-teal-800 border-teal-200'
-              }`}
-            >
-              {toast.type === 'success' ? (
-                <CheckCircle size={18} className="text-teal-600" />
-              ) : toast.type === 'error' ? (
-                <AlertCircle size={18} className="text-rose-600" />
-              ) : (
-                <Info size={18} className="text-teal-600" />
-              )}
-              <span className="text-sm font-semibold">{toast.message}</span>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                className="ml-2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
-            Institutional Capacity Engine
-          </h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Capacity Engine</h2>
           <p className="text-sm text-slate-500 font-normal italic">Trainer workload matrix and resource allocation optimization.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
           className="flex items-center gap-2 px-8 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition-all shadow-xl shadow-teal-100 font-black text-xs active:scale-95 uppercase tracking-widest"
         >
-          <Plus size={16} /> Declare Capacity Profile
+          <Plus size={18} /> Schedule Session
         </button>
       </div>
 

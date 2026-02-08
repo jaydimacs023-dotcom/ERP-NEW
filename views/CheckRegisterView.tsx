@@ -155,7 +155,14 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Check Register</h2>
+          <p className="text-sm font-normal italic text-slate-500">Track disbursement history and monitor bank clearance statuses.</p>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <SummaryCard 

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { AlertTriangle, TrendingDown, TrendingUp, Eye } from 'lucide-react';
+﻿import React, { useMemo, useState } from 'react';
+import { AlertTriangle, TrendingDown, TrendingUp, Eye, Package, ShieldCheck, Box, Filter, Search, Download, Check, ArrowRight, BarChart3, Warehouse } from 'lucide-react';
 import { InventoryLevel, StockItem } from '../types';
 import { InventoryService } from '../services/InventoryService';
 
@@ -30,8 +30,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   currency,
   isLoading = false,
 }) => {
-  const [statusFilter, setStatusFilter] = React.useState<'ALL' | 'RED' | 'YELLOW' | 'GREEN' | 'BLUE'>('ALL');
-  const [typeFilter, setTypeFilter] = React.useState<'ALL' | 'STOCK_ITEM' | 'NON_STOCK_ITEM'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'RED' | 'YELLOW' | 'GREEN' | 'BLUE'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const stockStatuses = useMemo(() => {
     const statuses: StockStatus[] = items
@@ -82,231 +82,218 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const filteredStatuses = useMemo(() => {
     return stockStatuses.filter((s) => {
       if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
-      if (typeFilter !== 'ALL' && s.item.type !== typeFilter) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return s.item.name.toLowerCase().includes(term) || s.item.code.toLowerCase().includes(term);
+      }
       return true;
     });
-  }, [stockStatuses, statusFilter, typeFilter]);
+  }, [stockStatuses, statusFilter, searchTerm]);
 
-  // Calculate summaries
   const summaries = useMemo(() => {
-    const summary = {
+    return {
       totalItems: items.filter((i) => !i.isDeleted && i.type === 'STOCK_ITEM').length,
       criticalItems: stockStatuses.filter((s) => s.status === 'RED').length,
       lowStockItems: stockStatuses.filter((s) => s.status === 'YELLOW').length,
-      overstockedItems: stockStatuses.filter((s) => s.status === 'BLUE').length,
+      optimalItems: stockStatuses.filter((s) => s.status === 'GREEN').length,
       totalQuantity: stockStatuses.reduce((sum, s) => sum + s.availableQuantity, 0),
     };
-    return summary;
   }, [items, stockStatuses]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'RED':
-        return 'bg-red-50 border-red-200';
-      case 'YELLOW':
-        return 'bg-yellow-50 border-yellow-200';
-      case 'BLUE':
-        return 'bg-teal-50 border-teal-200';
-      default:
-        return 'bg-green-50 border-green-200';
-    }
-  };
-
-  const getStatusTextColor = (status: string) => {
-    switch (status) {
-      case 'RED':
-        return 'text-red-700 bg-red-100';
-      case 'YELLOW':
-        return 'text-yellow-700 bg-yellow-100';
-      case 'BLUE':
-        return 'text-teal-700 bg-teal-100';
-      default:
-        return 'text-green-700 bg-green-100';
-    }
+  const STATUS_CONFIG = {
+    RED: { color: 'bg-rose-100 text-rose-700', icon: <AlertTriangle size={12} />, border: 'border-rose-200' },
+    YELLOW: { color: 'bg-amber-100 text-amber-700', icon: <TrendingDown size={12} />, border: 'border-amber-200' },
+    GREEN: { color: 'bg-emerald-100 text-emerald-700', icon: <Check size={12} />, border: 'border-emerald-200' },
+    BLUE: { color: 'bg-blue-100 text-blue-700', icon: <TrendingUp size={12} />, border: 'border-blue-200' },
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Inventory Dashboard</h2>
-        <p className="text-slate-500 font-normal italic">Real-time stock status and proactive replenishment alerts.</p>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-sm text-gray-600 mb-1">Total Items</p>
-          <p className="text-2xl font-bold text-gray-900">{summaries.totalItems}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
-          <p className="text-sm text-red-700 mb-1 font-medium">Critical (RED)</p>
-          <p className="text-2xl font-bold text-red-600">{summaries.criticalItems}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-yellow-200 shadow-sm">
-          <p className="text-sm text-yellow-700 mb-1 font-medium">Low Stock (YELLOW)</p>
-          <p className="text-2xl font-bold text-yellow-600">{summaries.lowStockItems}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-teal-200 shadow-sm">
-          <p className="text-sm text-teal-700 mb-1 font-medium">Overstock (BLUE)</p>
-          <p className="text-2xl font-bold text-teal-600">{summaries.overstockedItems}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-green-200 shadow-sm">
-          <p className="text-sm text-green-700 mb-1 font-medium">Total Qty</p>
-          <p className="text-2xl font-bold text-green-600">{summaries.totalQuantity.toFixed(0)}</p>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <p className="text-sm font-semibold text-gray-900 mb-3">Status Legend</p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-600"></div>
-            <span className="text-sm text-gray-700">
-              <strong className="text-red-700">RED:</strong> Below safety stock
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <span className="text-sm text-gray-700">
-              <strong className="text-yellow-700">YELLOW:</strong> Below reorder level
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-600"></div>
-            <span className="text-sm text-gray-700">
-              <strong className="text-green-700">GREEN:</strong> Optimal stock
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-teal-600"></div>
-            <span className="text-sm text-gray-700">
-              <strong className="text-teal-700">BLUE:</strong> Overstock detected
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-6 flex flex-col md:flex-row gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status Filter</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-          >
-            <option value="ALL">All Status</option>
-            <option value="RED">Critical (RED)</option>
-            <option value="YELLOW">Low Stock (YELLOW)</option>
-            <option value="GREEN">Optimal (GREEN)</option>
-            <option value="BLUE">Overstock (BLUE)</option>
-          </select>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Stock Command Centre</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Real-time surveillance of global inventory levels and reorder triggers.</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type Filter</label>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-          >
-            <option value="ALL">All Types</option>
-            <option value="STOCK_ITEM">Stock Items</option>
-            <option value="NON_STOCK_ITEM">Non-Stock Items</option>
-          </select>
+        <div className="flex gap-3">
+          <div className="bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+             <Warehouse size={16} className="text-teal-600" />
+             <div className="leading-none">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active nodes</p>
+                <p className="text-sm font-black text-slate-800">Operational</p>
+             </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl shadow-slate-900/20 group hover:-translate-y-1 transition-all">
+          <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-1">Total Stock Keeping Units (SKU)</p>
+          <div className="flex items-end justify-between">
+            <p className="text-3xl font-black text-white tracking-tight">{summaries.totalItems}</p>
+            <Package className="text-white/20 group-hover:text-teal-400/20 transition-colors" size={40} />
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between">
+          <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <AlertTriangle size={12} /> Stock Out (Critical)
+          </p>
+          <p className="text-3xl font-black text-slate-800 tracking-tight">{summaries.criticalItems}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between">
+          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <TrendingDown size={12} /> Below Reorder Point
+          </p>
+          <p className="text-3xl font-black text-slate-800 tracking-tight">{summaries.lowStockItems}</p>
+        </div>
+
+        <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 shadow-sm flex flex-col justify-between group">
+          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1.5">Optimal Balance</p>
+          <div className="flex items-center justify-between">
+             <p className="text-3xl font-black text-emerald-600 tracking-tight">{summaries.optimalItems}</p>
+             <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-900/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                <BarChart3 size={16} />
+             </div>
+          </div>
         </div>
       </div>
 
-      {/* Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading ? (
-          <div className="col-span-full p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
-            <p className="mt-2 text-gray-600">Loading inventory...</p>
-          </div>
-        ) : filteredStatuses.length === 0 ? (
-          <div className="col-span-full p-8 text-center text-gray-600">
-            <p>No items match your filter.</p>
-          </div>
-        ) : (
-          filteredStatuses.map((status) => (
-            <div
-              key={status.item.id}
-              className={`p-4 rounded-lg border-2 ${getStatusColor(status.status)}`}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{status.item.code}</p>
-                  <p className="text-sm text-gray-600">{status.item.name}</p>
-                </div>
-                <button
-                  onClick={() => onSelectItem?.(status.item.id)}
-                  className="p-1 hover:bg-white rounded transition-colors"
-                  title="View details"
-                >
-                  <Eye className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Status Badge */}
-              <div className="mb-3">
-                <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusTextColor(status.status)}`}>
-                  {status.statusLabel}
-                </span>
-              </div>
-
-              {/* Metrics */}
-              <div className="space-y-2 text-sm mb-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Available:</span>
-                  <span className="font-medium text-gray-900">
-                    {status.availableQuantity.toFixed(0)} {status.item.unitOfMeasure}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Reorder Level:</span>
-                  <span className="text-gray-700">{status.item.reorderLevel}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Safety Stock:</span>
-                  <span className="text-gray-700">{status.item.safetyStock}</span>
-                </div>
-              </div>
-
-              {/* Alerts */}
-              {status.isLowStock && (
-                <div className="p-2 bg-yellow-100 rounded text-xs text-yellow-800 flex items-start gap-2 mb-2">
-                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Stock below reorder level</span>
-                </div>
-              )}
-
-              {status.isOverstocked && (
-                <div className="p-2 bg-teal-100 rounded text-xs text-teal-800 flex items-start gap-2">
-                  <TrendingUp className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Overstock detected</span>
-                </div>
-              )}
-
-              {!status.isLowStock && !status.isOverstocked && status.status === 'GREEN' && (
-                <div className="p-2 bg-green-100 rounded text-xs text-green-800 flex items-start gap-2">
-                  <TrendingUp className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Stock level is optimal</span>
-                </div>
-              )}
+      <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+         <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1 space-y-1.5">
+               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SKU Search Protocol</label>
+               <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Identify item by code, name or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800"
+                  />
+               </div>
             </div>
-          ))
-        )}
+
+            <div className="md:w-64 space-y-1.5">
+               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Inventory Health Filter</label>
+               <div className="flex items-center gap-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800 appearance-none"
+                  >
+                    <option value="ALL">TOTAL SPECTRUM</option>
+                    <option value="RED">CRITICAL STOCK-OUT</option>
+                    <option value="YELLOW">LOW STOCK WARNING</option>
+                    <option value="GREEN">OPTIMAL LEVELS</option>
+                    <option value="BLUE">OVERSTOCK PHONICS</option>
+                  </select>
+               </div>
+            </div>
+         </div>
       </div>
 
-      {/* Summary Text */}
-      {filteredStatuses.length > 0 && (
-        <div className="mt-6 text-sm text-gray-600">
-          Showing {filteredStatuses.length} of {summaries.totalItems} item{summaries.totalItems !== 1 ? 's' : ''}
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory Object</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Health Status</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Available Qty</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Target Range</th>
+                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {isLoading ? (
+                <tr>
+                   <td colSpan={5} className="px-8 py-20 text-center">
+                      <div className="w-10 h-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Synchronizing Clusters...</p>
+                   </td>
+                </tr>
+              ) : filteredStatuses.length === 0 ? (
+                <tr>
+                   <td colSpan={5} className="px-8 py-20 text-center text-slate-400 italic font-medium">
+                      <div className="max-w-xs mx-auto space-y-2">
+                        <Box className="w-12 h-12 text-slate-200 mx-auto" />
+                        <p className="text-sm font-black text-slate-900 uppercase tracking-widest not-italic">No objects in viewport</p>
+                        <p className="text-xs">Adjust filters to broaden surveillance.</p>
+                      </div>
+                   </td>
+                </tr>
+              ) : (
+                filteredStatuses.map((s) => (
+                  <tr key={s.item.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                       <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm ${STATUS_CONFIG[s.status].color} border-${STATUS_CONFIG[s.status].color.split('-')[1]}-200 bg-${STATUS_CONFIG[s.status].color.split('-')[1]}-50`}>
+                             <Package size={18} />
+                          </div>
+                          <div>
+                             <p className="text-xs font-black text-slate-900 tracking-tight uppercase">{s.item.code}</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate max-w-[200px]">{s.item.name}</p>
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-6 py-5">
+                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 w-fit ${STATUS_CONFIG[s.status].color} ${STATUS_CONFIG[s.status].bgColor} border border-black/5`}>
+                          {STATUS_CONFIG[s.status].icon}
+                          {s.statusLabel}
+                       </span>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                       <div className="space-y-0.5">
+                          <p className="text-sm font-black font-mono">
+                             {s.availableQuantity.toLocaleString()}
+                          </p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{s.item.unitOfMeasure}</p>
+                       </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                       <div className="space-y-0.5">
+                          <p className="text-[10px] font-black text-slate-600 font-mono italic">
+                             Min: {s.item.safetyStock || 0} / Opt: {s.item.reorderLevel || 0}
+                          </p>
+                          <div className="flex justify-end gap-1">
+                             <div className={`h-1 rounded-full ${s.isBelowSafety ? 'bg-rose-500' : 'bg-emerald-500'} w-8`} />
+                             <div className={`h-1 rounded-full ${s.isBelowReorder ? 'bg-amber-400' : 'bg-emerald-500'} w-12`} />
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                       <button
+                         onClick={() => onSelectItem?.(s.item.id)}
+                         className="p-2.5 bg-slate-900 text-white rounded-xl shadow-lg shadow-slate-900/10 hover:bg-black hover:-translate-y-0.5 transition-all active:scale-95"
+                       >
+                         <Eye size={14} />
+                       </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+
+        <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm"><ShieldCheck size={16} className="text-teal-600" /></div>
+               <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Operational Integrity</p>
+                  <p className="text-xs font-bold text-slate-600">Inventory coordinate system strictly mapped to Warehouse Clusters.</p>
+               </div>
+            </div>
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-1.5 font-mono">
+                  {summaries.totalQuantity.toLocaleString()} TOTAL_UNITS
+               </p>
+               <p className="text-[9px] font-bold text-slate-300 italic mt-1 uppercase">Snapshot verified: {new Date().toLocaleTimeString()}</p>
+            </div>
+        </div>
+      </div>
     </div>
   );
 };

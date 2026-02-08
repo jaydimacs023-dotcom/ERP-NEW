@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
 import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine } from '../types';
 import { InventoryService } from '../services/InventoryService';
@@ -239,384 +239,391 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Stock Adjustments</h1>
-        <p className="text-gray-600">Record inventory variances, damage, and write-offs</p>
-      </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">{error}</p>
-          </div>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
-            <X className="w-4 h-4" />
-          </button>
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Stock Adjustments</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Record inventory variances, damage, and write-offs.</p>
         </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-800">{success}</p>
-          </div>
-          <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-700">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Controls */}
-      <div className="mb-6 flex gap-3 items-center">
-        {!showForm && (
-          <button
-            onClick={handleAddClick}
-            disabled={isLoading || submitting}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Record Adjustment
-          </button>
-        )}
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by item code or name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            disabled={showForm}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50"
-          />
-        </div>
-      </div>
-
-      {/* Form */}
-      {showForm && (
-        <div className="mb-6 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-lg text-gray-900 mb-4">
-            {editingId ? 'Edit Stock Adjustment' : 'Record Stock Adjustment'}
-          </h2>
-
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Item */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item *</label>
-                <select
-                  value={formData.stockItemId}
-                  onChange={(e) => setFormData({ ...formData, stockItemId: e.target.value })}
-                  disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select an item...</option>
-                  {stockItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.code} - {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Warehouse Location *
-                </label>
-                <select
-                  value={formData.warehouseLocationId}
-                  onChange={(e) => setFormData({ ...formData, warehouseLocationId: e.target.value })}
-                  disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select a location...</option>
-                  {activeLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.code} - {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
-                <select
-                  value={formData.adjustmentType}
-                  onChange={(e) => setFormData({ ...formData, adjustmentType: e.target.value as any })}
-                  disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                >
-                  {ADJUSTMENT_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Quantity */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
-                  disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Reason */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason *</label>
-                <input
-                  type="text"
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  placeholder="e.g., Physical count variance"
-                  disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Optional notes about the adjustment"
-                  disabled={submitting}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
-                />
-              </div>
-
-              {/* Approval */}
-              <div className="md:col-span-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isApproved}
-                    onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
-                    disabled={submitting}
-                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Mark as Approved</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={submitting}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-              >
-                <Check className="w-4 h-4" />
-                {submitting ? 'Saving...' : 'Save Adjustment'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* List */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        {filteredAdjustments.length > 0 && (
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">Stock Adjustments</h3>
-              <p className="text-xs text-gray-600 mt-1">Showing {filteredAdjustments.length} of {activeAdjustments.length} adjustment{activeAdjustments.length !== 1 ? 's' : ''}</p>
-            </div>
+        <div className="flex gap-3">
+           {!showForm && (
             <button
-              onClick={() => {
+              onClick={handleAddClick}
+              disabled={isLoading || submitting}
+              className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-teal-900/20 hover:bg-teal-700 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              New Adjustment
+            </button>
+           )}
+           <button
+             onClick={() => {
                 const exportData = filteredAdjustments.map(adj => {
-                  const item = items.find(i => i.id === adj.stockItemId);
+                  const item = stockItems.find(i => i.id === adj.stockItemId);
+                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
                   return {
-                    referenceNumber: `ADJ-${adj.id.slice(0, 8)}`,
-                    itemName: item?.name || 'N/A',
-                    warehouse: adj.warehouseLocationId,
-                    type: adj.adjustmentType,
-                    quantity: adj.quantityChange,
-                    reason: adj.reason,
-                    notes: adj.notes || '',
-                    status: adj.isApproved ? 'Approved' : 'Pending',
-                    glStatus: adj.journalEntryId ? 'Posted' : 'Ready',
-                    createdAt: new Date(adj.createdAt || Date.now()).toLocaleDateString()
+                    Date: new Date(adj.createdAt).toLocaleDateString(),
+                    Code: item?.code || 'N/A',
+                    Item: item?.name || 'N/A',
+                    Location: location?.name || 'N/A',
+                    Type: adj.adjustmentType,
+                    Qty: adj.quantity,
+                    Reason: adj.reason,
+                    Posted: adj.journalEntryId ? 'Yes' : 'No'
                   };
                 });
-                DataExportService.exportStockAdjustments(exportData, currency);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
-            >
-              <Download size={14} /> Export CSV
+                DataExportService.exportToCSV(exportData, `Stock_Adjustments_${new Date().toISOString().split('T')[0]}.csv`);
+             }}
+             className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-teal-600 hover:border-teal-100 transition-all active:scale-95 shadow-sm"
+             title="Export CSV"
+           >
+             <Download size={20} />
+           </button>
+        </div>
+      </header>
+
+      {/* Notifications */}
+      <div className="space-y-4">
+        {error && (
+          <div className="p-4 bg-rose-50 border-2 border-rose-100 rounded-2xl flex items-center justify-between gap-3 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+               <AlertCircle className="text-rose-600" size={20} />
+               <p className="text-sm font-black text-rose-800 uppercase tracking-tight">{error}</p>
+            </div>
+            <button onClick={() => setError(null)} className="p-1.5 hover:bg-rose-100 rounded-lg text-rose-500 transition-colors">
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
-        {isLoading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
-            <p className="mt-2 text-gray-600">Loading adjustments...</p>
-          </div>
-        ) : filteredAdjustments.length === 0 ? (
-          <div className="p-8 text-center text-gray-600">
-            <p>
-              {searchTerm ? 'No adjustments match your search.' : 'No adjustments recorded yet.'}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Item
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Location
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Reason
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Approval
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    GL Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredAdjustments.map((adj) => {
-                  const item = stockItems.find((i) => i.id === adj.stockItemId);
-                  const location = activeLocations.find((l) => l.id === adj.warehouseLocationId);
 
-                  return (
-                    <tr key={adj.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm">
-                        <div className="font-medium text-gray-900">{item?.code}</div>
-                        <div className="text-xs text-gray-600">{item?.name}</div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {location?.code} - {location?.name}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getTypeColor(adj.adjustmentType)}`}>
-                          {adj.adjustmentType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900 font-medium">
-                        {adj.quantity} {item?.unitOfMeasure}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {adj.reason}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                            adj.isApproved
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
-                        >
-                          {adj.isApproved ? 'Approved' : 'Pending'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {adj.journalEntryId ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                            <Check className="w-3 h-3" />
-                            Posted
-                          </span>
-                        ) : adj.isApproved ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">
-                            <AlertCircle className="w-3 h-3" />
-                            Ready
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-500">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right">
-                        <div className="flex justify-end gap-2">
-                          {adj.isApproved && !adj.journalEntryId && onPostGL && (
-                            <button
-                              onClick={() => handlePostToGL(adj)}
-                              disabled={submitting || postingGL === adj.id}
-                              className="p-2 hover:bg-purple-50 text-purple-600 rounded hover:text-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Post to GL"
-                            >
-                              {postingGL === adj.id ? <div className="w-4 h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" /> : <BookOpen className="w-4 h-4" />}
-                            </button>
-                          )}
-                          {adj.journalEntryId && (
-                            <div className="flex items-center gap-1 text-xs text-green-600 px-2 py-1 bg-green-50 rounded">
-                              <Check className="w-3 h-3" />
-                              GL Posted
-                            </div>
-                          )}
-                          <button
-                            onClick={() => handleEditClick(adj)}
-                            disabled={submitting}
-                            className="p-2 hover:bg-teal-50 text-teal-600 rounded hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(adj.id)}
-                            disabled={submitting}
-                            className={`p-2 rounded transition-colors ${
-                              deleting === adj.id
-                                ? 'bg-red-100 text-red-700'
-                                : 'hover:bg-red-50 text-red-600 hover:text-red-700'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            title={deleting === adj.id ? 'Click again to confirm' : 'Delete'}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {success && (
+          <div className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl flex items-center justify-between gap-3 animate-in slide-in-from-top-2">
+             <div className="flex items-center gap-3">
+               <Check className="text-emerald-600" size={20} />
+               <p className="text-sm font-black text-emerald-800 uppercase tracking-tight">{success}</p>
+             </div>
+             <button onClick={() => setSuccess(null)} className="p-1.5 hover:bg-emerald-100 rounded-lg text-emerald-500 transition-colors">
+               <X className="w-4 h-4" />
+             </button>
           </div>
         )}
       </div>
 
-      {/* Summary */}
-      {filteredAdjustments.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600">
-          Showing {filteredAdjustments.length} of {activeAdjustments.length} adjustment{activeAdjustments.length !== 1 ? 's' : ''}
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Adjustments</p>
+          <div className="flex items-end justify-between">
+            <p className="text-3xl font-black text-slate-800 tracking-tight">{activeAdjustments.length}</p>
+            <BookOpen className="text-slate-100 group-hover:scale-110 transition-transform" size={40} />
+          </div>
+        </div>
+        <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 shadow-sm">
+           <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-1">Write-Offs / Damages</p>
+           <p className="text-3xl font-black text-rose-600 tracking-tight">
+             {activeAdjustments.filter(a => a.adjustmentType === 'WRITEOFF' || a.adjustmentType === 'DAMAGE').length}
+           </p>
+        </div>
+        <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 shadow-sm">
+           <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-1">Pending GL Posting</p>
+           <p className="text-3xl font-black text-amber-600 tracking-tight">
+             {activeAdjustments.filter(a => !a.journalEntryId).length}
+           </p>
+        </div>
+        <div className="bg-slate-900 p-6 rounded-[2rem] border border-slate-800 shadow-xl">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Units (Net Change)</p>
+          <p className="text-3xl font-black text-white tracking-tight leading-none pt-1">
+            {activeAdjustments.reduce((sum, a) => sum + (a.adjustmentType === 'RECEIPT' || (a.adjustmentType === 'CORRECTION' && a.quantity > 0) ? a.quantity : -a.quantity), 0).toFixed(0)}
+          </p>
+        </div>
+      </div>
+
+       {/* Form Overlay (Institutional Standard) */}
+       {showForm && (
+        <div className="bg-white rounded-[2.5rem] border-2 border-teal-100 shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+           <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{editingId ? 'Edit Stock Adjustment' : 'Record Physical Variance'}</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1 italic">Authorized personal only â€¢ Document #ADJ-{Date.now().toString().slice(-4)}</p>
+              </div>
+              <button onClick={handleCancel} className="p-2.5 bg-white rounded-xl shadow-sm text-slate-400 hover:text-slate-600 transition-all border border-slate-100"><X size={20} /></button>
+           </div>
+           
+           <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reference SKU *</label>
+                    <select
+                      value={formData.stockItemId}
+                      onChange={(e) => setFormData({ ...formData, stockItemId: e.target.value })}
+                      disabled={submitting}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800"
+                    >
+                      <option value="">Select an item...</option>
+                      {stockItems.map((item) => (
+                        <option key={item.id} value={item.id}>[{item.code}] {item.name}</option>
+                      ))}
+                    </select>
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Warehouse Zone *</label>
+                    <select
+                      value={formData.warehouseLocationId}
+                      onChange={(e) => setFormData({ ...formData, warehouseLocationId: e.target.value })}
+                      disabled={submitting}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800"
+                    >
+                      <option value="">Select a location...</option>
+                      {activeLocations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>[{loc.code}] {loc.name}</option>
+                      ))}
+                    </select>
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Adjustment Type *</label>
+                    <select
+                      value={formData.adjustmentType}
+                      onChange={(e) => setFormData({ ...formData, adjustmentType: e.target.value as any })}
+                      disabled={submitting}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800 uppercase"
+                    >
+                      {ADJUSTMENT_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                 </div>
+
+                 <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity Variance *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
+                      disabled={submitting}
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800 font-mono"
+                    />
+                 </div>
+
+                 <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Justification *</label>
+                    <input
+                      type="text"
+                      value={formData.reason}
+                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                      disabled={submitting}
+                      placeholder="Enter legal justification for stock variance..."
+                      className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800"
+                    />
+                 </div>
+
+                 <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Internal Notes</label>
+                    <textarea
+                       value={formData.notes || ''}
+                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                       disabled={submitting}
+                       placeholder="Additional details for audit trail..."
+                       rows={3}
+                       className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-black text-slate-800 resize-none"
+                    />
+                 </div>
+
+                 <div className="md:col-span-2">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formData.isApproved}
+                          onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
+                          disabled={submitting}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-teal-600 transition-colors"></div>
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-800 transition-colors">Mark as Authorized / Approved</span>
+                    </label>
+                  </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-8 py-3.5 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-10 py-3.5 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-teal-900/20 hover:bg-teal-700 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {submitting ? 'PROCESSING...' : 'COMMIT ADJUSTMENT'}
+                </button>
+              </div>
+           </form>
         </div>
       )}
+
+      {/* Filter & List Bar */}
+      {!showForm && (
+        <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm no-print">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search historical adjustments by SKU or name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-teal-500/20 outline-none transition-all placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* List Table */}
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-24">Date</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Adjustment Detail</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Type</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Variance Qty</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">GL Status</th>
+                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 text-sm">
+              {isLoading ? (
+                <tr>
+                   <td colSpan={6} className="px-8 py-20 text-center">
+                      <div className="w-10 h-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Synching Records...</p>
+                   </td>
+                </tr>
+              ) : filteredAdjustments.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-20 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 italic">
+                      <BookOpen className="text-slate-200" size={32} />
+                    </div>
+                    <p className="text-sm font-black text-slate-900 uppercase tracking-widest">No variance logs detected</p>
+                    <p className="text-xs text-slate-400 mt-2 italic font-medium">Historical adjustments will appear here after creation.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredAdjustments.map((adj) => {
+                  const item = stockItems.find(i => i.id === adj.stockItemId);
+                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
+                  
+                  return (
+                    <tr key={adj.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-8 py-5">
+                         <div className="text-center">
+                            <div className="text-[10px] font-black text-slate-400 uppercase mb-0.5">{new Date(adj.createdAt).toLocaleDateString('en-US', { month: 'short' })}</div>
+                            <div className="text-lg font-black text-slate-800 leading-none">{new Date(adj.createdAt).getDate()}</div>
+                         </div>
+                      </td>
+                      <td className="px-6 py-5">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
+                               <BookOpen size={18} />
+                            </div>
+                            <div>
+                               <div className="text-[10px] font-mono font-black text-slate-400 uppercase tracking-tighter mb-0.5">LOCATION: {location?.name || 'GEN-WH'}</div>
+                               <div className="text-sm font-black text-slate-800 tracking-tight">{item?.name || 'N/A'}</div>
+                               <div className="text-[10px] text-slate-500 italic mt-0.5 flex items-center gap-1.5"><AlertCircle size={10} /> {adj.reason}</div>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-6 py-5 text-center">
+                         <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                            adj.adjustmentType === 'WRITEOFF' ? 'bg-rose-100 text-rose-700' :
+                            adj.adjustmentType === 'CORRECTION' ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
+                         }`}>
+                            {adj.adjustmentType}
+                         </span>
+                      </td>
+                      <td className="px-6 py-5 text-right font-mono font-black text-slate-800">
+                         {adj.quantity > 0 ? '+' : ''}{adj.quantity.toFixed(0)} <span className="text-[10px] text-slate-400">{item?.unitOfMeasure}</span>
+                      </td>
+                      <td className="px-6 py-5 text-center">
+                         {adj.journalEntryId ? (
+                            <div className="flex justify-center" title="GL Posted">
+                               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-700 rounded-full border border-teal-100">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-[0_0_10px_rgba(20,184,166,0.3)]"></div>
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Posted</span>
+                               </div>
+                            </div>
+                         ) : adj.isApproved ? (
+                            <button
+                               onClick={() => handlePostToGL(adj)}
+                               disabled={postingGL === adj.id || submitting}
+                               className="text-[9px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg hover:bg-amber-600 hover:text-white transition-all border border-amber-100 uppercase tracking-widest mx-auto block"
+                            >
+                               {postingGL === adj.id ? 'PENDING...' : 'Post to GL'}
+                            </button>
+                         ) : (
+                            <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 uppercase tracking-widest mx-auto block w-fit">
+                               Pending
+                            </span>
+                         )}
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!adj.journalEntryId && (
+                               <>
+                                  <button
+                                    onClick={() => handleEditClick(adj)}
+                                    className="p-2.5 text-slate-400 hover:text-teal-600 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-100"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteClick(adj.id)}
+                                    className={`p-2.5 rounded-xl transition-all shadow-sm border border-transparent ${
+                                       deleting === adj.id ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-rose-600 hover:bg-white hover:border-slate-100'
+                                    }`}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                               </>
+                            )}
+                         </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary Audit Footer */}
+        {!isLoading && filteredAdjustments.length > 0 && (
+           <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center no-print">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm"><AlertCircle size={16} className="text-amber-500" /></div>
+                  <div>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Integrity Check</p>
+                     <p className="text-xs font-bold text-slate-600">Representing {filteredAdjustments.length} physical count variance logs.</p>
+                  </div>
+               </div>
+               <div className="text-right">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-1.5"><Check size={12} className="text-teal-600" /> LOGISTICS_AUDIT_ENABLED</p>
+                  <p className="text-[9px] font-bold text-slate-300 italic mt-1 uppercase">Snapshot: {new Date().toLocaleString()}</p>
+               </div>
+           </div>
+        )}
+      </div>
     </div>
   );
 };

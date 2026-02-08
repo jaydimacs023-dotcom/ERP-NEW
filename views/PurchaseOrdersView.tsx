@@ -1,11 +1,10 @@
-
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, Vendor, NonStockItem, TaxCategory } from '../types';
 import { 
   FileStack, Plus, Search, Filter, X, Save, Trash2, 
   ChevronRight, ArrowUpRight, CheckCircle, Clock, AlertCircle,
   Building2, Box, CreditCard, ShoppingCart, Printer, Send,
-  ShieldCheck, ShieldAlert, CheckCircle2, Ban
+  ShieldCheck, ShieldAlert, CheckCircle2, Ban, Database, Layers, Check, Zap, Target
 } from 'lucide-react';
 
 interface PurchaseOrdersViewProps {
@@ -24,11 +23,10 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [viewPO, setViewPO] = useState<PurchaseOrder | null>(null);
 
-  // PO Form State
   const [formData, setFormData] = useState<Partial<PurchaseOrder>>({
     vendorId: '',
     date: new Date().toISOString().split('T')[0],
-    reference: `PO-${Date.now().toString().slice(-6)}`,
+    reference: '',
     memo: '',
     lines: [{ id: '1', itemId: '', description: '', qty: 1, unitPrice: 0, taxAmount: 0 }]
   });
@@ -40,12 +38,11 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   const getStatusStyle = (status: PurchaseOrderStatus) => {
     switch (status) {
       case PurchaseOrderStatus.DRAFT: return 'bg-slate-100 text-slate-600 border-slate-200';
-      // Corrected PEND_APPROVAL to PENDING_APPROVAL
-      case PurchaseOrderStatus.PENDING_APPROVAL: return 'bg-amber-50 text-amber-700 border-amber-100';
-      case PurchaseOrderStatus.APPROVED: return 'bg-teal-50 text-teal-700 border-teal-100';
-      case PurchaseOrderStatus.REJECTED: return 'bg-rose-50 text-rose-700 border-rose-100';
-      case PurchaseOrderStatus.BILLED: return 'bg-emerald-50 text-teal-700 border-emerald-100';
-      case PurchaseOrderStatus.CLOSED: return 'bg-slate-200 text-slate-800 border-slate-300';
+      case PurchaseOrderStatus.PENDING_APPROVAL: return 'bg-amber-50 text-amber-700 border-amber-200';
+      case PurchaseOrderStatus.APPROVED: return 'bg-teal-50 text-teal-700 border-teal-200';
+      case PurchaseOrderStatus.REJECTED: return 'bg-rose-50 text-rose-700 border-rose-200';
+      case PurchaseOrderStatus.BILLED: return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case PurchaseOrderStatus.CLOSED: return 'bg-slate-800 text-white border-slate-900';
       default: return 'bg-slate-100 text-slate-600 border-slate-200';
     }
   };
@@ -57,35 +54,6 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   const poTotal = useMemo(() => {
     return (formData.lines || []).reduce((sum, line) => sum + calculateLineTotal(line), 0);
   }, [formData.lines]);
-
-  const addLine = () => {
-    setFormData({
-      ...formData,
-      lines: [...(formData.lines || []), { id: Date.now().toString(), itemId: '', description: '', qty: 1, unitPrice: 0, taxAmount: 0 }]
-    });
-  };
-
-  const removeLine = (id: string) => {
-    if ((formData.lines || []).length <= 1) return;
-    setFormData({ ...formData, lines: (formData.lines || []).filter(l => l.id !== id) });
-  };
-
-  const updateLine = (id: string, updates: Partial<PurchaseOrderLine>) => {
-    const nextLines = (formData.lines || []).map(l => {
-      if (l.id !== id) return l;
-      const newLine = { ...l, ...updates };
-      if (updates.itemId) {
-        const item = items.find(i => i.id === updates.itemId);
-        if (item) {
-          newLine.description = item.name;
-          newLine.unitPrice = item.unitPrice;
-          newLine.taxAmount = item.taxCategoryId ? (item.unitPrice * 0.12) : 0; // VAT if tax category assigned
-        }
-      }
-      return newLine;
-    });
-    setFormData({ ...formData, lines: nextLines });
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,333 +74,152 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
 
     onCreatePO(newPO);
     setShowModal(false);
-    resetForm();
-  };
-
-  const resetForm = () => {
     setFormData({
       vendorId: '',
       date: new Date().toISOString().split('T')[0],
-      reference: `PO-${Date.now().toString().slice(-6)}`,
+      reference: '',
       memo: '',
       lines: [{ id: '1', itemId: '', description: '', qty: 1, unitPrice: 0, taxAmount: 0 }]
     });
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-            Procurement & POs
-          </h2>
-          <p className="text-sm text-slate-500 font-normal italic">Authorized purchase commitments for vendor fulfillment.</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Procurement Intelligence</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Authorized purchase commitments and vendor fulfillment tracking.</p>
         </div>
         <button 
-          onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-8 py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-teal-900/10 hover:bg-teal-700 hover:-translate-y-0.5 transition-all active:scale-95"
         >
-          <Plus size={18} /> New Purchase Order
+          <Plus className="w-5 h-5" /> Initialize PO
         </button>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Active Commitments</p>
+            <div className="flex items-end justify-between">
+               <p className="text-4xl font-black text-slate-800 tracking-tight">{purchaseOrders.filter(p => p.status === PurchaseOrderStatus.APPROVED).length}</p>
+               <div className="p-3 bg-teal-50 rounded-xl text-teal-600"><CheckCircle size={20} /></div>
+            </div>
+         </div>
+         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1.5">Awaiting Approval</p>
+            <div className="flex items-end justify-between">
+               <p className="text-4xl font-black text-slate-800 tracking-tight">{purchaseOrders.filter(p => p.status === PurchaseOrderStatus.PENDING_APPROVAL).length}</p>
+               <div className="p-3 bg-amber-50 rounded-xl text-amber-600"><Clock size={20} /></div>
+            </div>
+         </div>
+         <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800 shadow-xl col-span-2 relative overflow-hidden group">
+            <div className="absolute -right-4 -bottom-4 text-slate-800 opacity-20 group-hover:scale-110 transition-transform">
+               <ShoppingCart size={160} />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Open Obligation</p>
+            <div className="flex items-end justify-between relative z-10">
+               <p className="text-4xl font-black text-white tracking-tight leading-none pt-1">
+                  PHP {purchaseOrders.reduce((sum, p) => sum + (p.status !== PurchaseOrderStatus.CLOSED ? p.totalAmount : 0), 0).toLocaleString()}
+               </p>
+               <div className="p-3 bg-white/5 rounded-xl text-teal-400 border border-white/10"><ShieldCheck size={20} /></div>
+            </div>
+         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
-           <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                placeholder="Search POs..." 
-                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-teal-600"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-           </div>
-           <button className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:bg-white rounded-xl transition-all border border-transparent hover:border-slate-200 text-xs font-bold">
-              <Filter size={14} /> Filter Status
-           </button>
+      <div className="p-6 bg-white rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-6 no-print">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            type="text"
+            placeholder="Search obligations by reference, vendor, or project code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-[1.5rem] text-sm font-bold text-slate-800 focus:bg-white focus:border-teal-500/10 outline-none transition-all"
+          />
         </div>
-        
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">PO Reference</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vendor</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date Issued</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredPOs.length > 0 ? filteredPOs.reverse().map(po => {
-              const vendor = vendors.find(v => v.id === po.vendorId);
-              return (
-                <tr key={po.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="text-sm font-black text-teal-600 font-mono">{po.reference}</div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                       <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-400 flex items-center justify-center font-bold text-[10px]">V</div>
-                       <div className="text-sm font-bold text-slate-800">{vendor?.name || 'Unknown Vendor'}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-xs text-slate-500 font-medium">{po.date}</td>
-                  <td className="px-6 py-5 text-right font-mono font-bold text-slate-900">{po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`px-2 py-0.5 border rounded-full text-[9px] font-black uppercase ${getStatusStyle(po.status)}`}>
-                      {po.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex justify-end gap-2">
+        <div className="flex items-center gap-3 bg-slate-100 p-2 rounded-2xl">
+           <button className="p-2.5 text-slate-500 hover:text-teal-600 bg-white rounded-xl shadow-sm border border-slate-200"><Filter size={18} /></button>
+           <div className="w-[1px] h-6 bg-slate-200" />
+           <p className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">{filteredPOs.length} Records</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">PO Reference</th>
+                <th className="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier / Vendor</th>
+                <th className="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Issuance Date</th>
+                <th className="px-6 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Value (PHP)</th>
+                <th className="px-6 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Internal Status</th>
+                <th className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Navigation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 text-[11px] font-bold">
+              {filteredPOs.length > 0 ? filteredPOs.reverse().map(po => {
+                const vendor = vendors.find(v => v.id === po.vendorId);
+                return (
+                  <tr key={po.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-4">
+                         <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-all border border-slate-200 shadow-sm">
+                            <FileStack size={18} />
+                         </div>
+                         <div className="text-sm font-black text-slate-900 font-mono tracking-tight">{po.reference}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="flex items-center gap-3">
+                         <div className="text-sm font-black text-slate-800 leading-none">{vendor?.name || 'Unknown Vendor'}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-6 text-slate-500">{po.date}</td>
+                    <td className="px-6 py-6 text-right font-mono font-black text-slate-900 text-sm">
+                       {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-6 text-center">
+                      <span className={`px-3 py-1 border rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        po.status === 'APPROVED' ? 'bg-teal-50 border-teal-200 text-teal-700' :
+                        po.status === 'PENDING_APPROVAL' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                        'bg-slate-50 border-slate-200 text-slate-500'
+                      }`}>
+                        {po.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6 text-right">
                        <button 
                         onClick={() => setViewPO(po)}
-                        className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-xl transition-all"
+                        className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-teal-600 rounded-xl transition-all shadow-sm hover:shadow-md"
                        >
                           <ChevronRight size={18} />
                        </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            }) : (
-              <tr><td colSpan={6} className="py-24 text-center text-slate-400 italic">No purchase orders found.</td></tr>
-            )}
-          </tbody>
-        </table>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan={6} className="py-32 text-center text-slate-400 italic font-medium">No purchase commitments identified in the current index.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-10 bg-slate-50 border-t border-slate-100 flex justify-between items-center no-print">
+            <div className="flex items-center gap-5">
+               <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm text-teal-600"><Database size={24} /></div>
+               <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Obligation State</p>
+                  <p className="text-xs font-bold text-slate-600">Total of {purchaseOrders.length} purchase orders recorded in the current lifecycle.</p>
+               </div>
+            </div>
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-2"><ShieldCheck size={14} className="text-teal-600" /> PROCUREMENT_VERIFIED</p>
+               <p className="text-[9px] font-black text-slate-300 italic mt-2 uppercase tracking-tighter">Verified Timestamp: {new Date().toISOString()}</p>
+            </div>
+        </div>
       </div>
-
-      {/* PO Detail View Modal */}
-      {viewPO && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 flex flex-col h-[85vh]">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-               <div className="flex items-center gap-4">
-                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><FileStack size={24} /></div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Purchase Order Detail</h3>
-                    <p className="text-xs font-mono font-bold text-teal-600">{viewPO.reference}</p>
-                  </div>
-               </div>
-               <div className="flex items-center gap-3">
-                  <button className="p-2 hover:bg-slate-200 rounded-xl transition-colors"><Printer size={20} /></button>
-                  <button onClick={() => setViewPO(null)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors"><X size={24} /></button>
-               </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-10 bg-white">
-               <div className="grid grid-cols-2 gap-20 mb-12">
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier Information</p>
-                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                        <h4 className="text-lg font-black text-slate-800">{vendors.find(v => v.id === viewPO.vendorId)?.name}</h4>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{vendors.find(v => v.id === viewPO.vendorId)?.address}</p>
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Commitment Terms</p>
-                     <div className="space-y-2 text-right">
-                        <div className="flex justify-end gap-10">
-                           <span className="text-xs text-slate-400 font-bold uppercase">Issued On</span>
-                           <span className="text-xs text-slate-800 font-black">{viewPO.date}</span>
-                        </div>
-                        <div className="flex justify-end gap-10">
-                           <span className="text-xs text-slate-400 font-bold uppercase">Approval Status</span>
-                           <span className={`px-2 py-0.5 border rounded-lg text-[9px] font-black uppercase ${getStatusStyle(viewPO.status)}`}>{viewPO.status.replace('_', ' ')}</span>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-
-               <table className="min-w-full mb-10">
-                  <thead>
-                     <tr className="border-b-2 border-slate-900">
-                        <th className="py-4 text-left text-[10px] font-black text-slate-900 uppercase">Item Description</th>
-                        <th className="py-4 text-center text-[10px] font-black text-slate-900 uppercase">Qty</th>
-                        <th className="py-4 text-right text-[10px] font-black text-slate-900 uppercase">Unit Price</th>
-                        <th className="py-4 text-right text-[10px] font-black text-slate-900 uppercase">Total</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                     {viewPO.lines.map((line, i) => (
-                        <tr key={i}>
-                           <td className="py-5">
-                              <div className="text-sm font-bold text-slate-800">{items.find(it => it.id === line.itemId)?.name || line.description}</div>
-                              <div className="text-[10px] text-slate-400 font-mono">CODE: {items.find(it => it.id === line.itemId)?.code || 'N/A'}</div>
-                           </td>
-                           <td className="py-5 text-center text-sm font-bold text-slate-600">{line.qty}</td>
-                           <td className="py-5 text-right text-sm font-mono font-medium text-slate-600">{line.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                           <td className="py-5 text-right text-sm font-mono font-black text-slate-900">{(line.qty * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                     ))}
-                  </tbody>
-               </table>
-
-               <div className="flex justify-end pt-6 border-t-4 border-double border-slate-200">
-                  <div className="w-64 space-y-3">
-                     <div className="flex justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                        <span>Total Commit</span>
-                        <span className="text-slate-900 text-lg font-black font-mono">PHP {viewPO.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                     </div>
-                  </div>
-               </div>
-            </div>
-
-            <div className="p-8 bg-slate-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
-               <div className="flex items-center gap-3">
-                  <AlertCircle className="text-teal-500" size={20} />
-                  <p className="text-[11px] text-slate-500 font-medium">Internal approval controls authorized spend levels.</p>
-               </div>
-               <div className="flex gap-4 w-full md:w-auto">
-                  {viewPO.status === PurchaseOrderStatus.DRAFT && (
-                    <button 
-                      onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.PENDING_APPROVAL); setViewPO(null); }}
-                      className="flex-1 px-8 py-3 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-teal-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                       <Send size={18} /> Submit for Approval
-                    </button>
-                  )}
-
-                  {viewPO.status === PurchaseOrderStatus.PENDING_APPROVAL && (
-                    <>
-                      <button 
-                        onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.APPROVED); setViewPO(null); }}
-                        className="flex-1 px-8 py-3 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-teal-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                      >
-                         <ShieldCheck size={18} /> Approve PO
-                      </button>
-                      <button 
-                        onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.REJECTED); setViewPO(null); }}
-                        className="flex-1 px-8 py-3 bg-white border border-rose-200 text-rose-600 rounded-2xl text-sm font-black hover:bg-rose-50 active:scale-95 transition-all flex items-center justify-center gap-2"
-                      >
-                         <Ban size={18} /> Reject
-                      </button>
-                    </>
-                  )}
-
-                  {viewPO.status === PurchaseOrderStatus.APPROVED && (
-                    <button 
-                      onClick={() => onConvertToBill(viewPO)}
-                      className="flex-1 px-8 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                       <CreditCard size={18} /> Convert to Bill
-                    </button>
-                  )}
-
-                  {viewPO.status === PurchaseOrderStatus.REJECTED && (
-                    <button 
-                      onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.DRAFT); setViewPO(null); }}
-                      className="flex-1 px-8 py-3 bg-slate-900 text-white rounded-2xl text-sm font-black hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
-                    >
-                       <X size={18} /> Reset to Draft
-                    </button>
-                  )}
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New PO Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><ShoppingCart size={24} /></div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Draft Purchase Order</h3>
-              </div>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={28} /></button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-10">
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Vendor / Partner</label>
-                    <select 
-                       required 
-                       className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800 appearance-none"
-                       value={formData.vendorId}
-                       onChange={e => setFormData({...formData, vendorId: e.target.value})}
-                    >
-                       <option value="">Choose Supplier...</option>
-                       {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Order Date</label>
-                    <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-sm"
-                      value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Reference #</label>
-                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-mono font-black text-sm text-teal-600"
-                      value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} />
-                  </div>
-               </div>
-
-               <div className="space-y-4 mb-10">
-                  <div className="grid grid-cols-12 gap-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                     <div className="col-span-5">Procurement Item / Description</div>
-                     <div className="col-span-2 text-center">Quantity</div>
-                     <div className="col-span-2 text-right">Unit Price</div>
-                     <div className="col-span-2 text-right">Subtotal</div>
-                     <div className="col-span-1"></div>
-                  </div>
-
-                  {(formData.lines || []).map((line) => (
-                    <div key={line.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-teal-200 transition-colors shadow-sm">
-                       <div className="col-span-5">
-                          <select 
-                            required 
-                            className="w-full px-3 py-2 bg-teal-50 border border-teal-100 rounded-xl text-xs font-bold text-teal-700 outline-none appearance-none"
-                            value={line.itemId}
-                            onChange={e => updateLine(line.id!, { itemId: e.target.value })}
-                          >
-                             <option value="">Select Catalog Item...</option>
-                             {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                          </select>
-                       </div>
-                       <div className="col-span-2">
-                          <input type="number" min="1" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs font-black outline-none"
-                            value={line.qty} onChange={e => updateLine(line.id!, { qty: Number(e.target.value) })} />
-                       </div>
-                       <div className="col-span-2">
-                          <input type="number" step="0.01" className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-right text-xs font-mono font-bold outline-none"
-                            value={line.unitPrice} onChange={e => updateLine(line.id!, { unitPrice: Number(e.target.value) })} />
-                       </div>
-                       <div className="col-span-2 text-right font-mono font-black text-sm text-slate-800">
-                          {calculateLineTotal(line).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                       </div>
-                       <div className="col-span-1 flex justify-center">
-                          <button type="button" onClick={() => removeLine(line.id!)} className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
-                       </div>
-                    </div>
-                  ))}
-
-                  <button type="button" onClick={addLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-teal-600 hover:bg-teal-50 rounded-xl transition-colors border-2 border-dashed border-teal-100"><Plus size={14} /> Add Line Item</button>
-               </div>
-
-               <div className="p-10 bg-slate-900 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
-                  <div className="flex-1 space-y-4">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Order Notes / Terms</label>
-                     <textarea rows={2} placeholder="Specify delivery conditions, lead times, or project tags..." className="w-full px-6 py-4 bg-slate-800 border border-slate-700 rounded-3xl outline-none text-slate-200 text-sm font-medium resize-none"
-                        value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} />
-                  </div>
-                  <div className="w-full md:w-64 text-right">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Commit Value</p>
-                     <p className="text-4xl font-mono font-black text-white tracking-tighter">PHP {poTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                     <div className="pt-8 flex gap-4">
-                        <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-white transition-colors">Discard</button>
-                        <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all">Authorize PO</button>
-                     </div>
-                  </div>
-               </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

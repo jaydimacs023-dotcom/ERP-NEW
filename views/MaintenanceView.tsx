@@ -37,7 +37,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <header>
         <h2 className="text-3xl font-black text-slate-800 tracking-tight">System Maintenance & Data Utility</h2>
         <p className="text-sm text-slate-500 font-normal italic">Institutional disaster recovery and immutable data portability.</p>

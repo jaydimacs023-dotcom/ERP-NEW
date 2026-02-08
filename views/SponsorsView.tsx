@@ -147,45 +147,10 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   };
 
   return (
-    <div className="space-y-8">
-      {/* Toast Notifications */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
-                toast.type === 'success'
-                  ? 'bg-emerald-50 text-teal-800 border-teal-200'
-                  : toast.type === 'error'
-                  ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-teal-50 text-teal-800 border-teal-200'
-              }`}
-            >
-              {toast.type === 'success' ? (
-                <CheckCircle size={18} className="text-teal-600" />
-              ) : toast.type === 'error' ? (
-                <AlertCircle size={18} className="text-rose-600" />
-              ) : (
-                <AlertCircle size={18} className="text-teal-600" />
-              )}
-              <span className="text-sm font-semibold">{toast.message}</span>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                className="ml-2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
+    <div className="space-y-8 pb-20 relative animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-            Financial Sponsors
-          </h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Financial Sponsors</h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage donors, corporate grants, and sponsorship records.</p>
         </div>
         <button 
@@ -196,7 +161,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
@@ -416,6 +381,39 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notifications moved to bottom */}
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 text-teal-800 border-teal-200'
+                  : toast.type === 'error'
+                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                  : 'bg-teal-50 text-teal-800 border-teal-200'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle size={18} className="text-teal-600" />
+              ) : toast.type === 'error' ? (
+                <AlertCircle size={18} className="text-rose-600" />
+              ) : (
+                <AlertCircle size={18} className="text-teal-600" />
+              )}
+              <span className="text-sm font-semibold">{toast.message}</span>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="ml-2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

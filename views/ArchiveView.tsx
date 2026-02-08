@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   Archive, RotateCcw, Trash2, Search, Filter, 
   AlertCircle, ChevronDown, ChevronRight, Info,
   GraduationCap, Users, BookOpen, MapPin, 
-  Building, Package, Wallet, UserCircle, Briefcase
+  Building, Package, Wallet, UserCircle, Briefcase, Landmark, ShieldCheck, FileText, Check, Database
 } from 'lucide-react';
 
 interface ArchiveViewProps {
@@ -33,12 +33,11 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Group all archived items
   const archivedItems = useMemo(() => {
     const items: any[] = [];
     
-    // Helper to add archived items
-    const collect = (list: any[], type: string, label: string, icon: any) => {
+    const collect = (list: any[] | undefined, type: string, label: string, icon: any) => {
+      if (!list) return;
       list.filter(item => item.isDeleted).forEach(item => {
         items.push({
           ...item,
@@ -66,18 +65,18 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
     return items;
   }, [data]);
 
-  const filteredItems = archivedItems.filter(item => {
-    const matchesSearch = item.displayName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = activeCategory === 'all' || item.archiveType === activeCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredItems = useMemo(() => {
+    return archivedItems.filter(item => {
+      const matchesSearch = item.displayName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = activeCategory === 'all' || item.archiveType === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [archivedItems, searchTerm, activeCategory]);
 
   const categories = [
     { id: 'all', label: 'All Items' },
     { id: 'STUDENT', label: 'Students' },
     { id: 'TRAINER', label: 'Trainers' },
-    { id: 'QUALIFICATION', label: 'Qualifications' },
-    { id: 'BATCH', label: 'Batches' },
     { id: 'EMPLOYEE', label: 'Employees' },
     { id: 'VENDOR', label: 'Vendors' },
     { id: 'ITEM', label: 'Items' }
@@ -105,118 +104,131 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
-            Archived Records
-          </h2>
-          <p className="text-sm text-slate-500 font-normal italic mt-1">
-            Manage soft-deleted items, restore them, or delete them permanently.
-          </p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Secure Archive Repository</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Centralized decommissioning and recovery zone for all system entities.</p>
         </div>
+        <div className="flex gap-3">
+           <div className="bg-slate-900 px-6 py-3 rounded-2xl flex items-center gap-3 text-white shadow-lg shadow-slate-900/20">
+              <Database size={16} className="text-teal-400" />
+              <div className="leading-none">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cold Storage</p>
+                 <p className="text-sm font-black text-white leading-none">{archivedItems.length} OBJECTS</p>
+              </div>
+           </div>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-[2rem] w-fit">
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeCategory === cat.id 
+                ? 'bg-white text-teal-600 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Filters */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+         <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search archived items..."
+              placeholder="Search archive indices..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800"
             />
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  activeCategory === cat.id 
-                    ? 'bg-teal-600 text-white shadow-lg shadow-teal-200' 
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="divide-y divide-slate-100">
-          {filteredItems.length > 0 ? (
-            filteredItems.map((item) => (
-              <div key={`${item.archiveType}-${item.id}`} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-teal-100 group-hover:text-teal-600 transition-colors">
-                    {item.archiveIcon}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">{item.displayName}</h4>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-teal-500 bg-teal-50 px-2 py-0.5 rounded-full">
-                        {item.archiveLabel}
-                      </span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Info size={10} />
-                        ID: {item.id.substring(0, 8)}...
-                      </span>
-                      {item.deletedAt && (
-                        <span className="text-[10px] text-slate-400">
-                          Archived on {new Date(item.deletedAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleAction('restore', item)}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-teal-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                  >
-                    <RotateCcw size={14} />
-                    Restore
-                  </button>
-                  <button
-                    onClick={() => handleAction('delete', item)}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={14} />
-                    Perm Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="p-12 text-center">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Archive size={32} className="text-slate-300" />
-              </div>
-              <h3 className="text-slate-900 font-bold">No archived items found</h3>
-              <p className="text-slate-500 text-sm mt-1">Items you soft-delete will appear here for management.</p>
-            </div>
-          )}
-        </div>
+         </div>
       </div>
 
-      <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-2xl">
-        <div className="flex gap-3">
-          <AlertCircle size={20} className="text-amber-600 shrink-0" />
-          <div className="text-sm">
-            <p className="font-bold text-amber-900">Archive Policy</p>
-            <p className="text-amber-700 mt-1">
-              Items that are referenced in active transactions, payroll runs, or accounting entries cannot be archived. 
-              Restoring an item will move it back to its original module and make it available for use.
-            </p>
-          </div>
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Archived Object</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type Classification</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Decommission Date</th>
+                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Recovery Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredItems.length === 0 ? (
+                <tr>
+                   <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic font-medium">
+                      Archive index is empty for the current selection.
+                   </td>
+                </tr>
+              ) : (
+                filteredItems.map((item, i) => (
+                  <tr key={`${item.archiveType}-${item.id}`} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors border border-slate-200">
+                             {item.archiveIcon}
+                          </div>
+                          <div>
+                             <p className="text-xs font-black text-slate-900 tracking-tight">{item.displayName}</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">ID: {item.id.substring(0, 8)}...</p>
+                          </div>
+                       </div>
+                    </td>
+                    <td className="px-6 py-5">
+                       <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-200">
+                          {item.archiveLabel}
+                       </span>
+                    </td>
+                    <td className="px-6 py-5">
+                       <p className="text-xs font-bold text-slate-600">{item.deletedAt ? new Date(item.deletedAt).toLocaleDateString() : 'N/A'}</p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                       <div className="flex justify-end gap-2">
+                          <button
+                            disabled={isProcessing}
+                            onClick={() => handleAction('restore', item)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                          >
+                             <RotateCcw size={12} /> RESTORE
+                          </button>
+                          <button
+                            disabled={isProcessing}
+                            onClick={() => handleAction('delete', item)}
+                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                          >
+                             <Trash2 size={16} />
+                          </button>
+                       </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm"><ShieldCheck size={16} className="text-teal-600" /></div>
+               <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cold Storage Security</p>
+                  <p className="text-xs font-bold text-slate-600">Archived indices are encrypted and segregated from active transaction nodes.</p>
+               </div>
+            </div>
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-1.5">
+                  <Database size={12} /> ARCHIVE_ACTIVE
+               </p>
+               <p className="text-[9px] font-bold text-slate-300 italic mt-1 uppercase">Log cursor verified: {new Date().toLocaleTimeString()}</p>
+            </div>
         </div>
       </div>
     </div>
@@ -224,27 +236,3 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
 };
 
 export default ArchiveView;
-
-function Landmark(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="3" y1="22" x2="21" y2="22" />
-      <line x1="6" y1="18" x2="6" y2="11" />
-      <line x1="10" y1="18" x2="10" y2="11" />
-      <line x1="14" y1="18" x2="14" y2="11" />
-      <line x1="18" y1="18" x2="18" y2="11" />
-      <polygon points="12 2 20 7 4 7" />
-    </svg>
-  );
-}

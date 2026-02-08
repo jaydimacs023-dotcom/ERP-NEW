@@ -187,7 +187,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">

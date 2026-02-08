@@ -291,108 +291,172 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
   const getPONumber = (poId: string) => orgPOs.find(p => p.id === poId)?.poNumber || purchaseOrders.find(p => p.id === poId)?.poNumber || 'Unknown';
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Goods Receipt (GR/IR)</h2>
           <p className="text-sm text-slate-500 font-normal italic">Receive goods against Purchase Orders with GR/IR clearing integration.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-medium text-sm"
+          className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-teal-900/20 hover:bg-teal-700 hover:-translate-y-0.5 transition-all"
         >
           <Plus size={18} /> New Goods Receipt
         </button>
-      </div>
+      </header>
 
       {/* GR/IR Explanation Card */}
-      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-5">
+      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-[2.5rem] p-8 shadow-sm">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-teal-100 rounded-xl">
             <Link className="text-teal-600" size={24} />
           </div>
-          <div>
-            <h3 className="font-semibold text-teal-800 mb-1">GR/IR Clearing Account</h3>
-            <p className="text-sm text-teal-700 leading-relaxed">
-              When goods are received, the system debits <strong>Inventory</strong> and credits <strong>GR/IR Clearing</strong>. 
-              When the vendor invoice is posted, it debits <strong>GR/IR Clearing</strong> and credits <strong>Accounts Payable</strong>. 
+          <div className="flex-1">
+            <h3 className="text-lg font-black text-teal-800 mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
+            <p className="text-sm text-teal-700 leading-relaxed font-medium">
+              When goods are received, the system debits <strong className="font-black">Inventory</strong> and credits <strong className="font-black">GR/IR Clearing</strong>. 
+              When the vendor invoice is posted, it debits <strong className="font-black">GR/IR Clearing</strong> and credits <strong className="font-black">Accounts Payable</strong>. 
               This ensures proper matching between receipts and invoices.
             </p>
-            <div className="flex items-center gap-4 mt-3 text-xs text-teal-600">
-              <span className="flex items-center gap-1"><Package size={14} /> Goods Receipt</span>
-              <ArrowRight size={14} />
-              <span className="flex items-center gap-1"><FileText size={14} /> Invoice Match</span>
-              <ArrowRight size={14} />
-              <span className="flex items-center gap-1"><CheckCircle size={14} /> Clearing Complete</span>
+            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-teal-200/50">
+              <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 rounded-lg bg-teal-200/50 flex items-center justify-center">
+                    <Package size={14} className="text-teal-700" />
+                 </div>
+                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Goods Receipt</span>
+              </div>
+              <ArrowRight size={14} className="text-teal-400" />
+              <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 rounded-lg bg-teal-200/50 flex items-center justify-center">
+                    <FileText size={14} className="text-teal-700" />
+                 </div>
+                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Invoice Match</span>
+              </div>
+              <ArrowRight size={14} className="text-teal-400" />
+              <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 rounded-lg bg-teal-500 text-white flex items-center justify-center shadow-lg shadow-teal-500/20">
+                    <CheckCircle size={14} />
+                 </div>
+                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Clearing Complete</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft GRs</p>
-          <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftValue)}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-teal-200 transition-all">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <Clock size={12} className="text-slate-400" /> Draft Index
+          </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">
+                {summaryMetrics.draftCount}
+              </p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">PENDING_POST</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-600 font-mono">
+                {"\u20B1"}{formatCurrency(summaryMetrics.draftValue)}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Posted GRs</p>
-          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.postedCount}</p>
-          <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}</p>
+
+        <div className="bg-slate-900 p-6 rounded-[2.5rem] shadow-xl shadow-slate-900/20 flex flex-col justify-between group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-full -mr-8 -mt-8 blur-2xl" />
+          <p className="text-[10px] font-black text-teal-400/80 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <CheckCircle size={12} className="text-teal-400" /> Posted Ledger
+          </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-3xl font-black text-white tracking-tighter">
+                {summaryMetrics.postedCount}
+              </p>
+              <p className="text-[10px] font-bold text-teal-500 uppercase mt-1">CLEARED_RECORDS</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-teal-400 font-mono">
+                {"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest">Total Line Items</p>
-          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.totalLineItems}</p>
+
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-teal-200 transition-all">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <Layers size={12} className="text-teal-600" /> Total Lines
+          </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">
+                {summaryMetrics.totalLineItems}
+              </p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">RECEIPT_ENTRIES</p>
+            </div>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Open POs</p>
-          <p className="text-2xl font-black mt-1 text-amber-600">{orgPOs.length}</p>
-          <p className="text-xs text-amber-500">Available for receipt</p>
+
+        <div className="bg-teal-600 p-6 rounded-[2.5rem] shadow-xl shadow-teal-900/20 flex flex-col justify-between group">
+          <p className="text-[10px] font-black text-teal-100 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+             <ShoppingCart size={12} className="text-teal-100" /> Open POs
+          </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-3xl font-black text-white tracking-tighter">
+                {orgPOs.length}
+              </p>
+              <p className="text-[10px] font-bold text-teal-200 uppercase mt-1">ELIGIBLE_FOR_GR</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl border shadow-sm">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search goods receipts..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm appearance-none"
-          >
-            <option value="all">All Statuses</option>
-            {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-              <option key={value} value={value}>{config.label}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-        </div>
+      {/* Registry Filters */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+         <div className="relative w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+               type="text" 
+               placeholder="Search goods receipts..." 
+               className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800"
+               value={searchTerm}
+               onChange={e => setSearchTerm(e.target.value)}
+            />
+         </div>
+         <div className="flex items-center gap-3">
+            <div className="relative font-bold">
+               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+               <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
+                  className="pl-10 pr-10 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-[10px] font-black uppercase tracking-widest text-slate-600 appearance-none min-w-[160px]"
+               >
+                  <option value="all">All Statuses</option>
+                  {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                     <option key={value} value={value}>{config.label}</option>
+                  ))}
+               </select>
+               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+            </div>
+         </div>
       </div>
 
       {/* GRs Table */}
       <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">GR #</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">PO / Vendor</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Receipt Date</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Value</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">GR Number</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">PO / Vendor</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Receipt Date</th>
+              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Lines</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</th>
+              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -480,6 +544,30 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               </tr>
             )}
           </tbody>
+          <tfoot className="border-t-4 border-slate-900">
+             <tr className="bg-slate-50">
+                <td colSpan={4} className="px-8 py-6">
+                   <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                      <p className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Institutional Receipt Intelligence Active</p>
+                   </div>
+                </td>
+                <td className="px-6 py-6 text-right">
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregated Valuation</p>
+                      <p className="text-xl font-black text-slate-900 font-mono">
+                         {"\u20B1"}{formatCurrency(filteredGRs.reduce((sum, gr) => sum + gr.totalValue, 0))}
+                      </p>
+                   </div>
+                </td>
+                <td colSpan={2} className="px-8 py-6 text-right">
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Records</p>
+                      <p className="text-sm font-black text-slate-900 uppercase">{filteredGRs.length} TRANSACTIONS</p>
+                   </div>
+                </td>
+             </tr>
+          </tfoot>
         </table>
       </div>
 

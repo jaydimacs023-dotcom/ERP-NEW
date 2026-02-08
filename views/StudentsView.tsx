@@ -310,34 +310,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   };
 
   return (
-    <div className="space-y-8 relative">
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
-              toast.type === 'success'
-                ? 'bg-emerald-50 border border-teal-200 text-teal-800'
-                : toast.type === 'error'
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-teal-50 border border-teal-200 text-teal-800'
-            }`}
-          >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-teal-600" />}
-            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
-            <span>{toast.message}</span>
-            <button
-              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-              className="ml-auto text-slate-400 hover:text-slate-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
-
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Student Information System</h2>
@@ -357,7 +330,24 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input 
+            placeholder="Search by name or ULI..." 
+            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-teal-500/20 outline-none font-bold"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+           <div className="px-5 py-3 bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 border border-slate-200">
+              Total Learners: {filteredStudents.length}
+           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
@@ -1198,6 +1188,33 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
           </div>
         </div>
       )}
+
+      {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
+      <div className="fixed top-4 right-4 z-[200] space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 border border-teal-200 text-teal-800'
+                : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-teal-50 border border-teal-200 text-teal-800'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-teal-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
