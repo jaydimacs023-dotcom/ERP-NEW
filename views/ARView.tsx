@@ -38,6 +38,7 @@ const ARView: React.FC<ARViewProps> = ({
   const [invoiceRef, setInvoiceRef] = useState('');
   const [recipientType, setRecipientType] = useState<'STUDENT' | 'SPONSOR'>('SPONSOR');
   const [recipientId, setRecipientId] = useState('');
+  const [selectedArAccountId, setSelectedArAccountId] = useState('');
   const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number }[]>([
     { itemId: '', qty: 1, price: 0 }
   ]);
@@ -49,6 +50,7 @@ const ARView: React.FC<ARViewProps> = ({
   const [collPayerId, setCollPayerId] = useState('');
   const [collAmount, setCollAmount] = useState<number>(0);
   const [collBankId, setCollBankId] = useState('');
+  const [selectedCollArAccountId, setSelectedCollArAccountId] = useState('');
 
   // Load next sequential references
   useEffect(() => {
@@ -62,6 +64,55 @@ const ARView: React.FC<ARViewProps> = ({
       setCollRef(AccountingService.getNextReference(entries, 'OR'));
     }
   }, [showCollectionModal, entries]);
+
+  // Pre-select G/L account for Invoice when recipient changes or modal opens
+  useEffect(() => {
+    if (showInvoiceModal) {
+      if (recipientId && recipientType === 'SPONSOR') {
+        const sponsor = sponsors.find(s => s.id === recipientId);
+        if (sponsor?.arAccountId) {
+          setSelectedArAccountId(sponsor.arAccountId);
+          return;
+        }
+      }
+
+      // Default fallback: Try code 1200, then name, then ANY Asset account if still empty
+      // CRITICAL: Must be an ASSET and not a header account
+      const defaultAr = accounts.find(a => a.code === '1200' && a.class === AccountClass.ASSET && !a.isHeader)?.id || 
+                        accounts.find(a => a.name.toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id ||
+                        accounts.find(a => a.name.toLowerCase().includes('receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
+      
+      if (defaultAr) {
+        setSelectedArAccountId(defaultAr);
+      } else {
+        // Last resort
+        const firstAsset = accounts.find(a => a.class === AccountClass.ASSET && !a.isHeader)?.id;
+        if (firstAsset) setSelectedArAccountId(firstAsset);
+      }
+    }
+  }, [showInvoiceModal, recipientId, recipientType, sponsors, accounts]);
+
+  // Pre-select G/L account for Collection when payer changes
+  useEffect(() => {
+    if (showCollectionModal) {
+      if (collPayerId && collPayerType === 'SPONSOR') {
+        const sponsor = sponsors.find(s => s.id === collPayerId);
+        if (sponsor?.arAccountId) {
+          setSelectedCollArAccountId(sponsor.arAccountId);
+          return;
+        }
+      }
+      const defaultAr = accounts.find(a => a.code === '1200' && a.class === AccountClass.ASSET && !a.isHeader)?.id || 
+                        accounts.find(a => a.name.toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
+      
+      if (defaultAr) {
+        setSelectedCollArAccountId(defaultAr);
+      } else {
+        const firstAsset = accounts.find(a => a.class === AccountClass.ASSET && !a.isHeader)?.id;
+        if (firstAsset) setSelectedCollArAccountId(firstAsset);
+      }
+    }
+  }, [showCollectionModal, collPayerId, collPayerType, sponsors, accounts]);
 
   const arInvoices = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
   const arCollections = entries.filter(e => e.sourceType === 'COLLECTION' && e.status !== 'REVERSED');
@@ -151,10 +202,21 @@ const ARView: React.FC<ARViewProps> = ({
     if (grossInvoiceAmount <= 0) return onNotify('error', 'Validation Error: Invoice amount must be greater than zero.');
     
     const entryId = `je-inv-${Date.now()}`;
-    const arAccountId = recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.arAccountId : accounts.find(a => a.code === '1200')?.id;
-    const vatPayableId = accounts.find(a => a.code === '2200')?.id;
+    // Use the explicitly selected G/L account from the form
+    const arAccountId = selectedArAccountId;
+      
+    const vatPayableId = accounts.find(a => a.code === '2200')?.id || 
+      accounts.find(a => a.name.toLowerCase().includes('vat payable'))?.id ||
+      accounts.find(a => a.name.toLowerCase().includes('output vat'))?.id ||
+      accounts.find(a => a.name.toLowerCase().includes('vat'))?.id;
     
-    if (!arAccountId || !vatPayableId) return onNotify('error', 'Accounting Framework Error: Targeted G/L accounts for Receivables or VAT Payable are missing.');
+    if (!arAccountId) {
+      return onNotify('error', 'Accounting Error: Please select a Target G/L Receivable Account.');
+    }
+
+    if (totalVat > 0 && !vatPayableId) {
+      return onNotify('error', 'Accounting Error: VAT account (2200 or "Output VAT") not found in Chart of Accounts.');
+    }
 
     const finalizedLines: JournalEntryLine[] = [];
     finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType });
@@ -176,9 +238,11 @@ const ARView: React.FC<ARViewProps> = ({
     
     const entryId = `je-coll-${Date.now()}`;
     const bank = bankAccounts.find(b => b.id === collBankId);
-    const arAccountId = collPayerType === 'SPONSOR' ? sponsors.find(s => s.id === collPayerId)?.arAccountId : accounts.find(a => a.code === '1200')?.id;
+    const arAccountId = selectedCollArAccountId;
     
-    if (!bank || !arAccountId) return onNotify('error', "Accounting Resolution Error: G/L accounts for treasury or receivables not found.");
+    if (!bank) return onNotify('error', "Validation Error: Selected Bank account not found.");
+    if (!arAccountId) return onNotify('error', "Validation Error: Please select a Source G/L Receivable Account.");
+    
     const payerName = collPayerType === 'SPONSOR' ? sponsors.find(s => s.id === collPayerId)?.name : `${students.find(s => s.id === collPayerId)?.lastName}, ${students.find(s => s.id === collPayerId)?.firstName}`;
 
     const finalizedLines: JournalEntryLine[] = [
@@ -399,7 +463,33 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                </div>
-
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100/50">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                      <BookOpen size={12} /> Target G/L Receivable Account
+                    </label>
+                    <select 
+                      required 
+                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm"
+                      value={selectedArAccountId}
+                      onChange={e => setSelectedArAccountId(e.target.value)}
+                    >
+                      <option value="">Select account...</option>
+                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.code} - {acc.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[9px] text-slate-500 italic mt-1 px-1">
+                      This defines where the debit entry will be recorded in the general ledger.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 text-slate-400 italic text-xs pt-4">
+                    <AlertCircle size={14} className="text-indigo-400" />
+                    <span>Selected account is automatically synced with {recipientType === 'SPONSOR' ? 'Sponsor' : 'Individual'} defaults but can be overridden here.</span>
+                  </div>
+               </div>
                <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
                     <div className="col-span-5">Item / Service</div>
@@ -491,20 +581,40 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                </div>
 
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-emerald-50/30 rounded-3xl border border-emerald-100/50">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                      <BookOpen size={12} /> Source G/L Receivable Account
+                    </label>
+                    <select 
+                      required 
+                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm"
+                      value={selectedCollArAccountId}
+                      onChange={e => setSelectedCollArAccountId(e.target.value)}
+                    >
+                      <option value="">Select account...</option>
+                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.code} - {acc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest px-1">Deposit Target</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
+                      <option value="">Select Treasury Account...</option>
+                      {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} ({b.currency})</option>)}
+                    </select>
+                  </div>
+               </div>
+
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Collection Amount</label>
                  <div className="relative">
                     <input type="number" step="0.01" required className="w-full px-6 py-5 bg-slate-50 border-none rounded-[2rem] text-4xl font-mono font-black text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
                     <span className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-black text-slate-300">PHP</span>
                  </div>
-               </div>
-
-               <div className="space-y-1.5">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Deposit Target</label>
-                 <select required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
-                   <option value="">Select Treasury Account...</option>
-                   {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} ({b.currency})</option>)}
-                 </select>
                </div>
 
                <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 flex gap-4">

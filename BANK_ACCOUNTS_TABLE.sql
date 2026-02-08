@@ -1,5 +1,5 @@
 -- ============================================================================
--- BANK ACCOUNTS TABLE - Supabase SQL
+-- BANK chart_of_accounts TABLE - Supabase SQL
 -- Run this in your Supabase SQL Editor
 -- ============================================================================
 
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
   bank_name VARCHAR(255) NOT NULL,
   account_number VARCHAR(100) NOT NULL,
   type VARCHAR(20) NOT NULL CHECK (type IN ('SAVINGS', 'CHECKING', 'CREDIT', 'CASH')),
-  gl_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL,
+  gl_account_id UUID REFERENCES chart_of_accounts(id) ON DELETE SET NULL,
   currency VARCHAR(10) NOT NULL DEFAULT 'PHP',
   balance DECIMAL(18, 2) NOT NULL DEFAULT 0.00,
   
@@ -37,8 +37,8 @@ ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
--- Policy: Users can view bank accounts in their organization
-CREATE POLICY "Users can view bank accounts in their org"
+-- Policy: Users can view bank chart_of_accounts in their organization
+CREATE POLICY "Users can view bank chart_of_accounts in their org"
 ON bank_accounts FOR SELECT
 USING (
   org_id IN (
@@ -46,8 +46,8 @@ USING (
   )
 );
 
--- Policy: Users can insert bank accounts in their organization
-CREATE POLICY "Users can insert bank accounts in their org"
+-- Policy: Users can insert bank chart_of_accounts in their organization
+CREATE POLICY "Users can insert bank chart_of_accounts in their org"
 ON bank_accounts FOR INSERT
 WITH CHECK (
   org_id IN (
@@ -55,8 +55,8 @@ WITH CHECK (
   )
 );
 
--- Policy: Users can update bank accounts in their organization
-CREATE POLICY "Users can update bank accounts in their org"
+-- Policy: Users can update bank chart_of_accounts in their organization
+CREATE POLICY "Users can update bank chart_of_accounts in their org"
 ON bank_accounts FOR UPDATE
 USING (
   org_id IN (
@@ -64,8 +64,8 @@ USING (
   )
 );
 
--- Policy: Users can delete bank accounts in their organization
-CREATE POLICY "Users can delete bank accounts in their org"
+-- Policy: Users can delete bank chart_of_accounts in their organization
+CREATE POLICY "Users can delete bank chart_of_accounts in their org"
 ON bank_accounts FOR DELETE
 USING (
   org_id IN (

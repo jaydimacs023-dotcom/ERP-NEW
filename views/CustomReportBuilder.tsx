@@ -35,7 +35,7 @@ export interface ReportTemplate {
   id: string;
   name: string;
   description?: string;
-  dataSource: 'transactions' | 'accounts' | 'entries' | 'contacts';
+  dataSource: 'transactions' | 'chart_of_accounts' | 'entries' | 'contacts';
   columns: ReportColumn[];
   filters: ReportFilter[];
   sorts: ReportSort[];
@@ -116,7 +116,7 @@ const FILTER_OPERATORS: Record<string, { label: string; requiresValue: boolean; 
 
 const DATA_SOURCES = [
   { id: 'transactions', label: 'Transaction Details', description: 'Individual journal line items with full details' },
-  { id: 'accounts', label: 'Account Summaries', description: 'Chart of accounts with debit/credit totals' },
+  { id: 'chart_of_accounts', label: 'Account Summaries', description: 'Chart of accounts with debit/credit totals' },
   { id: 'entries', label: 'Journal Entries', description: 'Journal entry headers with line counts' },
 ];
 
@@ -134,7 +134,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
   onNotify
 }) => {
   // ===== State =====
-  const [dataSource, setDataSource] = useState<'transactions' | 'accounts' | 'entries'>('transactions');
+  const [dataSource, setDataSource] = useState<'transactions' | 'chart_of_accounts' | 'entries'>('transactions');
   const [columns, setColumns] = useState<ReportColumn[]>(COLUMN_DEFINITIONS.transactions);
   const [filters, setFilters] = useState<ReportFilter[]>([]);
   const [sorts, setSorts] = useState<ReportSort[]>([{ field: 'date', direction: 'desc' }]);
@@ -156,7 +156,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
 
   // ===== Data Source Change Handler =====
-  const handleDataSourceChange = useCallback((source: 'transactions' | 'accounts' | 'entries') => {
+  const handleDataSourceChange = useCallback((source: 'transactions' | 'chart_of_accounts' | 'entries') => {
     setDataSource(source);
     setColumns(COLUMN_DEFINITIONS[source] || []);
     setFilters([]);
@@ -195,7 +195,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
         });
     }
 
-    if (dataSource === 'accounts') {
+    if (dataSource === 'chart_of_accounts') {
       return accounts
         .filter(a => !a.isHeader && a.isActive)
         .map(account => {

@@ -203,12 +203,16 @@ export class MockDataService implements IDataService {
 
   async createSponsor(sponsor: Sponsor): Promise<Sponsor> {
     console.warn('[MockDataService] Sponsors persist to memory only; changes lost on refresh');
-    return sponsor;
+    return {
+      ...sponsor,
+      id: sponsor.id || `sponsor-${Date.now()}`,
+      arAccountId: sponsor.arAccountId || ''
+    };
   }
 
   async updateSponsor(id: string, updates: Partial<Sponsor>): Promise<Sponsor> {
     console.warn('[MockDataService] Sponsors persist to memory only; changes lost on refresh');
-    return { ...updates } as Sponsor;
+    return { id, ...updates } as Sponsor;
   }
 
   async deleteSponsor(id: string): Promise<void> {

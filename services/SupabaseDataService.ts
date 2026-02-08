@@ -135,7 +135,7 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('items'),
         this.fetchFromSupabase('vendors'),
         this.fetchFromSupabase('locations'),
-        this.fetchFromSupabase('schedules'),
+        this.fetchFromSupabase('trainer_schedules'),
         this.fetchFromSupabase('employees'),
         this.fetchFromSupabase('bank_accounts'),
         this.fetchFromSupabase('bank_reconciliations'),
@@ -224,18 +224,21 @@ export class SupabaseDataService implements IDataService {
   /**
    * Convert snake_case object keys to camelCase
    * Used because Supabase tables use snake_case but app uses camelCase
+   * Deeply recursive to handle JSONB columns
    */
   private snakeToCamel(obj: any): any {
     if (obj === null || obj === undefined) return obj;
     if (typeof obj !== 'object') return obj;
     if (Array.isArray(obj)) return obj.map(item => this.snakeToCamel(item));
+    if (obj instanceof Date) return obj;
 
     const camelCaseObj: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         // Convert snake_case to camelCase: is_vat_registered → isVatRegistered
         const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        camelCaseObj[camelKey] = obj[key];
+        // Recursively convert values for nested JSONB objects
+        camelCaseObj[camelKey] = this.snakeToCamel(obj[key]);
       }
     }
     return camelCaseObj;
@@ -244,18 +247,21 @@ export class SupabaseDataService implements IDataService {
   /**
    * Convert camelCase object keys to snake_case
    * Used because Supabase tables use snake_case column names
+   * Deeply recursive to handle JSONB columns
    */
   private camelToSnake(obj: any): any {
     if (obj === null || obj === undefined) return obj;
     if (typeof obj !== 'object') return obj;
     if (Array.isArray(obj)) return obj.map(item => this.camelToSnake(item));
+    if (obj instanceof Date) return obj;
 
     const snakeCaseObj: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         // Convert camelCase to snake_case: isVatRegistered → is_vat_registered
         const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        snakeCaseObj[snakeKey] = obj[key];
+        // Recursively convert values for nested JSONB objects
+        snakeCaseObj[snakeKey] = this.camelToSnake(obj[key]);
       }
     }
     return snakeCaseObj;
@@ -466,16 +472,17 @@ export class SupabaseDataService implements IDataService {
       qualifications: ['id', 'org_id', 'code', 'name', 'duration_days', 'sector', 'created_at', 'updated_at'],
       employees: ['id', 'org_id', 'first_name', 'last_name', 'designation', 'tin', 'sss', 'philhealth', 'pagibig', 'basic_salary', 'bank_name', 'bank_account', 'is_active', 'created_at', 'updated_at'],
       locations: ['id', 'org_id', 'code', 'name', 'address', 'capacity', 'created_at', 'updated_at'],
-      schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
-      sponsors: ['id', 'org_id', 'name', 'contact_person', 'email', 'phone', 'address', 'created_at', 'updated_at'],
+      trainer_schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
+      sponsors: ['id', 'org_id', 'name', 'contact_person', 'email', 'phone', 'address', 'ar_account_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'],
       batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
       vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'created_at', 'updated_at'],
       atc_categories: ['id', 'code', 'name', 'created_at', 'updated_at'],
       atc_items: ['id', 'category_id', 'atc_code', 'description', 'taxpayer_type', 'created_at', 'updated_at'],
       atc_rates: ['id', 'atc_item_id', 'rate', 'rate_label', 'created_at', 'updated_at'],
       bank_accounts: ['id', 'org_id', 'bank_name', 'account_number', 'type', 'gl_account_id', 'currency', 'balance', 'created_at', 'updated_at'],
+      chart_of_accounts: ['id', 'org_id', 'code', 'name', 'class', 'description', 'is_header', 'parent_id', 'created_at', 'updated_at'],
       fixed_assets: ['id', 'org_id', 'code', 'name', 'description', 'category', 'purchase_date', 'purchase_cost', 'accumulated_depreciation', 'depreciation_method', 'useful_life_years', 'gl_account_id', 'created_at', 'updated_at'],
-      items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'created_at', 'updated_at'],
+      items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'tax_category_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'],
       payables: [
         'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'description', 'amount',
         'bill_date', 'due_date', 'payment_date', 'currency', 'status', 'reference_document',
@@ -642,10 +649,11 @@ export class SupabaseDataService implements IDataService {
     }
 
     // Convert documents array (StudentDocument[] to text[])
+    // NOTE: In the current schema, students.documents is jsonb, so we should KEEP the full objects.
+    // The previous logic was stripping fileData and other fields.
     if (snakeCaseStudent.documents && Array.isArray(snakeCaseStudent.documents)) {
-      snakeCaseStudent.documents = snakeCaseStudent.documents
-        .map((doc: any) => typeof doc === 'string' ? doc : doc.name || doc.id)
-        .filter(Boolean);
+      // camelToSnake has already processed this since it's now deeply recursive
+      console.debug('[Supabase] Preserving documents array:', snakeCaseStudent.documents.length, 'items');
     }
 
     // Filter to only valid columns AFTER converting to snake_case
@@ -687,10 +695,10 @@ export class SupabaseDataService implements IDataService {
     snakeCaseUpdates.updated_at = new Date().toISOString();
     
     // Convert StudentDocument[] to text[] for Supabase
+    // NOTE: In the current schema, students.documents is jsonb, so we should KEEP the full objects.
     if (snakeCaseUpdates.documents && Array.isArray(snakeCaseUpdates.documents)) {
-      snakeCaseUpdates.documents = snakeCaseUpdates.documents
-        .map((doc: any) => typeof doc === 'string' ? doc : doc.name || doc.id)
-        .filter(Boolean);
+      // camelToSnake has already processed this since it's now deeply recursive
+      console.debug('[Supabase] Preserving documents array for update');
     }
 
     // Filter to only valid columns for students table
@@ -1391,6 +1399,12 @@ export class SupabaseDataService implements IDataService {
    */
   async createItem(item: any): Promise<any> {
     const snakeCaseItem = this.camelToSnake(item);
+    
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseItem.income_account_id === '') snakeCaseItem.income_account_id = null;
+    if (snakeCaseItem.expense_account_id === '') snakeCaseItem.expense_account_id = null;
+    if (snakeCaseItem.tax_category_id === '') snakeCaseItem.tax_category_id = null;
+
     // Use isInsert: true to exclude generated columns (created_at, updated_at)
     const filteredItem = this.filterToTableSchema('items', snakeCaseItem, true);
     if ((filteredItem as any).id && !this.isValidUUID((filteredItem as any).id)) {
@@ -1401,6 +1415,12 @@ export class SupabaseDataService implements IDataService {
 
   async updateItem(id: string, updates: Partial<any>): Promise<any> {
     const snakeCaseUpdates = this.camelToSnake(updates);
+    
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseUpdates.income_account_id === '') snakeCaseUpdates.income_account_id = null;
+    if (snakeCaseUpdates.expense_account_id === '') snakeCaseUpdates.expense_account_id = null;
+    if (snakeCaseUpdates.tax_category_id === '') snakeCaseUpdates.tax_category_id = null;
+
     const filteredUpdates = this.filterToTableSchema('items', snakeCaseUpdates);
     return this.updateInSupabaseRaw('items', id, filteredUpdates);
   }
@@ -3060,7 +3080,7 @@ export class SupabaseDataService implements IDataService {
     try {
       const payload = this.camelToSnake(account);
       delete payload.id;
-      const url = `${this.baseUrl}/accounts`;
+      const url = `${this.baseUrl}/chart_of_accounts`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3082,7 +3102,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateAccount called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3103,7 +3123,7 @@ export class SupabaseDataService implements IDataService {
   async deleteAccount(id: string): Promise<void> {
     console.debug('[Supabase] deleteAccount called with id:', id);
     try {
-      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: this.getHeaders(),
@@ -3119,7 +3139,7 @@ export class SupabaseDataService implements IDataService {
   async getAccountsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getAccountsByOrg called with orgId:', orgId);
     try {
-      const url = `${this.baseUrl}/accounts?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
+      const url = `${this.baseUrl}/chart_of_accounts?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
       const response = await fetch(url, { headers: this.getHeaders() });
       if (!response.ok) return [];
       const data = await response.json();
@@ -3133,7 +3153,7 @@ export class SupabaseDataService implements IDataService {
   async getAccountById(id: string): Promise<any | null> {
     console.debug('[Supabase] getAccountById called with id:', id);
     try {
-      const url = `${this.baseUrl}/accounts?id=eq.${id}`;
+      const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
       const response = await fetch(url, { headers: this.getHeaders() });
       if (!response.ok) return null;
       const data = await response.json();
@@ -3246,7 +3266,7 @@ export class SupabaseDataService implements IDataService {
     try {
       const payload = this.camelToSnake(line);
       delete payload.id;
-      const url = `${this.baseUrl}/journal_lines`;
+      const url = `${this.baseUrl}/journal_entry_lines`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3272,7 +3292,7 @@ export class SupabaseDataService implements IDataService {
         delete payload.id;
         return payload;
       });
-      const url = `${this.baseUrl}/journal_lines`;
+      const url = `${this.baseUrl}/journal_entry_lines`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3294,7 +3314,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateJournalLine called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
+      const url = `${this.baseUrl}/journal_entry_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3315,7 +3335,7 @@ export class SupabaseDataService implements IDataService {
   async deleteJournalLine(id: string): Promise<void> {
     console.debug('[Supabase] deleteJournalLine called with id:', id);
     try {
-      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
+      const url = `${this.baseUrl}/journal_entry_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
         headers: this.getHeaders()
@@ -3330,7 +3350,7 @@ export class SupabaseDataService implements IDataService {
   async getJournalLinesByEntry(entryId: string): Promise<any[]> {
     console.debug('[Supabase] getJournalLinesByEntry called with entryId:', entryId);
     try {
-      const url = `${this.baseUrl}/journal_lines?entry_id=eq.${entryId}&order=id.asc`;
+      const url = `${this.baseUrl}/journal_entry_lines?journal_entry_id=eq.${entryId}&order=id.asc`;
       const response = await fetch(url, { headers: this.getHeaders() });
       if (!response.ok) return [];
       const data = await response.json();

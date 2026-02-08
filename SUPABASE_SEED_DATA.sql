@@ -15,16 +15,16 @@ INSERT INTO organizations (
 ) ON CONFLICT DO NOTHING;
 
 -- ============================================================================
--- 2. CHART OF ACCOUNTS (Philippine GAAP Chart of Accounts)
+-- 2. CHART OF chart_of_accounts (Philippine GAAP Chart of chart_of_accounts)
 -- ============================================================================
 
--- ASSET ACCOUNTS
-INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
+-- ASSET chart_of_accounts
+INSERT INTO chart_of_accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '1000', 'ASSETS', 'ASSET', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1010', 'Cash - Peso', 'ASSET', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1020', 'Petty Cash', 'ASSET', FALSE, TRUE),
-  ((SELECT id FROM organizations LIMIT 1), '1050', 'Accounts Receivable - Students', 'ASSET', FALSE, TRUE),
-  ((SELECT id FROM organizations LIMIT 1), '1051', 'Accounts Receivable - Sponsors', 'ASSET', FALSE, TRUE),
+  ((SELECT id FROM organizations LIMIT 1), '1050', 'chart_of_accounts Receivable - Students', 'ASSET', FALSE, TRUE),
+  ((SELECT id FROM organizations LIMIT 1), '1051', 'chart_of_accounts Receivable - Sponsors', 'ASSET', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1100', 'CURRENT ASSETS - NON-FINANCIAL', 'ASSET', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1110', 'Prepaid Expenses', 'ASSET', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1120', 'Supplies Inventory', 'ASSET', FALSE, TRUE),
@@ -40,10 +40,10 @@ INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '1560', 'Vehicles', 'ASSET', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '1599', 'Accumulated Depreciation', 'ASSET', FALSE, TRUE);
 
--- LIABILITY ACCOUNTS
-INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
+-- LIABILITY chart_of_accounts
+INSERT INTO chart_of_accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '2000', 'LIABILITIES', 'LIABILITY', TRUE, TRUE),
-  ((SELECT id FROM organizations LIMIT 1), '2100', 'Accounts Payable - Vendors', 'LIABILITY', FALSE, TRUE),
+  ((SELECT id FROM organizations LIMIT 1), '2100', 'chart_of_accounts Payable - Vendors', 'LIABILITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '2200', 'Accrued Expenses', 'LIABILITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '2210', 'Salaries & Wages Payable', 'LIABILITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '2220', 'Utilities Payable', 'LIABILITY', FALSE, TRUE),
@@ -58,16 +58,16 @@ INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '2430', 'Pag-IBIG Payable', 'LIABILITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '2440', 'Income Tax Withholding Payable', 'LIABILITY', FALSE, TRUE);
 
--- EQUITY ACCOUNTS
-INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
+-- EQUITY chart_of_accounts
+INSERT INTO chart_of_accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '3000', 'EQUITY', 'EQUITY', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '3100', 'Capital Stock', 'EQUITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '3110', 'Additional Paid-In Capital', 'EQUITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '3200', 'Retained Earnings', 'EQUITY', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '3210', 'Dividends', 'EQUITY', FALSE, TRUE);
 
--- REVENUE ACCOUNTS
-INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
+-- REVENUE chart_of_accounts
+INSERT INTO chart_of_accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '4000', 'REVENUE', 'REVENUE', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '4010', 'Training Fees - Tuition', 'REVENUE', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '4020', 'Training Fees - Registration', 'REVENUE', FALSE, TRUE),
@@ -76,8 +76,8 @@ INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '4050', 'Other Income', 'REVENUE', FALSE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '4100', 'Government Grants & Subsidies', 'REVENUE', FALSE, TRUE);
 
--- EXPENSE ACCOUNTS
-INSERT INTO accounts (org_id, code, name, class, is_header, is_active) VALUES
+-- EXPENSE chart_of_accounts
+INSERT INTO chart_of_accounts (org_id, code, name, class, is_header, is_active) VALUES
   ((SELECT id FROM organizations LIMIT 1), '5000', 'EXPENSES', 'EXPENSE', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '5100', 'PERSONNEL COSTS', 'EXPENSE', TRUE, TRUE),
   ((SELECT id FROM organizations LIMIT 1), '5110', 'Trainer Salaries & Wages', 'EXPENSE', FALSE, TRUE),
@@ -130,12 +130,12 @@ INSERT INTO qualifications (org_id, code, name, duration_days, sector) VALUES
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
--- 5. VENDORS (FOR ACCOUNTS PAYABLE)
+-- 5. VENDORS (FOR chart_of_accounts PAYABLE)
 -- ============================================================================
 INSERT INTO vendors (org_id, name, category, email, contact_number, address, ap_account_id) VALUES
-  ((SELECT id FROM organizations LIMIT 1), 'ABC Supplies Inc.', 'Office Supplies', 'sales@abcsupplies.com', '555-0001', 'Quezon City', (SELECT id FROM accounts WHERE code = '2100' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'XYZ Training Materials Co.', 'Training Materials', 'contact@xyztraining.com', '555-0002', 'Makati', (SELECT id FROM accounts WHERE code = '2100' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'Metro Electric Services', 'Utilities & Maintenance', 'billing@metroelectric.com', '555-0003', 'Manila', (SELECT id FROM accounts WHERE code = '2100' LIMIT 1))
+  ((SELECT id FROM organizations LIMIT 1), 'ABC Supplies Inc.', 'Office Supplies', 'sales@abcsupplies.com', '555-0001', 'Quezon City', (SELECT id FROM chart_of_accounts WHERE code = '2100' LIMIT 1)),
+  ((SELECT id FROM organizations LIMIT 1), 'XYZ Training Materials Co.', 'Training Materials', 'contact@xyztraining.com', '555-0002', 'Makati', (SELECT id FROM chart_of_accounts WHERE code = '2100' LIMIT 1)),
+  ((SELECT id FROM organizations LIMIT 1), 'Metro Electric Services', 'Utilities & Maintenance', 'billing@metroelectric.com', '555-0003', 'Manila', (SELECT id FROM chart_of_accounts WHERE code = '2100' LIMIT 1))
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -171,19 +171,19 @@ ON CONFLICT DO NOTHING;
 -- 7. NON-STOCK ITEMS (SERVICE & TRAINING ITEMS)
 -- ============================================================================
 INSERT INTO non_stock_items (org_id, code, name, description, unit_price, income_account_id, expense_account_id) VALUES
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-001', 'NC II Electrical Installation Course', 'Full-time training program for NC II certification', 15000.00, (SELECT id FROM accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM accounts WHERE code = '5110' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-002', 'Registration Fee', 'Student registration and processing', 500.00, (SELECT id FROM accounts WHERE code = '4020' LIMIT 1), (SELECT id FROM accounts WHERE code = '5450' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-003', 'Certification Exam', 'External certification examination', 1500.00, (SELECT id FROM accounts WHERE code = '4030' LIMIT 1), (SELECT id FROM accounts WHERE code = '5400' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'SUP-001', 'Training Materials Kit', 'Complete training materials for one student', 2500.00, (SELECT id FROM accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM accounts WHERE code = '5210' LIMIT 1))
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-001', 'NC II Electrical Installation Course', 'Full-time training program for NC II certification', 15000.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5110' LIMIT 1)),
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-002', 'Registration Fee', 'Student registration and processing', 500.00, (SELECT id FROM chart_of_accounts WHERE code = '4020' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5450' LIMIT 1)),
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-003', 'Certification Exam', 'External certification examination', 1500.00, (SELECT id FROM chart_of_accounts WHERE code = '4030' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5400' LIMIT 1)),
+  ((SELECT id FROM organizations LIMIT 1), 'SUP-001', 'Training Materials Kit', 'Complete training materials for one student', 2500.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5210' LIMIT 1))
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
--- 8. BANK ACCOUNTS
+-- 8. BANK chart_of_accounts
 -- ============================================================================
 INSERT INTO bank_accounts (org_id, bank_name, account_number, type, gl_account_id, currency, balance) VALUES
-  ((SELECT id FROM organizations LIMIT 1), 'BDO Unibank - Checking', '1234567890', 'CHECKING', (SELECT id FROM accounts WHERE code = '1010' LIMIT 1), 'PHP', 500000.00),
-  ((SELECT id FROM organizations LIMIT 1), 'MetroBank - Savings', '0987654321', 'SAVINGS', (SELECT id FROM accounts WHERE code = '1010' LIMIT 1), 'PHP', 1000000.00),
-  ((SELECT id FROM organizations LIMIT 1), 'Petty Cash Box', 'CASH-001', 'CASH', (SELECT id FROM accounts WHERE code = '1020' LIMIT 1), 'PHP', 10000.00)
+  ((SELECT id FROM organizations LIMIT 1), 'BDO Unibank - Checking', '1234567890', 'CHECKING', (SELECT id FROM chart_of_accounts WHERE code = '1010' LIMIT 1), 'PHP', 500000.00),
+  ((SELECT id FROM organizations LIMIT 1), 'MetroBank - Savings', '0987654321', 'SAVINGS', (SELECT id FROM chart_of_accounts WHERE code = '1010' LIMIT 1), 'PHP', 1000000.00),
+  ((SELECT id FROM organizations LIMIT 1), 'Petty Cash Box', 'CASH-001', 'CASH', (SELECT id FROM chart_of_accounts WHERE code = '1020' LIMIT 1), 'PHP', 10000.00)
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -207,7 +207,7 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 -- ACCOUNTING NOTES:
 -- ============================================================================
--- The Chart of Accounts follows Philippine GAAP and is structured as:
+-- The Chart of chart_of_accounts follows Philippine GAAP and is structured as:
 --
 -- ASSETS (1000-1999):
 --   - Current Assets: Cash, AR, Prepaids (1000-1199)

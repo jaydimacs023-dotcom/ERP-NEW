@@ -1,5 +1,5 @@
 -- ============================================================================
--- BANK ACCOUNTS TABLE - Migration Script
+-- BANK chart_of_accounts TABLE - Migration Script
 -- Run this to update your existing bank_accounts table
 -- ============================================================================
 
@@ -31,10 +31,10 @@ CREATE INDEX IF NOT EXISTS idx_bank_accounts_gl_account ON bank_accounts(gl_acco
 ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies (safe to re-run)
-DROP POLICY IF EXISTS "Users can view bank accounts in their org" ON bank_accounts;
-DROP POLICY IF EXISTS "Users can insert bank accounts in their org" ON bank_accounts;
-DROP POLICY IF EXISTS "Users can update bank accounts in their org" ON bank_accounts;
-DROP POLICY IF EXISTS "Users can delete bank accounts in their org" ON bank_accounts;
+DROP POLICY IF EXISTS "Users can view bank chart_of_accounts in their org" ON bank_accounts;
+DROP POLICY IF EXISTS "Users can insert bank chart_of_accounts in their org" ON bank_accounts;
+DROP POLICY IF EXISTS "Users can update bank chart_of_accounts in their org" ON bank_accounts;
+DROP POLICY IF EXISTS "Users can delete bank chart_of_accounts in their org" ON bank_accounts;
 DROP POLICY IF EXISTS "Service role bypass for bank_accounts" ON bank_accounts;
 DROP POLICY IF EXISTS "Anon can read bank_accounts" ON bank_accounts;
 DROP POLICY IF EXISTS "Anon can insert bank_accounts" ON bank_accounts;

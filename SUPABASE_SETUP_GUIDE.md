@@ -93,7 +93,7 @@ organizations (one)
     ├── users
     ├── accounts (Chart of Accounts)
     ├── journal_entries
-    │   └── journal_entry_lines
+    │   └── journal_lines
     ├── students
     ├── trainers
     ├── vendors

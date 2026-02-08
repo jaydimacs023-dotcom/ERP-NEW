@@ -1,5 +1,5 @@
 -- ============================================================================
--- QUICK FIX: Bank Accounts RLS Policy
+-- QUICK FIX: Bank chart_of_accounts RLS Policy
 -- Run this in Supabase SQL Editor to fix the 401/42501 error
 -- ============================================================================
 

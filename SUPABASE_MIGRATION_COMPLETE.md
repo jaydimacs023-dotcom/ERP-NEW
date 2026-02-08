@@ -134,7 +134,7 @@ The system manages 20 main entities:
 - schedules, items, bank_accounts
 
 **Financial:**
-- chart_of_accounts, journal_entries, journal_entry_lines, payroll_runs, payroll_lines
+- chart_of_accounts, journal_entries, journal_lines, payroll_runs, payroll_lines
 
 **Administrative:**
 - purchase_orders, audit_logs

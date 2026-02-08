@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Sponsor } from '../types';
+import { Sponsor, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
-  Building, Filter, Edit2, Loader2, CheckCircle, AlertCircle, MapPin
+  Building, Filter, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
+  BookOpen
 } from 'lucide-react';
 
 interface Toast {
@@ -14,13 +15,14 @@ interface Toast {
 
 interface SponsorsViewProps {
   sponsors: Sponsor[];
+  accounts?: any[];
   onAddSponsor: (sponsor: Sponsor) => void | Promise<void>;
   onUpdateSponsor: (sponsor: Sponsor) => void | Promise<void>;
   onDeleteSponsor: (id: string) => void | Promise<boolean>;
 }
 
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
-  sponsors, onAddSponsor, onUpdateSponsor, onDeleteSponsor 
+  sponsors, accounts = [], onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -34,7 +36,8 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
     contactPerson: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    arAccountId: ''
   });
 
   const filteredSponsors = useMemo(() => sponsors.filter(s => 
@@ -46,7 +49,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   ), [sponsors, searchTerm]);
 
   const resetForm = () => {
-    setFormData({ name: '', contactPerson: '', email: '', phone: '', address: '' });
+    setFormData({ name: '', contactPerson: '', email: '', phone: '', address: '', arAccountId: '' });
     setEditingSponsor(null);
   };
 
@@ -77,6 +80,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
+          arAccountId: formData.arAccountId,
           updatedAt: new Date().toISOString()
         };
         await onUpdateSponsor(updatedSponsor);
@@ -91,6 +95,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
+          arAccountId: formData.arAccountId,
           createdAt: new Date().toISOString()
         };
         await onAddSponsor(newSponsor);
@@ -135,7 +140,8 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
       contactPerson: sponsor.contactPerson,
       email: sponsor.email,
       phone: sponsor.phone,
-      address: sponsor.address
+      address: sponsor.address,
+      arAccountId: sponsor.arAccountId || ''
     });
     setShowModal(true);
   };
@@ -357,11 +363,32 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Address</label>
                   <textarea 
                     placeholder="Complete business address" 
-                    rows={3}
+                    rows={2}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium resize-none"
                     value={formData.address || ''} 
                     onChange={e => setFormData({...formData, address: e.target.value})} 
                   />
+                </div>
+
+                <div className="space-y-1.5 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                  <label className="text-[10px] font-semibold text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <BookOpen size={12} /> Specific G/L Receivable Account
+                  </label>
+                  <select 
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    value={formData.arAccountId || ''}
+                    onChange={e => setFormData({ ...formData, arAccountId: e.target.value })}
+                  >
+                    <option value="">Default Accounts Receivable (1200)</option>
+                    {accounts.filter(a => a.class === 'ASSET' && !a.isHeader).map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.code} - {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[9px] text-slate-500 italic mt-2 px-1">
+                    Override the default A/R account for this specific sponsor if needed for departmental tracking.
+                  </p>
                 </div>
               </div>
 

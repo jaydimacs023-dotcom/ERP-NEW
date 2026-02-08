@@ -199,6 +199,7 @@ export interface Sponsor extends BaseEntity {
   email?: string;
   phone?: string;
   address?: string;
+  arAccountId?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS payables_new (
   status TEXT CHECK (status IN ('for_approval', 'approved', 'paid', 'partially_paid', 'cancelled')) DEFAULT 'for_approval',
   reference_document TEXT,
   journal_entry_id UUID REFERENCES journal_entries(id),
-  gl_account_id UUID REFERENCES accounts(id),
+  gl_account_id UUID REFERENCES chart_of_accounts(id),
   notes TEXT,
   withholding_type TEXT CHECK (withholding_type IN ('EXPANDED', 'FINAL')),
   atc_item_id UUID REFERENCES atc_items(id),
@@ -130,7 +130,7 @@ Audit:
 -- ============================================================================
 -- SAMPLE PAYABLES DATA
 -- ============================================================================
--- Insert sample payables after organizations, vendors, users, and accounts exist
+-- Insert sample payables after organizations, vendors, users, and chart_of_accounts exist
 
 INSERT INTO payables_new (
   org_id, vendor_id, payable_number, category, description, amount,

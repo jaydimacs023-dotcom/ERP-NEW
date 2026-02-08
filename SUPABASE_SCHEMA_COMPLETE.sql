@@ -81,16 +81,16 @@ CREATE TABLE audit_logs (
 );
 
 -- ============================================================================
--- CHART OF ACCOUNTS (Double-Entry Accounting Framework)
+-- CHART OF chart_of_accounts (Double-Entry Accounting Framework)
 -- ============================================================================
 
-CREATE TABLE accounts (
+CREATE TABLE chart_of_accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES organizations(id),
   code TEXT NOT NULL,
   name TEXT NOT NULL,
   class TEXT CHECK (class IN ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE')) NOT NULL,
-  parent_id UUID REFERENCES accounts(id),
+  parent_id UUID REFERENCES chart_of_accounts(id),
   qualification_id UUID,
   is_active BOOLEAN DEFAULT TRUE,
   is_header BOOLEAN DEFAULT FALSE,
@@ -125,7 +125,7 @@ CREATE TABLE journal_entries (
 CREATE TABLE journal_entry_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
-  account_id UUID NOT NULL REFERENCES accounts(id),
+  account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   debit NUMERIC(15, 2) DEFAULT 0,
   credit NUMERIC(15, 2) DEFAULT 0,
   memo TEXT,
@@ -315,8 +315,8 @@ CREATE TABLE non_stock_items (
   name TEXT NOT NULL,
   description TEXT,
   unit_price NUMERIC(15, 2) NOT NULL,
-  income_account_id UUID NOT NULL REFERENCES accounts(id),
-  expense_account_id UUID NOT NULL REFERENCES accounts(id),
+  income_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
+  expense_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   is_deleted BOOLEAN DEFAULT FALSE,
@@ -338,7 +338,7 @@ CREATE TABLE fixed_assets (
   net_book_value NUMERIC(15, 2) GENERATED ALWAYS AS (purchase_cost - accumulated_depreciation) STORED,
   depreciation_method TEXT DEFAULT 'STRAIGHT_LINE',
   useful_life_years INTEGER NOT NULL,
-  gl_account_id UUID NOT NULL REFERENCES accounts(id),
+  gl_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   is_deleted BOOLEAN DEFAULT FALSE,
@@ -347,7 +347,7 @@ CREATE TABLE fixed_assets (
 );
 
 -- ============================================================================
--- VENDORS & SUPPLY CHAIN (ACCOUNTS PAYABLE)
+-- VENDORS & SUPPLY CHAIN (chart_of_accounts PAYABLE)
 -- ============================================================================
 
 CREATE TABLE vendors (
@@ -358,7 +358,7 @@ CREATE TABLE vendors (
   email TEXT,
   contact_number TEXT,
   address TEXT,
-  ap_account_id UUID REFERENCES accounts(id),
+  ap_account_id UUID REFERENCES chart_of_accounts(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   is_deleted BOOLEAN DEFAULT FALSE,
@@ -422,7 +422,7 @@ CREATE TABLE payables (
   status TEXT CHECK (status IN ('for_approval', 'approved', 'paid', 'partially_paid', 'cancelled')) DEFAULT 'for_approval',
   reference_document TEXT,
   journal_entry_id UUID REFERENCES journal_entries(id),
-  gl_account_id UUID REFERENCES accounts(id),
+  gl_account_id UUID REFERENCES chart_of_accounts(id),
   notes TEXT,
   withholding_type TEXT CHECK (withholding_type IN ('EXPANDED', 'FINAL')),
   atc_item_id UUID REFERENCES atc_items(id),
@@ -453,7 +453,7 @@ CREATE TABLE bank_accounts (
   bank_name TEXT NOT NULL,
   account_number TEXT NOT NULL,
   type TEXT CHECK (type IN ('SAVINGS', 'CHECKING', 'CREDIT', 'CASH')) NOT NULL,
-  gl_account_id UUID NOT NULL REFERENCES accounts(id),
+  gl_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   currency TEXT DEFAULT 'PHP',
   balance NUMERIC(15, 2) DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -569,7 +569,7 @@ CREATE TABLE budgets (
 CREATE TABLE budget_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   budget_id UUID NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
-  account_id UUID NOT NULL REFERENCES accounts(id),
+  account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   budgeted_amount NUMERIC(15, 2) NOT NULL
 );
 
@@ -593,10 +593,10 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
 CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
 
 -- Accounting indexes
-CREATE INDEX idx_accounts_org_id ON accounts(org_id);
-CREATE INDEX idx_accounts_code ON accounts(org_id, code);
-CREATE INDEX idx_accounts_class ON accounts(org_id, class);
-CREATE INDEX idx_accounts_parent_id ON accounts(parent_id);
+CREATE INDEX idx_accounts_org_id ON chart_of_accounts(org_id);
+CREATE INDEX idx_accounts_code ON chart_of_accounts(org_id, code);
+CREATE INDEX idx_accounts_class ON chart_of_accounts(org_id, class);
+CREATE INDEX idx_accounts_parent_id ON chart_of_accounts(parent_id);
 
 -- Journal indexes
 CREATE INDEX idx_journal_entries_org_id ON journal_entries(org_id);
@@ -658,7 +658,7 @@ CREATE INDEX idx_payroll_lines_employee_id ON payroll_lines(employee_id);
 
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chart_of_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entry_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
@@ -674,9 +674,9 @@ ALTER TABLE payables ENABLE ROW LEVEL SECURITY;
 -- This schema supports:
 -- ✓ Multi-tenant architecture with organization isolation
 -- ✓ Double-entry accounting with automatic balance validation
--- ✓ Complete chart of accounts hierarchy
--- ✓ Accounts Payable with Philippine ATC withholding
--- ✓ Accounts Receivable with student/sponsor tracking
+-- ✓ Complete chart of chart_of_accounts hierarchy
+-- ✓ chart_of_accounts Payable with Philippine ATC withholding
+-- ✓ chart_of_accounts Receivable with student/sponsor tracking
 -- ✓ Banking and cash management
 -- ✓ Fixed asset management with depreciation
 -- ✓ Payroll processing with statutory deductions

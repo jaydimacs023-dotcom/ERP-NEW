@@ -8,7 +8,7 @@
 
 ### 2. **Updated `SupabaseDataService.ts`**
    - Now fully implements real Supabase integration
-   - Uses REST API to fetch from tables: `organizations`, `users`, `students`, `qualifications`, `trainers`, `batches`, `sponsors`, `items`, `vendors`, `locations`, `schedules`, `employees`, `bank_accounts`, `chart_of_accounts`, `journal_entries`, `journal_entry_lines`, `payroll_runs`, `payroll_lines`, `audit_logs`, `purchase_orders`
+   - Uses REST API to fetch from tables: `organizations`, `users`, `students`, `qualifications`, `trainers`, `batches`, `sponsors`, `items`, `vendors`, `locations`, `schedules`, `employees`, `bank_accounts`, `chart_of_accounts`, `journal_entries`, `journal_lines`, `payroll_runs`, `payroll_lines`, `audit_logs`, `purchase_orders`
    - Graceful fallback to MockDataService if credentials are missing or fetch fails
    - Parallel fetching of all tables for performance
 
