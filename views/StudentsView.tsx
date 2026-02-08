@@ -318,13 +318,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
               toast.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                ? 'bg-emerald-50 border border-teal-200 text-teal-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
                 : 'bg-teal-50 border border-teal-200 text-teal-800'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-teal-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
             {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
             <span>{toast.message}</span>
@@ -349,7 +349,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
           </button>
           <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
           <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm">
-            <FileSpreadsheet size={18} className="text-emerald-600" /> MIS Batch
+            <FileSpreadsheet size={18} className="text-teal-600" /> MIS Batch
           </button>
           <button onClick={() => { setShowModal(true); setPhotoPreview(null); }} className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-lg font-bold text-sm">
             <Plus size={18} /> Register Learner
@@ -395,7 +395,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
                        {isCompliant ? (
-                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
+                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-teal-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
                             <Check size={10} /> Qualified
                          </span>
                        ) : pendingDocs > 0 ? (
@@ -521,7 +521,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                        <span className="text-[10px] font-mono font-black text-teal-600 uppercase tracking-widest bg-teal-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
                          (auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
-                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                         ? 'bg-emerald-50 text-teal-600 border-emerald-100'
                          : 'bg-amber-50 text-amber-600 border-amber-100'
                        }`}>
                          {auditStudent.isEnrollmentOverridden ? 'ADMIN OVERRIDE ACTIVE' : 'STANDARD REGISTRY'}
@@ -641,7 +641,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                             )}
 
                             {isVerified && (
-                               <div className="text-[9px] font-black text-emerald-600 uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
+                               <div className="text-[9px] font-black text-teal-600 uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
                             )}
                          </div>
                        )

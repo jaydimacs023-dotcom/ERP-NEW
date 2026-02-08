@@ -434,7 +434,7 @@ const APView: React.FC<APViewProps> = ({
                 return (
                   <tr key={pymt.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-5 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-[10px]"><CheckCircle size={14} /></div>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-teal-600 flex items-center justify-center font-bold text-[10px]"><CheckCircle size={14} /></div>
                       <div className="text-sm font-bold text-slate-800">{pymt.description.split(': ')[1]}</div>
                     </td>
                     <td className="px-6 py-5 text-xs font-mono font-semibold text-teal-600">{pymt.reference}</td>
@@ -524,7 +524,7 @@ const APView: React.FC<APViewProps> = ({
                        <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold text-[9px] uppercase">V</div>
                        <div className="text-sm font-bold text-slate-800">{row.name}</div>
                     </td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-emerald-600 font-bold">{formatCurrency(row.current)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600 font-bold">{formatCurrency(row.current)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-amber-600 font-bold">{formatCurrency(row.thirty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-orange-600 font-bold">{formatCurrency(row.sixty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-black bg-rose-50/30">{formatCurrency(row.ninety)}</td>

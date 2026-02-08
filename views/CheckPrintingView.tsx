@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; bgColor
   DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100' },
   PRINTED: { label: 'Printed', color: 'text-teal-600', bgColor: 'bg-teal-50' },
   RELEASED: { label: 'Released', color: 'text-violet-600', bgColor: 'bg-violet-50' },
-  CLEARED: { label: 'Cleared', color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
+  CLEARED: { label: 'Cleared', color: 'text-teal-600', bgColor: 'bg-emerald-50' },
   VOIDED: { label: 'Voided', color: 'text-rose-600', bgColor: 'bg-rose-50' },
   STALE: { label: 'Stale', color: 'text-amber-600', bgColor: 'bg-amber-50' },
 };
@@ -469,7 +469,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Cleared (Total)</p>
-          <p className="text-2xl font-black mt-1 text-emerald-600">{"\u20B1"}{formatCurrency(summaryMetrics.clearedAmount)}</p>
+          <p className="text-2xl font-black mt-1 text-teal-600">{"\u20B1"}{formatCurrency(summaryMetrics.clearedAmount)}</p>
         </div>
       </div>
 
@@ -599,7 +599,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                           {check.status === 'RELEASED' && (
                             <button
                               onClick={() => handleClear(check)}
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"
+                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
                               title="Clear"
                             >
                               <CheckCircle size={16} />

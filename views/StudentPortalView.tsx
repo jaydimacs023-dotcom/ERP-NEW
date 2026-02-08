@@ -195,7 +195,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-500 uppercase tracking-widest">
                                BATCH: {enrollment.batch.name}
                              </span>
-                             <span className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                             <span className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] font-black text-teal-600 uppercase tracking-widest">
                                {enrollment.batch.status.replace('_', ' ')}
                              </span>
                           </div>
@@ -274,7 +274,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   <div className="w-full md:w-64 space-y-4">
                      <div className="flex justify-between items-center">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Due</span>
-                        <span className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <span className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-teal-600'}`}>
                            {"\u20B1"} {formatCurrency(billing.balance)}
                         </span>
                      </div>
@@ -337,7 +337,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                       <FileText size={28}/>
                    </div>
                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                     doc.status === 'VERIFIED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                     doc.status === 'VERIFIED' ? 'bg-emerald-50 text-teal-600 border-emerald-100' : 
                      doc.status === 'UPLOADED' ? 'bg-teal-50 text-teal-600 border-teal-100' :
                      'bg-slate-50 text-slate-400 border-slate-200'
                    }`}>
@@ -358,7 +358,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   </div>
                 )}
                 {doc.status === 'VERIFIED' && (
-                  <div className="flex items-center gap-2 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
+                  <div className="flex items-center gap-2 text-teal-600 text-[10px] font-black uppercase tracking-widest">
                      <ShieldCheck size={16} /> Auditor Approved
                   </div>
                 )}
@@ -377,11 +377,11 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                </div>
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Payments Made</p>
-                  <p className="text-2xl font-mono font-black text-emerald-600">{"\u20B1"} {formatCurrency(billing.totalPaid)}</p>
+                  <p className="text-2xl font-mono font-black text-teal-600">{"\u20B1"} {formatCurrency(billing.totalPaid)}</p>
                </div>
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Statement Balance</p>
-                  <p className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{"\u20B1"} {formatCurrency(billing.balance)}</p>
+                  <p className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-teal-600'}`}>{"\u20B1"} {formatCurrency(billing.balance)}</p>
                </div>
             </div>
 
@@ -417,7 +417,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                                 <td className="px-10 py-6 text-right font-mono text-sm font-bold text-slate-600">
                                    {line.debit > 0 ? formatCurrency(line.debit) : '—'}
                                 </td>
-                                <td className="px-10 py-6 text-right font-mono text-sm font-black text-emerald-600">
+                                <td className="px-10 py-6 text-right font-mono text-sm font-black text-teal-600">
                                    {line.credit > 0 ? `+ ${formatCurrency(line.credit)}` : '—'}
                                 </td>
                              </tr>

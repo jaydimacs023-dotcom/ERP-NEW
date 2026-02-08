@@ -108,11 +108,11 @@ export default function RevenueRecognitionView({
 
   // Filters
   const liabilityAccounts = useMemo(() => 
-    accounts.filter(a => a.accountClass === 'LIABILITY' && !a.isDeleted),
+    accounts.filter(a => a.class === 'LIABILITY' && !a.isHeader && !a.isDeleted),
     [accounts]
   );
   const revenueAccounts = useMemo(() => 
-    accounts.filter(a => a.accountClass === 'REVENUE' && !a.isDeleted),
+    accounts.filter(a => a.class === 'REVENUE' && !a.isHeader && !a.isDeleted),
     [accounts]
   );
 
@@ -425,7 +425,7 @@ export default function RevenueRecognitionView({
             <DollarSign className="w-4 h-4" />
             Deferred Balance
           </div>
-          <div className="text-2xl font-bold text-orange-600">
+          <div className="text-2xl font-bold text-teal-600">
             {formatCurrency(summary.totalDeferred)}
           </div>
         </div>
@@ -576,7 +576,7 @@ export default function RevenueRecognitionView({
                           {formatCurrency(schedule.recognizedAmount)}
                           <div className="text-xs text-gray-400">{progressPercent}%</div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-orange-600">
+                        <td className="px-4 py-3 text-sm font-medium text-teal-600">
                           {formatCurrency(schedule.deferredBalance)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
@@ -818,7 +818,7 @@ export default function RevenueRecognitionView({
                       <td className="px-4 py-3 text-sm text-green-600">
                         {formatCurrency(summary.totalRecognized)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-orange-600">
+                      <td className="px-4 py-3 text-sm font-medium text-teal-600">
                         {formatCurrency(summary.totalRemaining)}
                       </td>
                       <td className="px-4 py-3">

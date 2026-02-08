@@ -74,23 +74,23 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={20} />} color="teal" />
-        <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={20} />} color="emerald" />
-        <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={20} />} color="rose" />
-        <StatCard title="Current Ratio" value={currentRatio} icon={<Activity size={20} />} color="amber" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={18} />} color="teal" />
+        <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={18} />} color="emerald" />
+        <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={18} />} color="rose" />
+        <StatCard title="Current Ratio" value={currentRatio} icon={<Activity size={18} />} color="amber" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Analytical Graph: Performance Trend */}
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-10">
-          <div className="flex justify-between items-center mb-10">
+        <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+          <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Revenue vs Expense Trend</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Fiscal Year Performance Matrix</p>
             </div>
-            <div className="p-3 bg-brand-light text-brand rounded-2xl shadow-sm no-print">
-              <BarChart3 size={20} />
+            <div className="p-2.5 bg-brand-light text-brand rounded-xl shadow-sm no-print">
+              <BarChart3 size={18} />
             </div>
           </div>
           
@@ -122,18 +122,18 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl p-10 flex flex-col text-white relative overflow-hidden print:text-slate-900 print:border print:bg-white">
-          <div className="absolute top-0 right-0 p-10 opacity-5 no-print">
-             <LucideLineChart size={120} />
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 flex flex-col text-slate-800 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10 text-slate-100 no-print">
+             <LucideLineChart size={100} />
           </div>
           <div className="relative z-10">
-             <h3 className="text-lg font-black tracking-tight mb-8">Asset Liquidity Mix</h3>
-             <div className="h-[250px] min-h-[250px]">
+             <h3 className="text-base font-black tracking-tight mb-6">Asset Liquidity Mix</h3>
+             <div className="h-[220px] min-h-[220px]">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <BarChart data={classDistributionData} layout="vertical">
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" hide />
-                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: 'white' }} />
+                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '12px', color: '#1e293b' }} />
                     <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={30}>
                        {classDistributionData.map((entry, index) => (
                          <Cell key={`cell-${index}`} fill={entry.color} />
@@ -148,9 +148,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
                    <div key={i} className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 print:text-slate-500">{item.name}</span>
+                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.name}</span>
                       </div>
-                      <span className="text-sm font-mono font-bold">{formatCurrency(item.value)}</span>
+                      <span className="text-sm font-mono font-bold text-slate-900">{formatCurrency(item.value)}</span>
                    </div>
                 ))}
              </div>
@@ -158,19 +158,19 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-10">
-        <div className="flex justify-between items-center mb-8">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        <div className="flex justify-between items-center mb-6">
            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Balance Sheet Matrix</h3>
            <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.2em] no-print">Aggregated GL Summary</span>
         </div>
-        <div className="overflow-hidden rounded-[2rem] border border-slate-100">
+        <div className="overflow-hidden rounded-2xl border border-slate-100">
           <table className="min-w-full divide-y divide-slate-100 text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-10 py-5 text-left font-black text-slate-400 uppercase text-[10px] tracking-widest">Classification</th>
-                <th className="px-10 py-5 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Debit</th>
-                <th className="px-10 py-5 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Credit</th>
-                <th className="px-10 py-5 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Net Balance</th>
+                <th className="px-6 py-4 text-left font-black text-slate-400 uppercase text-[10px] tracking-widest">Classification</th>
+                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Debit</th>
+                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Credit</th>
+                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Net Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -181,10 +181,10 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
                 const b = s.reduce((acc, val) => acc + val.balance, 0);
                 return (
                   <tr key={cls} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-10 py-5 font-black text-slate-600 uppercase tracking-tight">{cls}</td>
-                    <td className="px-10 py-5 text-right font-mono text-slate-500">{d.toLocaleString()}</td>
-                    <td className="px-10 py-5 text-right font-mono text-slate-500">{c.toLocaleString()}</td>
-                    <td className="px-10 py-5 text-right font-mono font-black text-slate-900">{b.toLocaleString()}</td>
+                    <td className="px-6 py-4 font-black text-slate-600 uppercase tracking-tight">{cls}</td>
+                    <td className="px-6 py-4 text-right font-mono text-slate-500">{d.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-mono text-slate-500">{c.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">{b.toLocaleString()}</td>
                   </tr>
                 );
               })}
@@ -197,12 +197,12 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 };
 
 const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
-  <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 group hover:border-brand transition-all">
-    <div className={`w-12 h-12 rounded-2xl bg-${color}-50 text-${color}-600 flex items-center justify-center mb-6 border border-${color}-100 transition-all group-hover:scale-110 no-print`}>
+  <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 group hover:border-brand transition-all">
+    <div className={`w-10 h-10 rounded-xl bg-${color}-50 text-${color}-600 flex items-center justify-center mb-3 border border-${color}-100 transition-all group-hover:scale-110 no-print`}>
       {icon}
     </div>
     <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</div>
-    <div className="text-2xl font-black text-slate-900 tracking-tight">{value}</div>
+    <div className="text-xl font-black text-slate-900 tracking-tight">{value}</div>
   </div>
 );
 

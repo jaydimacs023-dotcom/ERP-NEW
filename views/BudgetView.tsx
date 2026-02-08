@@ -162,7 +162,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                              </td>
                              <td className="px-10 py-6 text-right font-mono text-xs font-bold text-slate-600">{formatCurrency(line.budgetedAmount)}</td>
                              <td className="px-10 py-6 text-right font-mono text-xs font-black text-slate-900">{formatCurrency(actual)}</td>
-                             <td className={`px-10 py-6 text-right font-mono text-xs font-black ${isFavorable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                             <td className={`px-10 py-6 text-right font-mono text-xs font-black ${isFavorable ? 'text-teal-600' : 'text-rose-600'}`}>
                                 {variance > 0 ? '+' : ''}{formatCurrency(variance)}
                              </td>
                              <td className="px-10 py-6 text-right">
@@ -173,7 +173,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                                         style={{ width: `${Math.min(100, Math.abs(percentUsed))}%` }} 
                                       />
                                    </div>
-                                   <span className={`text-[8px] font-black uppercase tracking-widest ${isFavorable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                   <span className={`text-[8px] font-black uppercase tracking-widest ${isFavorable ? 'text-teal-600' : 'text-rose-600'}`}>
                                       {percentUsed.toFixed(1)}% Usage
                                    </span>
                                 </div>
@@ -321,12 +321,12 @@ const SummaryWidget: React.FC<{ label: string, budget: number, actual: number, t
 
           <div className={`p-4 rounded-2xl flex items-center justify-between border ${isFavorable ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
              <div className="flex items-center gap-2">
-                {isFavorable ? <ArrowUpRight size={18} className="text-emerald-600" /> : <ArrowDownRight size={18} className="text-rose-600" />}
-                <span className={`text-[10px] font-black uppercase tracking-widest ${isFavorable ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {isFavorable ? <ArrowUpRight size={18} className="text-teal-600" /> : <ArrowDownRight size={18} className="text-rose-600" />}
+                <span className={`text-[10px] font-black uppercase tracking-widest ${isFavorable ? 'text-teal-700' : 'text-rose-700'}`}>
                    {isFavorable ? 'Favorable' : 'Over-Limit'} Variance
                 </span>
              </div>
-             <span className={`text-xs font-mono font-black ${isFavorable ? 'text-emerald-700' : 'text-rose-700'}`}>
+             <span className={`text-xs font-mono font-black ${isFavorable ? 'text-teal-700' : 'text-rose-700'}`}>
                 {variance >= 0 ? '+' : '-'}{"\u20B1"} {varianceDisplay}
              </span>
           </div>

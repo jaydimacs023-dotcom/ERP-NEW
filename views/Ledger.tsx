@@ -123,9 +123,9 @@ const Ledger: React.FC<LedgerProps> = ({
                     <td className="px-8 py-6 text-center align-top">
                       <div className="flex flex-col items-center gap-2">
                         <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase border tracking-widest ${
-                          entry.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                          entry.status === 'POSTED' ? 'bg-teal-50 text-teal-600 border-teal-100' : 
                           entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                          'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
+                          'bg-amber-50 text-teal-600 border-amber-100 animate-pulse'
                         }`}>
                           {entry.status || 'DRAFT'}
                         </span>

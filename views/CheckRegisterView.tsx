@@ -135,7 +135,7 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
       case 'DRAFT': return 'bg-slate-100 text-slate-600 border-slate-200';
       case 'PRINTED': return 'bg-teal-50 text-teal-600 border-teal-200'; // Changed from blue to teal
       case 'RELEASED': return 'bg-purple-50 text-purple-600 border-purple-200';
-      case 'CLEARED': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+      case 'CLEARED': return 'bg-emerald-50 text-teal-600 border-teal-200';
       case 'VOIDED': return 'bg-rose-50 text-rose-600 border-rose-200';
       case 'STALE': return 'bg-amber-50 text-amber-600 border-amber-200';
       default: return 'bg-gray-100 text-gray-600 border-gray-200';
@@ -381,7 +381,7 @@ const SummaryCard: React.FC<{ label: string; value: string; subValue?: string; i
   const colorMap: Record<string, string> = {
     teal: 'bg-teal-50 text-teal-600 border-teal-100',
     purple: 'bg-purple-50 text-purple-600 border-purple-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    emerald: 'bg-emerald-50 text-teal-600 border-emerald-100',
     rose: 'bg-rose-50 text-rose-600 border-rose-100',
   };
 

@@ -167,13 +167,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                     {acc.name}
                   </span>
                   {linkedQual && (
-                    <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span className="text-[9px] font-bold bg-amber-50 text-teal-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
                       <Award size={8} /> {linkedQual.code}
                     </span>
                   )}
                 </div>
                 {hasPostings && acc.isHeader && (
-                  <span className="text-[9px] text-amber-600 font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
+                  <span className="text-[9px] text-teal-600 font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
                 )}
               </div>
             </div>
@@ -181,9 +181,9 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
           <td className="px-6 py-3 whitespace-nowrap">
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
               !acc.isActive ? 'bg-slate-200 text-slate-500' :
-              acc.class === AccountClass.ASSET ? 'bg-emerald-100 text-emerald-700' :
+              acc.class === AccountClass.ASSET ? 'bg-teal-100 text-teal-700' :
               acc.class === AccountClass.LIABILITY ? 'bg-rose-100 text-rose-700' :
-              acc.class === AccountClass.EQUITY ? 'bg-amber-100 text-amber-700' :
+              acc.class === AccountClass.EQUITY ? 'bg-amber-100 text-teal-700' :
               acc.class === AccountClass.REVENUE ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700'
             }`}>
               {acc.class}
@@ -301,7 +301,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className={`p-6 flex flex-col items-center text-center ${confirmation.type === 'delete' ? 'bg-rose-50/30' : 'bg-amber-50/30'}`}>
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-teal-600'}`}>
                 <AlertTriangle size={32} />
               </div>
               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
@@ -318,7 +318,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             <div className="p-8 space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-teal-500'}`}>
                     {confirmation.hasEntries ? <X size={20} /> : <ShieldCheck size={20} />}
                   </div>
                   <div className="flex-1">
@@ -333,7 +333,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
                 {confirmation.account.isHeader && (
                   <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-teal-500'}`}>
                       {confirmation.hasChildren ? <X size={20} /> : <ShieldCheck size={20} />}
                     </div>
                     <div className="flex-1">
@@ -361,7 +361,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   className={`flex-1 py-3 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${
                     confirmation.type === 'delete' 
                       ? (confirmation.hasEntries || confirmation.hasChildren ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-100') 
-                      : 'bg-amber-600 hover:bg-amber-700 shadow-amber-100'
+                      : 'bg-teal-600 hover:bg-teal-700 shadow-teal-100'
                   }`}
                 >
                   {confirmation.type === 'delete' ? 'Delete Permanently' : 'Deactivate'}

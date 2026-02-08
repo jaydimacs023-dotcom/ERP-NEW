@@ -314,7 +314,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-100 rounded-lg">
-              <Upload size={20} className="text-emerald-600" />
+              <Upload size={20} className="text-teal-600" />
             </div>
             <div>
               <h3 className="font-black text-slate-900 uppercase tracking-tight">Restore Backup</h3>
@@ -536,7 +536,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
                           );
                           setShowRestoreConfirm(true);
                         }}
-                        className="flex-1 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 py-2 bg-emerald-50 text-teal-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
                       >
                         <Upload size={12} />
                         Restore

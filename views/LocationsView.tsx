@@ -142,13 +142,13 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
               toast.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                ? 'bg-emerald-50 border border-teal-200 text-teal-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
                 : 'bg-teal-50 border border-teal-200 text-teal-800'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-teal-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
             {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
             <span>{toast.message}</span>
@@ -237,7 +237,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             </div>
 
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 uppercase tracking-widest">
+               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-teal-600 uppercase tracking-widest">
                   <ShieldCheck size={14} /> Operational
                </div>
                <button className="text-teal-600 text-xs font-semibold uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">

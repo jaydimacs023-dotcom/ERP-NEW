@@ -231,7 +231,7 @@ const BankingView: React.FC<BankingViewProps> = ({
         <div className="flex flex-wrap gap-2 no-print">
           <button 
             onClick={() => { resetEntryForm(); setShowEntryModal('IN'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-all font-bold text-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 border border-teal-100 rounded-xl hover:bg-teal-100 transition-all font-bold text-xs"
           >
             <ArrowDownToLine size={16} /> Record Receipt
           </button>
@@ -281,11 +281,11 @@ const BankingView: React.FC<BankingViewProps> = ({
                         {bank.type}
                        </div>
                        {unclearedCount > 0 ? (
-                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-teal-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
                            <Clock size={10} /> {unclearedCount} Outstanding
                          </span>
                        ) : (
-                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                         <span className="flex items-center gap-1 text-[8px] font-black uppercase text-teal-600 bg-teal-50 px-2 py-0.5 rounded border border-teal-100">
                            <CheckCircle size={10} /> Reconciled
                          </span>
                        )}
@@ -358,7 +358,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                  </button>
                  <button 
                   onClick={() => setActiveTab('reconcile')}
-                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'reconcile' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                    <Scale size={14} /> Reconciliation
                  </button>
@@ -423,18 +423,18 @@ const BankingView: React.FC<BankingViewProps> = ({
                                  <div className="text-[10px] text-slate-400 uppercase tracking-tight mt-1 font-medium italic">{line.memo || 'Institutional Disbursement'}</div>
                               </td>
                               <td className="px-10 py-6 text-right">
-                                 {line.debit > 0 && <span className="font-mono text-sm text-emerald-600 font-bold">{formatCurrency(line.debit)}</span>}
+                                 {line.debit > 0 && <span className="font-mono text-sm text-teal-600 font-bold">{formatCurrency(line.debit)}</span>}
                               </td>
                               <td className="px-10 py-6 text-right">
                                  {line.credit > 0 && <span className="font-mono text-sm text-rose-600 font-bold">({formatCurrency(line.credit)})</span>}
                               </td>
                               <td className="px-10 py-6 text-right">
                                  {line.isCleared ? (
-                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
+                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-50 text-teal-600 rounded-full border border-teal-100 text-[9px] font-black uppercase tracking-widest">
                                       <CheckCircle2 size={12} /> Reconciled
                                    </span>
                                  ) : (
-                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 text-[9px] font-black uppercase tracking-widest">
+                                   <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-teal-600 rounded-full border border-amber-100 text-[9px] font-black uppercase tracking-widest">
                                       <Clock size={12} /> Outstanding
                                    </span>
                                  )}
@@ -450,7 +450,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                <div className="animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="p-10 border-b bg-slate-50 flex flex-col lg:flex-row justify-between items-center gap-10">
                      <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-[2rem] bg-emerald-600 text-white flex items-center justify-center shadow-2xl shadow-emerald-200 border-4 border-white">
+                        <div className="w-20 h-20 rounded-[2rem] bg-teal-600 text-white flex items-center justify-center shadow-2xl shadow-teal-200 border-4 border-white">
                            <Scale size={36} />
                         </div>
                         <div className="space-y-4">
@@ -473,16 +473,16 @@ const BankingView: React.FC<BankingViewProps> = ({
                            </div>
                         </div>
                      </div>
-                     <div className={`p-8 rounded-[2rem] border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                     <div className={`p-8 rounded-[2rem] border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-teal-50 border-teal-200' : 'bg-rose-50 border-rose-200'}`}>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Unreconciled Difference</p>
                         <div className="flex items-baseline gap-2">
                            <span className="text-xs font-black">{"\u20B1"}</span>
-                           <div className={`text-4xl font-mono font-black tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                           <div className={`text-4xl font-mono font-black tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-teal-700' : 'text-rose-700'}`}>
                               {reconciliationData?.difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                            </div>
                         </div>
                         {Math.abs(reconciliationData?.difference || 0) < 0.01 ? (
-                          <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-bounce">
+                          <div className="mt-3 flex items-center gap-2 text-[10px] font-black text-teal-600 uppercase tracking-widest animate-bounce">
                              <ShieldCheck size={18} /> Verified Match
                           </div>
                         ) : (
@@ -537,7 +537,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                                   </div>
                                </div>
                                <div className="text-right">
-                                  <p className={`text-lg font-mono font-black ${line.debit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  <p className={`text-lg font-mono font-black ${line.debit > 0 ? 'text-teal-600' : 'text-rose-600'}`}>
                                      {line.debit > 0 ? `+${formatCurrency(line.debit)}` : `-${formatCurrency(line.credit)}`}
                                   </p>
                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{line.memo || 'Direct Ledger Posting'}</p>
@@ -586,7 +586,7 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className={`p-3 ${showEntryModal === 'IN' ? 'bg-emerald-600' : 'bg-rose-600'} text-white rounded-2xl shadow-xl`}>
+                <div className={`p-3 ${showEntryModal === 'IN' ? 'bg-teal-600' : 'bg-rose-600'} text-white rounded-2xl shadow-xl`}>
                   {showEntryModal === 'IN' ? <ArrowDownToLine size={24} /> : <ArrowUpFromLine size={24} />}
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Record {showEntryModal === 'IN' ? 'Receipt' : 'Payment'}</h3>
@@ -640,7 +640,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowEntryModal(null)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className={`flex-1 py-4 ${showEntryModal === 'IN' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-rose-600 shadow-rose-100'} text-white rounded-2xl text-sm font-black shadow-2xl active:scale-95 transition-all`}>
+                <button type="submit" className={`flex-1 py-4 ${showEntryModal === 'IN' ? 'bg-teal-600 shadow-teal-100' : 'bg-rose-600 shadow-rose-100'} text-white rounded-2xl text-sm font-black shadow-2xl active:scale-95 transition-all`}>
                   Commit Entry
                 </button>
               </div>
@@ -680,7 +680,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">To Destination</label>
-                  <select required className="w-full px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl outline-none font-bold text-xs text-emerald-700"
+                  <select required className="w-full px-4 py-3 bg-teal-50 border border-teal-100 rounded-2xl outline-none font-bold text-xs text-teal-700"
                     value={entryAccountId} onChange={e => setEntryAccountId(e.target.value)}>
                     <option value="">Choose Target...</option>
                     {bankAccounts.filter(b => b.id !== targetBankId).map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}
@@ -701,7 +701,7 @@ const BankingView: React.FC<BankingViewProps> = ({
               </div>
 
               <div className="bg-amber-50 p-5 rounded-3xl border border-amber-100 flex gap-4">
-                 <AlertCircle className="text-amber-600 shrink-0" size={24} />
+                 <AlertCircle className="text-teal-600 shrink-0" size={24} />
                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
                    Fund transfers generate dual journal entries impacting both G/L accounts. This action is atomic and irreversible once committed to the ledger.
                  </p>

@@ -311,7 +311,7 @@ const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: 
      <div className="space-y-3">
         {features.map((f, i) => (
           <div key={i} className="flex items-center gap-2">
-             <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+             <div className="w-4 h-4 rounded-full bg-emerald-50 text-teal-600 flex items-center justify-center shrink-0">
                 <Check size={10} strokeWidth={4} />
              </div>
              <span className="text-[11px] font-medium text-slate-600">{f}</span>
@@ -332,7 +332,7 @@ const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: 
 const StatsCard: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string }> = ({ label, value, icon, color }) => (
   <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5">
     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 shadow-sm transition-all ${
-      color === 'emerald' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+      color === 'emerald' ? 'bg-emerald-50 text-teal-600 border-emerald-100' :
       color === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-100' :
       'bg-teal-50 text-teal-600 border-teal-100'
     }`}>

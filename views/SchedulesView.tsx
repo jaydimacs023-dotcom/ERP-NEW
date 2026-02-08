@@ -172,14 +172,14 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
               key={toast.id}
               className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
                 toast.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  ? 'bg-emerald-50 text-teal-800 border-teal-200'
                   : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
                   : 'bg-teal-50 text-teal-800 border-teal-200'
               }`}
             >
               {toast.type === 'success' ? (
-                <CheckCircle size={18} className="text-emerald-600" />
+                <CheckCircle size={18} className="text-teal-600" />
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (

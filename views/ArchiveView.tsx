@@ -180,7 +180,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
                   <button
                     onClick={() => handleAction('restore', item)}
                     disabled={isProcessing}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-teal-600 hover:bg-emerald-50 rounded-lg transition-colors"
                   >
                     <RotateCcw size={14} />
                     Restore

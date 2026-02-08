@@ -129,13 +129,13 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-amber-500">
+        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-teal-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500 uppercase font-semibold">Turnover Ratio</p>
               <p className="text-xl font-bold text-slate-900">{metricsReport.inventoryTurnover.toFixed(2)}x/yr</p>
             </div>
-            <Activity size={28} className="text-amber-500" />
+            <Activity size={28} className="text-teal-500" />
           </div>
         </div>
 
@@ -267,7 +267,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.ageCategory === 'Fresh' ? 'bg-green-100 text-green-700' :
                           item.ageCategory === 'Active' ? 'bg-teal-100 text-teal-700' :
-                          item.ageCategory === 'Slow' ? 'bg-amber-100 text-amber-700' :
+                          item.ageCategory === 'Slow' ? 'bg-amber-100 text-teal-700' :
                           'bg-red-100 text-red-700'
                         }`}>
                           {item.ageCategory}
@@ -439,7 +439,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
                           item.severity === 'High' ? 'bg-orange-100 text-orange-700' :
-                          item.severity === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                          item.severity === 'Medium' ? 'bg-amber-100 text-teal-700' :
                           'bg-green-100 text-green-700'
                         }`}>
                           {item.severity}
@@ -520,7 +520,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.category === 'A' ? 'bg-teal-100 text-teal-700' :
                           item.category === 'B' ? 'bg-green-100 text-green-700' :
-                          'bg-amber-100 text-amber-700'
+                          'bg-amber-100 text-teal-700'
                         }`}>
                           {item.category}
                         </span>
@@ -548,7 +548,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             </div>
             <div className="bg-white rounded-xl shadow p-4">
               <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Inactive Items</p>
-              <p className="text-2xl font-bold text-amber-600">{metricsReport.itemCount - metricsReport.activeItems}</p>
+              <p className="text-2xl font-bold text-teal-600">{metricsReport.itemCount - metricsReport.activeItems}</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
               <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Inventory Turnover</p>
@@ -568,7 +568,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             <div className="bg-white rounded-xl shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-orange-500" />
+                  <AlertTriangle size={20} className="text-teal-500" />
                   Low Stock Items ({lowStockReport.length})
                 </h2>
                 <button

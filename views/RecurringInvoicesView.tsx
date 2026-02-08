@@ -93,13 +93,13 @@ export default function RecurringInvoicesView({
 
   // Get AR accounts
   const arAccounts = useMemo(() => 
-    accounts.filter(a => a.accountClass === 'ASSET' && a.code?.startsWith('1')),
+    accounts.filter(a => a.class === 'ASSET' && !a.isHeader && a.name.toLowerCase().includes('receivable')),
     [accounts]
   );
 
   // Get Revenue accounts
   const revenueAccounts = useMemo(() => 
-    accounts.filter(a => a.accountClass === 'REVENUE'),
+    accounts.filter(a => a.class === 'REVENUE' && !a.isHeader),
     [accounts]
   );
 

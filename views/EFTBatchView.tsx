@@ -28,7 +28,7 @@ const BATCH_STATUS_CONFIG: Record<BatchStatus, { label: string; color: string; b
   DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <FileText size={14} /> },
   PENDING: { label: 'Pending', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: <Clock size={14} /> },
   SUBMITTED: { label: 'Submitted', color: 'text-teal-600', bgColor: 'bg-teal-50', icon: <Send size={14} /> },
-  PROCESSED: { label: 'Processed', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
+  PROCESSED: { label: 'Processed', color: 'text-teal-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
   PARTIALLY_PROCESSED: { label: 'Partial', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle size={14} /> },
   FAILED: { label: 'Failed', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
   CANCELLED: { label: 'Cancelled', color: 'text-slate-400', bgColor: 'bg-slate-50', icon: <XCircle size={14} /> },
@@ -415,7 +415,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Processed</p>
-          <p className="text-2xl font-black mt-1 text-emerald-600">{summaryMetrics.processedCount}</p>
+          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.processedCount}</p>
           <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.processedAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -532,7 +532,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                           {batch.status === 'SUBMITTED' && (
                             <button
                               onClick={() => handleMarkProcessed(batch)}
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"
+                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
                               title="Mark Processed"
                             >
                               <CheckCircle size={16} />
@@ -772,7 +772,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                         <td className="px-4 py-3 text-right font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(txn.amount)}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                            txn.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' :
+                            txn.status === 'SUCCESS' ? 'bg-emerald-50 text-teal-600' :
                             txn.status === 'FAILED' ? 'bg-rose-50 text-rose-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>

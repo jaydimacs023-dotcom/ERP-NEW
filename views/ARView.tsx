@@ -300,7 +300,7 @@ const ARView: React.FC<ARViewProps> = ({
                <BarChart3 size={14} className="inline mr-1.5" /> Aging Report
              </button>
            </div>
-           <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
+           <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
            <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
         </div>
       </div>
@@ -350,8 +350,8 @@ const ARView: React.FC<ARViewProps> = ({
                     <td className="px-6 py-5 text-center">
                       <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border ${
                         inv.status === 'POSTED' 
-                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                          : 'bg-amber-50 text-amber-600 border-amber-100'
+                          ? 'bg-teal-50 text-teal-600 border-teal-100' 
+                          : 'bg-amber-50 text-teal-600 border-amber-100'
                       }`}>
                         {inv.status || 'DRAFT'}
                       </span>
@@ -361,7 +361,7 @@ const ARView: React.FC<ARViewProps> = ({
                         {inv.status !== 'POSTED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
                           <button 
                             onClick={() => onApproveInvoice?.(inv.id)}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm"
                             title="Approve and Post to Ledger"
                           >
                             <CheckCircle2 size={12} /> Approve
@@ -409,12 +409,12 @@ const ARView: React.FC<ARViewProps> = ({
                 return (
                   <tr key={coll.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-5 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle size={14} /></div>
+                      <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center"><CheckCircle size={14} /></div>
                       <div className="text-sm font-bold text-slate-800">{coll.description.split(': ')[1]}</div>
                     </td>
                     <td className="px-6 py-5 text-xs font-mono font-bold text-teal-600">{coll.reference}</td>
                     <td className="px-6 py-5 text-xs text-slate-600">{coll.date}</td>
-                    <td className="px-6 py-5 text-right font-mono font-bold text-emerald-600">{formatCurrency(cashLine?.debit || 0)}</td>
+                    <td className="px-6 py-5 text-right font-mono font-bold text-teal-600">{formatCurrency(cashLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
                       <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase">
                         <Landmark size={10} /> {bankAcc?.bankName || 'Treasury'}
@@ -458,9 +458,9 @@ const ARView: React.FC<ARViewProps> = ({
                 {agingReport.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-5 text-sm font-bold text-slate-800">{row.name}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-emerald-600">{formatCurrency(row.current)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-amber-600">{formatCurrency(row.thirty)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-orange-600">{formatCurrency(row.sixty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.current)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.thirty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.sixty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-bold bg-rose-50/20">{formatCurrency(row.ninety)}</td>
                     <td className="px-6 py-5 text-right font-mono text-sm font-black text-slate-900">{formatCurrency(row.total)}</td>
                   </tr>
@@ -526,7 +526,7 @@ const ARView: React.FC<ARViewProps> = ({
                       onChange={e => setSelectedArAccountId(e.target.value)}
                     >
                       <option value="">Select account...</option>
-                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
+                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && a.name.toLowerCase().includes('receivable')).map(acc => (
                         <option key={acc.id} value={acc.id}>
                           {acc.code} - {acc.name}
                         </option>
@@ -598,7 +598,7 @@ const ARView: React.FC<ARViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-200"><Landmark size={24} /></div>
+                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-200"><Landmark size={24} /></div>
                   <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Record Receipt (OR)</h3>
                </div>
                <button onClick={() => setShowCollectionModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
@@ -612,7 +612,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">OR # / Reference</label>
-                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-emerald-600 font-mono" value={collRef} />
+                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-teal-600 font-mono" value={collRef} />
                   </div>
                </div>
 
@@ -626,7 +626,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Entity Identity</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-emerald-100 rounded-2xl text-sm font-black text-emerald-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-teal-100 rounded-2xl text-sm font-black text-teal-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}>
                       <option value="">Select Payer...</option>
                       {collPayerType === 'SPONSOR' 
                         ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name} (Bal: {formatCurrency(subsidiaryBalances[s.id] || 0)})</option>)
@@ -636,9 +636,9 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-emerald-50/30 rounded-3xl border border-emerald-100/50">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-teal-50/30 rounded-3xl border border-teal-100/50">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2 px-1">
                       <BookOpen size={12} /> Source G/L Receivable Account
                     </label>
                     <select 
@@ -648,7 +648,7 @@ const ARView: React.FC<ARViewProps> = ({
                       onChange={e => setSelectedCollArAccountId(e.target.value)}
                     >
                       <option value="">Select account...</option>
-                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
+                      {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && a.name.toLowerCase().includes('receivable')).map(acc => (
                         <option key={acc.id} value={acc.id}>
                           {acc.code} - {acc.name}
                         </option>
@@ -656,7 +656,7 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest px-1">Deposit Target</label>
+                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest px-1">Deposit Target</label>
                     <select required className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
                       <option value="">Select Treasury Account...</option>
                       {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} ({b.currency})</option>)}
@@ -667,21 +667,21 @@ const ARView: React.FC<ARViewProps> = ({
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Collection Amount</label>
                  <div className="relative">
-                    <input type="number" step="0.01" required className="w-full px-6 py-5 bg-slate-50 border-none rounded-[2rem] text-4xl font-mono font-black text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
+                    <input type="number" step="0.01" required className="w-full px-6 py-5 bg-slate-50 border-none rounded-[2rem] text-4xl font-mono font-black text-slate-900 outline-none focus:ring-4 focus:ring-teal-500/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
                     <span className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-black text-slate-300">PHP</span>
                  </div>
                </div>
 
-               <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 flex gap-4">
-                  <CheckCircle size={24} className="text-emerald-600 shrink-0" />
-                  <p className="text-[11px] text-emerald-800 leading-relaxed font-bold">
+               <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
+                  <CheckCircle size={24} className="text-teal-600 shrink-0" />
+                  <p className="text-[11px] text-teal-800 leading-relaxed font-bold">
                     Receipting will reduce the debtor subsidiary ledger balance and increase the institutional liquid assets. This entry is cryptographic and final.
                   </p>
                </div>
 
                <div className="pt-4 flex gap-4">
                   <button type="button" onClick={() => setShowCollectionModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-800 transition-colors">Discard</button>
-                  <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-100 active:scale-95 transition-all">Confirm Collection</button>
+                  <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-100 active:scale-95 transition-all">Confirm Collection</button>
                </div>
             </form>
           </div>
@@ -694,7 +694,7 @@ const ARView: React.FC<ARViewProps> = ({
 const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-     <p className={`text-2xl font-mono font-black text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'teal' ? 'teal-600' : 'amber-600'} tracking-tighter`}>{value}</p>
+     <p className={`text-2xl font-mono font-black text-${color === 'rose' ? 'rose-600' : 'teal-600'} tracking-tighter`}>{value}</p>
   </div>
 );
 

@@ -362,7 +362,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ organization, onUpd
               <div className="p-10 flex-1 space-y-5">
                 {plan.features.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className={`mt-0.5 p-0.5 rounded-full ${plan.id === 'ENTERPRISE' ? 'bg-teal-100 text-teal-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                    <div className={`mt-0.5 p-0.5 rounded-full ${plan.id === 'ENTERPRISE' ? 'bg-teal-100 text-teal-600' : 'bg-emerald-100 text-teal-600'}`}>
                       <Check size={12} strokeWidth={4} />
                     </div>
                     <span className="text-[11px] font-black text-slate-700 leading-tight uppercase tracking-tight">{feature}</span>

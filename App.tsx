@@ -3387,16 +3387,6 @@ export default function App() {
               <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
            </div>
            <div className="flex items-center gap-6">
-              {isFinance && !['PRESIDENT', 'REGISTRAR', 'TRAINER', 'STUDENT'].includes(currentUser?.role || '') && (
-                <button 
-                  onClick={() => setShowJournalForm(true)} 
-                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
-                  style={{ backgroundColor: brandColor }}
-                >
-                   <PlusCircle size={18} /> Manual Post
-                </button>
-              )}
-              <div className="h-10 w-px bg-slate-100 mx-2" />
               <div className="flex items-center gap-3">
                  <div className="text-right">
                     <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>

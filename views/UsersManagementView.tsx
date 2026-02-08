@@ -162,7 +162,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       case 'ADMIN': return 'bg-rose-50 text-rose-600 border-rose-100';
       case 'SYSTEM_ADMIN': return 'bg-purple-50 text-purple-600 border-purple-100';
       case 'ACCOUNTANT': return 'bg-teal-50 text-teal-600 border-teal-100';
-      case 'REGISTRAR': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'REGISTRAR': return 'bg-emerald-50 text-teal-600 border-emerald-100';
       case 'FINANCE_MANAGER': return 'bg-amber-50 text-amber-600 border-amber-100';
       case 'AP_SPECIALIST': return 'bg-cyan-50 text-cyan-600 border-cyan-100';
       case 'AR_SPECIALIST': return 'bg-teal-50 text-teal-600 border-teal-100';

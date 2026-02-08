@@ -261,7 +261,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     const styles = {
       [BatchStatus.PLANNED]: 'bg-teal-50 text-teal-700 border-teal-100',
       [BatchStatus.ONGOING]: 'bg-amber-50 text-amber-700 border-amber-100',
-      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-teal-700 border-emerald-100',
       [BatchStatus.CANCELLED]: 'bg-slate-100 text-slate-600 border-slate-200'
     };
     const labels = {
@@ -364,7 +364,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         <MapPin size={14} className="text-teal-500" />
                         {location?.code || 'TBD'}
                      </div>
-                     <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest ${batch.currentStudents >= 5 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
+                     <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest ${batch.currentStudents >= 5 ? 'bg-emerald-50 border-emerald-100 text-teal-600' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
                         <Users size={14} />
                         {batch.currentStudents}/{batch.maxStudents}
                      </div>

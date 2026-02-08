@@ -230,13 +230,13 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
            <div className="flex-1 flex justify-end">
               {selectedQualificationId ? (
                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-100 animate-in zoom-in duration-300">
-                  <Filter size={16} className="text-amber-600" />
-                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Segment Filter Active</span>
+                  <Filter size={16} className="text-teal-600" />
+                  <span className="text-[10px] font-black text-teal-700 uppercase tracking-widest">Segment Filter Active</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-2xl border border-emerald-100">
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                  <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Consolidated & Reconciled</span>
+                <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 rounded-2xl border border-teal-100">
+                  <CheckCircle2 size={16} className="text-teal-600" />
+                  <span className="text-[10px] font-black text-teal-700 uppercase tracking-widest">Consolidated & Reconciled</span>
                 </div>
               )}
            </div>
@@ -317,7 +317,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               <FinancialSection title="REVENUE SOURCES" items={isReport.revenue} total={isReport.totalRevenue} symbol={currencySymbol} />
               <FinancialSection title="OPERATING EXPENSES" items={isReport.expenses} total={isReport.totalExpenses} symbol={currencySymbol} />
               
-              <div className={`pt-10 mt-10 border-t-2 border-slate-900 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-emerald-700 print:text-slate-900' : 'text-rose-700 print:text-slate-900'}`}>
+              <div className={`pt-10 mt-10 border-t-2 border-slate-900 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-teal-700 print:text-slate-900' : 'text-rose-700 print:text-slate-900'}`}>
                 <span className="text-sm font-black uppercase tracking-widest">NET COMPREHENSIVE INCOME / (LOSS)</span>
                 <span className="text-lg font-mono font-black underline decoration-double underline-offset-4">
                   {currencySymbol} {formatCurrency(isReport.netIncome)}
@@ -466,7 +466,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
         <div className="px-16 py-10 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-white print:border-slate-900">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 print:bg-white print:border print:border-slate-900">
+             <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 print:bg-white print:border print:border-slate-900">
                 <ShieldCheck size={20} />
              </div>
              <div>

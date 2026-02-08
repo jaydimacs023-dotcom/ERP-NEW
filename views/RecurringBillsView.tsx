@@ -117,8 +117,8 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
   }, [filteredBills]);
 
   const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-    ACTIVE: { label: 'Active', color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-    PAUSED: { label: 'Paused', color: 'text-amber-600', bgColor: 'bg-amber-50' },
+    ACTIVE: { label: 'Active', color: 'text-teal-600', bgColor: 'bg-teal-50' },
+    PAUSED: { label: 'Paused', color: 'text-teal-600', bgColor: 'bg-amber-50' },
     COMPLETED: { label: 'Completed', color: 'text-slate-600', bgColor: 'bg-slate-100' },
     CANCELLED: { label: 'Cancelled', color: 'text-rose-600', bgColor: 'bg-rose-50' }
   };
@@ -128,7 +128,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
   };
 
   const getAccountName = (accountId: string) => {
-    return accounts.find(a => a.id === accountId)?.accountName || '-';
+    return accounts.find(a => a.id === accountId)?.name || '-';
   };
 
   const handleSubmit = () => {
@@ -233,7 +233,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Active</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1">{stats.activeBills}</p>
+          <p className="text-2xl font-black text-teal-600 mt-1">{stats.activeBills}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Monthly</p>
@@ -261,7 +261,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
           </h3>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-all"
           >
             <Plus size={14} /> Add Recurring Bill
           </button>
@@ -274,13 +274,13 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
               placeholder="Search bill name or vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
           >
             <option value="all">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -316,12 +316,12 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                   placeholder="Bill Name (e.g., 'Office Rent', 'SaaS Subscription')"
                   value={formData.billName}
                   onChange={(e) => setFormData(f => ({ ...f, billName: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
                 <select
                   value={formData.vendorId}
                   onChange={(e) => setFormData(f => ({ ...f, vendorId: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   <option value="">Select Vendor</option>
                   {vendors.map(v => (
@@ -333,7 +333,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                   value={formData.description}
                   onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
@@ -346,7 +346,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     placeholder="0.00"
                     value={formData.amount}
                     onChange={(e) => setFormData(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
                 <div>
@@ -354,7 +354,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                   <select
                     value={formData.frequency}
                     onChange={(e) => setFormData(f => ({ ...f, frequency: e.target.value as RecurrenceFrequency }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
                     <option value="WEEKLY">Weekly</option>
                     <option value="BIWEEKLY">Bi-weekly</option>
@@ -374,7 +374,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData(f => ({ ...f, startDate: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
                 <div>
@@ -383,7 +383,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData(f => ({ ...f, endDate: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
               </div>
@@ -396,7 +396,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     type="number"
                     value={formData.paymentTermsDays}
                     onChange={(e) => setFormData(f => ({ ...f, paymentTermsDays: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
                 <div>
@@ -404,11 +404,11 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                   <select
                     value={formData.glAccountId}
                     onChange={(e) => setFormData(f => ({ ...f, glAccountId: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
                     <option value="">Select Account</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.accountName}</option>
+                    {accounts.filter(a => !a.isHeader && !a.isDeleted).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                     ))}
                   </select>
                 </div>
@@ -421,7 +421,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     type="checkbox"
                     checked={formData.includeWithholding}
                     onChange={(e) => setFormData(f => ({ ...f, includeWithholding: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-300 text-emerald-600"
+                    className="w-4 h-4 rounded border-slate-300 text-teal-600"
                   />
                   <span className="text-sm font-bold text-slate-700">Include Withholding</span>
                 </label>
@@ -431,20 +431,20 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     placeholder="0.00"
                     value={formData.appliedRatePercent}
                     onChange={(e) => setFormData(f => ({ ...f, appliedRatePercent: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 )}
               </div>
 
               {/* Auto-create */}
-              <label className="flex items-center gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <label className="flex items-center gap-2 p-3 bg-teal-50 rounded-lg border border-teal-200">
                 <input
                   type="checkbox"
                   checked={formData.autoCreatePayable}
                   onChange={(e) => setFormData(f => ({ ...f, autoCreatePayable: e.target.checked }))}
-                  className="w-4 h-4 rounded border-emerald-300 text-emerald-600"
+                  className="w-4 h-4 rounded border-emerald-300 text-teal-600"
                 />
-                <span className="text-sm font-bold text-emerald-700">Automatically create payables when due</span>
+                <span className="text-sm font-bold text-teal-700">Automatically create payables when due</span>
               </label>
             </div>
 
@@ -457,7 +457,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
               >
                 <Save size={14} /> Save Bill
               </button>
@@ -510,7 +510,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                           e.stopPropagation();
                           onUpdateBill(bill.id, { status: 'PAUSED' });
                         }}
-                        className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-teal-600 hover:bg-amber-50 rounded-lg transition-colors"
                       >
                         <Pause size={16} />
                       </button>
@@ -521,7 +521,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                           e.stopPropagation();
                           onUpdateBill(bill.id, { status: 'ACTIVE' });
                         }}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                       >
                         <Play size={16} />
                       </button>
@@ -583,7 +583,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                       <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Upcoming Bills</h4>
                       <div className="flex flex-wrap gap-2">
                         {nextDates.map((date, i) => (
-                          <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-lg">
+                          <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-teal-100 text-teal-700 rounded-lg">
                             {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </span>
                         ))}
@@ -599,7 +599,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                             <div key={i} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200">
                               <span>{new Date(h.billDate).toLocaleDateString()}</span>
                               <span className="font-semibold text-slate-900">${h.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.status === 'CREATED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.status === 'CREATED' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'}`}>
                                 {h.status}
                               </span>
                             </div>

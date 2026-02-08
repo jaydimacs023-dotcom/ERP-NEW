@@ -27,7 +27,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PAID': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'PAID': return 'bg-emerald-50 text-teal-700 border-teal-200';
       case 'OVERDUE': return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'PENDING': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'CANCELLED': return 'bg-slate-50 text-slate-700 border-slate-200';
@@ -72,9 +72,9 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Paid</p>
-              <p className="text-2xl font-black text-emerald-600 mt-2">{currency} {stats.paid.toLocaleString()}</p>
+              <p className="text-2xl font-black text-teal-600 mt-2">{currency} {stats.paid.toLocaleString()}</p>
             </div>
-            <CheckCircle2 size={32} className="text-emerald-200" />
+            <CheckCircle2 size={32} className="text-teal-200" />
           </div>
         </div>
 

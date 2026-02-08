@@ -167,7 +167,7 @@ const SchemaManualView: React.FC = () => {
     {
       id: 'operational',
       title: 'V. Operational Lifecycle',
-      icon: <Layers size={24} className="text-emerald-600" />,
+      icon: <Layers size={24} className="text-teal-600" />,
       colorClass: 'emerald',
       entities: [
         {

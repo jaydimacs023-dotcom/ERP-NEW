@@ -26,7 +26,7 @@ interface GoodsReceiptViewProps {
 
 const STATUS_CONFIG: Record<GoodsReceiptStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
   DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <FileText size={14} /> },
-  POSTED: { label: 'Posted', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
+  POSTED: { label: 'Posted', color: 'text-teal-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
   CANCELLED: { label: 'Cancelled', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
 };
 
@@ -342,7 +342,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Posted GRs</p>
-          <p className="text-2xl font-black mt-1 text-emerald-600">{summaryMetrics.postedCount}</p>
+          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.postedCount}</p>
           <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -445,7 +445,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                             <>
                               <button
                                 onClick={() => handlePost(gr)}
-                                className="p-1.5 hover:bg-emerald-50 rounded-lg text-emerald-600 transition-colors"
+                                className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
                                 title="Post"
                               >
                                 <CheckCircle size={16} />
@@ -717,9 +717,9 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
               {/* Audit Info */}
               {selectedGR.status === 'POSTED' && (
-                <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-emerald-700 mb-1">Posted</p>
-                  <p className="text-sm text-emerald-600">
+                <div className="mt-6 bg-emerald-50 border border-teal-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-teal-700 mb-1">Posted</p>
+                  <p className="text-sm text-teal-600">
                     {selectedGR.postedAt && new Date(selectedGR.postedAt).toLocaleString()}
                   </p>
                 </div>

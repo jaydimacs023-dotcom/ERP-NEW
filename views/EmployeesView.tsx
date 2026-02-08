@@ -142,7 +142,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     {emp.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-5 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${emp.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${emp.isActive ? 'bg-emerald-50 text-teal-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                       {emp.isActive ? 'Active' : 'Archived'}
                     </span>
                   </td>

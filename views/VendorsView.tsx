@@ -36,7 +36,7 @@ const PAYMENT_TERMS = [
 ];
 
 const STATUS_CONFIG: Record<VendorStatus, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
-  active: { label: 'Active', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: CheckCircle },
+  active: { label: 'Active', color: 'text-teal-600', bgColor: 'bg-emerald-50', icon: CheckCircle },
   blocked: { label: 'Blocked', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: XCircle },
   archived: { label: 'Archived', color: 'text-slate-500', bgColor: 'bg-slate-100', icon: Archive },
 };
@@ -351,7 +351,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
       {/* Bank Info Section */}
       <div className="space-y-4">
-        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest border-b border-emerald-100 pb-2 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest border-b border-emerald-100 pb-2 flex items-center gap-1.5">
           <Banknote size={12} /> Bank Details (for Payments)
         </p>
         
@@ -415,10 +415,10 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active</p>
-              <p className="text-2xl font-black mt-1 text-emerald-600">{summaryMetrics.active}</p>
+              <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.active}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <CheckCircle className="text-emerald-600" size={24} />
+              <CheckCircle className="text-teal-600" size={24} />
             </div>
           </div>
         </div>
@@ -712,7 +712,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
               {/* Bank Info */}
               {(viewingVendor.bankName || viewingVendor.bankAccountNumber) && (
                 <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <Banknote size={12} /> Bank Details
                   </p>
                   <div className="grid grid-cols-3 gap-3 text-sm">
