@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  AccountingPeriod, PeriodStatus, Payable, JournalEntry, JournalEntryLine,
+  AccountingPeriod, PeriodStatus, Payable, JournalEntry, JournalLine,
   ChartOfAccount, AccountClass
 } from '../types';
 import { AccountingService } from '../accountingService';
@@ -17,12 +17,12 @@ interface PeriodClosingViewProps {
   periods: AccountingPeriod[];
   payables: Payable[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   accounts: ChartOfAccount[];
   currentUserId?: string;
   onCreatePeriod: (period: AccountingPeriod) => void;
   onUpdatePeriod: (id: string, updates: Partial<AccountingPeriod>) => void;
-  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -365,7 +365,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
       return;
     }
 
-    const accrualLines: JournalEntryLine[] = [
+    const accrualLines: JournalLine[] = [
       {
         id: `jl-${Date.now()}-1`,
         journalEntryId: '',
@@ -404,7 +404,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
       );
 
       if (nextPeriod) {
-        const reversalLines: JournalEntryLine[] = [
+        const reversalLines: JournalLine[] = [
           {
             id: `jl-${Date.now()}-3`,
             journalEntryId: '',

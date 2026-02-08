@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ChartOfAccount, AccountClass, JournalEntryLine, Qualification } from '../types';
+import { ChartOfAccount, AccountClass, JournalLine, Qualification } from '../types';
 import { Plus, ChevronRight, ChevronDown, Edit2, Trash2, FolderPlus, FilePlus, AlertTriangle, ShieldCheck, X, Link, Award } from 'lucide-react';
 
 interface ChartOfAccountsProps {
   accounts: ChartOfAccount[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   qualifications: Qualification[];
   onAddAccount: (acc: ChartOfAccount) => void;
   onUpdateAccount: (acc: ChartOfAccount) => void;

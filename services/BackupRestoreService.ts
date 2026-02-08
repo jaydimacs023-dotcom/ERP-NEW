@@ -6,7 +6,7 @@
 
 import {
   Organization, User, Student, Qualification, Trainer, Batch, Sponsor,
-  Vendor, Employee, PayrollRun, JournalEntry, JournalEntryLine, AuditLog,
+  Vendor, Employee, PayrollRun, JournalEntry, JournalLine, AuditLog,
   Budget, ChartOfAccount, PurchaseOrder, PaymentHistory, Payable,
   AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation,
   WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction,
@@ -39,7 +39,7 @@ export interface BackupRecordCount {
   employees: number;
   payrollRuns: number;
   journalEntries: number;
-  journalEntryLines: number;
+  JournalLines: number;
   auditLogs: number;
   budgets: number;
   chartOfAccounts: number;
@@ -76,7 +76,7 @@ export interface BackupData {
     employees: Employee[];
     payrollRuns: PayrollRun[];
     journalEntries: JournalEntry[];
-    journalEntryLines: JournalEntryLine[];
+    JournalLines: JournalLine[];
     auditLogs: AuditLog[];
     budgets: Budget[];
     chartOfAccounts: ChartOfAccount[];
@@ -135,7 +135,7 @@ export class BackupRestoreService {
       employees: (data.employees || []).length,
       payrollRuns: (data.payrollRuns || []).length,
       journalEntries: (data.journalEntries || []).length,
-      journalEntryLines: (data.journalEntryLines || []).length,
+      JournalLines: (data.JournalLines || []).length,
       auditLogs: (data.auditLogs || []).length,
       budgets: (data.budgets || []).length,
       chartOfAccounts: (data.chartOfAccounts || []).length,
@@ -211,7 +211,7 @@ export class BackupRestoreService {
       employees: (allData.employees || []).filter((e: any) => e.orgId === orgId && !e.isDeleted),
       payrollRuns: (allData.payrollRuns || []).filter((p: any) => p.orgId === orgId && !p.isDeleted),
       journalEntries: (allData.journalEntries || []).filter((j: any) => j.orgId === orgId && !j.isDeleted),
-      journalEntryLines: (allData.journalEntryLines || []).filter((l: any) => l.orgId === orgId && !l.isDeleted),
+      JournalLines: (allData.JournalLines || []).filter((l: any) => l.orgId === orgId && !l.isDeleted),
       auditLogs: (allData.auditLogs || []).filter((a: any) => a.orgId === orgId),
       budgets: (allData.budgets || []).filter((b: any) => b.orgId === orgId && !b.isDeleted),
       chartOfAccounts: (allData.chartOfAccounts || []).filter((a: any) => a.orgId === orgId && !a.isDeleted),
@@ -329,7 +329,7 @@ export class BackupRestoreService {
     const dataTypes = [
       'organizations', 'users', 'students', 'qualifications', 'trainers', 'batches',
       'sponsors', 'vendors', 'employees', 'payrollRuns', 'journalEntries',
-      'journalEntryLines', 'auditLogs', 'budgets', 'chartOfAccounts', 'purchaseOrders',
+      'JournalLines', 'auditLogs', 'budgets', 'chartOfAccounts', 'purchaseOrders',
       'paymentHistory', 'payables', 'accountingPeriods', 'checkVouchers', 'eftBatches',
       'goodsReceipts', 'bankReconciliations', 'warehouseLocations', 'stockItems',
       'inventoryLevels', 'inventoryTransactions', 'stockAdjustments', 'fixedAssets',

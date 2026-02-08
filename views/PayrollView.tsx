@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Employee, PayrollRun, PayrollLine, ChartOfAccount, BankAccount, JournalEntry, JournalEntryLine, PayFrequency, OvertimeType } from '../types';
+import { Employee, PayrollRun, PayrollLine, ChartOfAccount, BankAccount, JournalEntry, JournalLine, PayFrequency, OvertimeType } from '../types';
 import { AccountingService } from '../accountingService';
 import { TaxBracketService } from '../services/TaxBracketService';
 import { ContributionService } from '../services/ContributionService';
@@ -21,7 +21,7 @@ interface PayrollViewProps {
   bankAccounts: BankAccount[];
   entries: JournalEntry[];
   orgName?: string;
-  onPostPayroll: (run: Partial<PayrollRun>, lines: Partial<PayrollLine>[], entry: Partial<JournalEntry>, entryLines: JournalEntryLine[]) => void;
+  onPostPayroll: (run: Partial<PayrollRun>, lines: Partial<PayrollLine>[], entry: Partial<JournalEntry>, entryLines: JournalLine[]) => void;
 }
 
 const PayrollView: React.FC<PayrollViewProps> = ({ 
@@ -133,7 +133,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
     }));
 
     const entryId = `je-pr-${Date.now()}`;
-    const journalLines: JournalEntryLine[] = [
+    const journalLines: JournalLine[] = [
       { id: `l1-${entryId}`, journalEntryId: entryId, accountId: salariesExpId, debit: currentRunSummary.gross, credit: 0, memo: `Gross Payroll: ${periodStart} to ${periodEnd}` },
       { id: `l2-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: 0, credit: currentRunSummary.net, memo: `Net Disbursement: ${periodStart} to ${periodEnd}` },
       { id: `l3-${entryId}`, journalEntryId: entryId, accountId: taxPayId || '', debit: 0, credit: currentRunSummary.depr, memo: `Payroll Deductions: ${periodStart} to ${periodEnd}` }
@@ -377,7 +377,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                   <div className="bg-slate-950 p-10 rounded-[2.5rem] flex justify-between items-center text-white shadow-2xl relative overflow-hidden">
                      <div className="relative z-10">
                         <p className="text-[11px] font-black text-brand uppercase tracking-[0.3em] mb-2">Net Take Home Pay</p>
-                        <h2 className="text-4xl font-mono font-black tracking-tighter">₱ {formatCurrency(viewingPaystub.line.netPay)}</h2>
+                        <h2 className="text-4xl font-mono font-black tracking-tighter">{"\u20B1"} {formatCurrency(viewingPaystub.line.netPay)}</h2>
                      </div>
                      <div className="relative z-10 text-right">
                         <div className="p-3 bg-white/10 rounded-2xl border border-white/10 inline-block mb-2"><CheckCircle2 size={32} className="text-emerald-400" /></div>
@@ -440,7 +440,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
               </div>
 
               <div className="border-2 border-black p-4 text-center">
-                 <p className="text-xs font-black uppercase tracking-widest">NET PAY: ₱ {formatCurrency(viewingPaystub.line.netPay)}</p>
+                 <p className="text-xs font-black uppercase tracking-widest">NET PAY: {"\u20B1"} {formatCurrency(viewingPaystub.line.netPay)}</p>
               </div>
 
               <div className="pt-20 grid grid-cols-2 gap-20 text-[10px]">
@@ -523,7 +523,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                      <SummaryRow label="Statutory Liabilities" value={currentRunSummary.depr} isNegative />
                      <div className="pt-6 border-t-2 border-slate-200 mt-4 flex justify-between items-end">
                         <span className="text-xs font-black text-slate-800 uppercase tracking-widest">NET PAYABLE</span>
-                        <span className="text-2xl font-mono font-black text-indigo-700">₱ {currentRunSummary.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span className="text-2xl font-mono font-black text-indigo-700">{"\u20B1"} {currentRunSummary.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                      </div>
                   </div>
 

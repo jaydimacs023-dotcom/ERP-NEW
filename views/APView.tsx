@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Vendor, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher, RecurringBill, RecurringBillHistory } from '../types';
+import { Vendor, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher, RecurringBill, RecurringBillHistory } from '../types';
 import { AccountingService } from '../accountingService';
 import MatchingDashboard from './MatchingDashboard';
 import CheckRegisterView from './CheckRegisterView';
@@ -15,7 +15,7 @@ import {
 interface APViewProps {
   vendors: Vendor[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
@@ -28,7 +28,7 @@ interface APViewProps {
   goodsReceipts: GoodsReceipt[];
   goodsReceiptLines: GoodsReceiptLine[];
   currentUserId?: string;
-  onPostBill: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostBill: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onCreatePayable: (payable: Payable) => void;
   onApproveException?: (payableId: string, notes: string) => void;
   onCreateRecurringBill?: (bill: Partial<RecurringBill>) => void;
@@ -190,7 +190,7 @@ const APView: React.FC<APViewProps> = ({
       return onNotify('error', "Accounting Framework Error: Missing mandatory G/L accounts for AP, Input VAT, or EWT.");
     }
 
-    const finalizedLines: JournalEntryLine[] = [];
+    const finalizedLines: JournalLine[] = [];
     billLines.forEach((bl, idx) => {
       const item = items.find(i => i.id === bl.itemId);
       if (item) {
@@ -266,7 +266,7 @@ const APView: React.FC<APViewProps> = ({
     if (!bank || !apAccountId) return onNotify('error', "Accounting Resolution Error: Targeted bank or AP ledger account is currently unreachable.");
 
     const entryId = `je-pymt-${Date.now()}`;
-    const finalizedLines: JournalEntryLine[] = [
+    const finalizedLines: JournalLine[] = [
       { id: `l-ap-dr-${Date.now()}`, journalEntryId: entryId, accountId: apAccountId, debit: payAmount, credit: 0, memo: payMemo || `Payment ${payRef} to ${vendor?.name}`, contactId: payVendorId, contactType: 'VENDOR' },
       { id: `l-cash-cr-${Date.now()}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: 0, credit: payAmount, memo: payMemo || `Payment ${payRef} to ${vendor?.name}`, contactId: payVendorId, contactType: 'VENDOR' }
     ];

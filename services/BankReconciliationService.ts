@@ -8,7 +8,7 @@
  * - Persisting reconciliation records
  */
 
-import { BankReconciliation, JournalEntryLine, BankAccount, JournalEntry } from '../types';
+import { BankReconciliation, JournalLine, BankAccount, JournalEntry } from '../types';
 
 export interface ReconciliationResult {
   bankAccountId: string;
@@ -19,15 +19,15 @@ export interface ReconciliationResult {
   difference: number;
   unclearedCount: number;
   clearedCount: number;
-  unclearedLines: JournalEntryLine[];
-  clearedLines: JournalEntryLine[];
+  unclearedLines: JournalLine[];
+  clearedLines: JournalLine[];
 }
 
 export class BankReconciliationService {
   /**
    * Calculate the book balance from all journal lines for a given account
    */
-  static calculateBookBalance(lines: JournalEntryLine[], accountId: string): number {
+  static calculateBookBalance(lines: JournalLine[], accountId: string): number {
     return lines
       .filter(l => l.accountId === accountId)
       .reduce((sum, l) => sum + (l.debit - l.credit), 0);
@@ -36,7 +36,7 @@ export class BankReconciliationService {
   /**
    * Calculate balance from only cleared transactions
    */
-  static calculateClearedBalance(lines: JournalEntryLine[], accountId: string): number {
+  static calculateClearedBalance(lines: JournalLine[], accountId: string): number {
     return lines
       .filter(l => l.accountId === accountId && l.isCleared)
       .reduce((sum, l) => sum + (l.debit - l.credit), 0);
@@ -48,7 +48,7 @@ export class BankReconciliationService {
   static performReconciliation(
     bankAccount: BankAccount,
     statementBalance: number,
-    lines: JournalEntryLine[],
+    lines: JournalLine[],
     asOfDate: string
   ): ReconciliationResult {
     const bankLines = lines.filter(l => l.accountId === bankAccount.glAccountId);
@@ -77,10 +77,10 @@ export class BankReconciliationService {
    * Identify outstanding items (uncleared transactions)
    */
   static getOutstandingItems(
-    lines: JournalEntryLine[],
+    lines: JournalLine[],
     accountId: string,
     entries: JournalEntry[]
-  ): (JournalEntryLine & { entryDate?: string; entryReference?: string; entryDescription?: string })[] {
+  ): (JournalLine & { entryDate?: string; entryReference?: string; entryDescription?: string })[] {
     return lines
       .filter(l => l.accountId === accountId && !l.isCleared)
       .map(line => {

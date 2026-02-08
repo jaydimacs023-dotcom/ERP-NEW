@@ -51,7 +51,7 @@ await dataService.deleteVendor(vendorId);
 interface VendorsViewProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   onAddVendor?: (vendor: Vendor) => void;
   onUpdateVendor?: (id: string, updates: Partial<Vendor>) => void;
   onDeleteVendor?: (id: string) => void;
@@ -122,7 +122,7 @@ const handleDeleteVendor = async (id: string) => {
 ### Create Vendor Flow
 1. User fills form in create modal
 2. `handleSubmit()` validates inputs
-3. `onAddVendor()` called → App handler
+3. `onAddVendor()` called â†’ App handler
 4. Handler calls `dataService.createVendor()`
 5. Success: Update React state `setVendors(prev => [...prev, created])`
 6. Show notification: `handleNotify('success', ...)`
@@ -134,7 +134,7 @@ const handleDeleteVendor = async (id: string) => {
 3. Edit modal opens with pre-populated fields
 4. User modifies fields
 5. `handleEditSubmit()` validates inputs
-6. `onUpdateVendor()` called → App handler
+6. `onUpdateVendor()` called â†’ App handler
 7. Handler calls `dataService.updateVendor()`
 8. Success: Update React state `setVendors(prev => prev.map(...))`
 9. Show notification: `handleNotify('success', ...)`
@@ -143,8 +143,8 @@ const handleDeleteVendor = async (id: string) => {
 ### Delete Vendor Flow
 1. User clicks Delete button
 2. Confirmation prompt appears
-3. User confirms → `handleDeleteVendor()` called
-4. `onDeleteVendor()` called → App handler
+3. User confirms â†’ `handleDeleteVendor()` called
+4. `onDeleteVendor()` called â†’ App handler
 5. Handler calls `dataService.deleteVendor()`
 6. Success: Update React state `setVendors(prev => prev.filter(...))`
 7. Show notification: `handleNotify('success', ...)`
@@ -190,10 +190,10 @@ All CRUD operations include automatic fallback:
 
 ```
 Supabase Attempt
-    ↓
+    â†“
 Success? 
-    ├─ YES → Persist to DB + Update State + Show Success
-    └─ NO  → Show Error + Update State Only (Memory Storage)
+    â”œâ”€ YES â†’ Persist to DB + Update State + Show Success
+    â””â”€ NO  â†’ Show Error + Update State Only (Memory Storage)
 ```
 
 ## Multi-Tenancy Context
@@ -227,23 +227,23 @@ Text input - searches by name and category (client-side)
 
 | Component | Calls | Data Flow |
 |-----------|-------|-----------|
-| VendorsView | onAddVendor, onUpdateVendor, onDeleteVendor | Display → App → DataService → Supabase |
-| App.tsx | handleAddVendor, handleUpdateVendor, handleDeleteVendor | Handlers → DataService → Supabase + State Update |
-| DataService | createVendor, updateVendor, deleteVendor | Service → REST API → PostgreSQL |
+| VendorsView | onAddVendor, onUpdateVendor, onDeleteVendor | Display â†’ App â†’ DataService â†’ Supabase |
+| App.tsx | handleAddVendor, handleUpdateVendor, handleDeleteVendor | Handlers â†’ DataService â†’ Supabase + State Update |
+| DataService | createVendor, updateVendor, deleteVendor | Service â†’ REST API â†’ PostgreSQL |
 
 ## Fields in Database
 
 ```
-┌─ ID (UUID) - Unique identifier
-├─ ORG_ID (UUID) - Organization tenant
-├─ NAME (VARCHAR) - Business name
-├─ CATEGORY (VARCHAR) - Type (Supplies, Services, etc.)
-├─ EMAIL (VARCHAR) - Billing email
-├─ CONTACT_NUMBER (VARCHAR) - Phone
-├─ ADDRESS (TEXT) - Business address
-├─ AP_ACCOUNT_ID (UUID) - GL account link
-├─ CREATED_AT (TIMESTAMP) - Auto-set on insert
-└─ UPDATED_AT (TIMESTAMP) - Auto-updated on modify
+â”Œâ”€ ID (UUID) - Unique identifier
+â”œâ”€ ORG_ID (UUID) - Organization tenant
+â”œâ”€ NAME (VARCHAR) - Business name
+â”œâ”€ CATEGORY (VARCHAR) - Type (Supplies, Services, etc.)
+â”œâ”€ EMAIL (VARCHAR) - Billing email
+â”œâ”€ CONTACT_NUMBER (VARCHAR) - Phone
+â”œâ”€ ADDRESS (TEXT) - Business address
+â”œâ”€ AP_ACCOUNT_ID (UUID) - GL account link
+â”œâ”€ CREATED_AT (TIMESTAMP) - Auto-set on insert
+â””â”€ UPDATED_AT (TIMESTAMP) - Auto-updated on modify
 ```
 
 ## Future Enhancement Hooks
@@ -272,5 +272,5 @@ createAuditLog({
 ### Tax Withholding Configuration
 ```typescript
 // Create vendor_tax_settings table linking vendor to ATC category/item/rate
-// UI to select from getATCCategories() → getATCItems() → getATCRates()
+// UI to select from getATCCategories() â†’ getATCItems() â†’ getATCRates()
 ```

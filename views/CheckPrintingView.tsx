@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   CheckVoucher, CheckStatus, BankAccount, Vendor, Payable, 
-  JournalEntry, JournalEntryLine, ChartOfAccount
+  JournalEntry, JournalLine, ChartOfAccount
 } from '../types';
 import { AccountingService } from '../accountingService';
 import EmptyState from '../components/EmptyState';
@@ -23,7 +23,7 @@ interface CheckPrintingViewProps {
   onCreateCheck: (check: Partial<CheckVoucher>) => Promise<CheckVoucher | null> | void;
   onUpdateCheck: (id: string, updates: Partial<CheckVoucher>) => Promise<CheckVoucher | null> | void;
   onDeleteCheck?: (id: string) => Promise<boolean> | void;
-  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -297,7 +297,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       const apAccount = accounts.find(a => a.name.toLowerCase().includes('accounts payable'));
 
       if (bank && apAccount) {
-        const lines: JournalEntryLine[] = [
+        const lines: JournalLine[] = [
           {
             id: `jl-${Date.now()}-1`,
             journalEntryId: '',
@@ -455,21 +455,21 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft</p>
           <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">₱{formatCurrency(summaryMetrics.draftAmount)}</p>
+          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Printed</p>
           <p className="text-2xl font-black mt-1 text-blue-600">{summaryMetrics.printedCount}</p>
-          <p className="text-xs text-blue-500">₱{formatCurrency(summaryMetrics.printedAmount)}</p>
+          <p className="text-xs text-blue-500">{"\u20B1"}{formatCurrency(summaryMetrics.printedAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Released</p>
           <p className="text-2xl font-black mt-1 text-violet-600">{summaryMetrics.releasedCount}</p>
-          <p className="text-xs text-violet-500">₱{formatCurrency(summaryMetrics.releasedAmount)}</p>
+          <p className="text-xs text-violet-500">{"\u20B1"}{formatCurrency(summaryMetrics.releasedAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Cleared (Total)</p>
-          <p className="text-2xl font-black mt-1 text-emerald-600">₱{formatCurrency(summaryMetrics.clearedAmount)}</p>
+          <p className="text-2xl font-black mt-1 text-emerald-600">{"\u20B1"}{formatCurrency(summaryMetrics.clearedAmount)}</p>
         </div>
       </div>
 
@@ -549,7 +549,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                         <p className="text-xs text-slate-400">{check.payeeType}</p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">₱{formatCurrency(check.amount)}</span>
+                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(check.amount)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
@@ -825,7 +825,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                     <span className="text-sm italic">{selectedCheck.amountInWords}</span>
                   </div>
                   <div className="border-2 border-slate-400 px-4 py-2 bg-white">
-                    <span className="font-mono font-bold text-xl">₱{formatCurrency(selectedCheck.amount)}</span>
+                    <span className="font-mono font-bold text-xl">{"\u20B1"}{formatCurrency(selectedCheck.amount)}</span>
                   </div>
                 </div>
 

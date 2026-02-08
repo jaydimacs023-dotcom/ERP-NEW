@@ -170,11 +170,11 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 -- 7. NON-STOCK ITEMS (SERVICE & TRAINING ITEMS)
 -- ============================================================================
-INSERT INTO non_stock_items (org_id, code, name, description, unit_price, income_account_id, expense_account_id) VALUES
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-001', 'NC II Electrical Installation Course', 'Full-time training program for NC II certification', 15000.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5110' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-002', 'Registration Fee', 'Student registration and processing', 500.00, (SELECT id FROM chart_of_accounts WHERE code = '4020' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5450' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'TRN-003', 'Certification Exam', 'External certification examination', 1500.00, (SELECT id FROM chart_of_accounts WHERE code = '4030' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5400' LIMIT 1)),
-  ((SELECT id FROM organizations LIMIT 1), 'SUP-001', 'Training Materials Kit', 'Complete training materials for one student', 2500.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5210' LIMIT 1))
+INSERT INTO non_stock_items (org_id, code, name, description, unit_price, income_account_id, expense_account_id, tax_category_id) VALUES
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-001', 'NC II Electrical Installation Course', 'Full-time training program for NC II certification', 15000.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5110' LIMIT 1), 'VAT'),
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-002', 'Registration Fee', 'Student registration and processing', 500.00, (SELECT id FROM chart_of_accounts WHERE code = '4020' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5450' LIMIT 1), 'VAT'),
+  ((SELECT id FROM organizations LIMIT 1), 'TRN-003', 'Certification Exam', 'External certification examination', 1500.00, (SELECT id FROM chart_of_accounts WHERE code = '4030' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5400' LIMIT 1), 'VAT'),
+  ((SELECT id FROM organizations LIMIT 1), 'SUP-001', 'Training Materials Kit', 'Complete training materials for one student', 2500.00, (SELECT id FROM chart_of_accounts WHERE code = '4010' LIMIT 1), (SELECT id FROM chart_of_accounts WHERE code = '5210' LIMIT 1), 'VAT')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================

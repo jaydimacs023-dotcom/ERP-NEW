@@ -22,7 +22,8 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
     description: '',
     unitPrice: 0,
     incomeAccountId: '',
-    expenseAccountId: ''
+    expenseAccountId: '',
+    taxCategoryId: ''
   });
 
   const filteredItems = items.filter(i => 
@@ -31,7 +32,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', description: '', unitPrice: 0, incomeAccountId: '', expenseAccountId: '' });
+    setFormData({ code: '', name: '', description: '', unitPrice: 0, incomeAccountId: '', expenseAccountId: '', taxCategoryId: '' });
     setEditingItem(null);
   };
 
@@ -50,8 +51,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
         description: formData.description,
         unitPrice: Number(formData.unitPrice) || 0,
         incomeAccountId: formData.incomeAccountId || '',
-        expenseAccountId: formData.expenseAccountId || '',
-        createdAt: new Date().toISOString(),
+        expenseAccountId: formData.expenseAccountId || '',        taxCategoryId: formData.taxCategoryId || '',        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         isDeleted: false
       };
@@ -120,8 +120,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
             <tr>
               <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Description</th>
               <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Income Account</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expense Account</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit Price</th>
+              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expense Account</th>              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taxation</th>              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit Price</th>
               <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
@@ -157,6 +156,13 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                          {expenseAcc?.name || '-'}
                        </div>
                        {expenseAcc && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {expenseAcc?.code}</div>}
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col">
+                       <div className={`text-[10px] font-black px-2.5 py-1 rounded-full w-fit uppercase ${item.taxCategoryId === 'VAT' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                         {item.taxCategoryId || 'NON-TAX'}
+                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-5 text-right font-mono font-black text-slate-800">
@@ -235,6 +241,20 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                     ))}
                   </select>
                   <p className="text-[9px] text-slate-400 italic">Expense account for cost recognition when this item is purchased.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                    <Percent size={14} /> Tax Category
+                  </label>
+                  <select className="w-full px-4 py-3 bg-white border-2 border-indigo-100 rounded-2xl outline-none text-sm font-black text-indigo-700 appearance-none"
+                    value={formData.taxCategoryId} onChange={e => setFormData({...formData, taxCategoryId: e.target.value})}>
+                    <option value="">Non-Vatable / Exempt</option>
+                    <option value="VAT">VAT (12%)</option>
+                    <option value="VAT_EXEMPT">VAT Exempt</option>
+                    <option value="ZERO_RATED">Zero Rated</option>
+                  </select>
+                  <p className="text-[9px] text-slate-400 italic">Determines if Output VAT is applied during sales invoicing.</p>
                 </div>
 
                 <div className="space-y-1.5">

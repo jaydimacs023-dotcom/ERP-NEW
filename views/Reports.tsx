@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { TransactionSummary, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, Qualification, Batch } from '../types';
+import { TransactionSummary, ChartOfAccount, JournalEntry, JournalLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
 import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2, BarChart, Wrench } from 'lucide-react';
 import CustomReportBuilder from './CustomReportBuilder';
@@ -8,7 +8,7 @@ interface ReportsProps {
   summaries: TransactionSummary[];
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   qualifications: Qualification[];
   batches: Batch[];
   orgName?: string;
@@ -133,7 +133,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
     document.body.removeChild(link);
   };
 
-  const currencySymbol = currency === 'USD' ? '$' : currency === 'PHP' ? '₱' : currency === 'EUR' ? '€' : currency;
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'PHP' ? '\u20B1' : currency === 'EUR' ? '€' : currency;
 
   const formatDateLabel = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

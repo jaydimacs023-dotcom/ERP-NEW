@@ -3,7 +3,7 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch, 
   Sponsor, NonStockItem, Vendor, BankAccount, Location, 
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
-  JournalEntry, JournalEntryLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
+  JournalEntry, JournalLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, EFTBatch
@@ -52,7 +52,7 @@ export interface InitialData {
   recurringJournalEntries: RecurringJournalEntry[];
   accounts: any[]; // ChartOfAccount[]
   journalEntries: JournalEntry[];
-  journalLines: JournalEntryLine[];
+  journalLines: JournalLine[];
   bills: Bill[];
   payables: Payable[];
   payrollRuns: PayrollRun[];
@@ -298,11 +298,11 @@ export interface IDataService {
   getJournalEntryById(id: string): Promise<JournalEntry | null>;
 
   // Journal Entry Line CRUD
-  createJournalLine(line: JournalEntryLine): Promise<JournalEntryLine>;
-  updateJournalLine(id: string, updates: Partial<JournalEntryLine>): Promise<JournalEntryLine>;
+  createJournalLine(line: JournalLine): Promise<JournalLine>;
+  updateJournalLine(id: string, updates: Partial<JournalLine>): Promise<JournalLine>;
   deleteJournalLine(id: string): Promise<void>;
-  getJournalLinesByEntry(entryId: string): Promise<JournalEntryLine[]>;
-  createJournalLines(lines: JournalEntryLine[]): Promise<JournalEntryLine[]>;
+  getJournalLinesByEntry(entryId: string): Promise<JournalLine[]>;
+  createJournalLines(lines: JournalLine[]): Promise<JournalLine[]>;
 
   // Audit Log CRUD
   createAuditLog(log: AuditLog): Promise<AuditLog>;

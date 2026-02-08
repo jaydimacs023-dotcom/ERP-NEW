@@ -1,5 +1,5 @@
 
-import { AccountClass, JournalEntryLine, ChartOfAccount, TransactionSummary, JournalEntry } from './types';
+import { AccountClass, JournalLine, ChartOfAccount, TransactionSummary, JournalEntry } from './types';
 
 export class AccountingService {
   /**
@@ -37,7 +37,7 @@ export class AccountingService {
 
   static getLedgerSummaries(
     accounts: ChartOfAccount[],
-    lines: JournalEntryLine[]
+    lines: JournalLine[]
   ): TransactionSummary[] {
     const summaries: Map<string, TransactionSummary> = new Map();
 
@@ -122,7 +122,7 @@ export class AccountingService {
     return { revenue, expenses, totalRevenue, totalExpenses, netIncome };
   }
 
-  static generateCashFlow(summaries: TransactionSummary[], accounts: ChartOfAccount[], lines: JournalEntryLine[]) {
+  static generateCashFlow(summaries: TransactionSummary[], accounts: ChartOfAccount[], lines: JournalLine[]) {
     const incomeStatement = this.generateIncomeStatement(summaries, accounts);
     const netIncome = incomeStatement.netIncome;
 

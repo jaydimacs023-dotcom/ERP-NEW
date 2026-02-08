@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
-  JournalEntryLine, AccountClass 
+  JournalLine, AccountClass 
 } from '../types';
 import {
   InventoryReportingService,
@@ -26,7 +26,7 @@ interface AdvancedInventoryReportsProps {
   items: StockItem[];
   levels: InventoryLevel[];
   transactions: InventoryTransaction[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   currency: string;
 }
 

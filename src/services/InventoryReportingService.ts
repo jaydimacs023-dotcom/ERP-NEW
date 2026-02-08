@@ -6,7 +6,7 @@
 
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
-  StockAdjustment, JournalEntryLine 
+  StockAdjustment, JournalLine 
 } from '../types';
 
 export interface StockAgingData {
@@ -236,7 +236,7 @@ export class InventoryReportingService {
   static getVarianceAnalysis(
     items: StockItem[],
     levels: InventoryLevel[],
-    ledgerLines: JournalEntryLine[]
+    ledgerLines: JournalLine[]
   ): VarianceData[] {
     return items.map(item => {
       const level = levels.find(l => l.stockItemId === item.id);

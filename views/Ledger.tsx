@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { 
-  ChartOfAccount, JournalEntry, JournalEntryLine, Student, 
+  ChartOfAccount, JournalEntry, JournalLine, Student, 
   Trainer, Sponsor, Batch, NonStockItem 
 } from '../types';
 import { Search, Filter, RotateCcw, BookText, Plus, Database, ArrowRight } from 'lucide-react';
@@ -10,13 +10,13 @@ import JournalForm from '../components/JournalForm';
 interface LedgerProps {
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   students: Student[];
   sponsors: Sponsor[];
   trainers: Trainer[];
   batches: Batch[];
   items: NonStockItem[];
-  onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onReverseJournal?: (entryId: string) => void;
 }
 

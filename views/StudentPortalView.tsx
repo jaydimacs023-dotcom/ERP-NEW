@@ -9,7 +9,7 @@ import {
   Printer, Landmark, UserCheck, BadgeDollarSign,
   Lock, ArrowRight, Check
 } from 'lucide-react';
-import { Student, StudentDocument, Batch, Qualification, Trainer, Location, TrainerSchedule, JournalEntry, JournalEntryLine } from '../types';
+import { Student, StudentDocument, Batch, Qualification, Trainer, Location, TrainerSchedule, JournalEntry, JournalLine } from '../types';
 
 interface StudentPortalViewProps {
   student: Student;
@@ -19,7 +19,7 @@ interface StudentPortalViewProps {
   locations: Location[];
   schedules: TrainerSchedule[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   onUpdateStudent: (student: Student) => void;
 }
 
@@ -159,7 +159,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             <div className="shrink-0 flex flex-col items-center md:items-end gap-3">
                {billing.balance > 0 ? (
                  <div className="px-6 py-3 bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-pulse">
-                    <BadgeDollarSign size={18} /> Bal Due: ₱ {formatCurrency(billing.balance)}
+                    <BadgeDollarSign size={18} /> Bal Due: {"\u20B1"} {formatCurrency(billing.balance)}
                  </div>
                ) : (
                  <div className="px-6 py-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
@@ -275,7 +275,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                      <div className="flex justify-between items-center">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Due</span>
                         <span className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                           ₱ {formatCurrency(billing.balance)}
+                           {"\u20B1"} {formatCurrency(billing.balance)}
                         </span>
                      </div>
                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -373,15 +373,15 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Assessments</p>
-                  <p className="text-2xl font-mono font-black text-slate-800">₱ {formatCurrency(billing.totalInvoiced)}</p>
+                  <p className="text-2xl font-mono font-black text-slate-800">{"\u20B1"} {formatCurrency(billing.totalInvoiced)}</p>
                </div>
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Payments Made</p>
-                  <p className="text-2xl font-mono font-black text-emerald-600">₱ {formatCurrency(billing.totalPaid)}</p>
+                  <p className="text-2xl font-mono font-black text-emerald-600">{"\u20B1"} {formatCurrency(billing.totalPaid)}</p>
                </div>
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Statement Balance</p>
-                  <p className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>₱ {formatCurrency(billing.balance)}</p>
+                  <p className={`text-2xl font-mono font-black ${billing.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{"\u20B1"} {formatCurrency(billing.balance)}</p>
                </div>
             </div>
 

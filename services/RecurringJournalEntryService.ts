@@ -8,7 +8,7 @@
  * - Calculating next run dates
  */
 
-import { RecurringJournalEntry, JournalEntry, JournalEntryLine, RecurrenceFrequency } from '../types';
+import { RecurringJournalEntry, JournalEntry, JournalLine, RecurrenceFrequency } from '../types';
 
 export interface RecurrenceSchedule {
   nextRunDate: string;
@@ -122,7 +122,7 @@ export class RecurringJournalEntryService {
     recurringEntry: RecurringJournalEntry,
     entryDate: string,
     generatedId: string
-  ): { entry: Partial<JournalEntry>; lines: Omit<JournalEntryLine, 'id' | 'journalEntryId'>[] } {
+  ): { entry: Partial<JournalEntry>; lines: Omit<JournalLine, 'id' | 'journalEntryId'>[] } {
     const { templateEntry } = recurringEntry;
     const { lineTemplate, ...entryTemplate } = templateEntry;
 
@@ -141,7 +141,7 @@ export class RecurringJournalEntryService {
     };
 
     // Generate lines from template (without id/journalEntryId)
-    const lines: Omit<JournalEntryLine, 'id' | 'journalEntryId'>[] = lineTemplate.map(line => ({
+    const lines: Omit<JournalLine, 'id' | 'journalEntryId'>[] = lineTemplate.map(line => ({
       ...line
     }));
 
@@ -157,7 +157,7 @@ export class RecurringJournalEntryService {
     frequency: RecurrenceFrequency,
     startDate: string,
     templateEntry: Omit<JournalEntry, 'id' | 'orgId' | 'createdAt' | 'createdBy' | 'date' | 'reference'> & {
-      lineTemplate: Omit<JournalEntryLine, 'id' | 'journalEntryId'>[]
+      lineTemplate: Omit<JournalLine, 'id' | 'journalEntryId'>[]
     },
     options?: {
       description?: string;

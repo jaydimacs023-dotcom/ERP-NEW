@@ -4,7 +4,7 @@
  * Empty arrays provided for type compatibility only.
  */
 
-import { AccountClass, AssetCategory, ChartOfAccount, JournalEntry, JournalEntryLine, AuditLog, Organization, User, Student, Qualification, Trainer, Batch, BatchStatus, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TaxCategory, WHTCategory, TrainerSchedule, Employee, PaymentHistory } from './types';
+import { AccountClass, AssetCategory, ChartOfAccount, JournalEntry, JournalLine, AuditLog, Organization, User, Student, Qualification, Trainer, Batch, BatchStatus, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TaxCategory, WHTCategory, TrainerSchedule, Employee, PaymentHistory } from './types';
 
 // All data sourced from Supabase - empty arrays for compatibility
 export const INITIAL_ORGS: Organization[] = [];
@@ -23,7 +23,7 @@ export const INITIAL_TRAINERS: Trainer[] = [];
 export const INITIAL_SCHEDULES: TrainerSchedule[] = [];
 export const INITIAL_BATCHES: Batch[] = [];
 export const INITIAL_ENTRIES: JournalEntry[] = [];
-export const INITIAL_LINES: JournalEntryLine[] = [];
+export const INITIAL_LINES: JournalLine[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 export const INITIAL_PAYMENTS: PaymentHistory[] = [];
 

@@ -1,6 +1,6 @@
 # Foreign Currency & Exchange Rates Implementation
 
-## Status: ✅ COMPLETE
+## Status: âœ… COMPLETE
 
 This document outlines the complete foreign currency and exchange rate support implemented in AT-ERP.
 
@@ -28,14 +28,14 @@ The foreign currency module enables AT-ERP to:
 - **Support multi-currency** transactional data (vendors, payables, bank accounts)
 
 **Key Features:**
-- ✅ Exchange rate table with historical tracking
-- ✅ Implicit 1:1 rates for same-currency pairs
-- ✅ Inverse rate calculation (e.g., USD→PHP from PHP→USD)
-- ✅ Unrealized gain/loss calculations (GAAP-compliant)
-- ✅ Period-end adjustment entry generation
-- ✅ Rate validation with thresholds
-- ✅ Full audit trail integration
-- ✅ Organization-isolated data via RLS
+- âœ… Exchange rate table with historical tracking
+- âœ… Implicit 1:1 rates for same-currency pairs
+- âœ… Inverse rate calculation (e.g., USDâ†’PHP from PHPâ†’USD)
+- âœ… Unrealized gain/loss calculations (GAAP-compliant)
+- âœ… Period-end adjustment entry generation
+- âœ… Rate validation with thresholds
+- âœ… Full audit trail integration
+- âœ… Organization-isolated data via RLS
 
 ---
 
@@ -134,7 +134,7 @@ export interface MulticurrencyBalance {
   accountId: string;
   accountName: string;
   balances: {
-    [currency: string]: number;  // Currency code → balance
+    [currency: string]: number;  // Currency code â†’ balance
   };
   functionalBalance: number;     // Balance in functional currency
   functionalCurrency: string;    // Organization's functional currency
@@ -202,7 +202,7 @@ static getInverseRate(
 
 **Example:**
 ```typescript
-// If we have USD→PHP at 56.50, we can calculate PHP→USD
+// If we have USDâ†’PHP at 56.50, we can calculate PHPâ†’USD
 const inverseRate = ExchangeRateService.getInverseRate(
   exchangeRates,
   'PHP',
@@ -307,7 +307,7 @@ static generateUnrealizedGainLossEntries(
   gainAccountId: string,
   lossAccountId: string,
   assetAccountId: string
-): Partial<JournalEntryLine>[]
+): Partial<JournalLine>[]
 ```
 
 **Behavior:**
@@ -381,7 +381,7 @@ const prev = 50.00;
 const current = 50.75;
 
 const needsReval = ExchangeRateService.needsRevaluation(prev, current);
-// Change: 1.5% → returns true (exceeds 1% threshold)
+// Change: 1.5% â†’ returns true (exceeds 1% threshold)
 ```
 
 ---
@@ -414,11 +414,11 @@ static validateRate(rate: Partial<ExchangeRate>): {
 ```
 
 **Checks:**
-- ✅ Currency codes are 3-letter ISO codes
-- ✅ From and to currencies are different
-- ✅ Rate is positive
-- ✅ Effective date provided
-- ✅ Rate is reasonable (<1,000,000)
+- âœ… Currency codes are 3-letter ISO codes
+- âœ… From and to currencies are different
+- âœ… Rate is positive
+- âœ… Effective date provided
+- âœ… Rate is reasonable (<1,000,000)
 
 **Example:**
 ```typescript
@@ -527,7 +527,7 @@ const handleAddExchangeRate = async (rate: Partial<ExchangeRate>) => {
       entityName: `${rate.fromCurrency}/${rate.toCurrency}`
     });
     
-    handleNotify('success', `Rate ${rate.fromCurrency}→${rate.toCurrency} saved`);
+    handleNotify('success', `Rate ${rate.fromCurrency}â†’${rate.toCurrency} saved`);
   } catch (error) {
     handleNotify('error', `Failed to save rate: ${error.message}`);
   }
@@ -811,7 +811,7 @@ console.log(validation.isValid); // Should be true
 - [ ] Rate variance alerts
 
 ### Phase 3: Multi-currency Transactions
-- [ ] Enhance JournalEntryLine with currency and rate fields
+- [ ] Enhance JournalLine with currency and rate fields
 - [ ] Multi-currency AR/AP modules
 - [ ] Currency-aware cash application
 
@@ -824,7 +824,7 @@ console.log(validation.isValid); // Should be true
 
 ## Summary
 
-✅ **Exchange Rate System Complete**
+âœ… **Exchange Rate System Complete**
 - Database: `exchange_rates` table with RLS
 - Service: `ExchangeRateService` with 8 static methods
 - Data Layer: CRUD in IDataService, Supabase, Mock

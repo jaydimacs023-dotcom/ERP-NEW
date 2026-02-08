@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { BankAccount, TransactionSummary, ChartOfAccount, JournalEntryLine, JournalEntry, AccountClass } from '../types';
+import { BankAccount, TransactionSummary, ChartOfAccount, JournalLine, JournalEntry, AccountClass } from '../types';
 import { BankReconciliationService, ReconciliationResult } from '../services/BankReconciliationService';
 import { 
   Landmark, CreditCard, Wallet, ArrowRightLeft, History, Plus, 
@@ -16,7 +16,7 @@ interface BankingViewProps {
   summaries: TransactionSummary[];
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   bankReconciliations?: any[];
   onAddBankAccount: (bank: Partial<BankAccount>) => void;
   onUpdateBankAccount?: (id: string, bank: Partial<BankAccount>) => void;
@@ -24,7 +24,7 @@ interface BankingViewProps {
   onAddBankReconciliation?: (reconciliation: any) => void;
   onUpdateBankReconciliation?: (id: string, reconciliation: any) => void;
   onDeleteBankReconciliation?: (id: string) => void;
-  onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onToggleClearLine: (lineId: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
@@ -121,7 +121,7 @@ const BankingView: React.FC<BankingViewProps> = ({
     if (!entryAccountId) return onNotify('error', 'Configuration Error: Offset G/L account is required for proper double-entry.');
 
     const entryId = `je-bank-${Date.now()}`;
-    const finalizedLines: JournalEntryLine[] = [];
+    const finalizedLines: JournalLine[] = [];
 
     if (showEntryModal === 'IN') {
       finalizedLines.push({ id: `l1-${entryId}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo, isCleared: false });
@@ -154,7 +154,7 @@ const BankingView: React.FC<BankingViewProps> = ({
     if (entryAmount <= 0) return onNotify('error', 'Validation Error: Transfer amount must be positive.');
 
     const entryId = `je-trf-${Date.now()}`;
-    const finalizedLines: JournalEntryLine[] = [
+    const finalizedLines: JournalLine[] = [
       { id: `l1-${entryId}`, journalEntryId: entryId, accountId: fromBank.glAccountId, debit: 0, credit: entryAmount, memo: entryMemo || `Internal Transfer`, isCleared: false },
       { id: `l2-${entryId}`, journalEntryId: entryId, accountId: toBank.glAccountId, debit: entryAmount, credit: 0, memo: entryMemo || `Internal Transfer`, isCleared: false }
     ];
@@ -467,7 +467,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Actual Statement Balance</label>
                                  <div className="relative">
                                     <input type="number" step="0.01" className="bg-white border-2 border-indigo-600/20 rounded-xl pl-8 pr-4 py-1.5 text-base font-mono font-black text-slate-900 outline-none focus:border-indigo-600" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">₱</span>
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">{"\u20B1"}</span>
                                  </div>
                               </div>
                            </div>
@@ -476,7 +476,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                      <div className={`p-8 rounded-[2rem] border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Unreconciled Difference</p>
                         <div className="flex items-baseline gap-2">
-                           <span className="text-xs font-black">₱</span>
+                           <span className="text-xs font-black">{"\u20B1"}</span>
                            <div className={`text-4xl font-mono font-black tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
                               {reconciliationData?.difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                            </div>

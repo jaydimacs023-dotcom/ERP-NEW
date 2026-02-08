@@ -615,7 +615,7 @@ export interface RecurringJournalEntry extends BaseEntity {
   lastRunDate?: string;
   status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'INACTIVE';
   templateEntry: Omit<JournalEntry, 'id' | 'orgId' | 'createdAt' | 'createdBy' | 'date' | 'reference'> & {
-    lineTemplate: Omit<JournalEntryLine, 'id' | 'journalEntryId'>[]
+    lineTemplate: Omit<JournalLine, 'id' | 'journalEntryId'>[]
   };
   
   // Execution tracking
@@ -635,7 +635,7 @@ export interface RecurringJournalEntry extends BaseEntity {
   nextScheduledRun?: string;
 }
 
-export interface JournalEntryLine {
+export interface JournalLine {
   id: string;
   journalEntryId: string;
   accountId: string;

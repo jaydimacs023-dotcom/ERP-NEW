@@ -122,7 +122,7 @@ CREATE TABLE journal_entries (
   deleted_by UUID
 );
 
-CREATE TABLE journal_entry_lines (
+CREATE TABLE journal_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
   account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
@@ -317,6 +317,7 @@ CREATE TABLE non_stock_items (
   unit_price NUMERIC(15, 2) NOT NULL,
   income_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
   expense_account_id UUID NOT NULL REFERENCES chart_of_accounts(id),
+  tax_category_id TEXT, -- References atc_categories(code)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   is_deleted BOOLEAN DEFAULT FALSE,
@@ -604,9 +605,9 @@ CREATE INDEX idx_journal_entries_date ON journal_entries(org_id, date DESC);
 CREATE INDEX idx_journal_entries_status ON journal_entries(org_id, status);
 CREATE INDEX idx_journal_entries_source_type ON journal_entries(org_id, source_type);
 
-CREATE INDEX idx_journal_entry_lines_journal_entry_id ON journal_entry_lines(journal_entry_id);
-CREATE INDEX idx_journal_entry_lines_account_id ON journal_entry_lines(account_id);
-CREATE INDEX idx_journal_entry_lines_contact ON journal_entry_lines(contact_type, contact_id);
+CREATE INDEX idx_journal_lines_journal_entry_id ON journal_lines(journal_entry_id);
+CREATE INDEX idx_journal_lines_account_id ON journal_lines(account_id);
+CREATE INDEX idx_journal_lines_contact ON journal_lines(contact_type, contact_id);
 
 -- Student indexes
 CREATE INDEX idx_students_org_id ON students(org_id);
@@ -660,7 +661,7 @@ ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chart_of_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE journal_entry_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE journal_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bills ENABLE ROW LEVEL SECURITY;

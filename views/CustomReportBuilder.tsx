@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, Vendor, Student, Trainer, Employee, Batch, Qualification } from '../types';
+import { ChartOfAccount, JournalEntry, JournalLine, AccountClass, Vendor, Student, Trainer, Employee, Batch, Qualification } from '../types';
 import { Download, Printer, Plus, Trash2, GripVertical, Filter, Columns, ArrowUpDown, Save, FolderOpen, Play, X, ChevronDown, ChevronRight, BarChart3, Table, PieChart, Calendar, Eye, EyeOff } from 'lucide-react';
 
 // ===== Types =====
@@ -47,7 +47,7 @@ export interface ReportTemplate {
 interface CustomReportBuilderProps {
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   vendors?: Vendor[];
   students?: Student[];
   trainers?: Trainer[];

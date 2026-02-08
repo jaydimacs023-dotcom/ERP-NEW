@@ -1,4 +1,4 @@
-import { TransactionSummary, ChartOfAccount, JournalEntryLine, JournalEntry, AccountingPeriod } from '../types';
+import { TransactionSummary, ChartOfAccount, JournalLine, JournalEntry, AccountingPeriod } from '../types';
 import { AccountingService } from '../accountingService';
 
 /**

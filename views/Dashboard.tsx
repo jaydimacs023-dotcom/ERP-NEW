@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TransactionSummary, AccountClass, JournalEntryLine, ChartOfAccount } from '../types';
+import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount } from '../types';
 import { TrendingUp, TrendingDown, DollarSign, Activity, PieChart, BarChart3, LineChart as LucideLineChart, Printer } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -9,7 +9,7 @@ import {
 interface DashboardProps {
   summaries: TransactionSummary[];
   currency?: string;
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   accounts: ChartOfAccount[];
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
-import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalEntryLine } from '../types';
+import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine } from '../types';
 import { InventoryService } from '../services/InventoryService';
 import { InventoryGLService } from '../services/InventoryGLService';
 import { DataExportService } from '../services/DataExportService';
@@ -14,7 +14,7 @@ interface StockAdjustmentsViewProps {
   onAdd: (adj: Omit<StockAdjustment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onUpdate: (id: string, adj: Partial<StockAdjustment>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onPostGL?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[], adjustmentId: string) => Promise<void>;
+  onPostGL?: (entry: Partial<JournalEntry>, lines: JournalLine[], adjustmentId: string) => Promise<void>;
   currency: string;
   isLoading?: boolean;
   currentUserId?: string;

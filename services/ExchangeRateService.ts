@@ -1,4 +1,4 @@
-import { ExchangeRate, CurrencyConversion, JournalEntryLine } from '../types';
+import { ExchangeRate, CurrencyConversion, JournalLine } from '../types';
 
 /**
  * ExchangeRateService
@@ -150,7 +150,7 @@ export class ExchangeRateService {
     gainAccountId: string,
     lossAccountId: string,
     assetAccountId: string
-  ): Partial<JournalEntryLine>[] {
+  ): Partial<JournalLine>[] {
     const gapl = this.calculateUnrealizedGainLoss(
       foreignAmount,
       transactionRate,
@@ -162,7 +162,7 @@ export class ExchangeRateService {
       return []; // Negligible
     }
 
-    const lines: Partial<JournalEntryLine>[] = [];
+    const lines: Partial<JournalLine>[] = [];
 
     if (gapl.isGain) {
       // Debit asset account, credit gain account

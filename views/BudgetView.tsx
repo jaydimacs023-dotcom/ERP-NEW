@@ -250,7 +250,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                                value={editingLines[acc.id] || ''}
                                onChange={e => setEditingLines({...editingLines, [acc.id]: Number(e.target.value)})}
                              />
-                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300">₱</span>
+                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300">{"\u20B1"}</span>
                           </div>
                        </div>
                      ))}
@@ -299,7 +299,7 @@ const SummaryWidget: React.FC<{ label: string, budget: number, actual: number, t
           <div className="flex justify-between items-start">
              <div>
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</h4>
-                <p className="text-2xl font-black text-slate-900 tracking-tight">₱ {actual.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-black text-slate-900 tracking-tight">{"\u20B1"} {actual.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
              </div>
              <div className={`p-3 rounded-2xl bg-${color}-50 text-${color}-600 border border-${color}-100`}>
                 {isRevenue ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
@@ -327,7 +327,7 @@ const SummaryWidget: React.FC<{ label: string, budget: number, actual: number, t
                 </span>
              </div>
              <span className={`text-xs font-mono font-black ${isFavorable ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {variance >= 0 ? '+' : '-'}₱ {varianceDisplay}
+                {variance >= 0 ? '+' : '-'}{"\u20B1"} {varianceDisplay}
              </span>
           </div>
        </div>

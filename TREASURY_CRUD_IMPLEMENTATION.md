@@ -75,7 +75,7 @@ bank_accounts: ['created_at', 'updated_at']
 
 #### insertToSupabaseRaw<T>()
 Inserts a new record into any Supabase table with proper conversion:
-- Converts camelCase to snake_case (TypeScript → PostgreSQL convention)
+- Converts camelCase to snake_case (TypeScript â†’ PostgreSQL convention)
 - Validates against table schema
 - Returns result converted back to camelCase
 - Error handling with detailed logging
@@ -151,11 +151,11 @@ interface BankingViewProps {
   summaries: TransactionSummary[];
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   onAddBankAccount: (bank: Partial<BankAccount>) => void;
   onUpdateBankAccount?: (id: string, bank: Partial<BankAccount>) => void;
   onDeleteBankAccount?: (id: string) => void;
-  onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostTransfer: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onToggleClearLine: (lineId: string) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
@@ -276,63 +276,63 @@ const handleDeleteBankAccount = async (id: string) => {
 ### Create Flow
 ```
 User inputs form data
-    ↓
+    â†“
 handleAddSubmit() validates & prepares data
-    ↓
+    â†“
 onAddBankAccount() called from App
-    ↓
+    â†“
 dataService.createBankAccount() sends to Supabase
-    ↓
+    â†“
 insertToSupabaseRaw() handles conversion & REST API call
-    ↓
-camelToSnake() conversion (glAccountId → gl_account_id)
-    ↓
+    â†“
+camelToSnake() conversion (glAccountId â†’ gl_account_id)
+    â†“
 filterToTableSchema() removes invalid columns
-    ↓
+    â†“
 Supabase INSERT returns new record with auto-generated fields
-    ↓
+    â†“
 snakeToCamel() converts response back to camelCase
-    ↓
+    â†“
 React state updated via setBankAccounts()
-    ↓
+    â†“
 UI reflects new bank account with success notification
 ```
 
 ### Update Flow
 ```
 User clicks Edit, modifies fields
-    ↓
+    â†“
 handleEditSubmit() validates data
-    ↓
+    â†“
 onUpdateBankAccount(id, updates) called
-    ↓
+    â†“
 dataService.updateBankAccount() sends to Supabase
-    ↓
+    â†“
 updateInSupabaseRaw() handles conversion
-    ↓
+    â†“
 Supabase PATCH updates record
-    ↓
+    â†“
 Updated record returned and converted
-    ↓
+    â†“
 setState maps updated record back to list
-    ↓
+    â†“
 UI refreshes with new values
 ```
 
 ### Delete Flow
 ```
 User clicks Delete
-    ↓
+    â†“
 Confirmation dialog shown
-    ↓
+    â†“
 onDeleteBankAccount(id) called on confirm
-    ↓
+    â†“
 dataService.deleteBankAccount() sends DELETE to Supabase
-    ↓
+    â†“
 Supabase removes record permanently
-    ↓
+    â†“
 setState filters out deleted record
-    ↓
+    â†“
 Bank account disappears from UI
 ```
 
@@ -340,36 +340,36 @@ Bank account disappears from UI
 
 ## Features
 
-✅ **Full CRUD Operations**
+âœ… **Full CRUD Operations**
 - Create new bank accounts
 - Read/display accounts with details
 - Update account information (name, type, balance, GL mapping)
 - Delete accounts with confirmation
 
-✅ **Supabase Integration**
+âœ… **Supabase Integration**
 - Direct REST API calls (no mock data)
 - Proper error handling with fallback
 - Automatic timestamp management (created_at, updated_at)
 - UUID primary key generation
 
-✅ **Data Validation**
+âœ… **Data Validation**
 - Required field validation (bank name, GL account)
 - Schema validation (only valid columns sent to DB)
 - Type checking (currency, account type)
 
-✅ **User Experience**
+âœ… **User Experience**
 - Modal dialogs for add/edit operations
 - Success/error notifications
 - Confirmation before deletion
 - Organized account detail view
 - Edit & Delete buttons in UI
 
-✅ **Multi-Tenancy**
+âœ… **Multi-Tenancy**
 - Filters accounts by organization (orgId)
 - Filters by non-deleted accounts (isDeleted flag)
 - Organization context maintained throughout
 
-✅ **Accounting Integration**
+âœ… **Accounting Integration**
 - GL Account mapping for each bank account
 - Asset account selection only
 - Transaction reconciliation capability

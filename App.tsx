@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalEntryLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -316,7 +316,7 @@ export default function App() {
   // PAYROLL PERSISTENCE HANDLERS
   // ============================================================================
   
-  const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalEntryLine[]) => {
+  const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalLine[]) => {
     try {
       console.info('[App] Posting payroll run:', run.id);
       
@@ -425,7 +425,7 @@ export default function App() {
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
+  const [journalLines, setJournalLines] = useState<JournalLine[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -638,7 +638,7 @@ export default function App() {
     setActiveTab(getDefaultTab(user.role));
   };
 
-  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
+  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
     const fullEntry = {
       ...entry,
       id: entry.id || `je-${Date.now()}`,
@@ -921,7 +921,7 @@ export default function App() {
       if (backupData.data.employees?.length) setEmployees(backupData.data.employees);
       if (backupData.data.payrollRuns?.length) setPayrollRuns(backupData.data.payrollRuns);
       if (backupData.data.journalEntries?.length) setJournalEntries(backupData.data.journalEntries);
-      if (backupData.data.journalEntryLines?.length) setJournalLines(backupData.data.journalEntryLines);
+      if (backupData.data.JournalLines?.length) setJournalLines(backupData.data.JournalLines);
       if (backupData.data.auditLogs?.length) setAuditLogs(backupData.data.auditLogs);
       // if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets); // Budget state not yet implemented
       if (backupData.data.chartOfAccounts?.length) setAccounts(backupData.data.chartOfAccounts);
@@ -2622,7 +2622,7 @@ export default function App() {
       const entryId = `depr-${Date.now()}`;
 
       // Create depreciation lines with proper journalEntryId reference
-      const deprLines: JournalEntryLine[] = [
+      const deprLines: JournalLine[] = [
         {
           id: `line-${Date.now()}-debit`,
           journalEntryId: entryId,
@@ -2659,7 +2659,7 @@ export default function App() {
       };
 
       // Add journal entry lines separately
-      const newLines: JournalEntryLine[] = deprLines.map(line => ({
+      const newLines: JournalLine[] = deprLines.map(line => ({
         ...line,
         journalEntryId: entryId
       }));
@@ -3443,7 +3443,7 @@ export default function App() {
               currentUserName={currentUser?.email || 'System'}
               allData={{
                 organizations, users, students, qualifications, trainers, batches, sponsors,
-                vendors, employees, payrollRuns, journalEntries, journalEntryLines: journalLines, auditLogs,
+                vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
                 budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory: payments, payables, accountingPeriods,
                 checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
                 stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,

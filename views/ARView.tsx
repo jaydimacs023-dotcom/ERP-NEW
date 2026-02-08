@@ -1,6 +1,6 @@
-
+﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalEntryLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
 import { AccountingService } from '../accountingService';
 import { 
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock, 
@@ -12,13 +12,13 @@ import {
 
 interface ARViewProps {
   entries: JournalEntry[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   students: Student[];
   sponsors: Sponsor[];
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
-  onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -189,12 +189,15 @@ const ARView: React.FC<ARViewProps> = ({
     setInvoiceLines(newLines);
   };
 
+  const totalInvoiceNet = useMemo(() => invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0), [invoiceLines]);
+
   const vatableSales = useMemo(() => invoiceLines.reduce((sum, l) => {
     const item = items.find(i => i.id === l.itemId);
-    return (item?.taxCategoryId) ? sum + (l.qty * l.price) : sum;
+    return (item?.taxCategoryId === 'VAT') ? sum + (l.qty * l.price) : sum;
   }, 0), [invoiceLines, items]);
+
   const totalVat = vatableSales * 0.12;
-  const grossInvoiceAmount = invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0) + totalVat;
+  const grossInvoiceAmount = totalInvoiceNet + totalVat;
 
   const handlePostInvoice = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +221,7 @@ const ARView: React.FC<ARViewProps> = ({
       return onNotify('error', 'Accounting Error: VAT account (2200 or "Output VAT") not found in Chart of Accounts.');
     }
 
-    const finalizedLines: JournalEntryLine[] = [];
+    const finalizedLines: JournalLine[] = [];
     finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType });
     invoiceLines.forEach((il, idx) => {
       const item = items.find(i => i.id === il.itemId);
@@ -245,7 +248,7 @@ const ARView: React.FC<ARViewProps> = ({
     
     const payerName = collPayerType === 'SPONSOR' ? sponsors.find(s => s.id === collPayerId)?.name : `${students.find(s => s.id === collPayerId)?.lastName}, ${students.find(s => s.id === collPayerId)?.firstName}`;
 
-    const finalizedLines: JournalEntryLine[] = [
+    const finalizedLines: JournalLine[] = [
       { id: `l-cash-${Date.now()}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: collAmount, credit: 0, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType },
       { id: `l-ar-cr-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: 0, credit: collAmount, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType }
     ];
@@ -255,7 +258,7 @@ const ARView: React.FC<ARViewProps> = ({
     setCollAmount(0);
   };
 
-  const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatCurrency = (val: number) => `\u20B1 ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6">
@@ -287,7 +290,7 @@ const ARView: React.FC<ARViewProps> = ({
           const l = lines.find(line => line.journalEntryId === c.id && line.debit > 0);
           return s + (l?.debit || 0);
         }, 0))} color="emerald" />
-        <SummaryBox label="Output VAT Due" value="0.00" color="amber" />
+        <SummaryBox label="Output VAT Due" value={`\u20B1 0.00`} color="amber" />
         <SummaryBox label="Collection Efficiency" value="84%" color="slate" />
       </div>
 
@@ -518,13 +521,17 @@ const ARView: React.FC<ARViewProps> = ({
                <div className="p-10 bg-slate-900 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
                   <div className="flex gap-10">
                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subtotal (Net)</p>
+                        <p className="text-xl font-mono font-black text-white">{"\u20B1"} {totalInvoiceNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                     </div>
+                     <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Output VAT (12%)</p>
-                        <p className="text-xl font-mono font-black text-white">₱ {formatCurrency(totalVat)}</p>
+                        <p className="text-xl font-mono font-black text-white">{"\u20B1"} {totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      </div>
                      <div className="w-px h-12 bg-white/10"></div>
                      <div className="space-y-1">
                         <p className="text-[10px] font-black text-brand uppercase tracking-widest">Gross Invoice Value</p>
-                        <p className="text-3xl font-mono font-black text-white tracking-tighter">₱ {formatCurrency(grossInvoiceAmount)}</p>
+                        <p className="text-3xl font-mono font-black text-white tracking-tighter">{"\u20B1"} {grossInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      </div>
                   </div>
                   <div className="flex gap-4 w-full md:w-auto">
@@ -644,3 +651,4 @@ const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({
 );
 
 export default ARView;
+

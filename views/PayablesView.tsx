@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Vendor, Payable, PayableCategory, PayableStatus, InvoiceType, PaymentMethod,
-  WithholdingType, ChartOfAccount, JournalEntry, JournalEntryLine, AccountClass, BankAccount, PurchaseOrder
+  WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder
 } from '../types';
 import { AccountingService } from '../accountingService';
 import EmptyState from '../components/EmptyState';
@@ -29,7 +29,7 @@ interface PayablesViewProps {
   onCreatePayable: (payable: Payable) => void;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
   onDeletePayable: (id: string) => void;
-  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -663,7 +663,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       return;
     }
 
-    const lines: JournalEntryLine[] = [];
+    const lines: JournalLine[] = [];
     const amount = selectedPayable.amount;
     const withholdingAmount = selectedPayable.withholdingAmount || 0;
     const inputVat = selectedPayable.inputVatAmount || 0;
@@ -806,7 +806,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     // Payment Entry:
     // DR Accounts Payable
     // CR Cash/Bank
-    const lines: JournalEntryLine[] = [
+    const lines: JournalLine[] = [
       {
         id: `jl-${Date.now()}-1`,
         journalEntryId: '',
@@ -855,7 +855,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       paidAt: new Date().toISOString(),
     });
 
-    onNotify('success', `Payment of ₱${formatCurrency(paymentData.amountPaid)} processed for ${selectedPayable.payableNumber}`);
+    onNotify('success', `Payment of \u20B1${formatCurrency(paymentData.amountPaid)} processed for ${selectedPayable.payableNumber}`);
     setShowPaymentModal(false);
     setSelectedPayable(null);
     resetPaymentForm();
@@ -878,7 +878,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-          <p className={`text-2xl font-black mt-1 ${color}`}>₱{value}</p>
+          <p className={`text-2xl font-black mt-1 ${color}`}>{"\u20B1"}{value}</p>
         </div>
         <div className={`w-12 h-12 rounded-xl ${color.replace('text-', 'bg-').replace('600', '100')} flex items-center justify-center`}>
           <Icon className={color} size={24} />
@@ -995,15 +995,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end gap-1">
-                          <span className="font-mono text-sm text-slate-700">₱{formatCurrency(payable.amount)}</span>
+                          <span className="font-mono text-sm text-slate-700">{"\u20B1"}{formatCurrency(payable.amount)}</span>
                           {payable.withholdingAmount > 0 && (
-                            <span className="text-[10px] text-emerald-600">-₱{formatCurrency(payable.withholdingAmount)} WHT</span>
+                            <span className="text-[10px] text-emerald-600">-{"\u20B1"}{formatCurrency(payable.withholdingAmount)} WHT</span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right font-mono text-sm font-semibold">
                         <span className={remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                          ₱{formatCurrency(remainingBalance)}
+                          {"\u20B1"}{formatCurrency(remainingBalance)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -1131,7 +1131,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <div key={bucket.key} className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-sm`}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bucket.label}</p>
             <p className={`text-2xl font-black mt-2 text-${bucket.color}-600`}>
-              ₱{formatCurrency(bucket.data.amount)}
+              {"\u20B1"}{formatCurrency(bucket.data.amount)}
             </p>
             <p className="text-xs text-slate-500 mt-1">{bucket.data.count} invoice{bucket.data.count !== 1 ? 's' : ''}</p>
           </div>
@@ -1218,7 +1218,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             </div>
             <h3 className="text-lg font-semibold text-slate-800">AP Subledger Total</h3>
           </div>
-          <p className="text-3xl font-black text-indigo-600">₱{formatCurrency(totalApSubledger)}</p>
+          <p className="text-3xl font-black text-indigo-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</p>
           <p className="text-xs text-slate-500 mt-2">Sum of all vendor balances</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -1229,7 +1229,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <h3 className="text-lg font-semibold text-slate-800">AP Control Account</h3>
           </div>
           <p className="text-3xl font-black text-emerald-600">
-            ₱{formatCurrency(apControlAccount ? summaryMetrics.total : 0)}
+            {"\u20B1"}{formatCurrency(apControlAccount ? summaryMetrics.total : 0)}
           </p>
           <p className="text-xs text-slate-500 mt-2">{apControlAccount?.name || 'Not configured'}</p>
         </div>
@@ -1264,7 +1264,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 <td className="py-3 text-sm font-mono text-slate-500">{vendor.tin || '-'}</td>
                 <td className="py-3 text-center text-sm text-slate-600">{invoiceCount}</td>
                 <td className={`py-3 text-right text-sm font-mono font-semibold ${balance > 0 ? 'text-amber-600' : balance < 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  ₱{formatCurrency(balance)}
+                  {"\u20B1"}{formatCurrency(balance)}
                 </td>
               </tr>
             ))}
@@ -1272,7 +1272,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <tfoot>
             <tr className="bg-slate-50">
               <td colSpan={3} className="py-3 text-sm font-bold text-slate-800">TOTAL SUBLEDGER</td>
-              <td className="py-3 text-right text-sm font-mono font-black text-indigo-600">₱{formatCurrency(totalApSubledger)}</td>
+              <td className="py-3 text-right text-sm font-mono font-black text-indigo-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1408,19 +1408,19 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               <div className="space-y-1 font-mono text-xs">
                 {selectedPayable.invoiceType !== 'credit_memo' ? (
                   <>
-                    <p className="text-slate-600">DR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... ₱{formatCurrency(selectedPayable.amount)}</p>
+                    <p className="text-slate-600">DR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
                     {selectedPayable.inputVatAmount > 0 && (
-                      <p className="text-slate-600">DR Input VAT ... ₱{formatCurrency(selectedPayable.inputVatAmount)}</p>
+                      <p className="text-slate-600">DR Input VAT ... {"\u20B1"}{formatCurrency(selectedPayable.inputVatAmount)}</p>
                     )}
                     {selectedPayable.withholdingAmount > 0 && (
-                      <p className="text-slate-600 pl-4">CR Withholding Tax Payable ... ₱{formatCurrency(selectedPayable.withholdingAmount)}</p>
+                      <p className="text-slate-600 pl-4">CR Withholding Tax Payable ... {"\u20B1"}{formatCurrency(selectedPayable.withholdingAmount)}</p>
                     )}
-                    <p className="text-slate-600 pl-4">CR Accounts Payable ... ₱{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}</p>
+                    <p className="text-slate-600 pl-4">CR Accounts Payable ... {"\u20B1"}{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-slate-600">DR Accounts Payable ... ₱{formatCurrency(Math.abs(selectedPayable.netPayable || selectedPayable.amount))}</p>
-                    <p className="text-slate-600 pl-4">CR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... ₱{formatCurrency(selectedPayable.amount)}</p>
+                    <p className="text-slate-600">DR Accounts Payable ... {"\u20B1"}{formatCurrency(Math.abs(selectedPayable.netPayable || selectedPayable.amount))}</p>
+                    <p className="text-slate-600 pl-4">CR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
                   </>
                 )}
               </div>
@@ -1469,7 +1469,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-800">Outstanding Balance</span>
                   <span className="text-xl font-black text-amber-600">
-                    ₱{formatCurrency((selectedPayable.netPayable || selectedPayable.amount) - (selectedPayable.paidAmount || 0))}
+                    {"\u20B1"}{formatCurrency((selectedPayable.netPayable || selectedPayable.amount) - (selectedPayable.paidAmount || 0))}
                   </span>
                 </div>
               </div>
@@ -1971,9 +1971,9 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
               </span>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-black text-slate-800">₱{formatCurrency(payable.netPayable || payable.amount)}</p>
+              <p className="text-2xl font-black text-slate-800">{"\u20B1"}{formatCurrency(payable.netPayable || payable.amount)}</p>
               {remainingBalance !== (payable.netPayable || payable.amount) && (
-                <p className="text-xs text-amber-600 font-semibold">Balance: ₱{formatCurrency(remainingBalance)}</p>
+                <p className="text-xs text-amber-600 font-semibold">Balance: {"\u20B1"}{formatCurrency(remainingBalance)}</p>
               )}
             </div>
           </div>
@@ -1998,19 +1998,19 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gross Amount</p>
-              <p className="text-slate-700 font-mono">₱{formatCurrency(payable.amount)}</p>
+              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.amount)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Input VAT</p>
-              <p className="text-slate-700 font-mono">₱{formatCurrency(payable.inputVatAmount || 0)}</p>
+              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.inputVatAmount || 0)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Withholding</p>
-              <p className="text-slate-700 font-mono">₱{formatCurrency(payable.withholdingAmount || 0)}</p>
+              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.withholdingAmount || 0)}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paid Amount</p>
-              <p className="text-emerald-600 font-mono font-semibold">₱{formatCurrency(payable.paidAmount || 0)}</p>
+              <p className="text-emerald-600 font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.paidAmount || 0)}</p>
             </div>
             {payable.referenceDocument && (
               <div className="col-span-2">

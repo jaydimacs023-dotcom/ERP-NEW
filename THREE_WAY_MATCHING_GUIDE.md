@@ -12,58 +12,58 @@ The 3-way matching system validates that Purchase Orders (PO), Goods Receipts (G
 
 ```
 App.tsx
-  ↓
+  â†“
 APView.tsx
-  ├─ Bills Tab (existing)
-  ├─ 3-Way Match Tab (NEW)
-  │  ↓
-  │  MatchingDashboard.tsx
-  │    ├─ Summary Cards
-  │    ├─ Filters & Search
-  │    ├─ Matching Results (expandable)
-  │    │  ├─ Document References
-  │    │  ├─ Discrepancy Sections
-  │    │  ├─ Line Item Matching
-  │    │  └─ Action Buttons
-  │    └─ Exception Modal
-  ├─ Payments Tab (existing)
-  └─ Aging Tab (existing)
+  â”œâ”€ Bills Tab (existing)
+  â”œâ”€ 3-Way Match Tab (NEW)
+  â”‚  â†“
+  â”‚  MatchingDashboard.tsx
+  â”‚    â”œâ”€ Summary Cards
+  â”‚    â”œâ”€ Filters & Search
+  â”‚    â”œâ”€ Matching Results (expandable)
+  â”‚    â”‚  â”œâ”€ Document References
+  â”‚    â”‚  â”œâ”€ Discrepancy Sections
+  â”‚    â”‚  â”œâ”€ Line Item Matching
+  â”‚    â”‚  â””â”€ Action Buttons
+  â”‚    â””â”€ Exception Modal
+  â”œâ”€ Payments Tab (existing)
+  â””â”€ Aging Tab (existing)
 
 Services:
   ThreeWayMatchingService.ts
-    ├─ performThreeWayMatch()
-    ├─ matchLineItems()
-    ├─ validateAmounts()
-    ├─ validateDates()
-    └─ Helper utilities
+    â”œâ”€ performThreeWayMatch()
+    â”œâ”€ matchLineItems()
+    â”œâ”€ validateAmounts()
+    â”œâ”€ validateDates()
+    â””â”€ Helper utilities
 ```
 
 ### Data Flow
 
 ```
 Input: Payable (invoice)
-  ↓ [Look up PO by payable.purchaseOrderId]
-  ↓ [Look up GR by payable.goodsReceiptId]
-  ↓ [Get PO lines, GR lines]
-  ↓
+  â†“ [Look up PO by payable.purchaseOrderId]
+  â†“ [Look up GR by payable.goodsReceiptId]
+  â†“ [Get PO lines, GR lines]
+  â†“
 ThreeWayMatchingService.performThreeWayMatch()
-  ├─ Check document availability
-  ├─ Match line items (qty, price)
-  ├─ Validate total amounts
-  ├─ Validate dates/timeline
-  ├─ Classify discrepancies
-  └─ Return ThreeWayMatchResult
-  ↓
+  â”œâ”€ Check document availability
+  â”œâ”€ Match line items (qty, price)
+  â”œâ”€ Validate total amounts
+  â”œâ”€ Validate dates/timeline
+  â”œâ”€ Classify discrepancies
+  â””â”€ Return ThreeWayMatchResult
+  â†“
 MatchingDashboard
-  ├─ Render summary cards
-  ├─ Render expandable results
-  └─ Show discrepancies
-  ↓
+  â”œâ”€ Render summary cards
+  â”œâ”€ Render expandable results
+  â””â”€ Show discrepancies
+  â†“
 User Action: Approve Exception
-  ↓
+  â†“
 App.tsx handleApproveException callback
-  ├─ Update payable status
-  └─ Log audit entry
+  â”œâ”€ Update payable status
+  â””â”€ Log audit entry
 ```
 
 ---
@@ -129,15 +129,15 @@ static performThreeWayMatch(
 
 **`getStatusColor(status: MatchingStatus): string`**
 Returns Tailwind CSS classes for status badge:
-- FULLY_MATCHED → "text-green-600 bg-green-50"
-- PARTIALLY_MATCHED → "text-amber-600 bg-amber-50"
-- UNMATCHED → "text-red-600 bg-red-50"
+- FULLY_MATCHED â†’ "text-green-600 bg-green-50"
+- PARTIALLY_MATCHED â†’ "text-amber-600 bg-amber-50"
+- UNMATCHED â†’ "text-red-600 bg-red-50"
 - etc.
 
 **`getStatusLabel(status: MatchingStatus): string`**
 Returns human-readable label:
-- FULLY_MATCHED → "✓ Fully Matched"
-- PARTIALLY_MATCHED → "⚠ Partially Matched"
+- FULLY_MATCHED â†’ "âœ“ Fully Matched"
+- PARTIALLY_MATCHED â†’ "âš  Partially Matched"
 - etc.
 
 **`getSummaryStats(matchResults: ThreeWayMatchResult[]): {...}`**
@@ -199,7 +199,7 @@ interface APViewProps {
   // Existing props
   vendors: Vendor[]
   entries: JournalEntry[]
-  lines: JournalEntryLine[]
+  lines: JournalLine[]
   items: NonStockItem[]
   accounts: ChartOfAccount[]
   bankAccounts: BankAccount[]
@@ -213,7 +213,7 @@ interface APViewProps {
   
   // Existing callbacks
   currentUserId?: string
-  onPostBill: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void
+  onPostBill: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void
   onCreatePayable: (payable: Payable) => void
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void
   
@@ -323,7 +323,7 @@ const handleApproveException = async (payableId: string, notes: string) => {
 ### Expandable Results
 
 Each invoice row shows:
-- Status icon & badge (✓ ⚠ ✗ ○)
+- Status icon & badge (âœ“ âš  âœ— â—‹)
 - Invoice number
 - Vendor name
 - Invoice amount
@@ -412,9 +412,9 @@ PO-001: 100 widgets @ $10.00 = $1,000.00
 GR-001: 100 widgets @ $10.00 = $1,000.00
 INV-001: $1,000.00
 
-Result: ✓ Fully Matched (Green)
-→ Ready for Payment button enabled
-→ User can proceed directly to payment
+Result: âœ“ Fully Matched (Green)
+â†’ Ready for Payment button enabled
+â†’ User can proceed directly to payment
 ```
 
 ### Scenario 2: Partial Match (Minor Variance)
@@ -423,11 +423,11 @@ PO-002: 100 widgets @ $10.00 = $1,000.00
 GR-002: 98 widgets @ $10.00 = $980.00 (2% short)
 INV-002: $980.00
 
-Result: ⚠ Partially Matched (Amber)
+Result: âš  Partially Matched (Amber)
 Warnings:
 - Quantity variance: PO qty=100, GR qty=98 (variance: -2%)
 - Amount variance: PO=$1,000 vs Invoice=$980 (variance: -2%)
-→ User can approve after reviewing reasons
+â†’ User can approve after reviewing reasons
 ```
 
 ### Scenario 3: Critical Issue (Block Payment)
@@ -436,11 +436,11 @@ PO-003: 100 widgets @ $10.00 = $1,000.00
 GR-003: 100 widgets @ $10.00 = $1,000.00
 INV-003: $1,200.00 (overbilled 20%)
 
-Result: ✗ Unmatched (Red)
+Result: âœ— Unmatched (Red)
 Blocker:
 - Critical: Amount variance: PO=$1,000 vs Invoice=$1,200 (variance: 20%)
-→ "Ready for Payment" button DISABLED
-→ User must contact vendor to correct invoice
+â†’ "Ready for Payment" button DISABLED
+â†’ User must contact vendor to correct invoice
 ```
 
 ### Scenario 4: Missing GR
@@ -449,11 +449,11 @@ PO-004: 100 widgets @ $10.00 = $1,000.00
 GR-004: NOT CREATED
 INV-004: $1,000.00
 
-Result: ○ No GR (Blue)
+Result: â—‹ No GR (Blue)
 Blocker:
 - Major: No Goods Receipt found. Invoice received before goods?
-→ Cannot pay until GR is created
-→ User must contact receiving to create GR
+â†’ Cannot pay until GR is created
+â†’ User must contact receiving to create GR
 ```
 
 ### Scenario 5: Invoice Before Goods (Critical)
@@ -462,11 +462,11 @@ PO-005: 100 widgets @ $10.00 = $1,000.00
 GR-005: dated 2024-01-20
 INV-005: dated 2024-01-10 (before GR!)
 
-Result: ✗ Unmatched (Red)
+Result: âœ— Unmatched (Red)
 Blocker:
 - Critical: Invoice date (2024-01-10) is before GR date (2024-01-20)
-→ CANNOT PAY - dates are impossible
-→ User must fix invoice date or reject it
+â†’ CANNOT PAY - dates are impossible
+â†’ User must fix invoice date or reject it
 ```
 
 ---
@@ -524,34 +524,34 @@ describe('ThreeWayMatchingService', () => {
 
 ```
 1. Load dashboard
-   ✓ Summary cards render
-   ✓ Metrics calculate correctly
+   âœ“ Summary cards render
+   âœ“ Metrics calculate correctly
 
 2. Search functionality
-   ✓ Search by invoice number returns results
-   ✓ Search by vendor filters correctly
-   ✓ No results message shown when empty
+   âœ“ Search by invoice number returns results
+   âœ“ Search by vendor filters correctly
+   âœ“ No results message shown when empty
 
 3. Filter functionality
-   ✓ Filter by "fully matched" shows only green items
-   ✓ Filter by "unmatched" shows only red items
-   ✓ Filter by "blocked" shows only critical issues
+   âœ“ Filter by "fully matched" shows only green items
+   âœ“ Filter by "unmatched" shows only red items
+   âœ“ Filter by "blocked" shows only critical issues
 
 4. Expandable rows
-   ✓ Click expands to show details
-   ✓ Click again collapses
-   ✓ Shows all discrepancy sections
+   âœ“ Click expands to show details
+   âœ“ Click again collapses
+   âœ“ Shows all discrepancy sections
 
 5. Exception modal
-   ✓ Opens when "Request Exception" clicked
-   ✓ Submit disabled until notes entered
-   ✓ Close button dismisses modal
-   ✓ Submit calls callback
+   âœ“ Opens when "Request Exception" clicked
+   âœ“ Submit disabled until notes entered
+   âœ“ Close button dismisses modal
+   âœ“ Submit calls callback
 
 6. Data updates
-   ✓ When new payable added, dashboard updates
-   ✓ When payable deleted, count decreases
-   ✓ When status changes, color updates
+   âœ“ When new payable added, dashboard updates
+   âœ“ When payable deleted, count decreases
+   âœ“ When status changes, color updates
 ```
 
 ---

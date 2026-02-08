@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChartOfAccount, Student, Trainer, Sponsor, Batch, NonStockItem,
-  JournalEntryLine, JournalEntry, AccountClass 
+  JournalLine, JournalEntry, AccountClass 
 } from '../types';
 import { AccountingService } from '../accountingService';
 import { X, Plus, Trash2, AlertCircle, Save, CheckCircle2, User, GraduationCap, Handshake, Layers, Box } from 'lucide-react';
@@ -15,7 +15,7 @@ interface JournalFormProps {
   batches: Batch[];
   items: NonStockItem[];
   entries: JournalEntry[];
-  onSubmit: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onClose: () => void;
 }
 
@@ -35,7 +35,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
     setEntry(prev => ({ ...prev, reference: nextRef }));
   }, [entries]);
 
-  const [lines, setLines] = useState<Partial<JournalEntryLine>[]>([
+  const [lines, setLines] = useState<Partial<JournalLine>[]>([
     { id: '1', accountId: '', debit: 0, credit: 0, contactId: '', contactType: 'OTHER', batchId: '', itemId: '' },
     { id: '2', accountId: '', debit: 0, credit: 0, contactId: '', contactType: 'OTHER', batchId: '', itemId: '' }
   ]);
@@ -62,7 +62,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
     setLines(lines.filter(l => l.id !== id));
   };
 
-  const updateLine = (id: string, updates: Partial<JournalEntryLine>) => {
+  const updateLine = (id: string, updates: Partial<JournalLine>) => {
     setLines(lines.map(l => {
       if (l.id !== id) return l;
       
@@ -107,7 +107,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
     if (!isBalanced) return;
 
     const entryId = `je-${Date.now()}`;
-    const finalizedLines: JournalEntryLine[] = lines.map(l => ({
+    const finalizedLines: JournalLine[] = lines.map(l => ({
       id: `l-${Math.random().toString(36).substr(2, 9)}`,
       journalEntryId: entryId,
       accountId: l.accountId!,

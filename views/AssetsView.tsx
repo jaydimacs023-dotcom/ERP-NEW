@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { FixedAsset, AssetCategory, ChartOfAccount, JournalEntryLine, AccountClass, JournalEntry } from '../types';
+import { FixedAsset, AssetCategory, ChartOfAccount, JournalLine, AccountClass, JournalEntry } from '../types';
 import { 
   Box, Play, Trash2, Calendar, FileText, Plus, ShieldCheck, 
   TrendingDown, DollarSign, Activity, ChevronRight, X, Save,
@@ -15,7 +15,7 @@ interface Toast {
 interface AssetsViewProps {
   assets: FixedAsset[];
   accounts: ChartOfAccount[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   entries: JournalEntry[];
   onDepreciate: (assetId: string) => void;
   onAddAsset: (asset: FixedAsset) => void;

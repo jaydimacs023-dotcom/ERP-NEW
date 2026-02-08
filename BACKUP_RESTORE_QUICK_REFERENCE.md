@@ -4,7 +4,7 @@
 Complete per-organization data backup and restore system for AT-ERP. Allows system admins to create full snapshots of organization data and restore them on demand.
 
 ## Status
-✅ **PRODUCTION READY** - All components integrated and building successfully
+âœ… **PRODUCTION READY** - All components integrated and building successfully
 
 ## What Was Implemented
 
@@ -57,7 +57,7 @@ Core backup/restore utility with 14 public methods:
 - Organizational: organizations, users, locations
 - Academic: students, qualifications, trainers, batches, sponsors
 - Payroll: employees, payrollRuns (payrollLines included)
-- Accounting: accounts, journalEntries, journalEntryLines, auditLogs, budgets, accountingPeriods
+- Accounting: accounts, journalEntries, journalLines, auditLogs, budgets, accountingPeriods
 - Procurement: purchaseOrders, payables, checkVouchers, eftBatches, paymentHistory
 - Banking: bankAccounts, bankReconciliations
 - Inventory: stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, warehouseLocations, nonStockItems
@@ -159,15 +159,15 @@ const handleRestoreBackup = async (backupData: BackupData) => {
 
 #### Data Flow
 1. User selects organization
-2. Clicks "Create Backup" → Downloads JSON file
-3. Later, clicks "Restore Backup" → Uploads file
+2. Clicks "Create Backup" â†’ Downloads JSON file
+3. Later, clicks "Restore Backup" â†’ Uploads file
 4. System validates file and shows summary
 5. User confirms restore
 6. `handleRestoreBackup` updates all App state
 7. Audit log created automatically
 
 ## Build Status
-✅ **SUCCESS** (5.49 seconds)
+âœ… **SUCCESS** (5.49 seconds)
 - 2,408 modules compiled
 - 0 TypeScript errors
 - Bundle: 2,691 KB JS / 510 KB gzipped
@@ -187,7 +187,7 @@ const handleRestoreBackup = async (backupData: BackupData) => {
 1. Click "Backup & Restore" tab
 2. Select organization to restore to
 3. In "Restore Backup" section, select backup file
-4. System validates file → shows summary
+4. System validates file â†’ shows summary
 5. Review record counts
 6. Click "Confirm Restore"
 7. Wait for restore to complete
@@ -202,22 +202,22 @@ const handleRestoreBackup = async (backupData: BackupData) => {
 
 ## Security Considerations
 
-✅ **Per-Organization Isolation**
+âœ… **Per-Organization Isolation**
 - All backups filtered by orgId
 - Restore only affects selected organization
 - No cross-org data leakage
 
-✅ **Integrity Verification**
+âœ… **Integrity Verification**
 - SHA-256 checksum validation
 - Backup tampering detected on restore attempt
 - Rejected backups show validation error
 
-✅ **Audit Trail**
+âœ… **Audit Trail**
 - Every backup/restore logged via AuditService
 - Tracks user, timestamp, record counts
 - Useful for compliance
 
-✅ **Access Control**
+âœ… **Access Control**
 - Only SYSTEM_ADMIN can access backup/restore
 - Not available to tenant admins or regular users
 - Access controlled in App.tsx
@@ -349,7 +349,7 @@ const handleRestoreBackup = async (backupData: BackupData) => {
 
 ---
 
-**Status:** ✅ PRODUCTION READY  
-**Build:** ✅ SUCCESS (0 errors)  
+**Status:** âœ… PRODUCTION READY  
+**Build:** âœ… SUCCESS (0 errors)  
 **Testing:** Manual verification recommended  
 **Deployment:** Ready to merge

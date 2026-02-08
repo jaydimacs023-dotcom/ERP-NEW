@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Vendor, VendorType, VendorStatus, ChartOfAccount, JournalEntryLine, AccountClass } from '../types';
+import { Vendor, VendorType, VendorStatus, ChartOfAccount, JournalLine, AccountClass } from '../types';
 import EmptyState from '../components/EmptyState';
 import { 
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
@@ -11,7 +11,7 @@ import {
 interface VendorsViewProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   onAddVendor?: (vendor: Vendor) => void;
   onUpdateVendor?: (id: string, updates: Partial<Vendor>) => void;
   onDeleteVendor?: (id: string) => void;
@@ -437,7 +437,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Payables</p>
-              <p className="text-2xl font-black mt-1 text-amber-600">₱{formatCurrency(summaryMetrics.totalPayables)}</p>
+              <p className="text-2xl font-black mt-1 text-amber-600">{"\u20B1"}{formatCurrency(summaryMetrics.totalPayables)}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
               <CreditCard className="text-amber-600" size={24} />
@@ -540,7 +540,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   <td className="px-6 py-5 text-right">
                     <div className="flex flex-col items-end">
                       <div className={`text-sm font-mono font-bold ${balance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
-                        ₱{formatCurrency(balance)}
+                        {"\u20B1"}{formatCurrency(balance)}
                       </div>
                       <div className="text-[9px] font-semibold text-slate-400 uppercase">Accounts Payable</div>
                     </div>
@@ -668,7 +668,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   {STATUS_CONFIG[viewingVendor.status || 'active'].label}
                 </span>
                 <div className="text-right">
-                  <p className="text-2xl font-black text-amber-600">₱{formatCurrency(vendorApBalances[viewingVendor.id] || 0)}</p>
+                  <p className="text-2xl font-black text-amber-600">{"\u20B1"}{formatCurrency(vendorApBalances[viewingVendor.id] || 0)}</p>
                   <p className="text-[10px] text-slate-400 uppercase font-semibold">Outstanding Balance</p>
                 </div>
               </div>

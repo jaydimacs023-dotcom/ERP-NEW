@@ -406,17 +406,17 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft Batches</p>
           <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">₱{formatCurrency(summaryMetrics.draftAmount)}</p>
+          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Pending / Submitted</p>
           <p className="text-2xl font-black mt-1 text-amber-600">{summaryMetrics.pendingCount}</p>
-          <p className="text-xs text-amber-500">₱{formatCurrency(summaryMetrics.pendingAmount)}</p>
+          <p className="text-xs text-amber-500">{"\u20B1"}{formatCurrency(summaryMetrics.pendingAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Processed</p>
           <p className="text-2xl font-black mt-1 text-emerald-600">{summaryMetrics.processedCount}</p>
-          <p className="text-xs text-emerald-500">₱{formatCurrency(summaryMetrics.processedAmount)}</p>
+          <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.processedAmount)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Total Transactions</p>
@@ -494,7 +494,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                         <span className="font-mono font-semibold text-slate-600">{batch.transactionCount}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">₱{formatCurrency(batch.totalAmount)}</span>
+                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(batch.totalAmount)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
@@ -669,7 +669,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                             </div>
                           </div>
                           <span className="font-mono text-sm font-semibold text-slate-600">
-                            ₱{formatCurrency(p.balance)}
+                            {"\u20B1"}{formatCurrency(p.balance)}
                           </span>
                         </div>
                       );
@@ -683,7 +683,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                 {formData.selectedPayableIds.length > 0 && (
                   <div className="flex justify-end">
                     <p className="text-sm font-semibold text-slate-600">
-                      Total: ₱{formatCurrency(
+                      Total: {"\u20B1"}{formatCurrency(
                         orgPayables
                           .filter(p => formData.selectedPayableIds.includes(p.id))
                           .reduce((sum, p) => sum + p.balance, 0)
@@ -725,7 +725,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800">{selectedBatch.batchNumber}</h3>
-                  <p className="text-xs text-slate-500">{selectedBatch.transactionCount} transactions • ₱{formatCurrency(selectedBatch.totalAmount)}</p>
+                  <p className="text-xs text-slate-500">{selectedBatch.transactionCount} transactions • {"\u20B1"}{formatCurrency(selectedBatch.totalAmount)}</p>
                 </div>
               </div>
               <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -769,7 +769,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                         <td className="px-4 py-3 text-sm text-slate-700">{txn.beneficiaryName}</td>
                         <td className="px-4 py-3 text-sm font-mono text-slate-600">{txn.beneficiaryAccount || '-'}</td>
                         <td className="px-4 py-3 text-sm text-slate-500">{txn.reference || '-'}</td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-slate-700">₱{formatCurrency(txn.amount)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(txn.amount)}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                             txn.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' :

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   GoodsReceipt, GoodsReceiptLine, GoodsReceiptStatus, PurchaseOrder, 
-  Vendor, ChartOfAccount, JournalEntry, JournalEntryLine
+  Vendor, ChartOfAccount, JournalEntry, JournalLine
 } from '../types';
 import EmptyState from '../components/EmptyState';
 import {
@@ -20,7 +20,7 @@ interface GoodsReceiptViewProps {
   onCreateGoodsReceipt: (gr: GoodsReceipt) => void;
   onUpdateGoodsReceipt: (id: string, updates: Partial<GoodsReceipt>) => void;
   onDeleteGoodsReceipt?: (id: string) => void;
-  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => void;
+  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -209,7 +209,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
       ) || accounts.find(a => a.accountClass === 'LIABILITY');
 
       if (inventoryAccount && grirAccount) {
-        const lines: JournalEntryLine[] = [
+        const lines: JournalLine[] = [
           {
             id: `jl-${Date.now()}-1`,
             journalEntryId: '',
@@ -338,12 +338,12 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft GRs</p>
           <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">₱{formatCurrency(summaryMetrics.draftValue)}</p>
+          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftValue)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Posted GRs</p>
           <p className="text-2xl font-black mt-1 text-emerald-600">{summaryMetrics.postedCount}</p>
-          <p className="text-xs text-emerald-500">₱{formatCurrency(summaryMetrics.postedValue)}</p>
+          <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest">Total Line Items</p>
@@ -424,7 +424,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                         <span className="font-mono font-semibold text-slate-600">{gr.lines.length}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">₱{formatCurrency(gr.totalValue)}</span>
+                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(gr.totalValue)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
@@ -515,7 +515,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                     <option value="">Select Purchase Order...</option>
                     {orgPOs.map(po => (
                       <option key={po.id} value={po.id}>
-                        {po.poNumber} - {getVendorName(po.vendorId)} (₱{formatCurrency(po.totalAmount || 0)})
+                        {po.poNumber} - {getVendorName(po.vendorId)} ({"\u20B1"}{formatCurrency(po.totalAmount || 0)})
                       </option>
                     ))}
                   </select>
@@ -595,10 +595,10 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                               />
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className="font-mono text-sm text-slate-600">₱{formatCurrency(line.unitPrice || 0)}</span>
+                              <span className="font-mono text-sm text-slate-600">{"\u20B1"}{formatCurrency(line.unitPrice || 0)}</span>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className="font-mono font-semibold text-sm text-slate-700">₱{formatCurrency(line.totalValue || 0)}</span>
+                              <span className="font-mono font-semibold text-sm text-slate-700">{"\u20B1"}{formatCurrency(line.totalValue || 0)}</span>
                             </td>
                           </tr>
                         ))}
@@ -607,7 +607,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                         <tr>
                           <td colSpan={4} className="px-4 py-3 text-right font-semibold text-slate-600">Total:</td>
                           <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                            ₱{formatCurrency(formData.lines.reduce((sum, l) => sum + (l.totalValue || 0), 0))}
+                            {"\u20B1"}{formatCurrency(formData.lines.reduce((sum, l) => sum + (l.totalValue || 0), 0))}
                           </td>
                         </tr>
                       </tfoot>
@@ -699,8 +699,8 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                           {line.itemCode && <p className="text-xs text-slate-400">{line.itemCode}</p>}
                         </td>
                         <td className="px-4 py-3 text-center font-mono text-sm">{line.receivedQuantity}</td>
-                        <td className="px-4 py-3 text-right font-mono text-sm">₱{formatCurrency(line.unitPrice)}</td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold">₱{formatCurrency(line.totalValue)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-sm">{"\u20B1"}{formatCurrency(line.unitPrice)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold">{"\u20B1"}{formatCurrency(line.totalValue)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -708,7 +708,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                     <tr>
                       <td colSpan={3} className="px-4 py-3 text-right font-semibold text-slate-600">Total:</td>
                       <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
-                        ₱{formatCurrency(selectedGR.totalValue)}
+                        {"\u20B1"}{formatCurrency(selectedGR.totalValue)}
                       </td>
                     </tr>
                   </tfoot>

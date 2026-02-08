@@ -117,7 +117,7 @@ async createVendor(vendor: any): Promise<any> {
   return this.insertToSupabaseRaw('vendors', filtered);
 }
 ```
-- Uses `camelToSnake()` for TypeScript→PostgreSQL field conversion
+- Uses `camelToSnake()` for TypeScriptâ†’PostgreSQL field conversion
 - Filters to schema using `filterToTableSchema()` with `isInsert: true`
 - Excludes auto-generated fields (created_at, updated_at) on insert
 - Returns camelCase vendor object
@@ -183,7 +183,7 @@ async getATCRates(atcItemId: string): Promise<any[]> {
 interface VendorsViewProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
-  lines: JournalEntryLine[];
+  lines: JournalLine[];
   onAddVendor?: (vendor: Vendor) => void;
   onUpdateVendor?: (id: string, updates: Partial<Vendor>) => void;
   onDeleteVendor?: (id: string) => void;
@@ -366,25 +366,25 @@ const handleDeleteVendor = async (id: string) => {
 
 ```
 User Action (Create/Update/Delete)
-    ↓
+    â†“
 VendorsView Component
-    ↓
+    â†“
 App.tsx Handler Function (handleAddVendor/handleUpdateVendor/handleDeleteVendor)
-    ↓
+    â†“
 Try Block:
   DataService.createVendor/updateVendor/deleteVendor()
-    ↓
+    â†“
   Supabase REST API (POST/PATCH/DELETE)
-    ↓
+    â†“
   PostgreSQL Database
-    ↓
+    â†“
   Update React State (setVendors)
-    ↓
+    â†“
   Show Success Notification
     
 Catch Block (on Error):
   Show Error Notification
-    ↓
+    â†“
   Fallback to Memory Storage (state update only)
 ```
 
@@ -434,9 +434,9 @@ The vendor module integrates with Philippines tax withholding standards:
 
 ### ATC Items
 Examples from database:
-- WI010: Professional fees (lawyers, CPAs) - individual ≤ P 3M
-- WC010: Professional fees - corporate ≤ P 720K
-- WI100: Rental payments (≥ P 10K annually)
+- WI010: Professional fees (lawyers, CPAs) - individual â‰¤ P 3M
+- WC010: Professional fees - corporate â‰¤ P 720K
+- WI100: Rental payments (â‰¥ P 10K annually)
 
 ### ATC Rates
 Each item has associated withholding rate:

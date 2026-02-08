@@ -142,7 +142,7 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('recurring_journal_entries'),
         this.fetchFromSupabase('chart_of_accounts'),
         this.fetchFromSupabase('journal_entries'),
-        this.fetchFromSupabase('journal_entry_lines'),
+        this.fetchFromSupabase('journal_lines'),
         this.fetchFromSupabase('payroll_runs'),
         this.fetchFromSupabase('payroll_lines'),
         this.fetchFromSupabase('audit_logs'),
@@ -3266,7 +3266,7 @@ export class SupabaseDataService implements IDataService {
     try {
       const payload = this.camelToSnake(line);
       delete payload.id;
-      const url = `${this.baseUrl}/journal_entry_lines`;
+      const url = `${this.baseUrl}/journal_lines`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3292,7 +3292,7 @@ export class SupabaseDataService implements IDataService {
         delete payload.id;
         return payload;
       });
-      const url = `${this.baseUrl}/journal_entry_lines`;
+      const url = `${this.baseUrl}/journal_lines`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3314,7 +3314,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateJournalLine called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/journal_entry_lines?id=eq.${id}`;
+      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
         headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
@@ -3335,7 +3335,7 @@ export class SupabaseDataService implements IDataService {
   async deleteJournalLine(id: string): Promise<void> {
     console.debug('[Supabase] deleteJournalLine called with id:', id);
     try {
-      const url = `${this.baseUrl}/journal_entry_lines?id=eq.${id}`;
+      const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
         headers: this.getHeaders()
@@ -3350,7 +3350,7 @@ export class SupabaseDataService implements IDataService {
   async getJournalLinesByEntry(entryId: string): Promise<any[]> {
     console.debug('[Supabase] getJournalLinesByEntry called with entryId:', entryId);
     try {
-      const url = `${this.baseUrl}/journal_entry_lines?journal_entry_id=eq.${entryId}&order=id.asc`;
+      const url = `${this.baseUrl}/journal_lines?journal_entry_id=eq.${entryId}&order=id.asc`;
       const response = await fetch(url, { headers: this.getHeaders() });
       if (!response.ok) return [];
       const data = await response.json();

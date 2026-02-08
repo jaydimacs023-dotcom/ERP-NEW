@@ -5,7 +5,7 @@
  */
 
 import { 
-  JournalEntry, JournalEntryLine, ChartOfAccount, 
+  JournalEntry, JournalLine, ChartOfAccount, 
   StockAdjustment, InventoryTransaction, GoodsReceipt,
   StockItem, InventoryLevel, AccountClass 
 } from '../types';
@@ -30,7 +30,7 @@ export class InventoryGLService {
     accounts: ChartOfAccount[],
     orgId: string,
     createdBy: string
-  ): { entry: Partial<JournalEntry>; lines: JournalEntryLine[] } | null {
+  ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
     // Get GL accounts
     const varianceAccount = accounts.find(a => 
       a.name.toLowerCase().includes('inventory variance') && 
@@ -58,7 +58,7 @@ export class InventoryGLService {
       createdBy,
     };
 
-    const lines: JournalEntryLine[] = isIncrement
+    const lines: JournalLine[] = isIncrement
       ? [
           // Increment: DR Inventory / CR Variance (reversal of expense)
           {
@@ -116,7 +116,7 @@ export class InventoryGLService {
     accounts: ChartOfAccount[],
     orgId: string,
     createdBy: string
-  ): { entry: Partial<JournalEntry>; lines: JournalEntryLine[] } | null {
+  ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
     const inventoryAccount = item.cogsAccountId 
       ? accounts.find(a => a.id === item.cogsAccountId)
       : accounts.find(a => a.name.toLowerCase().includes('inventory') && a.class === AccountClass.ASSET);
@@ -138,7 +138,7 @@ export class InventoryGLService {
 
     // Simple transfer: Both sides use same account (no subledger)
     // In advanced setups, create separate accounts per warehouse
-    const lines: JournalEntryLine[] = [
+    const lines: JournalLine[] = [
       {
         id: `l1-${entryId}`,
         journalEntryId: entryId,
@@ -173,7 +173,7 @@ export class InventoryGLService {
     orgId: string,
     createdBy: string,
     config?: GLConfig
-  ): { entry: Partial<JournalEntry>; lines: JournalEntryLine[] } | null {
+  ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
     const inventoryAccount = config?.inventoryAccountId
       ? accounts.find(a => a.id === config.inventoryAccountId)
       : accounts.find(a => a.name.toLowerCase().includes('inventory') && a.class === AccountClass.ASSET);
@@ -199,7 +199,7 @@ export class InventoryGLService {
       createdBy,
     };
 
-    const lines: JournalEntryLine[] = [
+    const lines: JournalLine[] = [
       {
         id: `l1-${entryId}`,
         journalEntryId: entryId,
@@ -236,7 +236,7 @@ export class InventoryGLService {
     createdBy: string,
     grNumber?: string,
     config?: GLConfig
-  ): { entry: Partial<JournalEntry>; lines: JournalEntryLine[] } | null {
+  ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
     const grirAccount = config?.grirClearingAccountId
       ? accounts.find(a => a.id === config.grirClearingAccountId)
       : accounts.find(a => 
@@ -263,7 +263,7 @@ export class InventoryGLService {
       createdBy,
     };
 
-    const lines: JournalEntryLine[] = [
+    const lines: JournalLine[] = [
       {
         id: `l1-${entryId}`,
         journalEntryId: entryId,
