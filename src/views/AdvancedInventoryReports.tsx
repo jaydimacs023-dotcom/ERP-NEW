@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
   JournalLine, AccountClass 
@@ -100,30 +100,30 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   const SEVERITY_COLORS = { Critical: '#EF4444', High: '#F97316', Medium: '#FBBF24', Low: '#86EFAC' };
 
   return (
-    <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-purple-600 rounded-2xl p-8 text-white">
-        <h1 className="text-3xl font-bold mb-2">Advanced Inventory Analytics</h1>
-        <p className="text-teal-100">Real-time stock valuation, aging, trends, and variance analysis</p>
+      <div className="bg-gradient-to-r from-[#F47721] to-purple-600 rounded p-8 text-white">
+        <h1 className="text-xl font-bold mb-2">Advanced Inventory Analytics</h1>
+        <p className="text-orange-100">Real-time stock valuation, aging, trends, and variance analysis</p>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-teal-500">
+        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-400">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-semibold">Total Inventory Value</p>
-              <p className="text-xl font-bold text-slate-900">{currency} {metricsReport.totalInventoryValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold">Total Inventory Value</p>
+              <p className="text-xl font-bold text-gray-900">{currency} {metricsReport.totalInventoryValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
-            <DollarSign size={28} className="text-teal-500" />
+            <DollarSign size={28} className="text-orange-500" />
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow p-4 border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-semibold">Items in Stock</p>
-              <p className="text-xl font-bold text-slate-900">{metricsReport.activeItems} / {metricsReport.itemCount}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold">Items in Stock</p>
+              <p className="text-xl font-bold text-gray-900">{metricsReport.activeItems} / {metricsReport.itemCount}</p>
             </div>
             <Package size={28} className="text-green-500" />
           </div>
@@ -132,8 +132,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="bg-white rounded-xl shadow p-4 border-l-4 border-amber-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-semibold">Turnover Ratio</p>
-              <p className="text-xl font-bold text-slate-900">{metricsReport.inventoryTurnover.toFixed(2)}x/yr</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold">Turnover Ratio</p>
+              <p className="text-xl font-bold text-gray-900">{metricsReport.inventoryTurnover.toFixed(2)}x/yr</p>
             </div>
             <Activity size={28} className="text-amber-500" />
           </div>
@@ -142,8 +142,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="bg-white rounded-xl shadow p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-semibold">DIO (Days)</p>
-              <p className="text-xl font-bold text-slate-900">{Math.round(metricsReport.daysInventoryOutstanding)}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold">DIO (Days)</p>
+              <p className="text-xl font-bold text-gray-900">{Math.round(metricsReport.daysInventoryOutstanding)}</p>
             </div>
             <Clock size={28} className="text-purple-500" />
           </div>
@@ -152,8 +152,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="bg-white rounded-xl shadow p-4 border-l-4 border-red-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-semibold">Annual Carry Cost</p>
-              <p className="text-xl font-bold text-slate-900">{currency} {metricsReport.annualCarryingCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold">Annual Carry Cost</p>
+              <p className="text-xl font-bold text-gray-900">{currency} {metricsReport.annualCarryingCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
             <TrendingDown size={28} className="text-red-500" />
           </div>
@@ -175,8 +175,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             onClick={() => setActiveTab(tab.id as any)}
             className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition flex items-center gap-2 ${
               activeTab === tab.id
-                ? 'bg-teal-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-[#F47721] text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             {tab.icon}
@@ -190,7 +190,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Stock Age Distribution</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Stock Age Distribution</h2>
               <button
                 onClick={() => {
                   const exportData = sortedAging.map(item => ({
@@ -203,7 +203,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportAgingReport(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -231,11 +231,11 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
 
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Detailed Aging Report</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Detailed Aging Report</h2>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 bg-slate-100 rounded-lg text-sm font-semibold text-slate-700"
+                className="px-3 py-2 bg-gray-100 rounded-lg text-sm font-semibold text-gray-700"
               >
                 <option value="value">Sort by Value</option>
                 <option value="days">Sort by Days</option>
@@ -245,28 +245,28 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 border-b border-slate-200">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Item Name</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Quantity</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Days in Stock</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Value</th>
-                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Category</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Code</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Item Name</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Quantity</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Days in Stock</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Value</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Category</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-200">
                   {sortedAging.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
-                      <td className="px-4 py-3 text-slate-700">{item.itemName}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{item.currentQuantity}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.daysInStock}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{currency} {item.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
+                      <td className="px-4 py-3 text-gray-700">{item.itemName}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{item.currentQuantity}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{item.daysInStock}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{currency} {item.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.ageCategory === 'Fresh' ? 'bg-green-100 text-green-700' :
-                          item.ageCategory === 'Active' ? 'bg-teal-100 text-teal-700' :
+                          item.ageCategory === 'Active' ? 'bg-orange-100 text-orange-700' :
                           item.ageCategory === 'Slow' ? 'bg-amber-100 text-amber-700' :
                           'bg-red-100 text-red-700'
                         }`}>
@@ -286,7 +286,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Valuation Method Comparison</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Valuation Method Comparison</h2>
               <button
                 onClick={() => {
                   const exportData = valuationReport.map(item => ({
@@ -300,32 +300,32 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportValuationComparison(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
               >
                 <Download size={14} /> Export CSV
               </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 border-b border-slate-200">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Item Code</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Qty</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">FIFO Value</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">LIFO Value</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">WAC Value</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Current Cost</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Item Code</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Qty</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">FIFO Value</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">LIFO Value</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">WAC Value</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Current Cost</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-200">
                   {valuationReport.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-teal-600 font-semibold">{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-[#F47721] font-semibold">{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-green-600 font-semibold">{currency} {item.lifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-purple-600 font-semibold">{currency} {item.weightedAvgValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{currency} {item.currentCostPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{currency} {item.currentCostPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -339,7 +339,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">12-Month Movement Trends</h2>
+              <h2 className="text-lg font-semibold text-gray-900">12-Month Movement Trends</h2>
               <button
                 onClick={() => {
                   const exportData = trendsReport.map(item => ({
@@ -351,7 +351,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportMovementTrends(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -375,7 +375,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Variance by Severity</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Variance by Severity</h2>
               <button
                 onClick={() => {
                   const exportData = varianceReport.map(item => ({
@@ -387,7 +387,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportVarianceAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -414,27 +414,27 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           </div>
 
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Detailed Variance Report</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Detailed Variance Report</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 border-b border-slate-200">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Expected</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Actual</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Variance %</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Value Impact</th>
-                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Severity</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Code</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Expected</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Actual</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Variance %</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Value Impact</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Severity</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-200">
                   {sortedVariance.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{item.expectedQuantity}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.actualQuantity}</td>
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{item.expectedQuantity}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{item.actualQuantity}</td>
                       <td className="px-4 py-3 text-right font-semibold">{item.variancePercent > 0 ? '+' : ''}{item.variancePercent.toFixed(1)}%</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{currency} {item.varianceValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{currency} {item.varianceValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.severity === 'Critical' ? 'bg-red-100 text-red-700' :
@@ -458,7 +458,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">ABC Classification by Annual Consumption Value</h2>
+              <h2 className="text-lg font-semibold text-gray-900">ABC Classification by Annual Consumption Value</h2>
               <button
                 onClick={() => {
                   const exportData = abcReport.map(item => ({
@@ -471,7 +471,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportABCAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -498,34 +498,34 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           </div>
 
           <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Items by Category</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Items by Category</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100 border-b border-slate-200">
+                <thead className="bg-gray-100 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Item Code</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Annual Consumption Value</th>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700">Cumulative %</th>
-                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Category</th>
-                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Management Focus</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Item Code</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Annual Consumption Value</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Cumulative %</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Category</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Management Focus</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-gray-200">
                   {abcReport.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{currency} {item.annualConsumptionValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.cumulativePercent.toFixed(1)}%</td>
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{currency} {item.annualConsumptionValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{item.cumulativePercent.toFixed(1)}%</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          item.category === 'A' ? 'bg-teal-100 text-teal-700' :
+                          item.category === 'A' ? 'bg-orange-100 text-orange-700' :
                           item.category === 'B' ? 'bg-green-100 text-green-700' :
                           'bg-amber-100 text-amber-700'
                         }`}>
                           {item.category}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{item.managementFocus}</td>
+                      <td className="px-4 py-3 text-gray-700">{item.managementFocus}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -539,27 +539,27 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Total Items</p>
-              <p className="text-2xl font-bold text-slate-900">{metricsReport.itemCount}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Total Items</p>
+              <p className="text-2xl font-bold text-gray-900">{metricsReport.itemCount}</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Active Items</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Active Items</p>
               <p className="text-2xl font-bold text-green-600">{metricsReport.activeItems}</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Inactive Items</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Inactive Items</p>
               <p className="text-2xl font-bold text-amber-600">{metricsReport.itemCount - metricsReport.activeItems}</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Inventory Turnover</p>
-              <p className="text-2xl font-bold text-slate-900">{metricsReport.inventoryTurnover.toFixed(2)}x/yr</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Inventory Turnover</p>
+              <p className="text-2xl font-bold text-gray-900">{metricsReport.inventoryTurnover.toFixed(2)}x/yr</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Days Inventory Outstanding</p>
-              <p className="text-2xl font-bold text-slate-900">{Math.round(metricsReport.daysInventoryOutstanding)} days</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Days Inventory Outstanding</p>
+              <p className="text-2xl font-bold text-gray-900">{Math.round(metricsReport.daysInventoryOutstanding)} days</p>
             </div>
             <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-xs text-slate-500 uppercase font-semibold mb-2">Annual Carry Cost</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Annual Carry Cost</p>
               <p className="text-2xl font-bold text-red-600">{currency} {(metricsReport.annualCarryingCost / 1000).toFixed(0)}k</p>
             </div>
           </div>
@@ -567,7 +567,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           {lowStockReport.length > 0 && (
             <div className="bg-white rounded-xl shadow p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <AlertTriangle size={20} className="text-orange-500" />
                   Low Stock Items ({lowStockReport.length})
                 </h2>
@@ -586,30 +586,30 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       ['Code', 'Item', 'Current Qty', 'Min Level', 'Deficit', 'Reorder Point']
                     );
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
                 >
                   <Download size={14} /> Export CSV
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-100 border-b border-slate-200">
+                  <thead className="bg-gray-100 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-700">Code</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Current</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Min Level</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Deficit</th>
-                      <th className="px-4 py-3 text-right font-semibold text-slate-700">Reorder Qty</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Code</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Current</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Min Level</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Deficit</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Reorder Qty</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
+                  <tbody className="divide-y divide-gray-200">
                     {lowStockReport.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 bg-orange-50">
-                        <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.currentQuantity}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-700">{item.minLevel}</td>
+                      <tr key={idx} className="hover:bg-gray-50 bg-orange-50">
+                        <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{item.currentQuantity}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{item.minLevel}</td>
                         <td className="px-4 py-3 text-right font-semibold text-red-600">{item.deficit}</td>
-                        <td className="px-4 py-3 text-right text-slate-700">{item.reorderQuantity}</td>
+                        <td className="px-4 py-3 text-right text-gray-700">{item.reorderQuantity}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
 import { WarehouseLocation } from '../types';
 
@@ -159,7 +159,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Warehouse Locations</h1>
+        <h1 className="text-xl text-gray-900 mb-2">Warehouse Locations</h1>
         <p className="text-gray-600">Manage physical storage locations for inventory</p>
       </div>
 
@@ -197,7 +197,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         <button
           onClick={handleAddClick}
           disabled={isLoading || submitting}
-          className="mb-6 flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Warehouse Location
@@ -224,7 +224,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   placeholder="e.g., WH-01"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -239,7 +239,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Main Warehouse"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="e.g., Building A, Floor 2"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -266,7 +266,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     disabled={submitting}
-                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed"
+                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm font-medium text-gray-700">Active Location</span>
                 </label>
@@ -286,7 +286,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 <Check className="w-4 h-4" />
                 {submitting ? 'Saving...' : 'Save Location'}
@@ -300,7 +300,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading warehouse locations...</p>
           </div>
         ) : activeLocations.length === 0 ? (
@@ -357,7 +357,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                         <button
                           onClick={() => handleEditClick(location)}
                           disabled={submitting}
-                          className="p-2 hover:bg-teal-50 text-teal-600 rounded hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />

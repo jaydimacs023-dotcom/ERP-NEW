@@ -348,7 +348,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                                     </>
                                  )}
                                  <div className="pt-2 border-t border-gray-200">
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide leading-tight">Executor: <span className="text-gray-600 font-semibold">{tx.createdBy || 'SYSTEM_DAEMON'}</span></p>
+                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide leading-tight">Executor: <span className="text-gray-600 font-semibold">{tx.createdBy || 'SYSTEM_DAEMON'}</span></p>
                                  </div>
                               </div>
                            </div>

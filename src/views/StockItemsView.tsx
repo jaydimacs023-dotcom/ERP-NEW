@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search } from 'lucide-react';
 import { StockItem, InventoryValuationMethod } from '../types';
 
@@ -194,7 +194,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Stock Items</h1>
+        <h1 className="text-xl text-gray-900 mb-2">Stock Items</h1>
         <p className="text-gray-600">Manage your inventory items and product catalog</p>
       </div>
 
@@ -227,7 +227,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
           <button
             onClick={handleAddClick}
             disabled={isLoading || submitting}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Item
@@ -241,7 +241,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             disabled={showForm}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50"
           />
         </div>
       </div>
@@ -264,7 +264,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   placeholder="e.g., SKU-001"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -277,7 +277,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Product Name"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -288,7 +288,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   <option value="STOCK_ITEM">Stock Item</option>
                   <option value="NON_STOCK_ITEM">Non-Stock Item (Service)</option>
@@ -304,7 +304,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.unitOfMeasure}
                   onChange={(e) => setFormData({ ...formData, unitOfMeasure: e.target.value })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   {UNITS.map((unit) => (
                     <option key={unit} value={unit}>
@@ -323,7 +323,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.valuationMethod}
                   onChange={(e) => setFormData({ ...formData, valuationMethod: e.target.value as InventoryValuationMethod })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   {VALUATION_METHODS.map((method) => (
                     <option key={method} value={method}>
@@ -344,7 +344,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.reorderLevel}
                   onChange={(e) => setFormData({ ...formData, reorderLevel: parseFloat(e.target.value) })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -359,7 +359,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.reorderQuantity}
                   onChange={(e) => setFormData({ ...formData, reorderQuantity: parseFloat(e.target.value) })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -374,7 +374,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   value={formData.safetyStock}
                   onChange={(e) => setFormData({ ...formData, safetyStock: parseFloat(e.target.value) })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -389,7 +389,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                   placeholder="Optional item description"
                   disabled={submitting}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
                 />
               </div>
 
@@ -401,7 +401,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     disabled={submitting}
-                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed"
+                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm font-medium text-gray-700">Active Item</span>
                 </label>
@@ -421,7 +421,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 <Check className="w-4 h-4" />
                 {submitting ? 'Saving...' : 'Save Item'}
@@ -435,7 +435,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading items...</p>
           </div>
         ) : filteredItems.length === 0 ? (
@@ -504,7 +504,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                         <button
                           onClick={() => handleEditClick(item)}
                           disabled={submitting}
-                          className="p-2 hover:bg-teal-50 text-teal-600 rounded hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />

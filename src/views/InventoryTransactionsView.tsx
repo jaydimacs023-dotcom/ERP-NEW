@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Download, Eye, X, ChevronDown } from 'lucide-react';
 import { InventoryTransaction, StockItem, InventoryTransactionType } from '../types';
 
@@ -27,7 +27,7 @@ const TRANSACTION_TYPE_LABELS: Record<InventoryTransactionType, string> = {
 
 const TRANSACTION_TYPE_COLORS: Record<InventoryTransactionType, string> = {
   PURCHASE: 'bg-green-100 text-green-800',
-  SALE: 'bg-teal-100 text-teal-800',
+  SALE: 'bg-orange-100 text-orange-800',
   ADJUSTMENT: 'bg-yellow-100 text-yellow-800',
   TRANSFER: 'bg-purple-100 text-purple-800',
   RETURN: 'bg-orange-100 text-orange-800',
@@ -148,7 +148,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Inventory Transactions</h1>
+        <h1 className="text-xl text-gray-900 mb-2">Inventory Transactions</h1>
         <p className="text-gray-600">Complete audit trail of all stock movements</p>
       </div>
 
@@ -162,9 +162,9 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <p className="text-xs text-green-700 font-medium mb-1">Purchases</p>
           <p className="text-xl font-bold text-green-600">{summaries.purchases}</p>
         </div>
-        <div className="bg-white p-3 rounded-lg border border-teal-200 shadow-sm">
-          <p className="text-xs text-teal-700 font-medium mb-1">Sales</p>
-          <p className="text-xl font-bold text-teal-600">{summaries.sales}</p>
+        <div className="bg-white p-3 rounded-lg border border-orange-200 shadow-sm">
+          <p className="text-xs text-orange-700 font-medium mb-1">Sales</p>
+          <p className="text-xl font-bold text-[#F47721]">{summaries.sales}</p>
         </div>
         <div className="bg-white p-3 rounded-lg border border-red-200 shadow-sm">
           <p className="text-xs text-red-700 font-medium mb-1">Damage/Writeoff</p>
@@ -180,7 +180,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <select
             value={selectedTypeFilter}
             onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
             <option value="ALL">All Types</option>
             {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
@@ -197,7 +197,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <select
             value={selectedItemFilter}
             onChange={(e) => setSelectedItemFilter(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
             <option value="ALL">All Items</option>
             {uniqueItems.map((itemId) => {
@@ -217,7 +217,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
             <option value="date">Date</option>
             <option value="item">Item</option>
@@ -231,7 +231,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
             <option value="desc">Newest First</option>
             <option value="asc">Oldest First</option>
@@ -255,7 +255,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
       <div className="space-y-3">
         {isLoading ? (
           <div className="p-8 text-center bg-white rounded-lg border border-gray-200">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading transactions...</p>
           </div>
         ) : filteredTransactions.length === 0 ? (

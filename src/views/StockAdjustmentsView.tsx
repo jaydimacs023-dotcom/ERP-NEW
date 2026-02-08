@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
 import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine } from '../types';
 import { InventoryService } from '../services/InventoryService';
@@ -232,7 +232,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
       case 'WRITEOFF':
         return 'bg-orange-100 text-orange-800';
       case 'CORRECTION':
-        return 'bg-teal-100 text-teal-800';
+        return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -242,7 +242,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Stock Adjustments</h1>
+        <h1 className="text-xl text-gray-900 mb-2">Stock Adjustments</h1>
         <p className="text-gray-600">Record inventory variances, damage, and write-offs</p>
       </div>
 
@@ -275,7 +275,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
           <button
             onClick={handleAddClick}
             disabled={isLoading || submitting}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Plus className="w-4 h-4" />
             Record Adjustment
@@ -289,7 +289,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             disabled={showForm}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50"
           />
         </div>
       </div>
@@ -310,7 +310,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   value={formData.stockItemId}
                   onChange={(e) => setFormData({ ...formData, stockItemId: e.target.value })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select an item...</option>
                   {stockItems.map((item) => (
@@ -330,7 +330,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   value={formData.warehouseLocationId}
                   onChange={(e) => setFormData({ ...formData, warehouseLocationId: e.target.value })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a location...</option>
                   {activeLocations.map((loc) => (
@@ -348,7 +348,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   value={formData.adjustmentType}
                   onChange={(e) => setFormData({ ...formData, adjustmentType: e.target.value as any })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   {ADJUSTMENT_TYPES.map((type) => (
                     <option key={type} value={type}>
@@ -368,7 +368,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -381,7 +381,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                   placeholder="e.g., Physical count variance"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -394,7 +394,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   placeholder="Optional notes about the adjustment"
                   disabled={submitting}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
                 />
               </div>
 
@@ -406,7 +406,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                     checked={formData.isApproved}
                     onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
                     disabled={submitting}
-                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed"
+                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm font-medium text-gray-700">Mark as Approved</span>
                 </label>
@@ -426,7 +426,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 <Check className="w-4 h-4" />
                 {submitting ? 'Saving...' : 'Save Adjustment'}
@@ -463,7 +463,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                 });
                 DataExportService.exportStockAdjustments(exportData, currency);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
             >
               <Download size={14} /> Export CSV
             </button>
@@ -471,7 +471,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
         )}
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading adjustments...</p>
           </div>
         ) : filteredAdjustments.length === 0 ? (
@@ -554,7 +554,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                             Posted
                           </span>
                         ) : adj.isApproved ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
                             <AlertCircle className="w-3 h-3" />
                             Ready
                           </span>
@@ -583,7 +583,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                           <button
                             onClick={() => handleEditClick(adj)}
                             disabled={submitting}
-                            className="p-2 hover:bg-teal-50 text-teal-600 rounded hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="w-4 h-4" />

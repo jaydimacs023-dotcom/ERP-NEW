@@ -430,7 +430,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   </div>
                </div>
                <div className="text-right">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5 font-bold"><MapPin size={12} /> COORDINATES_VERIFIED</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5"><MapPin size={12} /> COORDINATES_VERIFIED</p>
                   <p className="text-xs font-bold text-gray-300 italic mt-1 uppercase">Snapshot: {new Date().toLocaleString()}</p>
                </div>
            </div>

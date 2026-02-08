@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, AlertTriangle } from 'lucide-react';
 import { ReorderPoint, StockItem, InventoryLevel } from '../types';
 
@@ -213,7 +213,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Reorder Management</h1>
+        <h1 className="text-xl text-gray-900 mb-2">Reorder Management</h1>
         <p className="text-gray-600">Configure minimum and maximum stock levels for automatic reordering</p>
       </div>
 
@@ -258,7 +258,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
         <button
           onClick={handleAddClick}
           disabled={isLoading || submitting}
-          className="mb-6 flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Reorder Point
@@ -281,7 +281,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   value={formData.stockItemId}
                   onChange={(e) => setFormData({ ...formData, stockItemId: e.target.value })}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select an item...</option>
                   {stockItems.map((item) => (
@@ -305,7 +305,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, minimumLevel: parseFloat(e.target.value) })}
                   placeholder="e.g., 100"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-600 mt-1">When stock falls below this, reorder is triggered</p>
               </div>
@@ -323,7 +323,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, maximumLevel: parseFloat(e.target.value) })}
                   placeholder="e.g., 500"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-600 mt-1">Target stock level to maintain</p>
               </div>
@@ -341,7 +341,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, reorderQuantity: parseFloat(e.target.value) })}
                   placeholder="e.g., 200"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-600 mt-1">Standard purchase order quantity</p>
               </div>
@@ -358,7 +358,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, leadTimeDays: parseInt(e.target.value) })}
                   placeholder="e.g., 7"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-600 mt-1">Days from order to delivery</p>
               </div>
@@ -376,7 +376,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                   onChange={(e) => setFormData({ ...formData, economicOrderQuantity: parseFloat(e.target.value) })}
                   placeholder="Optional"
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-600 mt-1">Optimal order size (calculated automatically)</p>
               </div>
@@ -389,7 +389,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     disabled={submitting}
-                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed"
+                    className="w-4 h-4 rounded border-gray-300 focus:ring-2 focus:ring-orange-400 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm font-medium text-gray-700">Active</span>
                 </label>
@@ -409,7 +409,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 <Check className="w-4 h-4" />
                 {submitting ? 'Saving...' : 'Save Reorder Point'}
@@ -423,7 +423,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading reorder points...</p>
           </div>
         ) : itemsNeedingReorder.length === 0 ? (
@@ -498,7 +498,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                         <button
                           onClick={() => handleEditClick(item.reorderPoint)}
                           disabled={submitting}
-                          className="p-2 hover:bg-teal-50 text-teal-600 rounded hover:text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />

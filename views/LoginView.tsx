@@ -185,7 +185,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
               <button 
                 disabled={loading}
-                className="w-full py-3.5 bg-[#F47721] text-white rounded text-sm font-semibold uppercase tracking-wide shadow-md shadow-gray-300/30 hover:bg-[#F47721] active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-[#F47721] text-white rounded text-sm font-semibold uppercase tracking-wide shadow-md shadow-gray-300/30 hover:bg-[#E06610] active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -234,7 +234,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Legal Institutional Title</label>
                   <input 
                     required placeholder="e.g. Phoenix Skills Center"
-                    className="w-full px-6 py-5 bg-gray-700/50 border-2 border-gray-600 rounded-md text-gray-200 text-sm font-bold outline-none focus:border-orange-400 transition-all"
+                    className="w-full px-4 py-3.5 bg-gray-700/50 border-2 border-gray-600 rounded text-gray-200 text-sm font-medium outline-none focus:border-orange-400 transition-all"
                     value={regOrgName} onChange={e => setRegOrgName(e.target.value)}
                   />
                 </div>
@@ -243,7 +243,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Workspace Email (Primary Admin)</label>
                   <input 
                     type="email" required placeholder="admin@center.ph"
-                    className="w-full px-6 py-5 bg-gray-700/50 border-2 border-gray-600 rounded-md text-gray-200 text-sm font-bold outline-none focus:border-orange-400 transition-all"
+                    className="w-full px-4 py-3.5 bg-gray-700/50 border-2 border-gray-600 rounded text-gray-200 text-sm font-medium outline-none focus:border-orange-400 transition-all"
                     value={regEmail} onChange={e => setRegEmail(e.target.value)}
                   />
                 </div>
@@ -252,7 +252,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                    <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Currency</label>
                     <select 
-                      className="w-full px-6 py-5 bg-gray-700/50 border-2 border-gray-600 rounded-md text-gray-200 text-sm font-semibold outline-none appearance-none"
+                      className="w-full px-4 py-3.5 bg-gray-700/50 border-2 border-gray-600 rounded text-gray-200 text-sm font-medium outline-none appearance-none"
                       value={regCurrency} onChange={e => setRegCurrency(e.target.value)}
                     >
                       <option value="PHP">PHP</option>
@@ -264,7 +264,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">Admin Pass</label>
                     <input 
                       type="password" required placeholder="••••••••" minLength={8}
-                      className="w-full px-6 py-5 bg-gray-700/50 border-2 border-gray-600 rounded-md text-gray-200 text-sm font-bold outline-none focus:border-orange-400 transition-all"
+                      className="w-full px-4 py-3.5 bg-gray-700/50 border-2 border-gray-600 rounded text-gray-200 text-sm font-medium outline-none focus:border-orange-400 transition-all"
                       value={regPassword} onChange={e => setRegPassword(e.target.value)}
                     />
                   </div>
@@ -308,7 +308,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
               <button 
                 disabled={loading}
-                className="w-full py-5 bg-[#F47721] text-white rounded text-sm font-semibold uppercase tracking-wide shadow-md hover:bg-[#F47721] active:scale-95 transition-all flex items-center justify-center gap-3"
+                className="w-full py-3.5 bg-[#F47721] text-white rounded text-sm font-semibold uppercase tracking-wide shadow-md hover:bg-[#E06610] active:scale-95 transition-all flex items-center justify-center gap-3"
               >
                 {loading ? 'Initializing...' : 'Launch Professional Instance'}
               </button>
