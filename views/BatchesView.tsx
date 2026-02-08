@@ -287,11 +287,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <Layers className="text-teal-600" size={28} />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
             Training Batches
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Institutional program monitoring with hour-based compliance tracking.</p>

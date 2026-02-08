@@ -100,11 +100,11 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   const SEVERITY_COLORS = { Critical: '#EF4444', High: '#F97316', Medium: '#FBBF24', Low: '#86EFAC' };
 
   return (
-    <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
+    <div className="space-y-8 pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-purple-600 rounded-2xl p-8 text-white">
-        <h1 className="text-3xl font-bold mb-2">Advanced Inventory Analytics</h1>
-        <p className="text-teal-100">Real-time stock valuation, aging, trends, and variance analysis</p>
+      <div>
+        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Advanced Inventory Analytics</h2>
+        <p className="text-sm text-slate-500 font-normal italic">Real-time stock valuation, aging, trends, and variance analysis.</p>
       </div>
 
       {/* Key Metrics */}

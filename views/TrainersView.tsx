@@ -169,7 +169,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-8 relative">
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
         {toasts.map(toast => (
@@ -199,8 +199,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <GraduationCap className="text-teal-600" size={28} />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
             Professional Trainers
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">TVET Instructor Registry & Certification Tracking</p>

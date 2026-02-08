@@ -35,10 +35,10 @@ const Ledger: React.FC<LedgerProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Journal Entries</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Journal Entries</h2>
           <p className="text-sm text-slate-400 font-medium">Complete transactional audit history and manual double-entry postings.</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">

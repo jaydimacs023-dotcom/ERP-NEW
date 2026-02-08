@@ -160,7 +160,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Payroll Processing Console</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Payroll Processing Console</h2>
           <p className="text-sm text-slate-500 font-normal italic">Automated salary disbursement and statutory liability recognition.</p>
         </div>
         <button 

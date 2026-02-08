@@ -310,7 +310,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-8 relative">
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
         {toasts.map(toast => (
@@ -340,7 +340,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Learner Ledger</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Student Information System</h2>
           <p className="text-sm text-slate-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.1)</p>
         </div>
         <div className="flex items-center gap-3">

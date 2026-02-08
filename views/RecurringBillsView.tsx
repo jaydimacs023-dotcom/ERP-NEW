@@ -224,7 +224,14 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Recurring Bills & Automation</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Automate monthly institutional expenses and recurring vendor obligations.</p>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-6 gap-4">
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">

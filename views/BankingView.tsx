@@ -225,7 +225,7 @@ const BankingView: React.FC<BankingViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Banking & Treasury</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Banking & Treasury</h2>
           <p className="text-sm text-slate-500 font-normal italic">Institutional liquidity management and bank-to-ledger reconciliation.</p>
         </div>
         <div className="flex flex-wrap gap-2 no-print">

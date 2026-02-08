@@ -282,10 +282,10 @@ const ARView: React.FC<ARViewProps> = ({
   const formatCurrency = (val: number) => `\u20B1 ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Receivables & Revenue Cycle</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Receivables & Revenue Cycle</h2>
           <p className="text-sm text-slate-500 font-normal italic">Monitor institutional cash inflows and analyzed aging debt buckets.</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">

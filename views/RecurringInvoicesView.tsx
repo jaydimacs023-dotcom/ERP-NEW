@@ -117,10 +117,13 @@ export default function RecurringInvoicesView({
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD'
-    }).format(amount);
+    // Explicitly handle symbols to stay consistent with institutional layout
+    const symbol = currency === 'PHP' ? '\u20B1' : currency === 'USD' ? '$' : '';
+    const formatted = Math.abs(amount).toLocaleString(undefined, { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+    return `${amount < 0 ? '-' : ''}${symbol}${formatted}`;
   };
 
   // Calculate totals from line items
@@ -287,20 +290,18 @@ export default function RecurringInvoicesView({
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Recurring Invoices</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Automate your customer billing with recurring invoices
-          </p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Recurring Invoices</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Automate customer billing cycles and recurring revenue recognition.</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-bold text-sm active:scale-95"
         >
-          <Plus className="w-4 h-4" />
+          <Plus size={18} />
           New Recurring Invoice
         </button>
       </div>
@@ -334,15 +335,15 @@ export default function RecurringInvoicesView({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="text-sm text-gray-500">Total Active</div>
-          <div className="text-2xl font-bold text-green-600">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Active Templates</div>
+          <div className="text-2xl font-mono font-black text-teal-600 tracking-tighter">
             {recurringInvoices.filter(i => i.status === 'ACTIVE').length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="text-sm text-gray-500">Monthly Revenue</div>
-          <div className="text-2xl font-bold text-teal-600">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monthly Recurring Revenue</div>
+          <div className="text-2xl font-mono font-black text-teal-600 tracking-tighter">
             {formatCurrency(
               recurringInvoices
                 .filter(i => i.status === 'ACTIVE' && i.frequency === 'MONTHLY')
@@ -350,28 +351,28 @@ export default function RecurringInvoicesView({
             )}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="text-sm text-gray-500">Due Today</div>
-          <div className="text-2xl font-bold text-orange-600">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cycles Due Today</div>
+          <div className="text-2xl font-mono font-black text-amber-600 tracking-tighter">
             {recurringInvoices.filter(i => RecurringInvoiceService.isDueToRun(i)).length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="text-sm text-gray-500">Total Generated</div>
-          <div className="text-2xl font-bold text-gray-700">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Life-time Issuance</div>
+          <div className="text-2xl font-mono font-black text-slate-900 tracking-tighter">
             {recurringInvoices.reduce((sum, i) => sum + (i.totalInvoicesGenerated || 0), 0)}
           </div>
         </div>
       </div>
 
       {/* Invoices Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <table className="min-w-full divide-y divide-slate-100">
+          <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Invoice Name</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
+              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Invoice</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>

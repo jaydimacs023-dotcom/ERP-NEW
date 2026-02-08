@@ -140,7 +140,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Toast Notifications */}
       {toasts.length > 0 && (
         <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
@@ -176,8 +176,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <Box className="text-teal-600" size={28} />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
             Fixed Asset Management
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Monitor institutional capital investments and automated depreciation schedules.</p>

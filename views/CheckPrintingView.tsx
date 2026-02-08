@@ -404,10 +404,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <FileText className="text-teal-600" size={28} />
-            Check Voucher Management
-          </h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Check Voucher Management</h2>
           <p className="text-sm text-slate-500 font-normal italic">Prepare, print, and track check payments.</p>
         </div>
         <div className="flex gap-2">

@@ -72,10 +72,10 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">HR / Staff Registry</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">HR / Staff Registry</h2>
           <p className="text-sm text-slate-500 font-normal italic">Institutional human resource master records and compensation templates.</p>
         </div>
         <button 

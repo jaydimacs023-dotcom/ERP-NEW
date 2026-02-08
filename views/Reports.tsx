@@ -142,9 +142,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   const activeQualification = qualifications.find(q => q.id === selectedQualificationId);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20 print:m-0 print:p-0">
+    <div className="pb-20 animate-in fade-in duration-500">
       {/* Print-Only Confidentiality Watermark */}
-      <div className="hidden print:flex justify-between items-center mb-8 border-b-2 border-slate-900 pb-6">
+      <div className="hidden print:flex justify-between items-center mb-12 border-b-2 border-slate-900 pb-8">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 rounded-full border-2 border-slate-900 flex items-center justify-center overflow-hidden shrink-0">
              {logoUrl ? (
@@ -164,7 +164,15 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
+      <div className="space-y-8">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 no-print">
+          <div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Financial Reports</h2>
+            <p className="text-sm text-slate-500 font-normal italic">Standardized statements and regulatory reporting for educational institutions.</p>
+          </div>
+        </header>
+
+        <div className="flex flex-col gap-6 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="flex bg-slate-100 rounded-2xl p-1.5 border border-slate-200 flex-wrap">
             <ReportTab active={reportType === 'BS'} onClick={() => { setReportType('BS'); setSelectedQualificationId(''); }} label="Balance Sheet" />
@@ -482,6 +490,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
         </div>
       </div>
       )}
+    </div>
     </div>
   );
 };

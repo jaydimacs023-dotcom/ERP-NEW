@@ -105,11 +105,10 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
-            <Archive className="text-teal-600" />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
             Archived Records
           </h2>
           <p className="text-sm text-slate-500 font-normal italic mt-1">

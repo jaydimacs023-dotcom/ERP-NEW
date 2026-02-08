@@ -12,10 +12,10 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs }) => {
   // Filter logs for current organization
   const orgLogs = logs.filter(log => log.orgId === orgId);
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Organization Audit Trail</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Organization Audit Trail</h2>
           <p className="text-sm text-slate-500">{orgLogs.length} audit records for this organization</p>
         </div>
         <div className="bg-emerald-50 text-teal-700 px-4 py-2 rounded-lg border border-teal-200 flex items-center gap-2 text-sm font-medium">

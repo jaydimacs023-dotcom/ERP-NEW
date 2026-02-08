@@ -199,8 +199,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3 uppercase">
-            <CalendarClock className="text-teal-600" size={32} />
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
             Institutional Capacity Engine
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Trainer workload matrix and resource allocation optimization.</p>

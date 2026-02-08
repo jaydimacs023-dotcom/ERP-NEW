@@ -204,7 +204,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Data Backup & Restore</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Data Backup & Restore</h2>
           <p className="text-sm text-slate-500 font-normal italic mt-2">
             Comprehensive per-organization backup and disaster recovery
           </p>

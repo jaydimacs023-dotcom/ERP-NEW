@@ -291,14 +291,11 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
   const getPONumber = (poId: string) => orgPOs.find(p => p.id === poId)?.poNumber || purchaseOrders.find(p => p.id === poId)?.poNumber || 'Unknown';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <Package className="text-teal-600" size={28} />
-            Goods Receipt (GR/IR)
-          </h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Goods Receipt (GR/IR)</h2>
           <p className="text-sm text-slate-500 font-normal italic">Receive goods against Purchase Orders with GR/IR clearing integration.</p>
         </div>
         <button 

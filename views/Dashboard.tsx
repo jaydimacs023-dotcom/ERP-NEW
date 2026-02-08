@@ -52,7 +52,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
   };
 
   return (
-    <div className="space-y-8 pb-20 animate-in fade-in duration-500">
+    <div className="pb-20 animate-in fade-in duration-500">
       {/* Print Only Header */}
       <div className="hidden print:block mb-8 border-b-2 border-slate-900 pb-4">
          <h1 className="text-2xl font-black uppercase tracking-tight">Institutional Performance Briefing</h1>
@@ -61,20 +61,21 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
          </p>
       </div>
 
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Performance Console</h2>
-          <p className="text-sm text-slate-400 font-medium mt-1">Real-time analytical oversight and liquidity metrics.</p>
-        </div>
-        <button 
-          onClick={handlePrint}
-          className="no-print flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
-        >
-          <Printer size={16} /> Print Briefing
-        </button>
-      </header>
+      <div className="space-y-8">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="no-print">
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Performance Console</h2>
+            <p className="text-sm text-slate-400 font-medium mt-1">Real-time analytical oversight and liquidity metrics.</p>
+          </div>
+          <button 
+            onClick={handlePrint}
+            className="no-print flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+          >
+            <Printer size={16} /> Print Briefing
+          </button>
+        </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={18} />} color="teal" />
         <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={18} />} color="emerald" />
         <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={18} />} color="rose" />
@@ -192,6 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
           </table>
         </div>
       </div>
+    </div>
     </div>
   );
 };

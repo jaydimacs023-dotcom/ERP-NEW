@@ -81,7 +81,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Fiscal Oversight & Budgeting</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Fiscal Oversight & Budgeting</h2>
           <p className="text-sm text-slate-500 font-normal italic">Monitor institutional performance targets and actual ledger utilization.</p>
         </div>
         <div className="flex gap-3">

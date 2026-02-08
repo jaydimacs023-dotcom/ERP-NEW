@@ -395,8 +395,8 @@ export default function RevenueRecognitionView({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Revenue Recognition</h1>
-          <p className="text-sm text-gray-500">Manage deferred revenue and recognition schedules</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Revenue Recognition</h2>
+          <p className="text-sm text-slate-500 font-normal italic">Manage deferred revenue and recognition schedules</p>
         </div>
         <div className="flex gap-2">
           {summary.dueForRecognition > 0 && (

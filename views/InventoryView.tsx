@@ -129,8 +129,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl text-gray-900 mb-2">Inventory Dashboard</h1>
-        <p className="text-gray-600">Real-time stock status and alerts</p>
+        <h2 className="text-3xl font-black text-slate-800 tracking-tight">Inventory Dashboard</h2>
+        <p className="text-slate-500 font-normal italic">Real-time stock status and proactive replenishment alerts.</p>
       </div>
 
       {/* Summary Cards */}

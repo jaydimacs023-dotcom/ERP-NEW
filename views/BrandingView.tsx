@@ -53,13 +53,10 @@ const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) =
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-brand-light text-brand rounded-lg shadow-sm">
-            <Palette size={24} />
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Identity & Motif</h1>
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Identity & Motif</h2>
         </div>
-        <p className="text-slate-500 font-medium italic">Customize the system appearance to align with your institutional brand identity.</p>
+        <p className="text-slate-500 font-medium italic mt-1">Customize the system appearance to align with your institutional brand identity.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

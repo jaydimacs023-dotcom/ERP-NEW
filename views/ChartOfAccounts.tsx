@@ -261,10 +261,10 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
   const isNominal = formData.class === AccountClass.REVENUE || formData.class === AccountClass.EXPENSE;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chart of Accounts</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Chart of Accounts</h2>
           <p className="text-sm text-slate-500 font-medium">Configure your financial reporting hierarchy and manage sub-account availability.</p>
         </div>
         <button 

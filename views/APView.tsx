@@ -301,7 +301,7 @@ const APView: React.FC<APViewProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Payables & Procurement</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Payables & Procurement</h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage supplier liabilities and monitor procurement credit cycles.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

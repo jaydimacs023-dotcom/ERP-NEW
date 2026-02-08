@@ -387,10 +387,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <Zap className="text-violet-600" size={28} />
-            EFT Batch Management
-          </h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">EFT Batch Management</h2>
           <p className="text-sm text-slate-500 font-normal italic">Create and manage electronic fund transfer batches.</p>
         </div>
         <button 
