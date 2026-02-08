@@ -846,4 +846,20 @@ export class MockDataService implements IDataService {
   async deleteEntity(table: string, id: string): Promise<void> {
     console.warn(`[MockDataService] deleteEntity for ${table} is memory-only.`);
   }
+
+  async archiveEntity(table: string, id: string, userId: string): Promise<void> {
+    console.warn(`[MockDataService] archiveEntity for ${table} (id: ${id})`);
+  }
+
+  async restoreEntity(table: string, id: string): Promise<void> {
+    console.warn(`[MockDataService] restoreEntity for ${table} (id: ${id})`);
+  }
+
+  async permanentDeleteEntity(table: string, id: string): Promise<void> {
+    console.warn(`[MockDataService] permanentDeleteEntity for ${table} (id: ${id})`);
+  }
+
+  async checkUsage(table: string, id: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    return { isUsed: false, usedIn: [] };
+  }
 }

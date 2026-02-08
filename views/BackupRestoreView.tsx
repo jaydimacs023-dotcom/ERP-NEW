@@ -142,11 +142,8 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
     setIsRestoringBackup(true);
     try {
-      // Prepare data for restoration
-      const preparedData = BackupRestoreService.prepareRestoreData(selectedBackup);
-
       // Perform restoration
-      await onRestore(selectedBackup.data);
+      await onRestore(selectedBackup);
 
       // Update local backup list
       const restoredBackupFile: BackupFile = {

@@ -62,6 +62,7 @@ import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import BackupRestoreView from './views/BackupRestoreView';
 import RecurringInvoicesView from './views/RecurringInvoicesView';
 import RevenueRecognitionView from './views/RevenueRecognitionView';
+import ArchiveView from './views/ArchiveView';
 
 // Lucide Icons
 import { 
@@ -73,7 +74,7 @@ import {
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
-  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp
+  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp, Archive
 } from 'lucide-react';
 
 export default function App() {
@@ -157,16 +158,31 @@ export default function App() {
 
     const handleDeleteRecurringInvoice = async (id: string) => {
       try {
-        console.info('[App] Deleting recurring invoice:', id);
+        console.info('[App] Archiving recurring invoice:', id);
         const existing = recurringInvoices.find(e => e.id === id);
-        await dataService.deleteRecurringInvoice(id);
+        
+        // Proceed with archival
+        await dataService.archiveEntity('RECURRING_INVOICES', id, currentUser?.id || 'system');
+        
+        // Update local state
         setRecurringInvoices(prev => prev.filter(e => e.id !== id));
-        // Audit: Recurring invoice deleted
-        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', id, existing?.invoiceName);
-        handleNotify('success', 'Recurring invoice deleted successfully');
+        
+        // Audit: Recurring invoice archived
+        AuditService.archive(
+          currentOrgId, 
+          currentUser?.id || 'system', 
+          currentUser?.name || 'System', 
+          'RECURRING_INVOICE', 
+          id, 
+          existing?.invoiceName
+        );
+        
+        handleNotify('success', 'Recurring invoice moved to archive');
+        return true;
       } catch (error) {
-        console.error('[App] Error deleting recurring invoice:', error);
-        handleNotify('error', `Failed to delete recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('[App] Error archiving recurring invoice:', error);
+        handleNotify('error', `Failed to archive recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return false;
       }
     };
 
@@ -245,15 +261,31 @@ export default function App() {
 
     const handleDeleteRevenueSchedule = async (id: string) => {
       try {
-        console.info('[App] Deleting revenue schedule:', id);
+        console.info('[App] Archiving revenue schedule:', id);
         const existing = revenueSchedules.find(e => e.id === id);
-        await dataService.deleteRevenueSchedule(id);
+
+        // Proceed with archival
+        await dataService.archiveEntity('REVENUE_SCHEDULES', id, currentUser?.id || 'system');
+        
+        // Update local state
         setRevenueSchedules(prev => prev.filter(e => e.id !== id));
-        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description);
-        handleNotify('success', 'Revenue schedule deleted successfully');
+        
+        // Audit: Revenue schedule archived
+        AuditService.archive(
+          currentOrgId, 
+          currentUser?.id || 'system', 
+          currentUser?.name || 'System', 
+          'REVENUE_SCHEDULE', 
+          id, 
+          existing?.description
+        );
+        
+        handleNotify('success', 'Revenue schedule moved to archive');
+        return true;
       } catch (error) {
-        console.error('[App] Error deleting revenue schedule:', error);
-        handleNotify('error', `Failed to delete revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('[App] Error archiving revenue schedule:', error);
+        handleNotify('error', `Failed to archive revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return false;
       }
     };
 
@@ -706,20 +738,39 @@ export default function App() {
 
   const handleDeletePayable = async (id: string) => {
     try {
-      console.info('[App] Deleting payable:', id);
+      console.info('[App] Archiving payable:', id);
       const existing = payables.find(p => p.id === id);
-      await dataService.deletePayable(id);
+
+      // Check usage (Payments)
+      const usage = await dataService.checkUsage('PAYABLES', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive payable. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('PAYABLES', id, currentUser?.id || 'system');
+      
+      // Update local state
       setPayables(prev => prev.filter(p => p.id !== id));
       
-      // Audit: Payable deleted
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', id, existing?.payableNumber);
+      // Audit: Payable archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'PAYABLE', 
+        id, 
+        existing?.payableNumber
+      );
       
-      handleNotify('success', 'Payable deleted successfully');
+      handleNotify('success', 'Payable moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting payable:', error);
-      handleNotify('error', 'Failed to delete payable. Falling back to memory storage.');
-      // Fallback to memory storage (soft delete)
-      setPayables(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
+      console.error('[App] Error archiving payable:', error);
+      handleNotify('error', 'Failed to archive payable.');
+      return false;
     }
   };
 
@@ -803,20 +854,39 @@ export default function App() {
 
   const handleDeleteOrganization = async (id: string) => {
     try {
-      console.info('[App] Deleting organization:', id);
+      console.info('[App] Archiving organization:', id);
       const existing = organizations.find(o => o.id === id);
-      await dataService.deleteOrganization(id);
+
+      // Check usage (Users, Data)
+      const usage = await dataService.checkUsage('ORGANIZATIONS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive organization. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('ORGANIZATIONS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setOrganizations(prev => prev.filter(o => o.id !== id));
       
-      // Audit: Organization deleted
-      AuditService.hardDelete(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name);
+      // Audit: Organization archived
+      AuditService.archive(
+        id, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'ORGANIZATION', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Organization deleted successfully');
+      handleNotify('success', 'Organization moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting organization:', error);
-      handleNotify('error', 'Failed to delete organization. Falling back to memory storage.');
-      // Fallback to memory storage
-      setOrganizations(prev => prev.filter(o => o.id !== id));
+      console.error('[App] Error archiving organization:', error);
+      handleNotify('error', 'Failed to archive organization.');
+      return false;
     }
   };
 
@@ -826,7 +896,11 @@ export default function App() {
 
   const handleRestoreBackup = async (backupData: any) => {
     try {
-      console.info('[App] Restoring backup for organization:', backupData.metadata?.orgId);
+      if (!backupData || !backupData.data) {
+        throw new Error('Invalid backup data format');
+      }
+
+      console.info('[App] Restoring backup for organization:', backupData.metadata?.organizationId);
       
       // Update all state with restored data
       if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations);
@@ -842,14 +916,14 @@ export default function App() {
       if (backupData.data.journalEntries?.length) setJournalEntries(backupData.data.journalEntries);
       if (backupData.data.journalEntryLines?.length) setJournalLines(backupData.data.journalEntryLines);
       if (backupData.data.auditLogs?.length) setAuditLogs(backupData.data.auditLogs);
-      if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets);
-      if (backupData.data.accounts?.length) setAccounts(backupData.data.accounts);
+      // if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets); // Budget state not yet implemented
+      if (backupData.data.chartOfAccounts?.length) setAccounts(backupData.data.chartOfAccounts);
       if (backupData.data.purchaseOrders?.length) setPurchaseOrders(backupData.data.purchaseOrders);
-      if (backupData.data.paymentHistory?.length) setPaymentHistory(backupData.data.paymentHistory);
+      if (backupData.data.paymentHistory?.length) setPayments(backupData.data.paymentHistory);
       if (backupData.data.payables?.length) setPayables(backupData.data.payables);
       if (backupData.data.accountingPeriods?.length) setAccountingPeriods(backupData.data.accountingPeriods);
       if (backupData.data.checkVouchers?.length) setCheckVouchers(backupData.data.checkVouchers);
-      if (backupData.data.eftBatches?.length) setEFTBatches(backupData.data.eftBatches);
+      if (backupData.data.eftBatches?.length) setEftBatches(backupData.data.eftBatches);
       if (backupData.data.goodsReceipts?.length) setGoodsReceipts(backupData.data.goodsReceipts);
       if (backupData.data.bankReconciliations?.length) setBankReconciliations(backupData.data.bankReconciliations);
       if (backupData.data.warehouseLocations?.length) setWarehouseLocations(backupData.data.warehouseLocations);
@@ -857,7 +931,7 @@ export default function App() {
       if (backupData.data.inventoryLevels?.length) setInventoryLevels(backupData.data.inventoryLevels);
       if (backupData.data.inventoryTransactions?.length) setInventoryTransactions(backupData.data.inventoryTransactions);
       if (backupData.data.stockAdjustments?.length) setStockAdjustments(backupData.data.stockAdjustments);
-      if (backupData.data.nonStockItems?.length) setNonStockItems(backupData.data.nonStockItems);
+      if (backupData.data.nonStockItems?.length) setItems(backupData.data.nonStockItems);
       if (backupData.data.fixedAssets?.length) setFixedAssets(backupData.data.fixedAssets);
       if (backupData.data.bankAccounts?.length) setBankAccounts(backupData.data.bankAccounts);
       if (backupData.data.locations?.length) setLocations(backupData.data.locations);
@@ -869,10 +943,10 @@ export default function App() {
         'BACKUP_RESTORED',
         'BACKUP',
         currentOrgId,
-        { backupTimestamp: backupData.metadata?.createdAt, recordCount: backupData.metadata?.recordCounts }
+        { backupTimestamp: backupData.metadata?.backupDate, recordCount: backupData.metadata?.recordCount }
       );
 
-      handleNotify('success', `Backup restored successfully. ${Object.values(backupData.metadata?.recordCounts || {}).reduce((a: number, b: number) => a + b, 0)} records restored.`);
+      handleNotify('success', `Backup restored successfully. ${Object.values(backupData.metadata?.recordCount || {}).reduce((a: any, b: any) => (a as number) + (b as number), 0)} records restored.`);
     } catch (error) {
       console.error('[App] Error restoring backup:', error);
       handleNotify('error', `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -929,20 +1003,40 @@ export default function App() {
 
   const handleDeleteUser = async (id: string) => {
     try {
-      console.info('[App] Deleting user:', id);
+      console.info('[App] Archiving user:', id);
       const existing = users.find(u => u.id === id);
-      await dataService.deleteUser(id);
+
+      // Check usage (Created objects, Audits?)
+      // Usually users aren't "used" in a way that blocks archival, but we check anyway.
+      const usage = await dataService.checkUsage('USERS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive user. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('USERS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setUsers(prev => prev.filter(u => u.id !== id));
       
-      // Audit: User deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'USER', id, existing?.name);
+      // Audit: User archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'USER', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'User deleted successfully');
+      handleNotify('success', 'User moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting user:', error);
-      handleNotify('error', 'Failed to delete user. Falling back to memory storage.');
-      // Fallback to memory storage
-      setUsers(prev => prev.filter(u => u.id !== id));
+      console.error('[App] Error archiving user:', error);
+      handleNotify('error', 'Failed to archive user.');
+      return false;
     }
   };
 
@@ -1043,15 +1137,17 @@ export default function App() {
         return false; // Return false to indicate deletion failed
       }
 
-      // Proceed with hard delete (Supabase table doesn't support soft delete)
-      console.info('[App] Deleting student:', id);
-      await dataService.deleteStudent(id);
-      setStudents(prev => prev.filter(s => s.id !== id));
+      // Proceed with soft delete (Archive)
+      console.info('[App] Archiving student:', id);
+      await dataService.archiveEntity('students', id, currentUser?.id || 'system');
       
-      // Audit: Student deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
+      // Update local state - set isDeleted: true instead of removing
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, isDeleted: true, deletedAt: new Date().toISOString() } : s));
       
-      handleNotify('success', 'Student record deleted successfully');
+      // Audit: Student archived
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
+      
+      handleNotify('success', 'Student record archived successfully');
       return true; // Return true to indicate successful deletion
     } catch (error) {
       console.error('[App] Error deleting student:', error);
@@ -1126,33 +1222,39 @@ export default function App() {
 
   const handleDeleteTrainer = async (id: string) => {
     try {
-      console.info('[App] Checking trainer usage before deletion:', id);
+      console.info('[App] Archiving trainer:', id);
       const existing = trainers.find(t => t.id === id);
       
-      // Check if trainer is used in other modules
-      const usage = await dataService.checkTrainerUsage(id);
+      // Check if trainer is used in other modules (archive check)
+      const usage = await dataService.checkUsage('TRAINERS', id);
       if (usage.isUsed) {
-        const message = `Cannot delete trainer. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot archive trainer. Referenced in: ${usage.usedIn.join(', ')}`;
         handleNotify('error', message);
-        return false; // Return false to indicate deletion failed
+        return false;
       }
 
-      // Proceed with hard delete
-      console.info('[App] Deleting trainer:', id);
-      await dataService.deleteTrainer(id);
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('TRAINERS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setTrainers(prev => prev.filter(t => t.id !== id));
       
-      // Audit: Trainer deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
+      // Audit: Trainer archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'TRAINER', 
+        id, 
+        existing ? `${existing.firstName} ${existing.lastName}` : undefined
+      );
       
-      handleNotify('success', 'Trainer record deleted successfully');
-      return true; // Return true to indicate successful deletion
-    } catch (error) {
-      console.error('[App] Error deleting trainer:', error);
-      handleNotify('error', 'Failed to delete trainer. Falling back to memory storage.');
-      // Fallback to hard delete in memory
-      setTrainers(prev => prev.filter(t => t.id !== id));
+      handleNotify('success', 'Trainer moved to archive');
       return true;
+    } catch (error) {
+      console.error('[App] Error archiving trainer:', error);
+      handleNotify('error', 'Failed to archive trainer.');
+      return false;
     }
   };
 
@@ -1199,32 +1301,39 @@ export default function App() {
 
   const handleDeleteQualification = async (id: string) => {
     try {
-      console.info('[App] Checking qualification usage before deletion:', id);
+      console.info('[App] Archiving qualification:', id);
       const existing = qualifications.find(q => q.id === id);
       
       // Check if qualification is used in other modules
-      const usage = await dataService.checkQualificationUsage(id);
+      const usage = await dataService.checkUsage('QUALIFICATIONS', id);
       if (usage.isUsed) {
-        const message = `Cannot delete qualification. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot archive qualification. Referenced in: ${usage.usedIn.join(', ')}`;
         handleNotify('error', message);
         return false;
       }
 
-      // Proceed with hard delete
-      console.info('[App] Deleting qualification:', id);
-      await dataService.deleteQualification(id);
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('QUALIFICATIONS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setQualifications(prev => prev.filter(q => q.id !== id));
       
-      // Audit: Qualification deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', id, existing?.name);
+      // Audit: Qualification archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'QUALIFICATION', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Qualification record deleted successfully');
+      handleNotify('success', 'Qualification moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting qualification:', error);
-      handleNotify('error', 'Failed to delete qualification. Falling back to memory storage.');
-      setQualifications(prev => prev.filter(q => q.id !== id));
-      return true;
+      console.error('[App] Error archiving qualification:', error);
+      handleNotify('error', 'Failed to archive qualification.');
+      return false;
     }
   };
 
@@ -1274,32 +1383,39 @@ export default function App() {
 
   const handleDeleteLocation = async (id: string) => {
     try {
-      console.info('[App] Checking location usage before deletion:', id);
+      console.info('[App] Archiving location:', id);
       const existing = locations.find(l => l.id === id);
       
       // Check if location is used in other modules
-      const usage = await dataService.checkLocationUsage(id);
+      const usage = await dataService.checkUsage('LOCATIONS', id);
       if (usage.isUsed) {
-        const message = `Cannot delete location. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot archive location. Referenced in: ${usage.usedIn.join(', ')}`;
         handleNotify('error', message);
         return false;
       }
 
-      // Proceed with hard delete
-      console.info('[App] Deleting location:', id);
-      await dataService.deleteLocation(id);
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('LOCATIONS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setLocations(prev => prev.filter(l => l.id !== id));
       
-      // Audit: Location deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', id, existing?.name);
+      // Audit: Location archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'LOCATION', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Location deleted successfully');
+      handleNotify('success', 'Location moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting location:', error);
-      handleNotify('error', 'Failed to delete location. Falling back to memory storage.');
-      setLocations(prev => prev.filter(l => l.id !== id));
-      return true;
+      console.error('[App] Error archiving location:', error);
+      handleNotify('error', 'Failed to archive location.');
+      return false;
     }
   };
 
@@ -1349,31 +1465,37 @@ export default function App() {
 
   const handleDeleteSchedule = async (id: string) => {
     try {
-      console.info('[App] Checking schedule usage before deletion:', id);
+      console.info('[App] Archiving schedule:', id);
       
       // Check if schedule is used in other modules
-      const usage = await dataService.checkScheduleUsage(id);
+      const usage = await dataService.checkUsage('SCHEDULES', id);
       if (usage.isUsed) {
-        const message = `Cannot delete schedule. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot archive schedule. Referenced in: ${usage.usedIn.join(', ')}`;
         handleNotify('error', message);
         return false;
       }
 
-      // Proceed with hard delete
-      console.info('[App] Deleting schedule:', id);
-      await dataService.deleteSchedule(id);
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('SCHEDULES', id, currentUser?.id || 'system');
+      
+      // Update local state
       setSchedules(prev => prev.filter(s => s.id !== id));
       
-      // Audit: Schedule deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', id);
+      // Audit: Schedule archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'SCHEDULE', 
+        id
+      );
       
-      handleNotify('success', 'Schedule deleted successfully');
+      handleNotify('success', 'Schedule moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting schedule:', error);
-      handleNotify('error', 'Failed to delete schedule. Falling back to memory storage.');
-      setSchedules(prev => prev.filter(s => s.id !== id));
-      return true;
+      console.error('[App] Error archiving schedule:', error);
+      handleNotify('error', 'Failed to archive schedule.');
+      return false;
     }
   };
 
@@ -1422,21 +1544,39 @@ export default function App() {
 
   const handleDeleteBatch = async (id: string) => {
     try {
-      console.info('[App] Deleting batch:', id);
+      console.info('[App] Archiving batch:', id);
       const existing = batches.find(b => b.id === id);
-      await dataService.deleteBatch(id);
+
+      // Check if batch is used
+      const usage = await dataService.checkUsage('BATCHES', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive batch. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('BATCHES', id, currentUser?.id || 'system');
+      
+      // Update local state
       setBatches(prev => prev.filter(b => b.id !== id));
       
-      // Audit: Batch deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', id, existing?.name || existing?.batchCode);
+      // Audit: Batch archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'BATCH', 
+        id, 
+        existing?.name || existing?.batchCode
+      );
       
-      handleNotify('success', 'Batch deleted successfully');
+      handleNotify('success', 'Batch moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting batch:', error);
-      handleNotify('error', 'Failed to delete batch. Falling back to memory storage.');
-      setBatches(prev => prev.filter(b => b.id !== id));
-      return true;
+      console.error('[App] Error archiving batch:', error);
+      handleNotify('error', 'Failed to archive batch.');
+      return false;
     }
   };
 
@@ -1482,32 +1622,39 @@ export default function App() {
 
   const handleDeleteSponsor = async (id: string) => {
     try {
-      console.info('[App] Checking sponsor usage before deletion:', id);
+      console.info('[App] Archiving sponsor:', id);
       const existing = sponsors.find(s => s.id === id);
       
       // Check if sponsor is used in other modules
-      const usage = await dataService.checkSponsorUsage(id);
+      const usage = await dataService.checkUsage('SPONSORS', id);
       if (usage.isUsed) {
-        const message = `Cannot delete sponsor. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot archive sponsor. Referenced in: ${usage.usedIn.join(', ')}`;
         handleNotify('error', message);
         return false;
       }
 
-      // Proceed with hard delete
-      console.info('[App] Deleting sponsor:', id);
-      await dataService.deleteSponsor(id);
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('SPONSORS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setSponsors(prev => prev.filter(s => s.id !== id));
       
-      // Audit: Sponsor deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', id, existing?.name);
+      // Audit: Sponsor archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'SPONSOR', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Sponsor deleted successfully');
+      handleNotify('success', 'Sponsor moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting sponsor:', error);
-      handleNotify('error', 'Failed to delete sponsor. Falling back to memory storage.');
-      setSponsors(prev => prev.filter(s => s.id !== id));
-      return true;
+      console.error('[App] Error archiving sponsor:', error);
+      handleNotify('error', 'Failed to archive sponsor.');
+      return false;
     }
   };
 
@@ -1551,19 +1698,38 @@ export default function App() {
 
   const handleDeleteBankAccount = async (id: string) => {
     try {
-      console.info('[App] Deleting bank account:', id);
+      console.info('[App] Archiving bank account:', id);
       const existing = bankAccounts.find(b => b.id === id);
-      await dataService.deleteBankAccount(id);
+
+      // Check usage (Transactions, Reconciliations)
+      const usage = await dataService.checkUsage('BANK_ACCOUNTS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive bank account. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('BANK_ACCOUNTS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setBankAccounts(prev => prev.filter(b => b.id !== id));
       
-      // Audit: Bank account deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', id, existing?.bankName);
+      // Audit: Bank account archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'BANK_ACCOUNT', 
+        id, 
+        existing?.bankName
+      );
       
-      handleNotify('success', 'Bank account deleted successfully');
+      handleNotify('success', 'Bank account moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting bank account:', error);
-      handleNotify('error', `Failed to delete bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[App] Error archiving bank account:', error);
+      handleNotify('error', `Failed to archive bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return false;
     }
   };
@@ -1605,18 +1771,31 @@ export default function App() {
 
   const handleDeleteBankReconciliation = async (id: string) => {
     try {
-      console.info('[App] Deleting bank reconciliation:', id);
+      console.info('[App] Archiving bank reconciliation:', id);
       const existing = bankReconciliations.find(r => r.id === id);
-      await dataService.deleteBankReconciliation(id);
+      
+      // Proceed with archival
+      await dataService.archiveEntity('BANK_RECONCILIATIONS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setBankReconciliations(prev => prev.filter(r => r.id !== id));
       
-      // Audit: Bank reconciliation deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', id, existing?.asOfDate);
+      // Audit: Bank reconciliation archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'BANK_RECONCILIATION', 
+        id, 
+        existing?.asOfDate
+      );
       
-      handleNotify('success', 'Bank reconciliation deleted successfully');
+      handleNotify('success', 'Bank reconciliation moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting bank reconciliation:', error);
-      handleNotify('error', `Failed to delete reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[App] Error archiving bank reconciliation:', error);
+      handleNotify('error', `Failed to archive reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
   };
 
@@ -1657,18 +1836,31 @@ export default function App() {
 
   const handleDeleteRecurringJournalEntry = async (id: string) => {
     try {
-      console.info('[App] Deleting recurring journal entry:', id);
+      console.info('[App] Archiving recurring journal entry:', id);
       const existing = recurringJournalEntries.find(e => e.id === id);
-      await dataService.deleteRecurringJournalEntry(id);
+      
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('RECURRING_JOURNAL_ENTRIES', id, currentUser?.id || 'system');
+      
+      // Update local state
       setRecurringJournalEntries(prev => prev.filter(e => e.id !== id));
       
-      // Audit: Recurring journal entry deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', id, existing?.name);
+      // Audit: Recurring journal entry archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'RECURRING_JOURNAL_ENTRY', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Recurring journal entry deleted successfully');
+      handleNotify('success', 'Recurring journal entry moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting recurring journal entry:', error);
-      handleNotify('error', `Failed to delete recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[App] Error archiving recurring journal entry:', error);
+      handleNotify('error', `Failed to archive recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
   };
 
@@ -1769,19 +1961,38 @@ export default function App() {
 
   const handleDeleteCheckVoucher = async (id: string) => {
     try {
-      console.info('[App] Deleting check voucher:', id);
+      console.info('[App] Archiving check voucher:', id);
       const existing = checkVouchers.find(c => c.id === id);
-      await dataService.deleteCheckVoucher(id);
+
+      // Check if check voucher is used (e.g., cleared in bank reconciliation)
+      const usage = await dataService.checkUsage('CHECK_VOUCHERS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive check voucher. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('CHECK_VOUCHERS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setCheckVouchers(prev => prev.filter(c => c.id !== id));
       
-      // Audit: Check voucher deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber}`);
+      // Audit: Check voucher archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'CHECK_VOUCHER', 
+        id, 
+        `Check #${existing?.checkNumber}`
+      );
       
-      handleNotify('success', 'Check voucher deleted successfully');
+      handleNotify('success', 'Check voucher moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting check voucher:', error);
-      handleNotify('error', `Failed to delete check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[App] Error archiving check voucher:', error);
+      handleNotify('error', `Failed to archive check: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return false;
     }
   };
@@ -1824,21 +2035,39 @@ export default function App() {
 
   const handleDeleteVendor = async (id: string) => {
     try {
-      console.info('[App] Deleting vendor:', id);
+      console.info('[App] Archiving vendor:', id);
       const existing = vendors.find(v => v.id === id);
-      await dataService.deleteVendor(id);
+
+      // Check for usage in POs or Payables
+      const usage = await dataService.checkUsage('VENDORS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive vendor. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival (soft delete)
+      await dataService.archiveEntity('VENDORS', id, currentUser?.id || 'system');
+      
+      // Update local state
       setVendors(prev => prev.filter(v => v.id !== id));
       
-      // Audit: Vendor deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name);
+      // Audit: Vendor archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'VENDOR', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Vendor deleted successfully');
+      handleNotify('success', 'Vendor moved to archive');
       return true;
     } catch (error) {
-      console.error('[App] Error deleting vendor:', error);
-      handleNotify('error', 'Failed to delete vendor. Falling back to memory storage.');
-      setVendors(prev => prev.filter(v => v.id !== id));
-      return true;
+      console.error('[App] Error archiving vendor:', error);
+      handleNotify('error', 'Failed to archive vendor.');
+      return false;
     }
   };
 
@@ -1876,14 +2105,39 @@ export default function App() {
 
   const handleDeleteWarehouseLocation = async (id: string) => {
     try {
-      console.info('[App] Deleting warehouse location:', id);
-      await dataService.deleteWarehouseLocation(id);
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
-      handleNotify('success', 'Location deleted successfully');
+      console.info('[App] Archiving warehouse location:', id);
+      const existing = warehouseLocations.find(l => l.id === id);
+
+      // Check for usage in inventory levels
+      const usage = await dataService.checkUsage('WAREHOUSE_LOCATIONS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive location. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('WAREHOUSE_LOCATIONS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
+      setWarehouseLocations(prev => prev.filter(l => l.id !== id));
+      
+      // Audit: Location archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'WAREHOUSE_LOCATION', 
+        id, 
+        existing?.name
+      );
+
+      handleNotify('success', 'Location moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting warehouse location:', error);
-      handleNotify('error', 'Failed to delete location. Falling back to memory storage.');
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      console.error('[App] Error archiving warehouse location:', error);
+      handleNotify('error', 'Failed to archive location.');
+      return false;
     }
   };
 
@@ -1917,14 +2171,39 @@ export default function App() {
 
   const handleDeleteStockItem = async (id: string) => {
     try {
-      console.info('[App] Deleting stock item:', id);
-      await dataService.deleteStockItem(id);
-      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
-      handleNotify('success', 'Item deleted successfully');
+      console.info('[App] Archiving stock item:', id);
+      const existing = stockItems.find(i => i.id === id);
+
+      // Check usage in inventory levels or PO entries
+      const usage = await dataService.checkUsage('STOCK_ITEMS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive item. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('STOCK_ITEMS', id, currentUser?.id || 'system');
+      
+      // Update local state
+      setStockItems(prev => prev.filter(i => i.id !== id));
+      
+      // Audit: Stock item archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'STOCK_ITEM', 
+        id, 
+        existing?.name
+      );
+
+      handleNotify('success', 'Stock item moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting stock item:', error);
-      handleNotify('error', 'Failed to delete item. Falling back to memory storage.');
-      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
+      console.error('[App] Error archiving stock item:', error);
+      handleNotify('error', 'Failed to archive item.');
+      return false;
     }
   };
 
@@ -1958,14 +2237,29 @@ export default function App() {
 
   const handleDeleteInventoryLevel = async (id: string) => {
     try {
-      console.info('[App] Deleting inventory level:', id);
-      await dataService.deleteInventoryLevel(id);
-      setInventoryLevels(inventoryLevels.map(l => l.id === id ? { ...l, isDeleted: true } : l));
-      handleNotify('success', 'Inventory level deleted successfully');
+      console.info('[App] Archiving inventory level:', id);
+      
+      // Proceed with archival
+      await dataService.archiveEntity('INVENTORY_LEVELS', id, currentUser?.id || 'system');
+      
+      // Update local state
+      setInventoryLevels(prev => prev.filter(l => l.id !== id));
+      
+      // Audit: Inventory level archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'INVENTORY_LEVEL', 
+        id
+      );
+
+      handleNotify('success', 'Inventory level moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting inventory level:', error);
-      handleNotify('error', 'Failed to delete inventory level. Falling back to memory storage.');
-      setInventoryLevels(inventoryLevels.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      console.error('[App] Error archiving inventory level:', error);
+      handleNotify('error', 'Failed to archive inventory level.');
+      return false;
     }
   };
 
@@ -1999,14 +2293,29 @@ export default function App() {
 
   const handleDeleteStockAdjustment = async (id: string) => {
     try {
-      console.info('[App] Deleting stock adjustment:', id);
-      await dataService.deleteStockAdjustment(id);
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
-      handleNotify('success', 'Stock adjustment deleted successfully');
+      console.info('[App] Archiving stock adjustment:', id);
+      
+      // Proceed with archival
+      await dataService.archiveEntity('STOCK_ADJUSTMENTS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
+      setStockAdjustments(prev => prev.filter(a => a.id !== id));
+      
+      // Audit: Stock adjustment archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'STOCK_ADJUSTMENT', 
+        id
+      );
+
+      handleNotify('success', 'Stock adjustment moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting stock adjustment:', error);
-      handleNotify('error', 'Failed to delete adjustment. Falling back to memory storage.');
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+      console.error('[App] Error archiving stock adjustment:', error);
+      handleNotify('error', 'Failed to archive adjustment.');
+      return false;
     }
   };
 
@@ -2040,14 +2349,29 @@ export default function App() {
 
   const handleDeleteReorderPoint = async (id: string) => {
     try {
-      console.info('[App] Deleting reorder point:', id);
-      await dataService.deleteReorderPoint(id);
-      setReorderPoints(reorderPoints.map(p => p.id === id ? { ...p, isDeleted: true } : p));
-      handleNotify('success', 'Reorder point deleted successfully');
+      console.info('[App] Archiving reorder point:', id);
+      
+      // Proceed with archival
+      await dataService.archiveEntity('REORDER_POINTS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
+      setReorderPoints(prev => prev.filter(p => p.id !== id));
+      
+      // Audit: Reorder point archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'REORDER_POINT', 
+        id
+      );
+
+      handleNotify('success', 'Reorder point moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting reorder point:', error);
-      handleNotify('error', 'Failed to delete reorder point. Falling back to memory storage.');
-      setReorderPoints(reorderPoints.map(p => p.id === id ? { ...p, isDeleted: true } : p));
+      console.error('[App] Error archiving reorder point:', error);
+      handleNotify('error', 'Failed to archive reorder point.');
+      return false;
     }
   };
 
@@ -2094,19 +2418,185 @@ export default function App() {
 
   const handleDeleteFixedAsset = async (id: string) => {
     try {
-      console.info('[App] Deleting fixed asset:', id);
+      console.info('[App] Archiving fixed asset:', id);
       const existing = fixedAssets.find(a => a.id === id);
-      await dataService.deleteFixedAsset(id);
+
+      // Check usage (Transactions, Depreciations)
+      const usage = await dataService.checkUsage('FIXED_ASSETS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive asset. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('FIXED_ASSETS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setFixedAssets(prev => prev.filter(a => a.id !== id));
       
-      // Audit: Fixed asset deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', id, existing?.name);
+      // Audit: Fixed asset archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'FIXED_ASSET', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Fixed asset deleted successfully');
+      handleNotify('success', 'Fixed asset moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting fixed asset:', error);
-      handleNotify('error', 'Failed to delete fixed asset. Falling back to memory storage.');
-      setFixedAssets(prev => prev.filter(a => a.id !== id));
+      console.error('[App] Error archiving fixed asset:', error);
+      handleNotify('error', 'Failed to archive fixed asset.');
+      return false;
+    }
+  };
+
+  // ============================================================================
+  // ARCHIVE HANDLERS
+  // ============================================================================
+
+  const handleRestoreFromArchive = async (type: string, id: string) => {
+    try {
+      console.info(`[App] Restoring ${type} from archive:`, id);
+      
+      const tableName = mapTypeToTable[type];
+      if (!tableName) throw new Error(`Unknown type: ${type}`);
+      
+      await dataService.restoreEntity(tableName, id);
+      
+      // Update local state
+      updateState(type, id, { isDeleted: false });
+      
+      // Audit: Restored
+      AuditService.logAction(currentUser?.id || "system", currentUser?.name || "System", "RESTORED", type, id);
+      
+      handleNotify('success', `${type} restored successfully`);
+    } catch (error) {
+      console.error(`[App] Error restoring ${type}:`, error);
+      handleNotify('error', `Failed to restore ${type}`);
+    }
+  };
+
+  const handlePermanentDelete = async (type: string, id: string) => {
+    try {
+      console.info(`[App] Permanent delete ${type}:`, id);
+      
+      const tableName = mapTypeToTable[type];
+      if (!tableName) throw new Error(`Unknown type: ${type}`);
+      
+      await dataService.permanentDeleteEntity(tableName, id);
+      
+      // Update local state - remove from list
+      removeFromState(type, id);
+      
+      // Audit: Permanent Delete
+      AuditService.logAction(currentUser?.id || "system", currentUser?.name || "System", "PERMANENT_DELETE", type, id);
+      
+      handleNotify('success', `${type} deleted permanently`);
+    } catch (error) {
+      console.error(`[App] Error permanent deleting ${type}:`, error);
+      handleNotify('error', `Failed to permanently delete ${type}`);
+    }
+  };
+
+  // Type to Table / State mapping helper
+  const mapTypeToTable: Record<string, string> = {
+    'STUDENT': 'students',
+    'TRAINER': 'trainers',
+    'QUALIFICATION': 'qualifications',
+    'BATCH': 'batches',
+    'LOCATION': 'locations',
+    'SPONSOR': 'sponsors',
+    'VENDOR': 'vendors',
+    'EMPLOYEE': 'employees',
+    'ITEM': 'non_stock_items',
+    'PO': 'purchase_orders',
+    'BANK_ACCOUNT': 'bank_accounts',
+    'FIXED_ASSET': 'fixed_assets',
+    'ACCOUNT': 'chart_of_accounts',
+    'RECURRING_INVOICE': 'recurring_invoices',
+    'REVENUE_SCHEDULE': 'revenue_schedules',
+    'PAYABLE': 'payables',
+    'CHECK_VOUCHERS': 'check_vouchers',
+    'BANK_RECONCILIATION': 'bank_reconciliations',
+    'RECURRING_JOURNAL_ENTRY': 'recurring_journal_entries',
+    'STOCK_ITEM': 'stock_items',
+    'WAREHOUSE_LOCATION': 'warehouse_locations',
+    'INVENTORY_LEVEL': 'inventory_levels',
+    'STOCK_ADJUSTMENT': 'stock_adjustments',
+    'REORDER_POINT': 'reorder_points',
+    'GOODS_RECEIPT': 'goods_receipts',
+    'EFT_BATCH': 'eft_batches',
+    'ORGANIZATION': 'organizations',
+    'USER': 'users'
+  };
+
+  const updateState = (type: string, id: string, updates: any) => {
+    switch(type) {
+      case 'STUDENT': setStudents(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'TRAINER': setTrainers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'QUALIFICATION': setQualifications(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'BATCH': setBatches(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'LOCATION': setLocations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'SPONSOR': setSponsors(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'VENDOR': setVendors(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'EMPLOYEE': setEmployees(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'ITEM': setItems(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'PO': setPurchaseOrders(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'BANK_ACCOUNT': setBankAccounts(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'FIXED_ASSET': setFixedAssets(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'ACCOUNT': setAccounts(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'RECURRING_INVOICE': setRecurringInvoices(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'REVENUE_SCHEDULE': setRevenueSchedules(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'PAYABLE': setPayables(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'CHECK_VOUCHER': setCheckVouchers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'BANK_RECONCILIATION': setBankReconciliations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'RECURRING_JOURNAL_ENTRY': setRecurringJournalEntries(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'STOCK_ITEM': setStockItems(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'WAREHOUSE_LOCATION': setWarehouseLocations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'INVENTORY_LEVEL': setInventoryLevels(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'STOCK_ADJUSTMENT': setStockAdjustments(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'REORDER_POINT': setReorderPoints(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'GOODS_RECEIPT': setGoodsReceipts(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'EFT_BATCH': setEftBatches(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'USER': setUsers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+    }
+  };
+
+  const removeFromState = (type: string, id: string) => {
+    switch(type) {
+      case 'STUDENT': setStudents(prev => prev.filter(x => x.id !== id)); break;
+      case 'TRAINER': setTrainers(prev => prev.filter(x => x.id !== id)); break;
+      case 'QUALIFICATION': setQualifications(prev => prev.filter(x => x.id !== id)); break;
+      case 'BATCH': setBatches(prev => prev.filter(x => x.id !== id)); break;
+      case 'LOCATION': setLocations(prev => prev.filter(x => x.id !== id)); break;
+      case 'SPONSOR': setSponsors(prev => prev.filter(x => x.id !== id)); break;
+      case 'VENDOR': setVendors(prev => prev.filter(x => x.id !== id)); break;
+      case 'EMPLOYEE': setEmployees(prev => prev.filter(x => x.id !== id)); break;
+      case 'ITEM': setItems(prev => prev.filter(x => x.id !== id)); break;
+      case 'PO': setPurchaseOrders(prev => prev.filter(x => x.id !== id)); break;
+      case 'BANK_ACCOUNT': setBankAccounts(prev => prev.filter(x => x.id !== id)); break;
+      case 'FIXED_ASSET': setFixedAssets(prev => prev.filter(x => x.id !== id)); break;
+      case 'ACCOUNT': setAccounts(prev => prev.filter(x => x.id !== id)); break;
+      case 'RECURRING_INVOICE': setRecurringInvoices(prev => prev.filter(x => x.id !== id)); break;
+      case 'REVENUE_SCHEDULE': setRevenueSchedules(prev => prev.filter(x => x.id !== id)); break;
+      case 'PAYABLE': setPayables(prev => prev.filter(x => x.id !== id)); break;
+      case 'CHECK_VOUCHER': setCheckVouchers(prev => prev.filter(x => x.id !== id)); break;
+      case 'BANK_RECONCILIATION': setBankReconciliations(prev => prev.filter(x => x.id !== id)); break;
+      case 'RECURRING_JOURNAL_ENTRY': setRecurringJournalEntries(prev => prev.filter(x => x.id !== id)); break;
+      case 'STOCK_ITEM': setStockItems(prev => prev.filter(x => x.id !== id)); break;
+      case 'WAREHOUSE_LOCATION': setWarehouseLocations(prev => prev.filter(x => x.id !== id)); break;
+      case 'INVENTORY_LEVEL': setInventoryLevels(prev => prev.filter(x => x.id !== id)); break;
+      case 'STOCK_ADJUSTMENT': setStockAdjustments(prev => prev.filter(x => x.id !== id)); break;
+      case 'REORDER_POINT': setReorderPoints(prev => prev.filter(x => x.id !== id)); break;
+      case 'GOODS_RECEIPT': setGoodsReceipts(prev => prev.filter(x => x.id !== id)); break;
+      case 'EFT_BATCH': setEftBatches(prev => prev.filter(x => x.id !== id)); break;
+      case 'ORGANIZATION': setOrganizations(prev => prev.filter(x => x.id !== id)); break;
+      case 'USER': setUsers(prev => prev.filter(x => x.id !== id)); break;
     }
   };
 
@@ -2234,19 +2724,39 @@ export default function App() {
 
   const handleDeleteItem = async (id: string) => {
     try {
-      console.info('[App] Deleting item:', id);
+      console.info('[App] Archiving item:', id);
       const existing = items.find(i => i.id === id);
-      await dataService.deleteItem(id);
+
+      // Check usage in POs or Stock Items
+      const usage = await dataService.checkUsage('NON_STOCK_ITEMS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive item. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('NON_STOCK_ITEMS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setItems(prev => prev.filter(i => i.id !== id));
       
-      // Audit: Item deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', id, existing?.name);
+      // Audit: Item archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'ITEM', 
+        id, 
+        existing?.name
+      );
       
-      handleNotify('success', 'Item deleted successfully');
+      handleNotify('success', 'Item moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting item:', error);
-      handleNotify('error', 'Failed to delete item. Falling back to memory storage.');
-      setItems(prev => prev.filter(i => i.id !== id));
+      console.error('[App] Error archiving item:', error);
+      handleNotify('error', 'Failed to archive item.');
+      return false;
     }
   };
 
@@ -2286,17 +2796,39 @@ export default function App() {
 
   const handleDeleteEmployee = async (id: string) => {
     try {
-      console.info('[App] Deleting employee:', id);
+      console.info('[App] Archiving employee:', id);
       const existing = employees.find(e => e.id === id);
-      await dataService.deleteEmployee(id);
-      setEmployees(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString() } : e));
+
+      // Check for usage in payroll
+      const usage = await dataService.checkUsage('EMPLOYEES', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive employee. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('EMPLOYEES', id, currentUser?.id || 'system');
       
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', id, `${existing?.firstName} ${existing?.lastName}`);
-      handleNotify('success', 'Employee deleted successfully');
+      // Update local state by removing from active list
+      setEmployees(prev => prev.filter(e => e.id !== id));
+      
+      // Audit: Employee archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'EMPLOYEE', 
+        id, 
+        `${existing?.firstName} ${existing?.lastName}`
+      );
+
+      handleNotify('success', 'Employee moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting employee:', error);
-      handleNotify('error', 'Failed to delete employee. Falling back to memory storage.');
-      setEmployees(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString() } : e));
+      console.error('[App] Error archiving employee:', error);
+      handleNotify('error', 'Failed to archive employee.');
+      return false;
     }
   };
 
@@ -2336,17 +2868,39 @@ export default function App() {
 
   const handleDeleteAccount = async (id: string) => {
     try {
-      console.info('[App] Deleting account:', id);
+      console.info('[App] Archiving account:', id);
       const existing = accounts.find(a => a.id === id);
-      await dataService.deleteAccount(id);
+
+      // Check usage in Journal lines
+      const usage = await dataService.checkUsage('CHART_OF_ACCOUNTS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive account. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('CHART_OF_ACCOUNTS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setAccounts(prev => prev.filter(a => a.id !== id));
       
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', id, existing?.name);
-      handleNotify('success', 'Account deleted successfully');
+      // Audit: Account archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'ACCOUNT', 
+        id, 
+        existing?.name
+      );
+
+      handleNotify('success', 'Account moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting account:', error);
-      handleNotify('error', 'Failed to delete account. Falling back to memory storage.');
-      setAccounts(prev => prev.filter(a => a.id !== id));
+      console.error('[App] Error archiving account:', error);
+      handleNotify('error', 'Failed to archive account.');
+      return false;
     }
   };
 
@@ -2420,17 +2974,39 @@ export default function App() {
 
   const handleDeleteGoodsReceipt = async (id: string) => {
     try {
-      console.info('[App] Deleting goods receipt:', id);
+      console.info('[App] Archiving goods receipt:', id);
       const existing = goodsReceipts.find(g => g.id === id);
-      await dataService.deleteGoodsReceipt(id);
+
+      // Check usage in payables
+      const usage = await dataService.checkUsage('GOODS_RECEIPTS', id);
+      if (usage.isUsed) {
+        const message = `Cannot archive goods receipt. Referenced in: ${usage.usedIn.join(', ')}`;
+        handleNotify('error', message);
+        return false;
+      }
+
+      // Proceed with archival
+      await dataService.archiveEntity('GOODS_RECEIPTS', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setGoodsReceipts(prev => prev.filter(g => g.id !== id));
       
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.receiptNumber);
-      handleNotify('success', 'Goods receipt deleted successfully');
+      // Audit: Goods receipt archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'GOODS_RECEIPT', 
+        id, 
+        existing?.receiptNumber
+      );
+
+      handleNotify('success', 'Goods receipt moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting goods receipt:', error);
-      handleNotify('error', 'Failed to delete goods receipt. Falling back to memory storage.');
-      setGoodsReceipts(prev => prev.filter(g => g.id !== id));
+      console.error('[App] Error archiving goods receipt:', error);
+      handleNotify('error', 'Failed to archive goods receipt.');
+      return false;
     }
   };
 
@@ -2470,17 +3046,31 @@ export default function App() {
 
   const handleDeleteEFTBatch = async (id: string) => {
     try {
-      console.info('[App] Deleting EFT batch:', id);
+      console.info('[App] Archiving EFT batch:', id);
       const existing = eftBatches.find(b => b.id === id);
-      await dataService.deleteEFTBatch(id);
+
+      // Proceed with archival
+      await dataService.archiveEntity('EFT_BATCHES', id, currentUser?.id || 'system');
+      
+      // Update local state by removing from active list
       setEftBatches(prev => prev.filter(b => b.id !== id));
       
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', id, existing?.batchNumber);
-      handleNotify('success', 'EFT batch deleted successfully');
+      // Audit: EFT batch archived
+      AuditService.archive(
+        currentOrgId, 
+        currentUser?.id || 'system', 
+        currentUser?.name || 'System', 
+        'EFT_BATCH', 
+        id, 
+        existing?.batchNumber
+      );
+
+      handleNotify('success', 'EFT batch moved to archive');
+      return true;
     } catch (error) {
-      console.error('[App] Error deleting EFT batch:', error);
-      handleNotify('error', 'Failed to delete EFT batch. Falling back to memory storage.');
-      setEftBatches(prev => prev.filter(b => b.id !== id));
+      console.error('[App] Error archiving EFT batch:', error);
+      handleNotify('error', 'Failed to archive EFT batch.');
+      return false;
     }
   };
 
@@ -2667,6 +3257,7 @@ export default function App() {
                </div>
                <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Archive size={20}/>} label="Archived Items" active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
@@ -2825,6 +3416,17 @@ export default function App() {
             onDeleteUser={handleDeleteUser} 
           />}
           {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
+          {activeTab === 'archive' && (
+            <ArchiveView 
+              data={{
+                students, trainers, qualifications, batches, locations, sponsors,
+                vendors, employees, items, purchaseOrders, bankAccounts, fixedAssets
+              }}
+              onRestore={handleRestoreFromArchive}
+              onPermanentDelete={handlePermanentDelete}
+              onNotify={handleNotify}
+            />
+          )}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
           {activeTab === 'backup-restore' && (
             <BackupRestoreView 
@@ -2834,14 +3436,14 @@ export default function App() {
               currentUserName={currentUser?.email || 'System'}
               allData={{
                 organizations, users, students, qualifications, trainers, batches, sponsors,
-                vendors, employees, payrollRuns, journalEntries, journalEntryLines, auditLogs,
-                budgets, accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
+                vendors, employees, payrollRuns, journalEntries, journalEntryLines: journalLines, auditLogs,
+                budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory: payments, payables, accountingPeriods,
                 checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
-                stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems,
+                stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
                 fixedAssets, bankAccounts, locations
               }}
               onRestore={handleRestoreBackup}
-              onNotify={notify}
+              onNotify={handleNotify}
               currency={currentOrg?.currency || 'USD'}
             />
           )}

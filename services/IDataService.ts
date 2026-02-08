@@ -340,4 +340,10 @@ export interface IDataService {
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;
   updateEntity<T>(table: string, id: string, updates: Partial<T>): Promise<T>;
   deleteEntity(table: string, id: string): Promise<void>;
+  
+  // Archive / Restore / Permanent Delete
+  archiveEntity(table: string, id: string, userId: string): Promise<void>;
+  restoreEntity(table: string, id: string): Promise<void>;
+  permanentDeleteEntity(table: string, id: string): Promise<void>;
+  checkUsage(table: string, id: string): Promise<{ isUsed: boolean; usedIn: string[] }>;
 }

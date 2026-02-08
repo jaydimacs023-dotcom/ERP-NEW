@@ -1323,6 +1323,46 @@ export class SupabaseDataService implements IDataService {
     return this.deleteFromSupabase(table, id);
   }
 
+  async archiveEntity(table: string, id: string, userId: string): Promise<void> {
+    return this.updateInSupabaseRaw(table, id, { 
+      is_deleted: true, 
+      deleted_at: new Date().toISOString(),
+      deleted_by: userId
+    });
+  }
+
+  async restoreEntity(table: string, id: string): Promise<void> {
+    return this.updateInSupabaseRaw(table, id, { 
+      is_deleted: false, 
+      deleted_at: null,
+      deleted_by: null
+    });
+  }
+
+  async permanentDeleteEntity(table: string, id: string): Promise<void> {
+    return this.deleteFromSupabase(table, id);
+  }
+
+  async checkUsage(table: string, id: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
+    // Map of internal table names to their check functions
+    const checkMap: Record<string, (id: string) => Promise<{ isUsed: boolean; usedIn: string[] }>> = {
+      'students': this.checkStudentUsage.bind(this),
+      'trainers': this.checkTrainerUsage.bind(this),
+      'qualifications': this.checkQualificationUsage.bind(this),
+      'locations': this.checkLocationUsage.bind(this),
+      'schedules': this.checkScheduleUsage.bind(this),
+      'sponsors': this.checkSponsorUsage.bind(this),
+      // Add more as needed
+    };
+
+    if (checkMap[table]) {
+      return checkMap[table](id);
+    }
+
+    // Default: no usage check implemented
+    return { isUsed: false, usedIn: [] };
+  }
+
   /**
    * Fixed Asset CRUD Operations
    */
