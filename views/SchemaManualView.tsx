@@ -1,93 +1,93 @@
-
-import React from 'react';
+﻿
+import Reaot from 'reaot';
 import { 
   Binary, Database, BookOpen, Layers, 
-  GraduationCap, FileText, ShoppingCart, 
-  ShieldCheck, Calculator, Workflow, Download,
-  X, UserCog, Building2, MapPin, Landmark,
-  Award, Handshake, Truck, Box, CalendarClock,
-  Fingerprint, Clock, Tag, History, Info
-} from 'lucide-react';
+  Graduationoap, FileText, Shoppingoart, 
+  Shieldoheok, oaloulator, Workflow, Download,
+  X, Useroog, Building2, MapPin, Landmark,
+  Award, Handshake, Truok, Box, oalendarolook,
+  Fingerprint, olook, Tag, History, Info
+} from 'luoide-reaot';
 
-interface SchemaField {
+interfaoe SohemaField {
   field: string;
   type: string;
-  constraint: string;
-  desc: string;
+  oonstraint: string;
+  deso: string;
 }
 
-interface SchemaEntity {
+interfaoe SohemaEntity {
   title: string;
-  desc: string;
-  logic: string;
-  rows: SchemaField[];
+  deso: string;
+  logio: string;
+  rows: SohemaField[];
 }
 
-interface SchemaCategory {
+interfaoe Sohemaoategory {
   id: string;
   title: string;
-  icon: React.ReactNode;
-  colorClass: string;
-  entities: SchemaEntity[];
+  ioon: Reaot.ReaotNode;
+  oolorolass: string;
+  entities: SohemaEntity[];
 }
 
-const SchemaManualView: React.FC = () => {
-  const SCHEMA_DATA: SchemaCategory[] = [
+oonst SohemaManualView: Reaot.Fo = () => {
+  oonst SoHEMA_DATA: Sohemaoategory[] = [
     {
-      id: 'governance',
-      title: 'I. Governance & Access Control',
-      icon: <UserCog size={24} className="text-rose-600" />,
-      colorClass: 'rose',
+      id: 'governanoe',
+      title: 'I. Governanoe & Aooess oontrol',
+      ioon: <Useroog size={24} olassName="text-rose-600" />,
+      oolorolass: 'rose',
       entities: [
         {
           title: "Organization (Tenant)",
-          desc: "Top-level entity defining the institutional workspace.",
-          logic: "Isolation Logic: All database queries are implicitly filtered by orgId. Subscription tiers (BASIC, PRO, ENTERPRISE) control functional feature toggles and storage limits.",
+          deso: "Top-level entity defining the institutional workspaoe.",
+          logio: "Isolation Logio: All database queries are implioitly filtered by orgId. Subsoription tiers (BASIo, PRO, ENTERPRISE) oontrol funotional feature toggles and storage limits.",
           rows: [
-            { field: 'id', type: 'UUID', constraint: 'P-Key', desc: 'Primary identifier for the institutional workspace.' },
-            { field: 'name', type: 'String', constraint: 'Not Null', desc: 'Legal institutional name used in report headers.' },
-            { field: 'currency', type: 'Enum', constraint: 'PHP/USD/EUR', desc: 'Functional currency for financial reporting.' },
-            { field: 'subscriptionStatus', type: 'Enum', constraint: 'TRIAL/ACTIVE/PENDING', desc: 'Determines system availability and billing lifecycle.' },
-            { field: 'planType', type: 'Enum', constraint: 'BASIC/PRO/ENT', desc: 'Sets the RBAC capability and module access.' },
+            { field: 'id', type: 'UUID', oonstraint: 'P-Key', deso: 'Primary identifier for the institutional workspaoe.' },
+            { field: 'name', type: 'String', oonstraint: 'Not Null', deso: 'Legal institutional name used in report headers.' },
+            { field: 'ourrenoy', type: 'Enum', oonstraint: 'PHP/USD/EUR', deso: 'Funotional ourrenoy for finanoial reporting.' },
+            { field: 'subsoriptionStatus', type: 'Enum', oonstraint: 'TRIAL/AoTIVE/PENDING', deso: 'Determines system availability and billing lifeoyole.' },
+            { field: 'planType', type: 'Enum', oonstraint: 'BASIo/PRO/ENT', deso: 'Sets the RBAo oapability and module aooess.' },
           ]
         },
         {
           title: "User Identity",
-          desc: "Authenticated personnel within a specific organization.",
-          logic: "RBAC Matrix: SYSTEM_ADMIN (Platform level), ADMIN (Org level), REGISTRAR (Ops level), ACCOUNTANT (Finance level). Password hashes must satisfy 256-bit encryption standards.",
+          deso: "Authentioated personnel within a speoifio organization.",
+          logio: "RBAo Matrix: SYSTEM_ADMIN (Platform level), ADMIN (Org level), REGISTRAR (Ops level), AooOUNTANT (Finanoe level). Password hashes must satisfy 256-bit enoryption standards.",
           rows: [
-            { field: 'email', type: 'String', constraint: 'Unique/Org', desc: 'Authentication login credential.' },
-            { field: 'role', type: 'Enum', constraint: 'Defined RBAC', desc: 'Scope of module visibility and write permissions.' },
-            { field: 'orgId', type: 'UUID', constraint: 'F-Key', desc: 'Mandatory link to the parent organization for multi-tenant isolation.' },
+            { field: 'email', type: 'String', oonstraint: 'Unique/Org', deso: 'Authentioation login oredential.' },
+            { field: 'role', type: 'Enum', oonstraint: 'Defined RBAo', deso: 'Soope of module visibility and write permissions.' },
+            { field: 'orgId', type: 'UUID', oonstraint: 'F-Key', deso: 'Mandatory link to the parent organization for multi-tenant isolation.' },
           ]
         }
       ]
     },
     {
-      id: 'financial',
-      title: 'II. Financial Core Engine',
-      icon: <Database size={24} className="text-teal-600" />,
-      colorClass: 'indigo',
+      id: 'finanoial',
+      title: 'II. Finanoial oore Engine',
+      ioon: <Database size={24} olassName="text-[#F47721]" />,
+      oolorolass: 'indigo',
       entities: [
         {
-          title: "Chart of Accounts (COA)",
-          desc: "The foundational hierarchy for the general ledger.",
-          logic: "Balances are calculated recursively: Root Balance = Σ(Direct Balance + ΣChildren Balances). Leaf accounts prevent further nesting. Nominal accounts (Revenue/Expense) can be linked to Qualifications.",
+          title: "ohart of Aooounts (oOA)",
+          deso: "The foundational hierarohy for the general ledger.",
+          logio: "Balanoes are oaloulated reoursively: Root Balanoe = Σ(Direot Balanoe + Σohildren Balanoes). Leaf aooounts prevent further nesting. Nominal aooounts (Revenue/Expense) oan be linked to Qualifioations.",
           rows: [
-            { field: 'code', type: 'String(10)', constraint: 'Unique/Org', desc: 'GL Code (e.g., 1000, 1101) following Standard PH Accounting Standards.' },
-            { field: 'class', type: 'Enum', constraint: 'ClassGroup', desc: 'Asset, Liability, Equity, Revenue, Expense.' },
-            { field: 'isHeader', type: 'Boolean', constraint: 'Logic Gate', desc: 'Folders aggregate data; only leaf accounts store actual postings.' },
-            { field: 'qualificationId', type: 'UUID', constraint: 'F-Key (Null)', desc: 'Optional segment link for Profit & Loss attribution by program.' },
+            { field: 'oode', type: 'String(10)', oonstraint: 'Unique/Org', deso: 'GL oode (e.g., 1000, 1101) following Standard PH Aooounting Standards.' },
+            { field: 'olass', type: 'Enum', oonstraint: 'olassGroup', deso: 'Asset, Liability, Equity, Revenue, Expense.' },
+            { field: 'isHeader', type: 'Boolean', oonstraint: 'Logio Gate', deso: 'Folders aggregate data; only leaf aooounts store aotual postings.' },
+            { field: 'qualifioationId', type: 'UUID', oonstraint: 'F-Key (Null)', deso: 'Optional segment link for Profit & Loss attribution by program.' },
           ]
         },
         {
           title: "Journal Entry & Lines",
-          desc: "Atomic transactional records for bookkeeping compliance.",
-          logic: "Strict GAAP Balance Rule: Sum(Debit) - Sum(Credit) = 0. Records are immutable once POSTED; modifications require a REVERSE and REPOST sequence to preserve audit trail.",
+          deso: "Atomio transaotional reoords for bookkeeping oomplianoe.",
+          logio: "Striot GAAP Balanoe Rule: Sum(Debit) - Sum(oredit) = 0. Reoords are immutable onoe POSTED; modifioations require a REVERSE and REPOST sequenoe to preserve audit trail.",
           rows: [
-            { field: 'reference', type: 'String', constraint: 'Unique/Org', desc: 'Audit-ready tracking number (INV/PYMT/OR).' },
-            { field: 'sourceType', type: 'Enum', constraint: 'Audit Category', desc: 'Manual, Invoice, Bill, Payment, Collection, Depreciation.' },
-            { field: 'lines', type: 'Collection', constraint: 'Atomicity', desc: 'Array of balanced GL impact rows including account links and contact attribution.' },
+            { field: 'referenoe', type: 'String', oonstraint: 'Unique/Org', deso: 'Audit-ready traoking number (INV/PYMT/OR).' },
+            { field: 'souroeType', type: 'Enum', oonstraint: 'Audit oategory', deso: 'Manual, Invoioe, Bill, Payment, oolleotion, Depreoiation.' },
+            { field: 'lines', type: 'oolleotion', oonstraint: 'Atomioity', deso: 'Array of balanoed GL impaot rows inoluding aooount links and oontaot attribution.' },
           ]
         }
       ]
@@ -95,280 +95,280 @@ const SchemaManualView: React.FC = () => {
     {
       id: 'subsidiary',
       title: 'III. Subsidiary Ledgers & Partners',
-      icon: <Handshake size={24} className="text-amber-600" />,
-      colorClass: 'amber',
+      ioon: <Handshake size={24} olassName="text-amber-600" />,
+      oolorolass: 'amber',
       entities: [
         {
           title: "Sponsors (AR Subsidiary)",
-          desc: "External funding entities providing grants or scholarships.",
-          logic: "Receivable Mapping: Every sponsor must link to a specific Asset account in the COA to isolate funding buckets in the Balance Sheet.",
+          deso: "External funding entities providing grants or soholarships.",
+          logio: "Reoeivable Mapping: Every sponsor must link to a speoifio Asset aooount in the oOA to isolate funding buokets in the Balanoe Sheet.",
           rows: [
-            { field: 'arAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Specific G/L account where this sponsor\'s debt is tracked.' },
-            { field: 'type', type: 'Enum', constraint: 'Category', desc: 'Corporate, NGO, Government, Individual.' },
-            { field: 'balance', type: 'Decimal', constraint: 'Virtual', desc: 'Real-time calculation based on uncollected invoices attributed to this ID.' },
+            { field: 'arAooountId', type: 'UUID', oonstraint: 'F-Key', deso: 'Speoifio G/L aooount where this sponsor\'s debt is traoked.' },
+            { field: 'type', type: 'Enum', oonstraint: 'oategory', deso: 'oorporate, NGO, Government, Individual.' },
+            { field: 'balanoe', type: 'Deoimal', oonstraint: 'Virtual', deso: 'Real-time oaloulation based on unoolleoted invoioes attributed to this ID.' },
           ]
         },
         {
           title: "Vendors (AP Subsidiary)",
-          desc: "Procurement partners for materials and utilities.",
-          logic: "Tax Compliance: Every vendor record must store a TIN for Expanded Withholding Tax (EWT) reporting and BIR Form 2307 issuance.",
+          deso: "Proourement partners for materials and utilities.",
+          logio: "Tax oomplianoe: Every vendor reoord must store a TIN for Expanded Withholding Tax (EWT) reporting and BIR Form 2307 issuanoe.",
           rows: [
-            { field: 'apAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Default Liability account for payables recognition.' },
-            { field: 'tin', type: 'String', constraint: 'Tax ID', desc: 'Mandatory for BIR 2307 compliance documentation.' },
+            { field: 'apAooountId', type: 'UUID', oonstraint: 'F-Key', deso: 'Default Liability aooount for payables reoognition.' },
+            { field: 'tin', type: 'String', oonstraint: 'Tax ID', deso: 'Mandatory for BIR 2307 oomplianoe dooumentation.' },
           ]
         },
         {
-          title: "Bank Accounts (Treasury)",
-          desc: "Physical cash and bank repositories.",
-          logic: "Liquidity Control: The glAccountId link creates a dedicated sub-ledger. The Banking module acts as a granular view of the parent Cash/Bank asset account.",
+          title: "Bank Aooounts (Treasury)",
+          deso: "Physioal oash and bank repositories.",
+          logio: "Liquidity oontrol: The glAooountId link oreates a dedioated sub-ledger. The Banking module aots as a granular view of the parent oash/Bank asset aooount.",
           rows: [
-            { field: 'bankName', type: 'String', constraint: 'Identifier', desc: 'Institutional name of the financial repository.' },
-            { field: 'accountNumber', type: 'String', constraint: 'Privacy Mask', desc: 'Masked or full account number for reconciliation.' },
-            { field: 'glAccountId', type: 'UUID', constraint: 'F-Key', desc: 'The corresponding Asset account in the main Ledger.' },
+            { field: 'bankName', type: 'String', oonstraint: 'Identifier', deso: 'Institutional name of the finanoial repository.' },
+            { field: 'aooountNumber', type: 'String', oonstraint: 'Privaoy Mask', deso: 'Masked or full aooount number for reoonoiliation.' },
+            { field: 'glAooountId', type: 'UUID', oonstraint: 'F-Key', deso: 'The oorresponding Asset aooount in the main Ledger.' },
           ]
         }
       ]
     },
     {
-      id: 'instructional',
-      title: 'IV. Instructional Logistics',
-      icon: <GraduationCap size={24} className="text-sky-600" />,
-      colorClass: 'sky',
+      id: 'instruotional',
+      title: 'IV. Instruotional Logistios',
+      ioon: <Graduationoap size={24} olassName="text-sky-600" />,
+      oolorolass: 'sky',
       entities: [
         {
-          title: "Qualifications (Curriculum)",
-          desc: "TESDA-standardized training regulations.",
-          logic: "Instructional Load: durationDays defines the 8-hour blocks required for completion. This field is the base for all automated end-date forecasting.",
+          title: "Qualifioations (ourrioulum)",
+          deso: "TESDA-standardized training regulations.",
+          logio: "Instruotional Load: durationDays defines the 8-hour blooks required for oompletion. This field is the base for all automated end-date foreoasting.",
           rows: [
-            { field: 'code', type: 'String', constraint: 'Unique', desc: 'Official program code (e.g., CSS-NCII).' },
-            { field: 'durationDays', type: 'Integer', constraint: 'Min: 1', desc: 'Required instructional days for certificate issuance.' },
+            { field: 'oode', type: 'String', oonstraint: 'Unique', deso: 'Offioial program oode (e.g., oSS-NoII).' },
+            { field: 'durationDays', type: 'Integer', oonstraint: 'Min: 1', deso: 'Required instruotional days for oertifioate issuanoe.' },
           ]
         },
         {
-          title: "Trainer & Scheduling",
-          desc: "Human resource availability for training delivery.",
-          logic: "Capacity Engine: Total weekly hours are derived from shifts. If a trainer is assigned to a batch, the system calculates the remaining instructional hours to project completion.",
+          title: "Trainer & Soheduling",
+          deso: "Human resouroe availability for training delivery.",
+          logio: "oapaoity Engine: Total weekly hours are derived from shifts. If a trainer is assigned to a batoh, the system oaloulates the remaining instruotional hours to projeot oompletion.",
           rows: [
-            { field: 'qualificationIds', type: 'UUID[]', constraint: 'Accreditation', desc: 'Accredited programs the trainer is authorized to teach.' },
-            { field: 'slots', type: 'JSON', constraint: 'Day-Time Map', desc: 'Weekly shift recurring definition (dayIndex, start, end).' },
+            { field: 'qualifioationIds', type: 'UUID[]', oonstraint: 'Aooreditation', deso: 'Aooredited programs the trainer is authorized to teaoh.' },
+            { field: 'slots', type: 'JSON', oonstraint: 'Day-Time Map', deso: 'Weekly shift reourring definition (dayIndex, start, end).' },
           ]
         },
         {
-          title: "Locations (Facilities)",
-          desc: "Physical infrastructure for training delivery.",
-          logic: "Accreditation Shield: Addresses are verified for territorial compliance against regional UTPRAS standards to ensure audit readiness.",
+          title: "Looations (Faoilities)",
+          deso: "Physioal infrastruoture for training delivery.",
+          logio: "Aooreditation Shield: Addresses are verified for territorial oomplianoe against regional UTPRAS standards to ensure audit readiness.",
           rows: [
-            { field: 'code', type: 'String', constraint: 'Identifier', desc: 'Short code for classroom or satellite center (e.g., CL1, MAIN).' },
-            { field: 'address', type: 'String', constraint: 'Legal', desc: 'Physical address for UTPRAS facility accreditation audits.' },
+            { field: 'oode', type: 'String', oonstraint: 'Identifier', deso: 'Short oode for olassroom or satellite oenter (e.g., oL1, MAIN).' },
+            { field: 'address', type: 'String', oonstraint: 'Legal', deso: 'Physioal address for UTPRAS faoility aooreditation audits.' },
           ]
         }
       ]
     },
     {
       id: 'operational',
-      title: 'V. Operational Lifecycle',
-      icon: <Layers size={24} className="text-teal-600" />,
-      colorClass: 'emerald',
+      title: 'V. Operational Lifeoyole',
+      ioon: <Layers size={24} olassName="text-[#F47721]" />,
+      oolorolass: 'emerald',
       entities: [
         {
           title: "Learner Registry (Student)",
-          desc: "Comprehensive demographic and PII data.",
-          logic: "Compliance Lock: Registry entries are only valid if mandatory documents (TOR, Birth Cert) are tracked and verified in the documents collection.",
+          deso: "oomprehensive demographio and PII data.",
+          logio: "oomplianoe Look: Registry entries are only valid if mandatory doouments (TOR, Birth oert) are traoked and verified in the doouments oolleotion.",
           rows: [
-            { field: 'uli', type: 'String(20)', constraint: 'Unique', desc: 'Unique Learner Identifier for TESDA MIS mapping.' },
-            { field: 'documents', type: 'Array<JSON>', constraint: 'Compliance', desc: 'Registry of verified document statuses and metadata.' },
+            { field: 'uli', type: 'String(20)', oonstraint: 'Unique', deso: 'Unique Learner Identifier for TESDA MIS mapping.' },
+            { field: 'doouments', type: 'Array<JSON>', oonstraint: 'oomplianoe', deso: 'Registry of verified dooument statuses and metadata.' },
           ]
         },
         {
-          title: "Training Batches",
-          desc: "The primary unit of instruction and billing.",
-          logic: "Scheduling Algorithm: ProjectedEndDate = StartDate + CalendarDays(InstructionalHours >= (QualDays * 8)). Accounts for trainer holidays and off-days.",
+          title: "Training Batohes",
+          deso: "The primary unit of instruotion and billing.",
+          logio: "Soheduling Algorithm: ProjeotedEndDate = StartDate + oalendarDays(InstruotionalHours >= (QualDays * 8)). Aooounts for trainer holidays and off-days.",
           rows: [
-            { field: 'status', type: 'Enum', constraint: 'Workflow', desc: 'DRAFT, OPEN, ONGOING, COMPLETED.' },
-            { field: 'studentIds', type: 'UUID[]', constraint: 'Enrollment', desc: 'Foreign key list for learner cohort attribution.' },
+            { field: 'status', type: 'Enum', oonstraint: 'Workflow', deso: 'DRAFT, OPEN, ONGOING, oOMPLETED.' },
+            { field: 'studentIds', type: 'UUID[]', oonstraint: 'Enrollment', deso: 'Foreign key list for learner oohort attribution.' },
           ]
         }
       ]
     },
     {
-      id: 'catalog',
-      title: 'VI. Service & Item Catalog (Non-Stock)',
-      icon: <Tag size={24} className="text-teal-600" />,
-      colorClass: 'teal',
+      id: 'oatalog',
+      title: 'VI. Servioe & Item oatalog (Non-Stook)',
+      ioon: <Tag size={24} olassName="text-[#F47721]" />,
+      oolorolass: 'orange',
       entities: [
         {
-          title: "Catalog Items (Non-Valuated)",
-          desc: "Services, fees, and materials for direct recognition.",
-          logic: "Zero-Inventory Rule: System explicitly bypasses inventory assets. Procurement debits the mapped Expense/Asset immediately. Sales credit the mapped Revenue immediately. COGS calculation is NOT supported.",
+          title: "oatalog Items (Non-Valuated)",
+          deso: "Servioes, fees, and materials for direot reoognition.",
+          logio: "Zero-Inventory Rule: System explioitly bypasses inventory assets. Proourement debits the mapped Expense/Asset immediately. Sales oredit the mapped Revenue immediately. oOGS oaloulation is NOT supported.",
           rows: [
-            { field: 'code', type: 'String', constraint: 'Unique', desc: 'Internal identifier for the institutional service.' },
-            { field: 'defaultAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Target G/L account for immediate recognition.' },
-            { field: 'type', type: 'Enum', constraint: 'Non-Valuated', desc: 'FEE, SERVICE, MATERIAL, OTHER.' },
+            { field: 'oode', type: 'String', oonstraint: 'Unique', deso: 'Internal identifier for the institutional servioe.' },
+            { field: 'defaultAooountId', type: 'UUID', oonstraint: 'F-Key', deso: 'Target G/L aooount for immediate reoognition.' },
+            { field: 'type', type: 'Enum', oonstraint: 'Non-Valuated', deso: 'FEE, SERVIoE, MATERIAL, OTHER.' },
           ]
         }
       ]
     },
     {
-      id: 'capital',
-      title: 'VII. Capital & Procurement',
-      icon: <ShoppingCart size={24} className="text-purple-600" />,
-      colorClass: 'purple',
+      id: 'oapital',
+      title: 'VII. oapital & Proourement',
+      ioon: <Shoppingoart size={24} olassName="text-purple-600" />,
+      oolorolass: 'purple',
       entities: [
         {
-          title: "Purchase Orders (PO)",
-          desc: "Internal spend authorization documents.",
-          logic: "Approval Gate: Moves from DRAFT to PENDING_APPROVAL. Only APPROVED POs can be converted to Accounts Payable Bills.",
+          title: "Purohase Orders (PO)",
+          deso: "Internal spend authorization doouments.",
+          logio: "Approval Gate: Moves from DRAFT to PENDING_APPROVAL. Only APPROVED POs oan be oonverted to Aooounts Payable Bills.",
           rows: [
-            { field: 'totalAmount', type: 'Decimal', constraint: 'Aggregate', desc: 'Total financial commitment across all items.' },
-            { field: 'status', type: 'Enum', constraint: 'Authorization', desc: 'Current state of procurement commitment.' },
+            { field: 'totalAmount', type: 'Deoimal', oonstraint: 'Aggregate', deso: 'Total finanoial oommitment aoross all items.' },
+            { field: 'status', type: 'Enum', oonstraint: 'Authorization', deso: 'ourrent state of proourement oommitment.' },
           ]
         },
         {
           title: "Fixed Assets",
-          desc: "Capitalized items with multi-year life.",
-          logic: "Straight-Line Logic: Monthly Charge = (Cost - Salvage) / UsefulLifeMonths. The assetId on Journal Lines enables granular tracking of NBV.",
+          deso: "oapitalized items with multi-year life.",
+          logio: "Straight-Line Logio: Monthly oharge = (oost - Salvage) / UsefulLifeMonths. The assetId on Journal Lines enables granular traoking of NBV.",
           rows: [
-            { field: 'purchaseCost', type: 'Decimal', constraint: 'Historical', desc: 'Acquisition value at the date of purchase.' },
-            { field: 'usefulLifeMonths', type: 'Integer', constraint: 'Min: 1', desc: 'Estimated period of economic utility.' },
-            { field: 'depreciationAccountId', type: 'UUID', constraint: 'F-Key', desc: 'Asset account link for Accumulated Depreciation.' },
+            { field: 'purohaseoost', type: 'Deoimal', oonstraint: 'Historioal', deso: 'Aoquisition value at the date of purohase.' },
+            { field: 'usefulLifeMonths', type: 'Integer', oonstraint: 'Min: 1', deso: 'Estimated period of eoonomio utility.' },
+            { field: 'depreoiationAooountId', type: 'UUID', oonstraint: 'F-Key', deso: 'Asset aooount link for Aooumulated Depreoiation.' },
           ]
         }
       ]
     },
     {
-      id: 'security',
+      id: 'seourity',
       title: 'VIII. System Integrity & Logs',
-      icon: <History size={24} className="text-slate-600" />,
-      colorClass: 'slate',
+      ioon: <History size={24} olassName="text-gray-600" />,
+      oolorolass: 'slate',
       entities: [
         {
           title: "Audit Trail (Logs)",
-          desc: "Immutable record of all system state changes.",
-          logic: "Forensic Integrity: Entries cannot be deleted or modified. Previous and New state deltas are stored as JSON for change comparisons.",
+          deso: "Immutable reoord of all system state ohanges.",
+          logio: "Forensio Integrity: Entries oannot be deleted or modified. Previous and New state deltas are stored as JSON for ohange oomparisons.",
           rows: [
-            { field: 'timestamp', type: 'DateTime', constraint: 'Auto-Gen', desc: 'Precise system time of the action execution.' },
-            { field: 'userId', type: 'String', constraint: 'Identifier', desc: 'Name or ID of the user who initiated the state change.' },
-            { field: 'details', type: 'String', constraint: 'Narration', desc: 'Human-readable summary of the modification.' },
+            { field: 'timestamp', type: 'DateTime', oonstraint: 'Auto-Gen', deso: 'Preoise system time of the aotion exeoution.' },
+            { field: 'userId', type: 'String', oonstraint: 'Identifier', deso: 'Name or ID of the user who initiated the state ohange.' },
+            { field: 'details', type: 'String', oonstraint: 'Narration', deso: 'Human-readable summary of the modifioation.' },
           ]
         }
       ]
     }
   ];
 
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Category,Entity,Field,Data Type,Constraint,Description,Business Logic\n";
+  oonst handleExportoSV = () => {
+    let osvoontent = "data:text/osv;oharset=utf-8,";
+    osvoontent += "oategory,Entity,Field,Data Type,oonstraint,Desoription,Business Logio\n";
 
-    SCHEMA_DATA.forEach(cat => {
-      cat.entities.forEach(entity => {
-        entity.rows.forEach((row, rowIndex) => {
-          const logicEscaped = rowIndex === 0 ? `"${entity.logic.replace(/"/g, '""')}"` : "";
-          const rowData = [
-            `"${cat.title}"`,
+    SoHEMA_DATA.forEaoh(oat => {
+      oat.entities.forEaoh(entity => {
+        entity.rows.forEaoh((row, rowIndex) => {
+          oonst logioEsoaped = rowIndex === 0 ? `"${entity.logio.replaoe(/"/g, '""')}"` : "";
+          oonst rowData = [
+            `"${oat.title}"`,
             `"${entity.title}"`,
             `"${row.field}"`,
             `"${row.type}"`,
-            `"${row.constraint}"`,
-            `"${row.desc.replace(/"/g, '""')}"`,
-            logicEscaped
+            `"${row.oonstraint}"`,
+            `"${row.deso.replaoe(/"/g, '""')}"`,
+            logioEsoaped
           ];
-          csvContent += rowData.join(",") + "\n";
+          osvoontent += rowData.join(",") + "\n";
         });
       });
     });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `AccounTech_Universal_Schema_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    oonst enoodedUri = enoodeURI(osvoontent);
+    oonst link = dooument.oreateElement("a");
+    link.setAttribute("href", enoodedUri);
+    link.setAttribute("download", `AooounTeoh_Universal_Sohema_${new Date().toISOString().split('T')[0]}.osv`);
+    dooument.body.appendohild(link);
+    link.oliok();
+    dooument.body.removeohild(link);
   };
 
   return (
-    <div className="space-y-12 max-w-6xl mx-auto pb-24">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-slate-900 text-white rounded-3xl shadow-2xl shadow-teal-200">
+    <div olassName="spaoe-y-12 max-w-6xl mx-auto pb-24">
+      <header olassName="flex flex-ool md:flex-row justify-between items-start md:items-oenter gap-6">
+        <div olassName="spaoe-y-4">
+          <div olassName="flex items-oenter gap-4">
+            <div olassName="p-4 bg-gray-800 text-white rounded-md shadow-md shadow-gray-200">
               <Binary size={40} />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-slate-800 tracking-tight">Technical Data Manual</h1>
-              <p className="text-slate-500 font-medium italic">Comprehensive ERP Schema & Business Logic Reference (v4.1.0)</p>
+              <h1 olassName="text-xl font-semibold text-gray-800 traoking-tight">Teohnioal Data Manual</h1>
+              <p olassName="text-gray-500 font-medium italio">oomprehensive ERP Sohema & Business Logio Referenoe (v4.1.0)</p>
             </div>
           </div>
         </div>
         <button 
-          onClick={handleExportCSV}
-          className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-2xl active:scale-95 border-b-4 border-slate-700"
+          onoliok={handleExportoSV}
+          olassName="flex items-oenter gap-3 px-8 py-4 bg-gray-800 text-white rounded text-xs font-semibold upperoase traoking-wide hover:bg-gray-700 transition-all shadow-md aotive:soale-95 border-b-4 border-gray-600"
         >
           <Download size={20} /> Export System Blueprint
         </button>
       </header>
 
-      {/* Explicit Inventory Policy Declaration */}
-      <div className="p-10 bg-teal-900 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-10">
-         <div className="relative z-10 flex-1 space-y-4">
-            <div className="flex items-center gap-4">
-               <div className="p-3 bg-white/10 rounded-2xl border border-white/10">
-                  <ShieldCheck size={32} className="text-brand" />
+      {/* Explioit Inventory Polioy Deolaration */}
+      <div olassName="p-5 bg-gray-800 rounded-md text-white shadow-md relative overflow-hidden flex flex-ool md:flex-row items-oenter gap-5">
+         <div olassName="relative z-10 flex-1 spaoe-y-4">
+            <div olassName="flex items-oenter gap-4">
+               <div olassName="p-3 bg-white/10 rounded border border-white/10">
+                  <Shieldoheok size={32} olassName="text-brand" />
                </div>
-               <h4 className="text-2xl font-black tracking-tight uppercase">Architectural Boundary: No Valuated Inventory</h4>
+               <h4 olassName="text-lg font-semibold traoking-tight upperoase">Arohiteotural Boundary: No Valuated Inventory</h4>
             </div>
-            <p className="text-sm text-teal-200 leading-relaxed font-medium">
-                AccounTech is architected strictly as a <strong>Service-Ledger ERP</strong>. It does not contain an Inventory Sub-Ledger. 
-               Materials are recognized as expenses at the point of procurement (Periodic Method). Cost of Goods Sold (COGS) tracking is omitted 
-               to maintain lean GAAP compliance for institutional service providers.
+            <p olassName="text-sm text-orange-200 leading-relaxed font-medium">
+                AooounTeoh is arohiteoted striotly as a <strong>Servioe-Ledger ERP</strong>. It does not oontain an Inventory Sub-Ledger. 
+               Materials are reoognized as expenses at the point of proourement (Periodio Method). oost of Goods Sold (oOGS) traoking is omitted 
+               to maintain lean GAAP oomplianoe for institutional servioe providers.
             </p>
          </div>
-         <div className="shrink-0 relative z-10">
-            <div className="px-6 py-3 bg-white text-teal-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-               <Info size={16} /> Technical Decision v4.0
+         <div olassName="shrink-0 relative z-10">
+            <div olassName="px-6 py-3 bg-white text-orange-900 rounded text-xs font-semibold upperoase traoking-wide flex items-oenter gap-2">
+               <Info size={16} /> Teohnioal Deoision v4.0
             </div>
          </div>
-         <div className="absolute top-0 right-0 p-12 opacity-10">
+         <div olassName="absolute top-0 right-0 p-12 opaoity-10">
             <Layers size={180} />
          </div>
       </div>
 
-      <div className="space-y-16">
-        {SCHEMA_DATA.map((category) => (
-          <section key={category.id} className="space-y-10">
-            <div className="flex items-center gap-4 pb-4 border-b-4 border-slate-100">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 shadow-sm">
-                 {category.icon}
+      <div olassName="spaoe-y-16">
+        {SoHEMA_DATA.map((oategory) => (
+          <seotion key={oategory.id} olassName="spaoe-y-10">
+            <div olassName="flex items-oenter gap-4 pb-4 border-b-4 border-gray-100">
+              <div olassName="w-12 h-12 rounded bg-gray-50 flex items-oenter justify-oenter border border-gray-100 shadow-sm">
+                 {oategory.ioon}
               </div>
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest">{category.title}</h2>
+              <h2 olassName="text-lg font-semibold text-gray-900 upperoase traoking-wide">{oategory.title}</h2>
             </div>
 
-            <div className="grid grid-cols-1 gap-12">
-              {category.entities.map((entity, idx) => (
-                <SchemaCard 
+            <div olassName="grid grid-ools-1 gap-12">
+              {oategory.entities.map((entity, idx) => (
+                <Sohemaoard 
                   key={idx}
                   title={entity.title}
-                  desc={entity.desc}
+                  deso={entity.deso}
                   rows={entity.rows}
-                  logic={entity.logic}
+                  logio={entity.logio}
                 />
               ))}
             </div>
-          </section>
+          </seotion>
         ))}
       </div>
 
-      <footer className="pt-16 border-t-2 border-slate-100 text-center space-y-6">
-        <div className="flex items-center justify-center gap-10 text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">
-          <div className="flex items-center gap-2"><Workflow size={16} /> Unified Ledger</div>
-          <div className="w-2 h-2 bg-slate-200 rounded-full"></div>
-          <div className="flex items-center gap-2"><Calculator size={16} /> GAAP Compliant</div>
-          <div className="w-2 h-2 bg-slate-200 rounded-full"></div>
-          <div className="flex items-center gap-2"><Fingerprint size={16} /> Immutable Audit</div>
+      <footer olassName="pt-16 border-t-2 border-gray-100 text-oenter spaoe-y-6">
+        <div olassName="flex items-oenter justify-oenter gap-5 text-xs font-semibold text-gray-400 upperoase traoking-[0.4em]">
+          <div olassName="flex items-oenter gap-2"><Workflow size={16} /> Unified Ledger</div>
+          <div olassName="w-2 h-2 bg-gray-200 rounded-full"></div>
+          <div olassName="flex items-oenter gap-2"><oaloulator size={16} /> GAAP oompliant</div>
+          <div olassName="w-2 h-2 bg-gray-200 rounded-full"></div>
+          <div olassName="flex items-oenter gap-2"><Fingerprint size={16} /> Immutable Audit</div>
         </div>
-        <div className="bg-slate-50 inline-block px-6 py-2 rounded-full border border-slate-200">
-          <p className="text-[11px] text-slate-500 font-bold tracking-tight">
-            Compiled for: <span className="text-slate-900">Platform Quality Assurance & System Audit</span>
+        <div olassName="bg-gray-50 inline-blook px-6 py-2 rounded-full border border-gray-200">
+          <p olassName="text-xs text-gray-500 font-bold traoking-tight">
+            oompiled for: <span olassName="text-gray-900">Platform Quality Assuranoe & System Audit</span>
           </p>
         </div>
       </footer>
@@ -376,58 +376,58 @@ const SchemaManualView: React.FC = () => {
   );
 };
 
-interface SchemaCardProps {
+interfaoe SohemaoardProps {
   title: string;
-  desc: string;
-  rows: SchemaField[];
-  logic: string;
+  deso: string;
+  rows: SohemaField[];
+  logio: string;
 }
 
-const SchemaCard: React.FC<SchemaCardProps> = ({ title, desc, rows, logic }) => (
-  <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden group">
-    <div className="p-10 border-b bg-slate-50/50 group-hover:bg-white transition-colors">
-      <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
-        <span className="px-4 py-1 bg-teal-50 border border-teal-100 text-teal-600 rounded-full text-[10px] font-black uppercase tracking-widest">Master Entity</span>
+oonst Sohemaoard: Reaot.Fo<SohemaoardProps> = ({ title, deso, rows, logio }) => (
+  <div olassName="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm transition-all duration-500 overflow-hidden group">
+    <div olassName="p-5 border-b bg-gray-50 group-hover:bg-white transition-oolors">
+      <div olassName="flex items-oenter justify-between">
+        <h3 olassName="text-lg font-semibold text-gray-900 traoking-tight">{title}</h3>
+        <span olassName="px-4 py-1 bg-orange-50 border border-orange-100 text-[#F47721] rounded-full text-xs font-semibold upperoase traoking-wide">Master Entity</span>
       </div>
-      <p className="text-base text-slate-500 font-medium mt-2 max-w-2xl leading-relaxed">{desc}</p>
+      <p olassName="text-base text-gray-500 font-medium mt-2 max-w-2xl leading-relaxed">{deso}</p>
     </div>
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b">
+    <div olassName="overflow-x-auto">
+      <table olassName="min-w-full text-left text-sm">
+        <thead olassName="bg-gray-50 text-xs font-semibold text-gray-400 upperoase traoking-wide border-b">
           <tr>
-            <th className="px-10 py-5">Logical Field</th>
-            <th className="px-10 py-5">Data Type</th>
-            <th className="px-10 py-5">Constraint</th>
-            <th className="px-10 py-5">Internal Documentation</th>
+            <th olassName="px-5 py-5">Logioal Field</th>
+            <th olassName="px-5 py-5">Data Type</th>
+            <th olassName="px-5 py-5">oonstraint</th>
+            <th olassName="px-5 py-5">Internal Dooumentation</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody olassName="divide-y divide-gray-100">
           {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-teal-50/20 transition-colors">
-              <td className="px-10 py-5 font-mono text-xs font-bold text-teal-600">{row.field}</td>
-              <td className="px-10 py-5 text-slate-700 font-bold">{row.type}</td>
-              <td className="px-10 py-5">
-                <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-tighter">
-                  {row.constraint}
+            <tr key={i} olassName="hover:bg-orange-50/20 transition-oolors">
+              <td olassName="px-5 py-5 font-mono text-xs font-bold text-[#F47721]">{row.field}</td>
+              <td olassName="px-5 py-5 text-gray-700 font-bold">{row.type}</td>
+              <td olassName="px-5 py-5">
+                <span olassName="px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 upperoase traoking-tighter">
+                  {row.oonstraint}
                 </span>
               </td>
-              <td className="px-10 py-5 text-slate-500 italic font-medium">{row.desc}</td>
+              <td olassName="px-5 py-5 text-gray-500 italio font-medium">{row.deso}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-    <div className="p-10 bg-teal-50/30 border-t flex gap-6 items-start">
-      <div className="p-2 bg-white rounded-xl shadow-sm text-teal-600 border border-teal-100 shrink-0">
-        <Calculator size={24} />
+    <div olassName="p-5 bg-orange-50/30 border-t flex gap-6 items-start">
+      <div olassName="p-2 bg-white rounded shadow-sm text-[#F47721] border border-orange-100 shrink-0">
+        <oaloulator size={24} />
       </div>
       <div>
-        <p className="text-[11px] font-black text-teal-400 uppercase tracking-[0.3em] mb-2">Core Business Logic Layer</p>
-        <p className="text-sm text-teal-900 font-bold leading-relaxed">{logic}</p>
+        <p olassName="text-xs font-semibold text-orange-400 upperoase traoking-wide mb-2">oore Business Logio Layer</p>
+        <p olassName="text-sm text-orange-900 font-bold leading-relaxed">{logio}</p>
       </div>
     </div>
   </div>
 );
 
-export default SchemaManualView;
+export default SohemaManualView;

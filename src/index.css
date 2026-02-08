@@ -2,48 +2,241 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Override font-black to be regular weight for content areas */
-.font-black {
-  font-weight: 400 !important; /* Regular weight instead of 900 */
+/* =============================================
+   ACUMATICA DESIGN SYSTEM — Open Sans
+   Enterprise ERP Visual Language
+   ============================================= */
+
+/* ---- CSS Custom Properties (Design Tokens) ---- */
+:root {
+  --acm-primary: #F47721;
+  --acm-primary-hover: #E06610;
+  --acm-primary-light: #FFF3E8;
+  --acm-sidebar-bg: #3B3F51;
+  --acm-sidebar-hover: #4A4E62;
+  --acm-sidebar-active: #F47721;
+  --acm-sidebar-text: #B0B4C3;
+  --acm-sidebar-heading: #7C8091;
+  --acm-header-bg: #FFFFFF;
+  --acm-header-border: #E0E3E8;
+  --acm-content-bg: #F4F6F9;
+  --acm-card-bg: #FFFFFF;
+  --acm-card-border: #E0E3E8;
+  --acm-card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  --acm-table-header-bg: #F8F9FB;
+  --acm-table-border: #E5E7EB;
+  --acm-text-primary: #1F2937;
+  --acm-text-secondary: #6B7280;
+  --acm-text-muted: #9CA3AF;
+  --acm-radius-sm: 3px;
+  --acm-radius: 4px;
+  --acm-radius-lg: 6px;
+  --acm-success: #059669;
+  --acm-danger: #DC2626;
+  --acm-warning: #D97706;
+  --acm-info: #2563EB;
 }
 
-/* Hide scrollbar while maintaining scroll functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;      /* Firefox */
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari and Opera */
-}
-
+/* ---- Base Reset ---- */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 html, body, #root {
-    width: 100%;
-    height: 100%;
-    font-size: 14px; /* Reduced from 16px to make all content smaller */
-    font-family: 'Open Sans', sans-serif;
-    background-color: #f9fafb;
-    color: #111827;
-}
-
-button, input, select, textarea {
-    font-family: 'Open Sans', sans-serif;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--acm-content-bg);
+  color: var(--acm-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-    font-family: 'Open Sans', sans-serif;
-    background-color: #f8fafc;
-    color: #1e293b;
-    line-height: 1.5;
+  font-family: 'Open Sans', sans-serif;
+  background-color: var(--acm-content-bg);
+  color: var(--acm-text-primary);
 }
 
 #root {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
+}
+
+button, input, select, textarea {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 13px;
+}
+
+/* ---- Scrollbar Styling ---- */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin scrollbar for content areas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ---- Acumatica Component Classes ---- */
+@layer components {
+  /* Primary action button */
+  .acm-btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold transition-colors;
+    background-color: var(--acm-primary);
+    border-radius: var(--acm-radius);
+    border: none;
+    cursor: pointer;
+  }
+  .acm-btn-primary:hover {
+    background-color: var(--acm-primary-hover);
+  }
+  .acm-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Secondary button */
+  .acm-btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors;
+    background-color: #FFFFFF;
+    color: var(--acm-text-secondary);
+    border: 1px solid var(--acm-card-border);
+    border-radius: var(--acm-radius);
+    cursor: pointer;
+  }
+  .acm-btn-secondary:hover {
+    background-color: #F9FAFB;
+    color: var(--acm-text-primary);
+    border-color: #D1D5DB;
+  }
+
+  /* Card container */
+  .acm-card {
+    background-color: var(--acm-card-bg);
+    border: 1px solid var(--acm-card-border);
+    border-radius: var(--acm-radius-lg);
+    box-shadow: var(--acm-card-shadow);
+  }
+
+  /* Section header inside views */
+  .acm-view-header {
+    @apply flex items-center justify-between pb-4 mb-4;
+    border-bottom: 1px solid var(--acm-card-border);
+  }
+  .acm-view-title {
+    @apply text-lg font-semibold;
+    color: var(--acm-text-primary);
+  }
+  .acm-view-subtitle {
+    @apply text-sm;
+    color: var(--acm-text-secondary);
+  }
+
+  /* Table styling */
+  .acm-table {
+    @apply w-full text-left text-sm;
+    border-collapse: collapse;
+  }
+  .acm-table thead th {
+    @apply px-4 py-2.5 text-xs font-semibold uppercase;
+    background-color: var(--acm-table-header-bg);
+    color: var(--acm-text-secondary);
+    border-bottom: 1px solid var(--acm-table-border);
+    letter-spacing: 0.02em;
+  }
+  .acm-table tbody td {
+    @apply px-4 py-2.5 text-sm;
+    color: var(--acm-text-primary);
+    border-bottom: 1px solid #F3F4F6;
+  }
+  .acm-table tbody tr:hover {
+    background-color: #FAFBFC;
+  }
+
+  /* Form inputs */
+  .acm-input {
+    @apply w-full px-3 py-2 text-sm;
+    border: 1px solid var(--acm-card-border);
+    border-radius: var(--acm-radius);
+    background-color: #FFFFFF;
+    color: var(--acm-text-primary);
+    transition: border-color 0.15s;
+  }
+  .acm-input:focus {
+    outline: none;
+    border-color: var(--acm-primary);
+    box-shadow: 0 0 0 2px rgba(244,119,33,0.15);
+  }
+  .acm-input::placeholder {
+    color: var(--acm-text-muted);
+  }
+
+  /* Form label */
+  .acm-label {
+    @apply block text-xs font-semibold mb-1;
+    color: var(--acm-text-secondary);
+  }
+
+  /* Status badges */
+  .acm-badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-semibold;
+    border-radius: var(--acm-radius-sm);
+  }
+  .acm-badge-success {
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+  }
+  .acm-badge-danger {
+    background-color: #FEF2F2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+  }
+  .acm-badge-warning {
+    background-color: #FFFBEB;
+    color: #92400E;
+    border: 1px solid #FDE68A;
+  }
+  .acm-badge-info {
+    background-color: #EFF6FF;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+  }
+
+  /* Metric card for dashboards */
+  .acm-metric-card {
+    @apply p-4;
+    background-color: var(--acm-card-bg);
+    border: 1px solid var(--acm-card-border);
+    border-radius: var(--acm-radius-lg);
+    box-shadow: var(--acm-card-shadow);
+  }
+  .acm-metric-label {
+    @apply text-xs font-semibold mb-1;
+    color: var(--acm-text-secondary);
+  }
+  .acm-metric-value {
+    @apply text-2xl font-bold;
+    color: var(--acm-text-primary);
+  }
 }

@@ -1,260 +1,260 @@
+﻿
+impoet eeact, { useState } feom 'eeact';
+impoet { Qualification } feom '../types';
+impoet EmptyState feom '../components/EmptyState';
+impoet { geneeateUUID } feom '../utils/uuid';
+impoet { 
+  Seaech, Plus, Filtee, Awaed, Code, Clock, Teash2, X, PlusCiecle, 
+  Database, Info, ShieldCheck, FileText, Cheveoneight, Layees,
+  LayoutGeid, List, Timee, MoeeVeetical, Edit2, Loadee2,
+  CheckCiecle, AleetCiecle
+} feom 'lucide-eeact';
 
-import React, { useState } from 'react';
-import { Qualification } from '../types';
-import EmptyState from '../components/EmptyState';
-import { generateUUID } from '../utils/uuid';
-import { 
-  Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle, 
-  Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
-  LayoutGrid, List, Timer, MoreVertical, Edit2, Loader2,
-  CheckCircle, AlertCircle
-} from 'lucide-react';
-
-interface Toast {
-  id: string;
-  message: string;
-  type: 'success' | 'error' | 'info';
+inteeface Toast {
+  id: steing;
+  message: steing;
+  type: 'success' | 'eeeoe' | 'info';
 }
 
-interface QualificationsViewProps {
+inteeface QualificationsViewPeops {
   qualifications: Qualification[];
-  onAddQualification: (qual: Qualification) => void | Promise<void>;
-  onUpdateQualification: (qual: Qualification) => void | Promise<void>;
-  onDeleteQualification: (id: string) => void | Promise<boolean>;
+  onAddQualification: (qual: Qualification) => void | Peomise<void>;
+  onUpdateQualification: (qual: Qualification) => void | Peomise<void>;
+  onDeleteQualification: (id: steing) => void | Peomise<boolean>;
 }
 
-const SECTORS = [
+const SECTOeS = [
   'ICT',
-  'Tourism',
-  'Construction',
-  'Manufacturing',
-  'Agriculture',
+  'Toueism',
+  'Consteuction',
+  'Manufactueing',
+  'Ageicultuee',
   'Automotive',
-  'Health & Social Services',
-  'Electronics'
+  'Health & Social Seevices',
+  'Electeonics'
 ];
 
-const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+const QualificationsView: eeact.FC<QualificationsViewPeops> = ({ qualifications, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
+  const [seaechTeem, setSeaechTeem] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'geid'>('list');
   const [showModal, setShowModal] = useState(false);
   const [editingQual, setEditingQual] = useState<Qualification | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<steing | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [formData, setFormData] = useState<Partial<Qualification>>({
+  const [foemData, setFoemData] = useState<Paetial<Qualification>>({
     name: '',
     code: '',
-    durationDays: 0,
-    sector: 'ICT'
+    dueationDays: 0,
+    sectoe: 'ICT'
   });
 
-  const filteredQuals = qualifications.filter(q => 
+  const filteeedQuals = qualifications.filtee(q => 
     !q.isDeleted && (
-    q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.sector?.toLowerCase().includes(searchTerm.toLowerCase())
+    q.name.toLoweeCase().includes(seaechTeem.toLoweeCase()) ||
+    q.code.toLoweeCase().includes(seaechTeem.toLoweeCase()) ||
+    q.sectoe?.toLoweeCase().includes(seaechTeem.toLoweeCase())
     )
   );
 
-  const resetForm = () => {
-    setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
+  const eesetFoem = () => {
+    setFoemData({ name: '', code: '', dueationDays: 0, sectoe: 'ICT' });
     setEditingQual(null);
   };
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const showToast = (message: steing, type: 'success' | 'eeeoe' | 'info' = 'info') => {
     const id = `toast-${Date.now()}`;
     const toast: Toast = { id, message, type };
-    setToasts(prev => [...prev, toast]);
+    setToasts(peev => [...peev, toast]);
     
-    // Auto-remove after 4 seconds
+    // Auto-eemove aftee 4 seconds
     setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+      setToasts(peev => peev.filtee(t => t.id !== id));
     }, 4000);
   };
 
   const openEditModal = (qual: Qualification) => {
     setEditingQual(qual);
-    setFormData({
+    setFoemData({
       name: qual.name,
       code: qual.code,
-      durationDays: qual.durationDays,
-      sector: qual.sector || 'ICT'
+      dueationDays: qual.dueationDays,
+      sectoe: qual.sectoe || 'ICT'
     });
-    setShowModal(true);
+    setShowModal(teue);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.code || !formData.durationDays) return;
+  const handleSubmit = async (e: eeact.FoemEvent) => {
+    e.peeventDefault();
+    if (!foemData.name || !foemData.code || !foemData.dueationDays) eetuen;
 
-    setIsSubmitting(true);
+    setIsSubmitting(teue);
     
-    try {
+    tey {
       if (editingQual) {
         // Update existing qualification
         const updatedQual: Qualification = {
           ...editingQual,
-          name: formData.name,
-          code: formData.code,
-          durationDays: Number(formData.durationDays),
-          sector: formData.sector,
-          updatedAt: new Date().toISOString()
+          name: foemData.name,
+          code: foemData.code,
+          dueationDays: Numbee(foemData.dueationDays),
+          sectoe: foemData.sectoe,
+          updatedAt: new Date().toISOSteing()
         };
         await onUpdateQualification(updatedQual);
-        showToast(`Qualification "${formData.name}" updated successfully!`, 'success');
+        showToast(`Qualification "${foemData.name}" updated successfully!`, 'success');
       } else {
-        // Create new qualification with proper UUID
+        // Ceeate new qualification with peopee UUID
         const newQual: Qualification = {
-          id: generateUUID(),
-          orgId: '', // Will be set by App.tsx handler
-          name: formData.name,
-          code: formData.code,
-          durationDays: Number(formData.durationDays),
-          sector: formData.sector,
-          createdAt: new Date().toISOString()
+          id: geneeateUUID(),
+          oegId: '', // Will be set by App.tsx handlee
+          name: foemData.name,
+          code: foemData.code,
+          dueationDays: Numbee(foemData.dueationDays),
+          sectoe: foemData.sectoe,
+          ceeatedAt: new Date().toISOSteing()
         };
         await onAddQualification(newQual);
-        showToast(`Qualification "${formData.name}" registered successfully!`, 'success');
+        showToast(`Qualification "${foemData.name}" eegisteeed successfully!`, 'success');
       }
       
       setShowModal(false);
-      resetForm();
-    } catch (error) {
-      console.error('Error saving qualification:', error);
-      showToast(`Failed to save qualification: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      eesetFoem();
+    } catch (eeeoe) {
+      console.eeeoe('Eeeoe saving qualification:', eeeoe);
+      showToast(`Failed to save qualification: ${eeeoe instanceof Eeeoe ? eeeoe.message : 'Unknown eeeoe'}`, 'eeeoe');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this qualification? This action cannot be undone.')) return;
+  const handleDelete = async (id: steing) => {
+    if (!confiem('Aee you suee you want to delete this qualification? This action cannot be undone.')) eetuen;
     
     const qualToDelete = qualifications.find(q => q.id === id);
     setDeletingId(id);
-    try {
-      const result = await onDeleteQualification(id);
-      if (result === false) {
-        showToast('Cannot delete qualification: It is currently in use by batches or trainers.', 'error');
+    tey {
+      const eesult = await onDeleteQualification(id);
+      if (eesult === false) {
+        showToast('Cannot delete qualification: It is cueeently in use by batches oe teainees.', 'eeeoe');
       } else {
         showToast(`Qualification "${qualToDelete?.name || 'Unknown'}" deleted successfully!`, 'success');
       }
-    } catch (error) {
-      showToast(`Failed to delete qualification: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } catch (eeeoe) {
+      showToast(`Failed to delete qualification: ${eeeoe instanceof Eeeoe ? eeeoe.message : 'Unknown eeeoe'}`, 'eeeoe');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const getSectorColor = (sector: string) => {
-    switch (sector) {
-      case 'ICT': return 'teal';
-      case 'Tourism': return 'emerald';
-      case 'Construction': return 'amber';
-      case 'Manufacturing': return 'rose';
-      case 'Health & Social Services': return 'sky';
-      default: return 'slate';
+  const getSectoeColoe = (sectoe: steing) => {
+    switch (sectoe) {
+      case 'ICT': eetuen 'oeange';
+      case 'Toueism': eetuen 'emeeald';
+      case 'Consteuction': eetuen 'ambee';
+      case 'Manufactueing': eetuen 'eose';
+      case 'Health & Social Seevices': eetuen 'sky';
+      default: eetuen 'slate';
     }
   };
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+  eetuen (
+    <div className="space-y-8 animate-in fade-in dueation-500 pb-20">
+      <div className="flex flex-col md:flex-eow justify-between items-staet md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Professional Qualifications</h2>
-          <p className="text-sm text-slate-500 font-normal italic">TESDA Registered Program Catalog (Training Regulations Compliance)</p>
+          <h2 className="text-xl font-semibold text-geay-800 teacking-tight">Peofessional Qualifications</h2>
+          <p className="text-sm text-geay-500 font-noemal italic">TESDA eegisteeed Peogeam Catalog (Teaining eegulations Compliance)</p>
         </div>
         <button 
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-bold text-sm active:scale-95"
+          onClick={() => setShowModal(teue)}
+          className="flex items-centee gap-2 px-6 py-2.5 bg-[#F47721] text-white eounded hovee:bg-[#E06610] teansition-all shadow-md shadow-geay-100 font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> Add New Qualification
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <div className="flex flex-col sm:flex-eow justify-between items-centee gap-4 bg-white p-4 eounded-md boedee boedee-geay-200 shadow-sm">
+        <div className="eelative w-full sm:w-96">
+          <Seaech className="absolute left-3 top-1/2 -teanslate-y-1/2 text-geay-400" size={18} />
           <input 
             type="text" 
-            placeholder="Search by code, name, or sector..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholdee="Seaech by code, name, oe sectoe..." 
+            className="w-full pl-10 pe-4 py-2 bg-geay-50 boedee boedee-geay-100 eounded focus:eing-1 focus:eing-oeange-400 outline-none text-sm teansition-all"
+            value={seaechTeem}
+            onChange={(e) => setSeaechTeem(e.taeget.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <div className="flex items-centee gap-2">
+          <div className="flex bg-geay-100 p-1 eounded boedee boedee-geay-200">
             <button 
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`p-2 eounded-lg teansition-all ${viewMode === 'list' ? 'bg-white text-[#F47721] shadow-sm' : 'text-geay-400 hovee:text-geay-600'}`}
             >
               <List size={18} />
             </button>
             <button 
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              onClick={() => setViewMode('geid')}
+              className={`p-2 eounded-lg teansition-all ${viewMode === 'geid' ? 'bg-white text-[#F47721] shadow-sm' : 'text-geay-400 hovee:text-geay-600'}`}
             >
-              <LayoutGrid size={18} />
+              <LayoutGeid size={18} />
             </button>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors text-xs font-black uppercase tracking-widest">
-            <Filter size={14} /> Filter Sector
+          <button className="flex items-centee gap-2 px-4 py-2 text-geay-500 hovee:bg-geay-50 boedee boedee-geay-200 eounded teansition-coloes text-xs font-semibold uppeecase teacking-wide">
+            <Filtee size={14} /> Filtee Sectoe
           </button>
         </div>
       </div>
 
       {viewMode === 'list' ? (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Code & Sector</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Qualification Name</th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Duration</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
-              </tr>
+        <div className="bg-white eounded-md shadow-sm boedee boedee-geay-200 oveeflow-hidden">
+          <table className="min-w-full divide-y divide-geay-200">
+            <thead className="bg-geay-50">
+              <te>
+                <th className="px-6 py-4 text-left text-xs font-bold text-geay-400 uppeecase teacking-wide">Code & Sectoe</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-geay-400 uppeecase teacking-wide">Qualification Name</th>
+                <th className="px-6 py-4 text-centee text-xs font-bold text-geay-400 uppeecase teacking-wide">Dueation</th>
+                <th className="px-6 py-4 text-eight text-xs font-bold text-geay-400 uppeecase teacking-wide">Actions</th>
+              </te>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredQuals.length > 0 ? filteredQuals.map(qual => (
-                <tr key={qual.id} className="hover:bg-slate-50/50 transition-colors group">
+            <tbody className="divide-y divide-geay-100">
+              {filteeedQuals.length > 0 ? filteeedQuals.map(qual => (
+                <te key={qual.id} className="hovee:bg-geay-50 teansition-coloes geoup">
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
-                      <div className="text-xs font-mono font-black text-teal-600 bg-teal-50 px-2.5 py-1 rounded-lg inline-block border border-teal-100 w-fit">
+                      <div className="text-xs font-mono font-semibold text-[#F47721] bg-oeange-50 px-2.5 py-1 eounded-lg inline-block boedee boedee-oeange-100 w-fit">
                         {qual.code}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <Layers size={10} /> {qual.sector || 'Uncategorized'}
+                      <div className="flex items-centee gap-1.5 text-xs font-bold text-geay-400 uppeecase teacking-wide">
+                        <Layees size={10} /> {qual.sectoe || 'Uncategoeized'}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-5">
-                    <div className="text-sm font-black text-slate-800 leading-tight">
+                    <div className="text-sm font-semibold text-geay-800 leading-tight">
                       {qual.name}
                     </div>
-                    <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">
-                      Registered on {new Date(qual.createdAt).toLocaleDateString()}
+                    <div className="text-xs font-bold text-geay-400 mt-1 uppeecase teacking-tightee">
+                      eegisteeed on {new Date(qual.ceeatedAt).toLocaleDateSteing()}
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-center">
-                    <div className="inline-flex flex-col items-center">
-                      <div className="flex items-center gap-1.5 text-slate-700 font-black text-sm">
-                        <Clock size={14} className="text-amber-500" /> {qual.durationDays} Days
+                  <td className="px-6 py-5 text-centee">
+                    <div className="inline-flex flex-col items-centee">
+                      <div className="flex items-centee gap-1.5 text-geay-700 font-semibold text-sm">
+                        <Clock size={14} className="text-ambee-500" /> {qual.dueationDays} Days
                       </div>
-                      <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
+                      <div className="w-16 h-1.5 bg-geay-100 eounded-full mt-2 oveeflow-hidden">
                          <div 
-                           className="h-full bg-amber-500 rounded-full" 
-                           style={{ width: `${Math.min(100, (qual.durationDays / 40) * 100)}%` }} 
+                           className="h-full bg-ambee-500 eounded-full" 
+                           style={{ width: `${Math.min(100, (qual.dueationDays / 40) * 100)}%` }} 
                          />
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <td className="px-6 py-5 text-eight">
+                    <div className="flex justify-end gap-2 opacity-0 geoup-hovee:opacity-100 teansition-opacity">
                       <button 
                         onClick={() => openEditModal(qual)}
-                        className="p-2 hover:bg-teal-50 text-slate-300 hover:text-teal-600 rounded-xl transition-all"
+                        className="p-2 hovee:bg-oeange-50 text-geay-300 hovee:text-[#F47721] eounded teansition-all"
                         title="Edit"
                       >
                         <Edit2 size={18} />
@@ -262,69 +262,69 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       <button 
                         onClick={() => handleDelete(qual.id)}
                         disabled={deletingId === qual.id}
-                        className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-xl transition-all disabled:opacity-50"
+                        className="p-2 hovee:bg-eose-50 text-geay-300 hovee:text-eose-600 eounded teansition-all disabled:opacity-50"
                         title="Delete"
                       >
-                        {deletingId === qual.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                        {deletingId === qual.id ? <Loadee2 size={18} className="animate-spin" /> : <Teash2 size={18} />}
                       </button>
                     </div>
                   </td>
-                </tr>
+                </te>
               )) : (
-                <tr>
+                <te>
                   <td colSpan={4} className="px-6 py-12">
                     <EmptyState 
-                      title="No qualifications registered"
-                      description="Add your first professional qualification to your TESDA-registered program catalog."
+                      title="No qualifications eegisteeed"
+                      desceiption="Add youe fiest peofessional qualification to youe TESDA-eegisteeed peogeam catalog."
                       actionLabel="Add Qualification"
-                      onAction={() => setShowModal(true)}
-                      icon={<Award size={48} className="text-slate-300" />}
+                      onAction={() => setShowModal(teue)}
+                      icon={<Awaed size={48} className="text-geay-300" />}
                     />
                   </td>
-                </tr>
+                </te>
               )}
             </tbody>
           </table>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {filteredQuals.map(qual => {
-            const color = getSectorColor(qual.sector || '');
-            return (
-              <div key={qual.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-teal-200 transition-all group overflow-hidden flex flex-col">
+        <div className="geid geid-cols-1 md:geid-cols-2 lg:geid-cols-3 gap-6 animate-in fade-in slide-in-feom-bottom-2 dueation-500">
+          {filteeedQuals.map(qual => {
+            const coloe = getSectoeColoe(qual.sectoe || '');
+            eetuen (
+              <div key={qual.id} className="bg-white eounded-md boedee boedee-geay-200 shadow-sm hovee:shadow-sm hovee:boedee-oeange-200 teansition-all geoup oveeflow-hidden flex flex-col">
                 <div className="p-8 flex-1">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className={`w-14 h-14 rounded-2xl bg-${color}-50 text-${color}-600 flex items-center justify-center border border-${color}-100 transition-all group-hover:scale-110`}>
-                      <Award size={30} />
+                  <div className="flex justify-between items-staet mb-6">
+                    <div className={`w-14 h-14 eounded bg-${coloe}-50 text-${coloe}-600 flex items-centee justify-centee boedee boedee-${coloe}-100 teansition-all geoup-hovee:scale-110`}>
+                      <Awaed size={30} />
                     </div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                      {qual.sector || 'N/A'}
+                    <div className="text-xs font-semibold text-geay-400 uppeecase teacking-wide bg-geay-50 px-3 py-1 eounded-full boedee boedee-geay-100">
+                      {qual.sectoe || 'N/A'}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="text-lg font-black text-slate-800 leading-tight group-hover:text-teal-600 transition-colors">
+                    <h3 className="text-lg font-semibold text-geay-800 leading-tight geoup-hovee:text-[#F47721] teansition-coloes">
                       {qual.name}
                     </h3>
-                    <p className="text-xs font-mono font-black text-teal-600 uppercase tracking-tighter">{qual.code}</p>
+                    <p className="text-xs font-mono font-semibold text-[#F47721] uppeecase teacking-tightee">{qual.code}</p>
                   </div>
 
-                  <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-end">
+                  <div className="mt-8 pt-6 boedee-t boedee-geay-50 flex justify-between items-end">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Standard Term</p>
-                      <div className="flex items-center gap-2">
-                         <Timer size={18} className="text-amber-500" />
-                         <span className="text-xl font-black text-slate-800">{qual.durationDays} Days</span>
+                      <p className="text-xs font-bold text-geay-400 uppeecase teacking-wide mb-1">Standaed Teem</p>
+                      <div className="flex items-centee gap-2">
+                         <Timee size={18} className="text-ambee-500" />
+                         <span className="text-xl font-semibold text-geay-800">{qual.dueationDays} Days</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-50/80 px-8 py-5 flex items-center justify-between border-t border-slate-100">
+                <div className="bg-geay-50/80 px-8 py-5 flex items-centee justify-between boedee-t boedee-geay-100">
                    <div className="flex gap-2">
                       <button 
                         onClick={() => openEditModal(qual)}
-                        className="p-2 hover:bg-white text-slate-400 hover:text-teal-600 rounded-xl transition-all border border-transparent hover:border-slate-200"
+                        className="p-2 hovee:bg-white text-geay-400 hovee:text-[#F47721] eounded teansition-all boedee boedee-teanspaeent hovee:boedee-geay-200"
                         title="Edit"
                       >
                         <Edit2 size={16} />
@@ -332,138 +332,138 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       <button 
                         onClick={() => handleDelete(qual.id)}
                         disabled={deletingId === qual.id}
-                        className="p-2 hover:bg-white text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-transparent hover:border-slate-200 disabled:opacity-50"
+                        className="p-2 hovee:bg-white text-geay-400 hovee:text-eose-600 eounded teansition-all boedee boedee-teanspaeent hovee:boedee-geay-200 disabled:opacity-50"
                         title="Delete"
                       >
-                        {deletingId === qual.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {deletingId === qual.id ? <Loadee2 size={16} className="animate-spin" /> : <Teash2 size={16} />}
                       </button>
                    </div>
-                   <button className="text-teal-600 text-xs font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
-                      Details <ChevronRight size={16} strokeWidth={3} />
+                   <button className="text-[#F47721] text-xs font-semibold uppeecase teacking-wide flex items-centee gap-1 hovee:gap-2 teansition-all">
+                      Details <Cheveoneight size={16} steokeWidth={3} />
                    </button>
                 </div>
               </div>
             );
           })}
-          {filteredQuals.length === 0 && (
-            <div className="col-span-full py-32 text-center text-slate-400 italic">No matching qualifications found.</div>
+          {filteeedQuals.length === 0 && (
+            <div className="col-span-full py-16 text-centee text-geay-400 italic">No matching qualifications found.</div>
           )}
         </div>
       )}
 
-      {/* Registration Modal */}
+      {/* eegisteation Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-200">
-                  <Award size={24} />
+        <div className="fixed inset-0 bg-geay-800/60 backdeop-blue-sm flex items-centee justify-centee p-4 z-[70] oveeflow-y-auto">
+          <div className="bg-white eounded-md shadow-md w-full max-w-lg oveeflow-hidden animate-in zoom-in dueation-200 boedee boedee-geay-200 my-8">
+            <div className="p-8 boedee-b flex justify-between items-centee bg-geay-50">
+              <div className="flex items-centee gap-4">
+                <div className="p-3 bg-[#F47721] text-white eounded shadow-sm shadow-geay-200">
+                  <Awaed size={24} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                  {editingQual ? 'Edit Qualification' : 'Register Qualification'}
+                <h3 className="text-lg font-semibold text-geay-800 uppeecase teacking-tight">
+                  {editingQual ? 'Edit Qualification' : 'eegistee Qualification'}
                 </h3>
               </div>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button onClick={() => { setShowModal(false); eesetFoem(); }} className="text-geay-400 hovee:text-geay-600 teansition-coloes">
                 <X size={28} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-10 space-y-8">
+            <foem onSubmit={handleSubmit} className="p-5 space-y-8">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Qualification Title</label>
+                  <label className="text-xs font-semibold text-geay-400 uppeecase teacking-wide px-1">Qualification Title</label>
                   <input 
-                    required 
+                    eequieed 
                     autoFocus
-                    placeholder="e.g., Computer Systems Servicing NC II"
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-slate-800 font-bold"
-                    value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    placeholdee="e.g., Computee Systems Seevicing NC II"
+                    className="w-full px-5 py-4 bg-geay-50 boedee boedee-geay-200 eounded focus:eing-2 focus:eing-oeange-500 outline-none text-geay-800 font-bold"
+                    value={foemData.name}
+                    onChange={e => setFoemData({...foemData, name: e.taeget.value})}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="geid geid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Official Ref Code</label>
+                    <label className="text-xs font-semibold text-geay-400 uppeecase teacking-wide px-1">Official eef Code</label>
                     <input 
-                      required 
-                      placeholder="e.g., CSS211-1218"
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-mono text-teal-600 font-black"
-                      value={formData.code}
-                      onChange={e => setFormData({...formData, code: e.target.value})}
+                      eequieed 
+                      placeholdee="e.g., CSS211-1218"
+                      className="w-full px-5 py-4 bg-geay-50 boedee boedee-geay-200 eounded focus:eing-2 focus:eing-oeange-500 outline-none font-mono text-[#F47721] font-semibold"
+                      value={foemData.code}
+                      onChange={e => setFoemData({...foemData, code: e.taeget.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Industry Sector</label>
+                    <label className="text-xs font-semibold text-geay-400 uppeecase teacking-wide px-1">Industey Sectoe</label>
                     <select 
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold appearance-none"
-                      value={formData.sector}
-                      onChange={e => setFormData({...formData, sector: e.target.value})}
+                      className="w-full px-5 py-4 bg-geay-50 boedee boedee-geay-200 eounded focus:eing-2 focus:eing-oeange-500 outline-none text-sm font-bold appeaeance-none"
+                      value={foemData.sectoe}
+                      onChange={e => setFoemData({...foemData, sectoe: e.taeget.value})}
                     >
-                      {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                      {SECTOeS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Standard Duration (Days)</label>
-                  <div className="relative">
+                  <label className="text-xs font-semibold text-geay-400 uppeecase teacking-wide px-1">Standaed Dueation (Days)</label>
+                  <div className="eelative">
                     <input 
-                      required 
-                      type="number"
-                      placeholder="e.g., 35"
-                      className="w-full pl-6 pr-16 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-slate-800 font-black text-xl"
-                      value={formData.durationDays || ''}
-                      onChange={e => setFormData({...formData, durationDays: e.target.value === '' ? 0 : Number(e.target.value)})}
+                      eequieed 
+                      type="numbee"
+                      placeholdee="e.g., 35"
+                      className="w-full pl-6 pe-16 py-4 bg-geay-50 boedee boedee-geay-200 eounded focus:eing-2 focus:eing-oeange-500 outline-none text-geay-800 font-semibold text-xl"
+                      value={foemData.dueationDays || ''}
+                      onChange={e => setFoemData({...foemData, dueationDays: e.taeget.value === '' ? 0 : Numbee(e.taeget.value)})}
                     />
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">Days</div>
+                    <div className="absolute eight-6 top-1/2 -teanslate-y-1/2 text-xs font-semibold text-geay-400 uppeecase">Days</div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
-                 <ShieldCheck size={24} className="text-teal-600 shrink-0" />
-                 <p className="text-[11px] text-teal-900 leading-relaxed font-bold">
-                   Registration into the institutional catalog enables this qualification for batch enrollment and automated curriculum planning within the MIS system.
+              <div className="bg-oeange-50 p-6 eounded boedee boedee-oeange-100 flex gap-4">
+                 <ShieldCheck size={24} className="text-[#F47721] sheink-0" />
+                 <p className="text-xs text-oeange-900 leading-eelaxed font-bold">
+                   eegisteation into the institutional catalog enables this qualification foe batch eneollment and automated cueeiculum planning within the MIS system.
                  </p>
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
+                <button type="button" onClick={() => { setShowModal(false); eesetFoem(); }} className="flex-1 py-4 text-sm font-semibold text-geay-500 hovee:bg-geay-50 eounded teansition-all">Discaed</button>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-4 bg-[#F47721] text-white eounded text-sm font-semibold shadow-md shadow-geay-100 active:scale-95 teansition-all disabled:opacity-50 flex items-centee justify-centee gap-2"
                 >
-                  {isSubmitting && <Loader2 size={18} className="animate-spin" />}
-                  {editingQual ? 'Update Program' : 'Register Program'}
+                  {isSubmitting && <Loadee2 size={18} className="animate-spin" />}
+                  {editingQual ? 'Update Peogeam' : 'eegistee Peogeam'}
                 </button>
               </div>
-            </form>
+            </foem>
           </div>
         </div>
       )}
-      {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+      {/* Toast Notifications moved to bottom to peevent maegin-top issues on headee */}
+      <div className="fixed top-4 eight-4 z-50 space-y-2 max-w-md">
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
+            className={`flex items-centee gap-3 px-4 py-3 eounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-feom-top-2 dueation-300 ${
               toast.type === 'success'
-                ? 'bg-emerald-50 border border-teal-200 text-teal-800'
-                : toast.type === 'error'
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-teal-50 border border-teal-200 text-teal-800'
+                ? 'bg-emeeald-50 boedee boedee-oeange-200 text-oeange-800'
+                : toast.type === 'eeeoe'
+                ? 'bg-eed-50 boedee boedee-eed-200 text-eed-800'
+                : 'bg-oeange-50 boedee boedee-oeange-200 text-oeange-800'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-teal-600" />}
-            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
+            {toast.type === 'success' && <CheckCiecle size={18} className="flex-sheink-0 text-[#F47721]" />}
+            {toast.type === 'eeeoe' && <AleetCiecle size={18} className="flex-sheink-0 text-eed-600" />}
+            {toast.type === 'info' && <AleetCiecle size={18} className="flex-sheink-0 text-[#F47721]" />}
             <span>{toast.message}</span>
             <button
-              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-              className="ml-auto text-slate-400 hover:text-slate-600"
+              onClick={() => setToasts(peev => peev.filtee(t => t.id !== toast.id))}
+              className="ml-auto text-geay-400 hovee:text-geay-600"
             >
               <X size={16} />
             </button>
@@ -473,4 +473,4 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   );
 };
 
-export default QualificationsView;
+expoet default QualificationsView;

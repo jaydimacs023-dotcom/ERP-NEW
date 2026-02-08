@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo } from 'react';
 import { User, Student, Trainer } from '../types';
 import EmptyState from '../components/EmptyState';
@@ -161,14 +161,14 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     switch (role) {
       case 'ADMIN': return 'bg-rose-50 text-rose-600 border-rose-100';
       case 'SYSTEM_ADMIN': return 'bg-purple-50 text-purple-600 border-purple-100';
-      case 'ACCOUNTANT': return 'bg-teal-50 text-teal-600 border-teal-100';
-      case 'REGISTRAR': return 'bg-emerald-50 text-teal-600 border-emerald-100';
+      case 'ACCOUNTANT': return 'bg-orange-50 text-[#F47721] border-orange-100';
+      case 'REGISTRAR': return 'bg-emerald-50 text-[#F47721] border-emerald-100';
       case 'FINANCE_MANAGER': return 'bg-amber-50 text-amber-600 border-amber-100';
       case 'AP_SPECIALIST': return 'bg-cyan-50 text-cyan-600 border-cyan-100';
-      case 'AR_SPECIALIST': return 'bg-teal-50 text-teal-600 border-teal-100';
-      case 'STUDENT': return 'bg-teal-50 text-teal-600 border-teal-100';
+      case 'AR_SPECIALIST': return 'bg-orange-50 text-[#F47721] border-orange-100';
+      case 'STUDENT': return 'bg-orange-50 text-[#F47721] border-orange-100';
       case 'TRAINER': return 'bg-orange-50 text-orange-600 border-orange-100';
-      default: return 'bg-slate-50 text-slate-500 border-slate-100';
+      default: return 'bg-gray-50 text-gray-500 border-gray-100';
     }
   };
 
@@ -190,85 +190,85 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">
             Users & Security
           </h2>
-          <p className="text-sm text-slate-500 font-normal italic">Institutional identity management and role-based access control (RBAC).</p>
+          <p className="text-sm text-gray-500 font-normal italic">Institutional identity management and role-based access control (RBAC).</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> Onboard New User
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex items-center gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             placeholder="Search by name or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">System User</th>
-              <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Role</th>
-              <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Authentication</th>
-              <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">System User</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned Role</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Authentication</th>
+              <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {filteredUsers.length > 0 ? filteredUsers.map(user => (
-              <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+              <tr key={user.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm border-2 border-white ${user.role === 'ADMIN' ? 'bg-rose-500' : 'bg-teal-500'}`}>
+                    <div className={`w-12 h-12 rounded flex items-center justify-center text-white shadow-sm border-2 border-white ${user.role === 'ADMIN' ? 'bg-rose-500' : 'bg-[#F47721]'}`}>
                       <UserCircle size={24} />
                     </div>
                     <div>
-                      <div className="text-sm font-black text-slate-800">{user.name}</div>
-                      <div className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">{user.id}</div>
+                      <div className="text-sm font-semibold text-gray-800">{user.name}</div>
+                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mt-0.5">{user.id}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${getRoleBadge(user.role)}`}>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wide ${getRoleBadge(user.role)}`}>
                     {getRoleIcon(user.role)}
                     {user.role}
                   </div>
                   {user.studentId && (
-                    <div className="text-[10px] text-slate-400 mt-1">Linked to Student</div>
+                    <div className="text-xs text-gray-400 mt-1">Linked to Student</div>
                   )}
                   {user.trainerId && (
-                    <div className="text-[10px] text-slate-400 mt-1">Linked to Trainer</div>
+                    <div className="text-xs text-gray-400 mt-1">Linked to Trainer</div>
                   )}
                 </td>
                 <td className="px-8 py-6">
                   <div className="flex flex-col gap-1">
-                    <div className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                      <Mail size={12} className="text-slate-300" /> {user.email}
+                    <div className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                      <Mail size={12} className="text-gray-300" /> {user.email}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-300">Last login: Today 10:42 AM</div>
+                    <div className="text-xs font-mono text-gray-300">Last login: Today 10:42 AM</div>
                   </div>
                 </td>
                 <td className="px-8 py-6 text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => onDeleteUser(user.id)}
-                      className="p-2 hover:bg-rose-50 text-slate-300 hover:text-rose-600 rounded-xl transition-all"
+                      className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded transition-all"
                       title="Revoke Access"
                     >
                       <Trash2 size={18} />
                     </button>
-                    <button className="p-2 hover:bg-slate-100 text-slate-300 hover:text-teal-600 rounded-xl transition-all">
+                    <button className="p-2 hover:bg-gray-100 text-gray-300 hover:text-[#F47721] rounded transition-all">
                       <ChevronRight size={18} />
                     </button>
                   </div>
@@ -282,7 +282,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     description="Onboard your first user to give them access to the ERP system."
                     actionLabel="Onboard User"
                     onAction={() => setShowModal(true)}
-                    icon={<Users size={48} className="text-slate-300" />}
+                    icon={<Users size={48} className="text-gray-300" />}
                   />
                 </td>
               </tr>
@@ -293,23 +293,23 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
       {/* Onboarding Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100">
+                <div className="p-3 bg-[#F47721] text-white rounded shadow-sm shadow-gray-100">
                   <Plus size={24} />
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Onboard User</h3>
+                <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Onboard User</h3>
               </div>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
                 <X size={28} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-10 space-y-8 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-5 space-y-8 max-h-[70vh] overflow-y-auto">
               {formError && (
-                <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-sm font-bold">
+                <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded text-rose-700 text-sm font-bold">
                   <AlertCircle size={20} />
                   {formError}
                 </div>
@@ -317,7 +317,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Institutional Role (RBAC)</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Institutional Role (RBAC)</label>
                   <div className="grid grid-cols-1 gap-3 max-h-64 overflow-y-auto pr-2">
                     {ROLES.map(r => {
                       const RoleIcon = r.icon;
@@ -329,26 +329,26 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                           type="button"
                           disabled={isDisabled}
                           onClick={() => handleRoleChange(r.id)}
-                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                          className={`flex items-center justify-between p-4 rounded border transition-all text-left ${
                             isDisabled 
-                              ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
+                              ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
                               : formData.role === r.id 
-                                ? 'bg-teal-600 border-teal-700 text-white shadow-lg' 
-                                : 'bg-white border-slate-100 hover:border-teal-200'
+                                ? 'bg-[#F47721] border-orange-600 text-white shadow-lg' 
+                                : 'bg-white border-gray-100 hover:border-orange-200'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <RoleIcon size={18} className={formData.role === r.id ? 'text-white' : isDisabled ? 'text-slate-300' : 'text-slate-500'} />
+                            <RoleIcon size={18} className={formData.role === r.id ? 'text-white' : isDisabled ? 'text-gray-300' : 'text-gray-500'} />
                             <div>
-                              <div className={`text-xs font-black uppercase tracking-tight ${formData.role === r.id ? 'text-white' : isDisabled ? 'text-slate-300' : 'text-slate-800'}`}>
+                              <div className={`text-xs font-semibold uppercase tracking-tight ${formData.role === r.id ? 'text-white' : isDisabled ? 'text-gray-300' : 'text-gray-800'}`}>
                                 {r.label}
                               </div>
-                              <div className={`text-[10px] mt-0.5 ${formData.role === r.id ? 'text-teal-100' : 'text-slate-400'}`}>
+                              <div className={`text-xs mt-0.5 ${formData.role === r.id ? 'text-orange-100' : 'text-gray-400'}`}>
                                 {isDisabled ? 'No unlinked records available' : r.desc}
                               </div>
                             </div>
                           </div>
-                          {formData.role === r.id ? <ShieldCheck size={20} /> : <div className={`w-5 h-5 rounded-full border-2 ${isDisabled ? 'border-slate-200' : 'border-slate-100'}`} />}
+                          {formData.role === r.id ? <ShieldCheck size={20} /> : <div className={`w-5 h-5 rounded-full border-2 ${isDisabled ? 'border-gray-200' : 'border-gray-100'}`} />}
                         </button>
                       );
                     })}
@@ -358,12 +358,12 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 {/* Student Selection (only shown when role is STUDENT) */}
                 {formData.role === 'STUDENT' && (
                   <div className="space-y-2 animate-in fade-in duration-200">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Link to Student Record *</label>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Link to Student Record *</label>
                     <select
                       required
                       value={formData.studentId}
                       onChange={e => handleStudentSelect(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
                     >
                       <option value="">-- Select a student --</option>
                       {availableStudents.map(s => (
@@ -372,7 +372,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                         </option>
                       ))}
                     </select>
-                    <p className="text-[10px] text-slate-400 px-1">
+                    <p className="text-xs text-gray-400 px-1">
                       This will allow the student to log in and access their portal.
                     </p>
                   </div>
@@ -381,12 +381,12 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 {/* Trainer Selection (only shown when role is TRAINER) */}
                 {formData.role === 'TRAINER' && (
                   <div className="space-y-2 animate-in fade-in duration-200">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Link to Trainer Record *</label>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Link to Trainer Record *</label>
                     <select
                       required
                       value={formData.trainerId}
                       onChange={e => handleTrainerSelect(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
                     >
                       <option value="">-- Select a trainer --</option>
                       {availableTrainers.map(t => (
@@ -395,61 +395,61 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                         </option>
                       ))}
                     </select>
-                    <p className="text-[10px] text-slate-400 px-1">
+                    <p className="text-xs text-gray-400 px-1">
                       This will allow the trainer to log in and access their portal.
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Full Name *</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Full Name *</label>
                   <input 
                     required 
                     placeholder="e.g. Maria Clara" 
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
                     value={formData.name} 
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Institutional Email *</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Institutional Email *</label>
                   <div className="relative">
                     <input 
                       required 
                       type="email" 
                       placeholder="name@institution.edu" 
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
                       value={formData.email} 
                       onChange={e => setFormData({...formData, email: e.target.value})} 
                     />
-                    <Mail className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                    <Mail className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Initial Password * (min 8 characters)</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Initial Password * (min 8 characters)</label>
                   <div className="relative">
                     <input 
                       required 
                       type="password" 
                       placeholder="••••••••" 
                       minLength={8}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-bold text-gray-800"
                       value={formData.password} 
                       onChange={e => setFormData({...formData, password: e.target.value})} 
                     />
-                    <Key className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
+                    <Key className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
                   </div>
-                  <p className="text-[10px] text-slate-400 px-1">
+                  <p className="text-xs text-gray-400 px-1">
                     The user should change this password after first login.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
-                <Lock size={24} className="text-teal-600 shrink-0" />
-                <p className="text-[11px] text-teal-900 leading-relaxed font-bold">
+              <div className="bg-orange-50 p-6 rounded border border-orange-100 flex gap-4">
+                <Lock size={24} className="text-[#F47721] shrink-0" />
+                <p className="text-xs text-orange-900 leading-relaxed font-bold">
                   {formData.role === 'STUDENT' 
                     ? 'Student users can only access their own portal with enrollment info, grades, and attendance.'
                     : formData.role === 'TRAINER'
@@ -459,8 +459,8 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               </div>
 
               <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 active:scale-95 transition-all">Onboard to System</button>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-4 text-sm font-semibold text-gray-500 hover:bg-gray-50 rounded transition-all">Discard</button>
+                <button type="submit" className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 active:scale-95 transition-all">Onboard to System</button>
               </div>
             </form>
           </div>

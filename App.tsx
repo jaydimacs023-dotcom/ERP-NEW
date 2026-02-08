@@ -3132,13 +3132,13 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
-        <div className="p-5 bg-teal-600 rounded-[2rem] shadow-2xl shadow-teal-500/20 animate-pulse">
-           <Building2 size={40} />
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#3B3F51] text-white gap-4">
+        <div className="p-4 bg-[#F47721] rounded-lg shadow-lg">
+           <Building2 size={32} />
         </div>
         <div className="flex items-center gap-3">
-           <Loader2 className="animate-spin text-teal-400" size={24} />
-           <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
+           <Loader2 className="animate-spin text-[#F47721]" size={20} />
+           <span className="text-sm font-semibold">Loading AccounTech ERP...</span>
         </div>
       </div>
     );
@@ -3172,25 +3172,28 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+    <div className="flex h-screen overflow-hidden" style={{ fontFamily: "'Open Sans', sans-serif", backgroundColor: '#F4F6F9', color: '#1F2937' }}>
+      {/* Acumatica-style orange accent strip at the very top */}
+      <div className="fixed top-0 left-0 right-0 h-[3px] z-[10000]" style={{ backgroundColor: '#F47721' }} />
+
       {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
+      <div className="fixed top-6 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
         {toasts.map(toast => (
           <div 
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${
-              toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-              toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-              'bg-teal-50 border-teal-200 text-teal-800'
+            className={`px-4 py-3 rounded shadow-md border flex items-center gap-3 animate-in slide-in-from-right duration-300 ${
+              toast.type === 'success' ? 'bg-white border-green-400 text-green-800' :
+              toast.type === 'error' ? 'bg-white border-red-400 text-red-800' :
+              'bg-white border-blue-400 text-blue-800'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
-            {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="text-teal-500 shrink-0" />}
-            <span className="text-sm font-medium">{toast.message}</span>
+            {toast.type === 'success' && <CheckCircle2 size={16} className="text-green-500 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle size={16} className="text-red-500 shrink-0" />}
+            {toast.type === 'info' && <AlertCircle size={16} className="text-blue-500 shrink-0" />}
+            <span className="text-sm">{toast.message}</span>
             <button 
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-              className="ml-auto text-current opacity-50 hover:opacity-100"
+              className="ml-auto text-gray-400 hover:text-gray-600"
             >
               <X size={14} />
             </button>
@@ -3198,68 +3201,69 @@ export default function App() {
         ))}
       </div>
 
-      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white flex flex-col transition-all duration-500 z-50 border-r border-slate-200`}>
-        <div className="p-6 flex items-center justify-center border-b border-slate-100 bg-slate-50/30">
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-16'} flex flex-col transition-all duration-300 z-50`} style={{ backgroundColor: '#3B3F51', marginTop: '3px' }}>
+        {/* Sidebar Logo / Org Header */}
+        <div className={`${sidebarOpen ? 'px-4 py-3' : 'px-2 py-3'} flex items-center gap-3 border-b border-white/10`}>
            {sidebarOpen ? (
-             <div className="flex flex-col items-center gap-3 w-full">
+             <div className="flex items-center gap-3 w-full min-w-0">
                 <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
-                  style={{ backgroundColor: brandColor }}
+                  className="w-9 h-9 rounded flex items-center justify-center text-white shrink-0 overflow-hidden"
+                  style={{ backgroundColor: '#F47721' }}
                 >
-                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
+                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={18} />}
                 </div>
-                <div className="w-full text-center">
-                   <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
-                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
+                <div className="min-w-0">
+                   <h1 className="text-sm font-semibold text-white truncate">{currentOrg?.name || 'AccounTech ERP'}</h1>
+                   <p className="text-[10px] text-gray-400">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
            ) : (
              <div 
-               className="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-white shadow-xl"
-               style={{ backgroundColor: brandColor }}
+               className="w-9 h-9 rounded flex items-center justify-center mx-auto text-white"
+               style={{ backgroundColor: '#F47721' }}
              >
-               <Building2 size={20} />
+               <Building2 size={18} />
              </div>
            )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5 scrollbar-hide">
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 scrollbar-hide">
            {/* Navigation Items (unchanged logic) */}
            {currentUser.role === 'STUDENT' && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-400 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
-               <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+             <div className="mb-4">
+               {sidebarOpen && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">Learner Portal</p>}
+               <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {currentUser.role === 'TRAINER' && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-400 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
-               <NavItem icon={<LayoutDashboard size={20}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+             <div className="mb-4">
+               {sidebarOpen && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">Instructor Portal</p>}
+               <NavItem icon={<LayoutDashboard size={18}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {isFinance && (
              <NavSection 
-               label="Financial Core" 
+               label="Finance" 
                isOpen={openSections.financial} 
                onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<LayoutDashboard size={20}/>} label="Executive Console" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<BookText size={20}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<PieChart size={20}/>} label="Reporting Hub" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Landmark size={20}/>} label="Treasury" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Printer size={20}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Zap size={20}/>} label="EFT Batches" active={activeTab === 'eft'} onClick={() => setActiveTab('eft')} compact={!sidebarOpen} brandColor={brandColor} />
-               {isAR && <NavItem icon={<Receipt size={20}/>} label="Receivables (AR)" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<RefreshCw size={20}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<TrendingUp size={20}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<CreditCard size={20}/>} label="Payables (AP)" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<ShoppingCart size={20}/>} label="Procurement (PO)" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<Package size={20}/>} label="Goods Receipt (GR)" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
-               <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<BookText size={18}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<PieChart size={18}/>} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Landmark size={18}/>} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Printer size={18}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Zap size={18}/>} label="EFT Batches" active={activeTab === 'eft'} onClick={() => setActiveTab('eft')} compact={!sidebarOpen} brandColor={brandColor} />
+               {isAR && <NavItem icon={<Receipt size={18}/>} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<RefreshCw size={18}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<TrendingUp size={18}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<CreditCard size={18}/>} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<ShoppingCart size={18}/>} label="Purchase Orders" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAP && <NavItem icon={<Package size={18}/>} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
+               <NavItem icon={<Briefcase size={18}/>} label="Payroll" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Calculator size={18}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
 
@@ -3270,136 +3274,134 @@ export default function App() {
                onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Users size={18}/>} label="Students" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<GraduationCap size={18}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Award size={18}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Layers size={18}/>} label="Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<MapPin size={18}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<CalendarClock size={18}/>} label="Schedules" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
 
            {isFinance && (
              <NavSection 
-               label="Registries" 
+               label="Master Records" 
                isOpen={openSections.registries} 
                onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Handshake size={18}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Truck size={18}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Tag size={18}/>} label="Non-Stock Items" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Box size={18}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
 
            {isFinance && (
              <NavSection 
-               label="Inventory Management" 
+               label="Inventory" 
                isOpen={openSections.inventory} 
                onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<Package size={20}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<MapPin size={20}/>} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Box size={20}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Layers size={20}/>} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<AlertCircle size={20}/>} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Zap size={20}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<History size={20}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<TrendingUp size={20}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Package size={18}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<MapPin size={18}/>} label="Warehouses" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Box size={18}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Layers size={18}/>} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<AlertCircle size={18}/>} label="Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Zap size={18}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<History size={18}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<TrendingUp size={18}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
 
            {isTenantAdmin && (
              <NavSection 
-               label="Administration" 
+               label="Configuration" 
                isOpen={openSections.admin} 
                onToggle={() => setOpenSections(prev => ({ ...prev, admin: !prev.admin }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<CalendarCheck size={20}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Users size={18}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Settings size={18}/>} label="Chart of Accounts" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<CalendarCheck size={18}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Palette size={18}/>} label="Branding" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Wallet size={18}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
                <div className="relative">
-                 <NavItem icon={<CreditCard size={20}/>} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
+                 <NavItem icon={<CreditCard size={18}/>} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
                  {paymentsDueSoon.length > 0 && (
-                   <div className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-full">
+                   <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
                      {paymentsDueSoon.length}
                    </div>
                  )}
                </div>
-               <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Archive size={20}/>} label="Archived Items" active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<UserCog size={18}/>} label="Users & Roles" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<History size={18}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Archive size={18}/>} label="Archive" active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
 
            {isSysAdmin && (
              <NavSection 
-               label="System Administration" 
+               label="System" 
                isOpen={openSections.sysadmin} 
                onToggle={() => setOpenSections(prev => ({ ...prev, sysadmin: !prev.sysadmin }))}
                compact={!sidebarOpen}
              >
-               <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<HardDrive size={20}/>} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<BarChart2 size={20}/>} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Wrench size={18}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<HardDrive size={18}/>} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Terminal size={18}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Binary size={18}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<BarChart2 size={18}/>} label="Payment Monitor" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
            )}
         </nav>
 
-        {/* System Data Engine Status Badge - SYSTEM_ADMIN only */}
+        {/* Data Engine Badge */}
         {sidebarOpen && isSysAdmin && (
-          <div className="px-6 mb-4">
-             <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-teal-50 border-teal-100 text-teal-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
-                {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
-                <div className="min-w-0">
-                   <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
-                   <p className="text-[10px] uppercase truncate font-bold">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
-                </div>
+          <div className="px-3 mb-2">
+             <div className={`px-3 py-2 rounded flex items-center gap-2 text-xs ${config.useMockData ? 'bg-amber-500/10 text-amber-300' : 'bg-green-500/10 text-green-300'}`}>
+                {config.useMockData ? <Database size={14} /> : <Cloud size={14} />}
+                <span className="font-semibold">{config.useMockData ? 'Mock Data' : 'Supabase Cloud'}</span>
              </div>
           </div>
         )}
 
-        <div className="p-6 mt-auto border-t border-slate-100">
-           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-slate-400 hover:text-slate-900 transition-colors rounded-2xl hover:bg-slate-50">
-              <LogOut size={20} />
-              {sidebarOpen && <span className="text-[11px] uppercase tracking-widest truncate">Logout</span>}
+        <div className="px-3 pb-3 mt-auto border-t border-white/10 pt-2">
+           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white hover:bg-white/5 transition-colors rounded">
+              <LogOut size={18} />
+              {sidebarOpen && <span className="text-sm">Sign Out</span>}
            </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header and Content Area (unchanged) */}
-        <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between z-40">
-           <div className="flex items-center gap-4">
+      <main className="flex-1 flex flex-col overflow-hidden" style={{ marginTop: '3px' }}>
+        {/* Acumatica-style Header */}
+        <header className="h-12 bg-white border-b flex items-center justify-between px-4 z-40" style={{ borderColor: '#E0E3E8' }}>
+           <div className="flex items-center gap-3">
               <button 
                 onClick={() => setSidebarOpen(!sidebarOpen)} 
-                className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all border border-slate-100"
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
               >
-                 {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
+                 {sidebarOpen ? <X size={18}/> : <Menu size={18}/>}
               </button>
-              <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
+              <div className="h-5 w-px bg-gray-200" />
+              <h2 className="text-sm font-semibold text-gray-700 capitalize">{activeTab.replace(/-/g, ' ')}</h2>
            </div>
-           <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
+           <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
                  <div className="text-right">
-                    <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
+                    <p className="text-sm font-semibold text-gray-800 leading-none">{currentUser.name}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 capitalize">{currentUser.role.replace('_', ' ').toLowerCase()}</p>
                  </div>
-                 <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
-                    {currentUser.name.substring(0,2)}
+                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: '#3B3F51' }}>
+                    {currentUser.name.substring(0,2).toUpperCase()}
                  </div>
               </div>
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-10 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: '#F4F6F9' }}>
           {/* View Router (unchanged) */}
           {activeTab === 'student-portal' && currentUser.studentId && (
             <StudentPortalView 
@@ -3559,22 +3561,22 @@ interface NavSectionProps {
 
 function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
   if (compact) {
-    return <div className="flex flex-col gap-1.5 mb-6">{children}</div>;
+    return <div className="flex flex-col gap-0.5 mb-3">{children}</div>;
   }
 
   return (
-    <div className="mb-4">
+    <div className="mb-2">
       <button 
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-2 text-slate-400 hover:text-slate-600 transition-colors group"
+        className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-white/5 transition-colors rounded group"
       >
-        <span className="text-[10px] uppercase tracking-[0.3em] font-bold">{label}</span>
-        <div className="text-slate-300 group-hover:text-slate-500 transition-colors">
-          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#7C8091' }}>{label}</span>
+        <div style={{ color: '#7C8091' }}>
+          {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </div>
       </button>
       {isOpen && (
-        <div className="mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-0.5 space-y-0.5">
           {children}
         </div>
       )}
@@ -3586,11 +3588,15 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
-      style={active ? { backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}44` } : {}}
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded transition-all text-left ${
+        active 
+          ? 'text-white' 
+          : 'hover:bg-white/5'
+      }`}
+      style={active ? { backgroundColor: '#F47721' } : { color: '#B0B4C3' }}
     >
-      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110 group-hover:text-slate-900'}`}>{icon}</div>
-      {!compact && <span className="text-[11px] font-medium uppercase tracking-widest truncate">{label}</span>}
+      <div className="shrink-0">{icon}</div>
+      {!compact && <span className="text-[13px] font-normal truncate">{label}</span>}
     </button>
   );
 }

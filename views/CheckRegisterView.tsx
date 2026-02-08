@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   CheckVoucher, BankAccount, Vendor, Payable, CheckStatus
 } from '../types';
@@ -132,10 +132,10 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
 
   const getStatusStyle = (status: CheckStatus) => {
     switch (status) {
-      case 'DRAFT': return 'bg-slate-100 text-slate-600 border-slate-200';
-      case 'PRINTED': return 'bg-teal-50 text-teal-600 border-teal-200'; // Changed from blue to teal
+      case 'DRAFT': return 'bg-gray-100 text-gray-600 border-gray-200';
+      case 'PRINTED': return 'bg-orange-50 text-[#F47721] border-orange-200'; // Changed from blue to teal
       case 'RELEASED': return 'bg-purple-50 text-purple-600 border-purple-200';
-      case 'CLEARED': return 'bg-emerald-50 text-teal-600 border-teal-200';
+      case 'CLEARED': return 'bg-emerald-50 text-[#F47721] border-orange-200';
       case 'VOIDED': return 'bg-rose-50 text-rose-600 border-rose-200';
       case 'STALE': return 'bg-amber-50 text-amber-600 border-amber-200';
       default: return 'bg-gray-100 text-gray-600 border-gray-200';
@@ -158,8 +158,8 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Check Register</h2>
-          <p className="text-sm font-normal italic text-slate-500">Track disbursement history and monitor bank clearance statuses.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Check Register</h2>
+          <p className="text-sm font-normal italic text-gray-500">Track disbursement history and monitor bank clearance statuses.</p>
         </div>
       </div>
 
@@ -169,13 +169,13 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
           label="Total Checks" 
           value={stats.totalCount.toString()} 
           icon={<Calculator size={20} />} 
-          color="teal" 
+          color="orange" 
         />
         <SummaryCard 
           label="Total Amount" 
           value={formatCurrency(stats.totalAmount)} 
           icon={<FileText size={20} />} 
-          color="teal" 
+          color="orange" 
         />
         <SummaryCard 
           label="Released" 
@@ -201,21 +201,21 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
       </div>
 
       {/* Filters & Actions */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-white p-6 rounded border border-gray-200 shadow-sm space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
               type="text"
               placeholder="Search check #, payee, or amount..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm font-medium"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-400 outline-none transition-all text-sm font-medium"
               value={filters.searchTerm}
               onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
             />
           </div>
           <div className="flex gap-2">
             <select 
-              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm font-medium"
+              className="px-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium"
               value={filters.status}
               onChange={(e) => setFilters({...filters, status: e.target.value as any})}
             >
@@ -228,7 +228,7 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
               <option value="STALE">Stale</option>
             </select>
             <select 
-              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm font-medium"
+              className="px-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium"
               value={filters.bankAccountId}
               onChange={(e) => setFilters({...filters, bankAccountId: e.target.value})}
             >
@@ -239,7 +239,7 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
             </select>
             <button 
               onClick={exportToCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all text-sm font-bold shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all text-sm font-bold shadow-sm"
             >
               <Download size={16} /> Export
             </button>
@@ -247,39 +247,39 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
         </div>
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-slate-400" />
+            <Calendar size={16} className="text-gray-400" />
             <input 
               type="date" 
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-orange-400 outline-none"
               value={filters.startDate}
               onChange={(e) => setFilters({...filters, startDate: e.target.value})}
             />
-            <span className="text-slate-400">to</span>
+            <span className="text-gray-400">to</span>
             <input 
               type="date" 
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-orange-400 outline-none"
               value={filters.endDate}
               onChange={(e) => setFilters({...filters, endDate: e.target.value})}
             />
           </div>
-          <div className="hidden md:block h-4 w-px bg-slate-200 mx-2" />
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <div className="hidden md:block h-4 w-px bg-gray-200 mx-2" />
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
             Sort by:
             <button 
               onClick={() => toggleSort('checkDate')}
-              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkDate' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkDate' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
               Date {sortField === 'checkDate' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               onClick={() => toggleSort('checkNumber')}
-              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkNumber' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkNumber' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
               Number {sortField === 'checkNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               onClick={() => toggleSort('amount')}
-              className={`px-2 py-1 rounded transition-colors ${sortField === 'amount' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'amount' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
               Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
@@ -288,61 +288,61 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
       </div>
 
       {/* Register Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Check #</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Bank Account</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Payee</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">Check #</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank Account</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">Payee</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {sortedChecks.length > 0 ? (
               sortedChecks.map((check) => (
-                <tr key={check.id} className="hover:bg-slate-50/50 transition-colors group">
+                <tr key={check.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4">
-                    <span className="text-sm font-mono font-bold text-teal-600">{check.checkNumber}</span>
+                    <span className="text-sm font-mono font-bold text-[#F47721]">{check.checkNumber}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-slate-600">
+                    <span className="text-sm font-bold text-gray-600">
                       {new Date(check.checkDate).toLocaleDateString()}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="text-sm font-bold text-slate-800">
+                      <span className="text-sm font-bold text-gray-800">
                         {bankAccounts.find(ba => ba.id === check.bankAccountId)?.accountName || 'Unknown Account'}
                       </span>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-xs text-gray-400">
                         {bankAccounts.find(ba => ba.id === check.bankAccountId)?.accountNumber}
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                    <span className="text-sm font-semibold text-gray-800 uppercase tracking-tight">
                       {check.payeeName}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-sm font-mono font-black text-slate-900">
+                    <span className="text-sm font-mono font-semibold text-gray-900">
                       {formatCurrency(check.amount)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${getStatusStyle(check.status)}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border flex items-center gap-1.5 ${getStatusStyle(check.status)}`}>
                         {getStatusIcon(check.status)}
                         {check.status}
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all">
+                    <button className="p-2 text-gray-400 hover:text-[#F47721] hover:bg-orange-50 rounded-lg transition-all">
                       <Eye size={16} />
                     </button>
                   </td>
@@ -350,9 +350,9 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 bg-slate-50/50">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-400 bg-gray-50">
                   <div className="flex flex-col items-center gap-2">
-                    <AlertCircle size={40} className="text-slate-300" />
+                    <AlertCircle size={40} className="text-gray-300" />
                     <p className="text-lg font-bold">No Records Found</p>
                     <p className="text-sm">Try adjusting your filters or search terms.</p>
                   </div>
@@ -361,15 +361,15 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
             )}
           </tbody>
           {sortedChecks.length > 0 && (
-            <tfoot className="bg-slate-50/50 border-t border-slate-200">
+            <tfoot className="bg-gray-50 border-t border-gray-200">
               <tr>
-                <td colSpan={4} className="px-6 py-4 text-sm font-bold text-slate-500 uppercase tracking-widest">
+                <td colSpan={4} className="px-6 py-4 text-sm font-bold text-gray-500 uppercase tracking-wide">
                   Showing {sortedChecks.length} of {checks.length} records
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex flex-col items-end">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Filtered</span>
-                    <span className="text-lg font-mono font-black text-teal-600">{formatCurrency(stats.totalAmount)}</span>
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Filtered</span>
+                    <span className="text-lg font-mono font-semibold text-[#F47721]">{formatCurrency(stats.totalAmount)}</span>
                   </div>
                 </td>
                 <td colSpan={2}></td>
@@ -386,21 +386,21 @@ const SummaryCard: React.FC<{ label: string; value: string; subValue?: string; i
   label, value, subValue, icon, color 
 }) => {
   const colorMap: Record<string, string> = {
-    teal: 'bg-teal-50 text-teal-600 border-teal-100',
+    orange: 'bg-orange-50 text-[#F47721] border-orange-100',
     purple: 'bg-purple-50 text-purple-600 border-purple-100',
-    emerald: 'bg-emerald-50 text-teal-600 border-emerald-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     rose: 'bg-rose-50 text-rose-600 border-rose-100',
   };
 
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-teal-300 transition-all">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 group-hover:scale-110 transition-transform ${colorMap[color] || colorMap.teal}`}>
+    <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex items-center gap-4 group hover:border-orange-300 transition-all">
+      <div className={`w-12 h-12 rounded flex items-center justify-center border shrink-0 group-hover:scale-110 transition-transform ${colorMap[color] || colorMap.orange}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-        <p className="text-xl font-black text-slate-900 tracking-tight truncate">{value}</p>
-        {subValue && <p className="text-[10px] font-mono font-bold text-slate-500 truncate">{subValue}</p>}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
+        <p className="text-xl font-semibold text-gray-900 tracking-tight truncate">{value}</p>
+        {subValue && <p className="text-xs font-mono font-bold text-gray-500 truncate">{subValue}</p>}
       </div>
     </div>
   );

@@ -24,9 +24,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 
   // Analytical Data for Charts
   const classDistributionData = [
-    { name: 'Assets', value: Math.abs(assets), color: '#0d9488' }, // Teal
-    { name: 'Liabilities', value: Math.abs(liabilities), color: '#f43f5e' }, // Rose
-    { name: 'Equity', value: Math.abs(assets - liabilities), color: '#10b981' }, // Emerald
+    { name: 'Assets', value: Math.abs(assets), color: '#2563EB' },
+    { name: 'Liabilities', value: Math.abs(liabilities), color: '#DC2626' },
+    { name: 'Equity', value: Math.abs(assets - liabilities), color: '#059669' },
   ];
 
   // Simulated Time-Series Data for Trend analysis
@@ -52,50 +52,50 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="space-y-6 pb-10">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
         <div className="no-print">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Performance Console</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Real-time analytical oversight and liquidity metrics.</p>
+          <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
+          <p className="text-sm text-gray-500">Financial overview and key performance indicators</p>
         </div>
         <button 
           onClick={handlePrint}
-          className="no-print flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+          className="no-print flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
         >
-          <Printer size={16} /> Print Briefing
+          <Printer size={14} /> Print
         </button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={18} />} color="teal" />
-        <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={18} />} color="emerald" />
-        <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={18} />} color="rose" />
-        <StatCard title="Current Ratio" value={currentRatio} icon={<Activity size={18} />} color="amber" />
+        <StatCard title="Total Assets" value={formatCurrency(assets)} icon={<DollarSign size={16} />} color="blue" />
+        <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={16} />} color="green" />
+        <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={16} />} color="red" />
+        <StatCard title="Current Ratio" value={currentRatio} icon={<Activity size={16} />} color="amber" />
       </div>
 
-      {/* Print Only Header moved to bottom to prevent alignment issues */}
-      <div className="hidden print:block border-b-2 border-slate-900 pb-4">
-         <h1 className="text-2xl font-black uppercase tracking-tight">Institutional Performance Briefing</h1>
-         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
+      {/* Print Only Header */}
+      <div className="hidden print:block border-b-2 border-gray-800 pb-3">
+         <h1 className="text-xl font-bold">Financial Performance Report</h1>
+         <p className="text-xs text-gray-500 mt-1">
             Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
          </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Analytical Graph: Performance Trend */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-          <div className="flex justify-between items-center mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Revenue vs Expense Trend */}
+        <div className="lg:col-span-2 bg-white rounded-md shadow-sm border border-gray-200 p-5">
+          <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Revenue vs Expense Trend</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Fiscal Year Performance Matrix</p>
+              <h3 className="text-sm font-semibold text-gray-800">Revenue vs Expense Trend</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Fiscal Year Performance</p>
             </div>
-            <div className="p-2.5 bg-brand-light text-brand rounded-xl shadow-sm no-print">
-              <BarChart3 size={18} />
+            <div className="p-1.5 bg-gray-50 text-gray-400 rounded no-print">
+              <BarChart3 size={16} />
             </div>
           </div>
           
-          <div className="h-[350px] w-full min-h-[350px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={300}>
+          <div className="h-[300px] w-full min-h-[300px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -107,33 +107,33 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
                     <stop offset="95%" stopColor="#e11d48" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}
-                  labelStyle={{ fontWeight: 900, fontSize: '12px', marginBottom: '4px', textTransform: 'uppercase' }}
+                  contentStyle={{ borderRadius: '4px', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '10px', fontFamily: "'Open Sans', sans-serif" }}
+                  labelStyle={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}
                 />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }} />
-                <Area type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" name="Gross Revenue" />
-                <Area type="monotone" dataKey="expense" stroke="#e11d48" strokeWidth={4} fillOpacity={1} fill="url(#colorExp)" name="Op. Expenses" />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '16px', fontSize: '11px', fontWeight: 600 }} />
+                <Area type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2} fillOpacity={1} fill="url(#colorRev)" name="Revenue" />
+                <Area type="monotone" dataKey="expense" stroke="#DC2626" strokeWidth={2} fillOpacity={1} fill="url(#colorExp)" name="Expenses" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 flex flex-col text-slate-800 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10 text-slate-100 no-print">
-             <LucideLineChart size={100} />
+        <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5 flex flex-col relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-5 text-gray-300 no-print">
+             <LucideLineChart size={80} />
           </div>
           <div className="relative z-10">
-             <h3 className="text-base font-black tracking-tight mb-6">Asset Liquidity Mix</h3>
-             <div className="h-[220px] min-h-[220px]">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
+             <h3 className="text-sm font-semibold text-gray-800 mb-4">Asset Distribution</h3>
+             <div className="h-[200px] min-h-[200px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
                   <BarChart data={classDistributionData} layout="vertical">
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" hide />
-                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '12px', color: '#1e293b' }} />
+                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '4px', color: '#1F2937', fontFamily: "'Open Sans', sans-serif" }} />
                     <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={30}>
                        {classDistributionData.map((entry, index) => (
                          <Cell key={`cell-${index}`} fill={entry.color} />
@@ -143,14 +143,14 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
                 </ResponsiveContainer>
              </div>
              
-             <div className="space-y-4 mt-6">
+             <div className="space-y-3 mt-4">
                 {classDistributionData.map((item, i) => (
                    <div key={i} className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.name}</span>
+                         <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                         <span className="text-xs text-gray-500">{item.name}</span>
                       </div>
-                      <span className="text-sm font-mono font-bold text-slate-900">{formatCurrency(item.value)}</span>
+                      <span className="text-sm font-semibold text-gray-800 font-mono">{formatCurrency(item.value)}</span>
                    </div>
                 ))}
              </div>
@@ -158,33 +158,33 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-        <div className="flex justify-between items-center mb-6">
-           <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Balance Sheet Matrix</h3>
-           <span className="text-[10px] text-slate-400 uppercase font-black tracking-[0.2em] no-print">Aggregated GL Summary</span>
+      <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5">
+        <div className="flex justify-between items-center mb-4">
+           <h3 className="text-sm font-semibold text-gray-800">Balance Sheet Summary</h3>
+           <span className="text-xs text-gray-400 no-print">Aggregated GL Summary</span>
         </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-100">
-          <table className="min-w-full divide-y divide-slate-100 text-sm">
-            <thead className="bg-slate-50">
+        <div className="overflow-hidden rounded border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left font-black text-slate-400 uppercase text-[10px] tracking-widest">Classification</th>
-                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Debit</th>
-                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Total Credit</th>
-                <th className="px-6 py-4 text-right font-black text-slate-400 uppercase text-[10px] tracking-widest">Net Balance</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Classification</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total Debit</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total Credit</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Net Balance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-gray-100">
               {[AccountClass.ASSET, AccountClass.LIABILITY, AccountClass.EQUITY, AccountClass.REVENUE, AccountClass.EXPENSE].map(cls => {
                 const s = summaries.filter(sum => sum.accountClass === cls);
                 const d = s.reduce((acc, val) => acc + val.totalDebit, 0);
                 const c = s.reduce((acc, val) => acc + val.totalCredit, 0);
                 const b = s.reduce((acc, val) => acc + val.balance, 0);
                 return (
-                  <tr key={cls} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4 font-black text-slate-600 uppercase tracking-tight">{cls}</td>
-                    <td className="px-6 py-4 text-right font-mono text-slate-500">{d.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right font-mono text-slate-500">{c.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">{b.toLocaleString()}</td>
+                  <tr key={cls} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5 font-semibold text-gray-700">{cls}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-gray-500">{d.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-gray-500">{c.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-900">{b.toLocaleString()}</td>
                   </tr>
                 );
               })}
@@ -197,12 +197,12 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 };
 
 const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
-  <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 group hover:border-brand transition-all">
-    <div className={`w-10 h-10 rounded-xl bg-${color}-50 text-${color}-600 flex items-center justify-center mb-3 border border-${color}-100 transition-all group-hover:scale-110 no-print`}>
+  <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+    <div className={`w-8 h-8 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center mb-2 no-print`}>
       {icon}
     </div>
-    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{title}</div>
-    <div className="text-xl font-black text-slate-900 tracking-tight">{value}</div>
+    <div className="text-xs text-gray-500 mb-1">{title}</div>
+    <div className="text-lg font-semibold text-gray-900">{value}</div>
   </div>
 );
 

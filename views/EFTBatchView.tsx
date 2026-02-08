@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   EFTBatch, EFTTransaction, BankAccount, Vendor, Payable
 } from '../types';
@@ -25,13 +25,13 @@ interface EFTBatchViewProps {
 type BatchStatus = 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'PROCESSED' | 'PARTIALLY_PROCESSED' | 'FAILED' | 'CANCELLED';
 
 const BATCH_STATUS_CONFIG: Record<BatchStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <FileText size={14} /> },
+  DRAFT: { label: 'Draft', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: <FileText size={14} /> },
   PENDING: { label: 'Pending', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: <Clock size={14} /> },
-  SUBMITTED: { label: 'Submitted', color: 'text-teal-600', bgColor: 'bg-teal-50', icon: <Send size={14} /> },
-  PROCESSED: { label: 'Processed', color: 'text-teal-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
+  SUBMITTED: { label: 'Submitted', color: 'text-[#F47721]', bgColor: 'bg-orange-50', icon: <Send size={14} /> },
+  PROCESSED: { label: 'Processed', color: 'text-[#F47721]', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
   PARTIALLY_PROCESSED: { label: 'Partial', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle size={14} /> },
   FAILED: { label: 'Failed', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
-  CANCELLED: { label: 'Cancelled', color: 'text-slate-400', bgColor: 'bg-slate-50', icon: <XCircle size={14} /> },
+  CANCELLED: { label: 'Cancelled', color: 'text-gray-400', bgColor: 'bg-gray-50', icon: <XCircle size={14} /> },
 };
 
 const EFTBatchView: React.FC<EFTBatchViewProps> = ({
@@ -387,12 +387,12 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">EFT Batch Management</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Create and manage electronic fund transfer batches.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">EFT Batch Management</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Create and manage electronic fund transfer batches.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-all shadow-md font-medium text-sm"
+          className="flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white rounded hover:bg-violet-700 transition-all shadow-md font-medium text-sm"
         >
           <Plus size={18} /> New EFT Batch
         </button>
@@ -400,70 +400,70 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft Batches</p>
-          <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Draft Batches</p>
+          <p className="text-lg font-semibold mt-1 text-gray-600">{summaryMetrics.draftCount}</p>
+          <p className="text-xs text-gray-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Pending / Submitted</p>
-          <p className="text-2xl font-black mt-1 text-amber-600">{summaryMetrics.pendingCount}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-amber-400 uppercase tracking-wide">Pending / Submitted</p>
+          <p className="text-lg font-semibold mt-1 text-amber-600">{summaryMetrics.pendingCount}</p>
           <p className="text-xs text-amber-500">{"\u20B1"}{formatCurrency(summaryMetrics.pendingAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Processed</p>
-          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.processedCount}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Processed</p>
+          <p className="text-lg font-semibold mt-1 text-[#F47721]">{summaryMetrics.processedCount}</p>
           <p className="text-xs text-emerald-500">{"\u20B1"}{formatCurrency(summaryMetrics.processedAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Total Transactions</p>
-          <p className="text-2xl font-black mt-1 text-violet-600">{summaryMetrics.totalTransactions}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-violet-400 uppercase tracking-wide">Total Transactions</p>
+          <p className="text-lg font-semibold mt-1 text-violet-600">{summaryMetrics.totalTransactions}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl border shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded border shadow-sm">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             type="text" 
             placeholder="Search batches..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-violet-500 outline-none text-sm"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-violet-500 outline-none text-sm"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as BatchStatus | 'all')}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm appearance-none"
+            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded outline-none text-sm appearance-none"
           >
             <option value="all">All Statuses</option>
             {Object.entries(BATCH_STATUS_CONFIG).map(([value, config]) => (
               <option key={value} value={value}>{config.label}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>
       </div>
 
       {/* Batches Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Batch #</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bank / Date</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Format</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Txns</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Batch #</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Bank / Date</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Format</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Txns</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {filteredBatches.length > 0 ? (
               filteredBatches
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -471,30 +471,30 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                   const statusConfig = BATCH_STATUS_CONFIG[batch.status];
                   
                   return (
-                    <tr key={batch.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={batch.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
                         <span className="font-mono font-bold text-violet-600">{batch.batchNumber}</span>
                         {batch.description && (
-                          <p className="text-xs text-slate-400 mt-0.5">{batch.description}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{batch.description}</p>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-700">{getBankName(batch.bankAccountId)}</p>
-                        <p className="text-xs text-slate-400">{batch.paymentDate}</p>
+                        <p className="text-sm font-medium text-gray-700">{getBankName(batch.bankAccountId)}</p>
+                        <p className="text-xs text-gray-400">{batch.paymentDate}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex px-2 py-0.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded">
+                        <span className="inline-flex px-2 py-0.5 text-xs font-bold uppercase bg-gray-100 text-gray-600 rounded">
                           {batch.fileFormat}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-mono font-semibold text-slate-600">{batch.transactionCount}</span>
+                        <span className="font-mono font-semibold text-gray-600">{batch.transactionCount}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(batch.totalAmount)}</span>
+                        <span className="font-mono font-semibold text-gray-700">{"\u20B1"}{formatCurrency(batch.totalAmount)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
                           {statusConfig.icon}
                           {statusConfig.label}
                         </span>
@@ -503,7 +503,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => { setSelectedBatch(batch); setShowDetailModal(true); }}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"
                             title="View Details"
                           >
                             <Eye size={16} />
@@ -511,7 +511,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                           {(batch.status === 'DRAFT' || batch.status === 'PENDING' || batch.status === 'SUBMITTED') && (
                             <button
                               onClick={() => handleDownloadFile(batch)}
-                              className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                              className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                               title="Download EFT File"
                             >
                               <Download size={16} />
@@ -529,7 +529,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                           {batch.status === 'SUBMITTED' && (
                             <button
                               onClick={() => handleMarkProcessed(batch)}
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
+                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-[#F47721] transition-colors"
                               title="Mark Processed"
                             >
                               <CheckCircle size={16} />
@@ -553,7 +553,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
               <tr>
                 <td colSpan={7} className="py-16 text-center">
                   <EmptyState 
-                    icon={<Zap className="text-slate-300" size={48} />}
+                    icon={<Zap className="text-gray-300" size={48} />}
                     title="No EFT batches found"
                     description="Create your first EFT batch to get started."
                   />
@@ -566,16 +566,16 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-violet-600 text-white rounded shadow-md">
                   <Zap size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">New EFT Batch</h3>
+                <h3 className="text-lg font-semibold text-gray-800">New EFT Batch</h3>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -583,10 +583,10 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
             <form onSubmit={handleCreate} className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bank Account *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Account *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.bankAccountId}
                     onChange={e => setFormData({...formData, bankAccountId: e.target.value})}
                   >
@@ -597,10 +597,10 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">File Format *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">File Format *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.fileFormat}
                     onChange={e => setFormData({...formData, fileFormat: e.target.value as 'ISO20022' | 'NACHA' | 'BACS' | 'SEPA'})}
                   >
@@ -614,21 +614,21 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Date *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Date *</label>
                   <input 
                     type="date"
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.paymentDate}
                     onChange={e => setFormData({...formData, paymentDate: e.target.value})}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Description</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</label>
                   <input 
                     type="text"
                     placeholder="Optional description..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.description}
                     onChange={e => setFormData({...formData, description: e.target.value})}
                   />
@@ -637,10 +637,10 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
 
               {/* Payables Selection */}
               <div className="space-y-2">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Select Payables for EFT ({formData.selectedPayableIds.length} selected)
                 </label>
-                <div className="border border-slate-200 rounded-xl max-h-64 overflow-y-auto">
+                <div className="border border-gray-200 rounded max-h-64 overflow-y-auto">
                   {orgPayables.length > 0 ? (
                     orgPayables.map(p => {
                       const vendor = orgVendors.find(v => v.id === p.vendorId);
@@ -651,35 +651,35 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                           key={p.id}
                           onClick={() => togglePayableSelection(p.id)}
                           className={`flex items-center justify-between p-3 border-b last:border-b-0 cursor-pointer transition-colors ${
-                            isSelected ? 'bg-violet-50' : 'hover:bg-slate-50'
+                            isSelected ? 'bg-violet-50' : 'hover:bg-gray-50'
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              isSelected ? 'bg-violet-600 border-violet-600' : 'border-slate-300'
+                              isSelected ? 'bg-violet-600 border-violet-600' : 'border-gray-300'
                             }`}>
                               {isSelected && <CheckCircle className="text-white" size={12} />}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-slate-700">{vendor?.name || p.vendor}</p>
-                              <p className="text-xs text-slate-400">{p.invoiceNumber} • Due: {p.dueDate}</p>
+                              <p className="text-sm font-medium text-gray-700">{vendor?.name || p.vendor}</p>
+                              <p className="text-xs text-gray-400">{p.invoiceNumber} • Due: {p.dueDate}</p>
                             </div>
                           </div>
-                          <span className="font-mono text-sm font-semibold text-slate-600">
+                          <span className="font-mono text-sm font-semibold text-gray-600">
                             {"\u20B1"}{formatCurrency(p.balance)}
                           </span>
                         </div>
                       );
                     })
                   ) : (
-                    <div className="p-8 text-center text-slate-400 text-sm">
+                    <div className="p-8 text-center text-gray-400 text-sm">
                       No EFT payables available. Make sure payables have payment method set to EFT.
                     </div>
                   )}
                 </div>
                 {formData.selectedPayableIds.length > 0 && (
                   <div className="flex justify-end">
-                    <p className="text-sm font-semibold text-slate-600">
+                    <p className="text-sm font-semibold text-gray-600">
                       Total: {"\u20B1"}{formatCurrency(
                         orgPayables
                           .filter(p => formData.selectedPayableIds.includes(p.id))
@@ -691,18 +691,18 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
               </div>
             </form>
 
-            <div className="p-6 border-t bg-slate-50/50 flex gap-3">
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
               <button 
                 type="button" 
                 onClick={() => setShowCreateModal(false)} 
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleCreate as any}
                 disabled={formData.selectedPayableIds.length === 0 || !formData.bankAccountId}
-                className="flex-1 py-3 bg-violet-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-violet-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-violet-600 text-white rounded text-sm font-bold shadow-lg shadow-violet-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Batch
               </button>
@@ -713,19 +713,19 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
 
       {/* Detail Modal */}
       {showDetailModal && selectedBatch && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-violet-600 text-white rounded shadow-md">
                   <Zap size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">{selectedBatch.batchNumber}</h3>
-                  <p className="text-xs text-slate-500">{selectedBatch.transactionCount} transactions • {"\u20B1"}{formatCurrency(selectedBatch.totalAmount)}</p>
+                  <h3 className="text-lg font-semibold text-gray-800">{selectedBatch.batchNumber}</h3>
+                  <p className="text-xs text-gray-500">{selectedBatch.transactionCount} transactions • {"\u20B1"}{formatCurrency(selectedBatch.totalAmount)}</p>
                 </div>
               </div>
-              <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -733,43 +733,43 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
             <div className="flex-1 overflow-y-auto p-6">
               {/* Batch Info */}
               <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Bank</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{getBankName(selectedBatch.bankAccountId)}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Bank</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{getBankName(selectedBatch.bankAccountId)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Payment Date</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{selectedBatch.paymentDate}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Payment Date</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{selectedBatch.paymentDate}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">File Format</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{selectedBatch.fileFormat}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">File Format</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{selectedBatch.fileFormat}</p>
                 </div>
               </div>
 
               {/* Transactions */}
-              <h4 className="text-sm font-bold text-slate-700 mb-3">Transactions</h4>
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
+              <h4 className="text-sm font-bold text-gray-700 mb-3">Transactions</h4>
+              <div className="border border-gray-200 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Beneficiary</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Account</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Reference</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Amount</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">Beneficiary</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">Account</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">Reference</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-400 uppercase">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-gray-100">
                     {selectedBatch.transactions.map(txn => (
                       <tr key={txn.id}>
-                        <td className="px-4 py-3 text-sm text-slate-700">{txn.beneficiaryName}</td>
-                        <td className="px-4 py-3 text-sm font-mono text-slate-600">{txn.beneficiaryAccount || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{txn.reference || '-'}</td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(txn.amount)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{txn.beneficiaryName}</td>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-600">{txn.beneficiaryAccount || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{txn.reference || '-'}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-gray-700">{"\u20B1"}{formatCurrency(txn.amount)}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                            txn.status === 'SUCCESS' ? 'bg-emerald-50 text-teal-600' :
+                          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                            txn.status === 'SUCCESS' ? 'bg-emerald-50 text-[#F47721]' :
                             txn.status === 'FAILED' ? 'bg-rose-50 text-rose-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>
@@ -783,17 +783,17 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t bg-slate-50/50 flex gap-3">
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
               <button 
                 onClick={() => setShowDetailModal(false)}
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Close
               </button>
               {(selectedBatch.status === 'DRAFT' || selectedBatch.status === 'PENDING' || selectedBatch.status === 'SUBMITTED') && (
                 <button 
                   onClick={() => { handleDownloadFile(selectedBatch); setShowDetailModal(false); }}
-                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={16} /> Download EFT File
                 </button>

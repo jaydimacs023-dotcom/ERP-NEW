@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Vendor, Payable, PayableCategory, PayableStatus, InvoiceType, PaymentMethod,
   WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder
@@ -50,9 +50,9 @@ const PAYABLE_CATEGORIES: { value: PayableCategory; label: string }[] = [
 ];
 
 const INVOICE_TYPES: { value: InvoiceType; label: string; color: string }[] = [
-  { value: 'standard', label: 'Standard Invoice', color: 'text-slate-600' },
+  { value: 'standard', label: 'Standard Invoice', color: 'text-gray-600' },
   { value: 'prepayment', label: 'Prepayment/Advance', color: 'text-violet-600' },
-  { value: 'credit_memo', label: 'Credit Memo', color: 'text-teal-600' },
+  { value: 'credit_memo', label: 'Credit Memo', color: 'text-[#F47721]' },
   { value: 'debit_memo', label: 'Debit Memo', color: 'text-rose-600' },
 ];
 
@@ -65,11 +65,11 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 ];
 
 const STATUS_CONFIG: Record<PayableStatus, { label: string; color: string; bgColor: string; borderColor: string }> = {
-  for_approval: { label: 'For Approval', color: 'text-teal-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
-  approved: { label: 'Approved', color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
-  paid: { label: 'Paid', color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
+  for_approval: { label: 'For Approval', color: 'text-[#F47721]', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
+  approved: { label: 'Approved', color: 'text-[#F47721]', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
+  paid: { label: 'Paid', color: 'text-[#F47721]', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
   partially_paid: { label: 'Partially Paid', color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200' },
-  cancelled: { label: 'Cancelled', color: 'text-slate-500', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },
+  cancelled: { label: 'Cancelled', color: 'text-gray-500', bgColor: 'bg-gray-100', borderColor: 'border-gray-200' },
 };
 
 const PayablesView: React.FC<PayablesViewProps> = ({ 
@@ -874,13 +874,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // RENDER: SUMMARY CARDS
   // ============================================================================
   const SummaryCard = ({ label, value, color, icon: Icon }: { label: string; value: string; color: string; icon: React.ElementType }) => (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-          <p className={`text-2xl font-black mt-1 ${color}`}>{"\u20B1"}{value}</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</p>
+          <p className={`text-lg font-semibold mt-1 ${color}`}>{"\u20B1"}{value}</p>
         </div>
-        <div className={`w-12 h-12 rounded-xl ${color.replace('text-', 'bg-').replace('600', '100')} flex items-center justify-center`}>
+        <div className={`w-12 h-12 rounded ${color.replace('text-', 'bg-').replace('600', '100')} flex items-center justify-center`}>
           <Icon className={color} size={24} />
         </div>
       </div>
@@ -893,67 +893,67 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const renderListTab = () => (
     <>
       {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:flex-none sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
               type="text" 
               placeholder="Search payables..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as PayableStatus | 'all')}
-              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
+              className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm appearance-none cursor-pointer"
             >
               <option value="all">All Statuses</option>
               {Object.entries(STATUS_CONFIG).map(([value, config]) => (
                 <option key={value} value={value}>{config.label}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
           </div>
           <div className="relative">
-            <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <select
               value={vendorFilter}
               onChange={(e) => setVendorFilter(e.target.value)}
-              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
+              className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm appearance-none cursor-pointer"
             >
               <option value="all">All Vendors</option>
               {orgVendors.map(v => (
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
           </div>
         </div>
-        <p className="text-xs text-slate-500">
-          Showing <span className="font-semibold text-slate-700">{filteredPayables.length}</span> of {orgPayables.length}
+        <p className="text-xs text-gray-500">
+          Showing <span className="font-semibold text-gray-700">{filteredPayables.length}</span> of {orgPayables.length}
         </p>
       </div>
 
       {/* Payables Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vendor</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Doc # / Type</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date / Due</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Vendor</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Doc # / Type</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date / Due</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Balance</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {filteredPayables.length > 0 ? (
               filteredPayables
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -965,54 +965,54 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                   const isPosted = !!payable.journalEntryId;
                   
                   return (
-                    <tr key={payable.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={payable.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-500 flex items-center justify-center font-bold text-xs">
+                          <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center font-bold text-xs">
                             {getVendorName(payable.vendorId).charAt(0)}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-800">{getVendorName(payable.vendorId)}</p>
-                            <p className="text-xs text-slate-500 truncate max-w-[180px]">{payable.description}</p>
+                            <p className="text-sm font-semibold text-gray-800">{getVendorName(payable.vendorId)}</p>
+                            <p className="text-xs text-gray-500 truncate max-w-[180px]">{payable.description}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs font-mono font-semibold text-teal-600">{payable.payableNumber}</span>
-                          <span className={`text-[10px] font-semibold ${invoiceTypeConfig?.color || 'text-slate-500'}`}>
+                          <span className="text-xs font-mono font-semibold text-[#F47721]">{payable.payableNumber}</span>
+                          <span className={`text-xs font-semibold ${invoiceTypeConfig?.color || 'text-gray-500'}`}>
                             {invoiceTypeConfig?.label || 'Standard'}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-600">{payable.billDate}</span>
-                          <span className={`text-xs ${isOverdue ? 'text-rose-600 font-semibold' : 'text-slate-400'}`}>
+                          <span className="text-xs text-gray-600">{payable.billDate}</span>
+                          <span className={`text-xs ${isOverdue ? 'text-rose-600 font-semibold' : 'text-gray-400'}`}>
                             Due: {payable.dueDate} {isOverdue && '⚠️'}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end gap-1">
-                          <span className="font-mono text-sm text-slate-700">{"\u20B1"}{formatCurrency(payable.amount)}</span>
+                          <span className="font-mono text-sm text-gray-700">{"\u20B1"}{formatCurrency(payable.amount)}</span>
                           {payable.withholdingAmount > 0 && (
-                            <span className="text-[10px] text-teal-600">-{"\u20B1"}{formatCurrency(payable.withholdingAmount)} WHT</span>
+                            <span className="text-xs text-[#F47721]">-{"\u20B1"}{formatCurrency(payable.withholdingAmount)} WHT</span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right font-mono text-sm font-semibold">
-                        <span className={remainingBalance > 0 ? 'text-teal-600' : 'text-teal-600'}>
+                        <span className={remainingBalance > 0 ? 'text-[#F47721]' : 'text-[#F47721]'}>
                           {"\u20B1"}{formatCurrency(remainingBalance)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
+                          <span className={`inline-flex items-center px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
                             {statusConfig.label}
                           </span>
                           {isPosted && (
-                            <span className="text-[9px] text-teal-600 font-semibold flex items-center gap-0.5">
+                            <span className="text-xs text-[#F47721] font-semibold flex items-center gap-0.5">
                               <BookOpen size={10} /> GL Posted
                             </span>
                           )}
@@ -1022,7 +1022,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => openViewModal(payable)}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
                             title="View Details"
                           >
                             <Eye size={16} />
@@ -1032,7 +1032,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {!isPosted && (
                                 <button
                                   onClick={() => openEditModal(payable)}
-                                  className="p-1.5 hover:bg-slate-100 rounded-lg text-teal-500 transition-colors"
+                                  className="p-1.5 hover:bg-gray-100 rounded-lg text-orange-500 transition-colors"
                                   title="Edit"
                                 >
                                   <Edit size={16} />
@@ -1041,7 +1041,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {!isPosted && (
                                 <button
                                   onClick={() => setConfirmDelete(payable.id)}
-                                  className="p-1.5 hover:bg-slate-100 rounded-lg text-rose-500 transition-colors"
+                                  className="p-1.5 hover:bg-gray-100 rounded-lg text-rose-500 transition-colors"
                                   title="Delete"
                                 >
                                   <Trash2 size={16} />
@@ -1050,7 +1050,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {payable.status === 'for_approval' && !isPosted && onPostJournal && (
                                 <button
                                   onClick={() => openPostGLModal(payable)}
-                                  className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                                   title="Post to GL"
                                 >
                                   <BookOpen size={16} />
@@ -1059,7 +1059,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {payable.status === 'for_approval' && (
                                 <button
                                   onClick={() => handleStatusChange(payable.id, 'approved')}
-                                  className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                                   title="Approve"
                                 >
                                   <CheckCircle size={16} />
@@ -1068,7 +1068,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {(payable.status === 'approved' || payable.status === 'partially_paid') && onPostJournal && (
                                 <button
                                   onClick={() => openPaymentModal(payable)}
-                                  className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                                  className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                                   title="Process Payment"
                                 >
                                   <Landmark size={16} />
@@ -1085,7 +1085,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               <tr>
                 <td colSpan={7} className="py-16 text-center">
                   <EmptyState 
-                    icon={<Coins className="text-slate-300" size={48} />}
+                    icon={<Coins className="text-gray-300" size={48} />}
                     title="No payables found"
                     description={searchTerm || statusFilter !== 'all' || vendorFilter !== 'all' ? 'Try adjusting your search or filters' : 'Create your first payable to get started'}
                   />
@@ -1101,22 +1101,22 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const renderAgingTab = () => (
     <div className="space-y-6">
       {/* Vendor Filter for Aging */}
-      <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border shadow-sm">
+      <div className="flex items-center gap-4 bg-white p-4 rounded border shadow-sm">
         <div className="relative">
-          <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <select
             value={vendorFilter}
             onChange={(e) => setVendorFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
+            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm appearance-none cursor-pointer"
           >
             <option value="all">All Vendors</option>
             {orgVendors.map(v => (
               <option key={v.id} value={v.id}>{v.name}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>
-        <span className="text-sm text-slate-500">As of {new Date().toLocaleDateString()}</span>
+        <span className="text-sm text-gray-500">As of {new Date().toLocaleDateString()}</span>
       </div>
 
       {/* Aging Buckets */}
@@ -1128,32 +1128,32 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           { key: 'days90', label: '61-90 Days', color: 'orange', data: agingBuckets.days90 },
           { key: 'days120Plus', label: '90+ Days', color: 'rose', data: agingBuckets.days120Plus },
         ].map(bucket => (
-          <div key={bucket.key} className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-sm`}>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bucket.label}</p>
-            <p className={`text-2xl font-black mt-2 text-${bucket.color}-600`}>
+          <div key={bucket.key} className={`bg-white rounded border border-gray-200 p-5 shadow-sm`}>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{bucket.label}</p>
+            <p className={`text-lg font-semibold mt-2 text-${bucket.color}-600`}>
               {"\u20B1"}{formatCurrency(bucket.data.amount)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{bucket.data.count} invoice{bucket.data.count !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-gray-500 mt-1">{bucket.data.count} invoice{bucket.data.count !== 1 ? 's' : ''}</p>
           </div>
         ))}
       </div>
 
       {/* Aging Summary */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <BarChart3 className="text-teal-600" size={20} />
+      <div className="bg-white rounded border border-gray-200 p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <BarChart3 className="text-[#F47721]" size={20} />
           Aging Summary by Vendor
         </h3>
         <table className="min-w-full">
           <thead>
-            <tr className="border-b border-slate-200">
-              <th className="py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Vendor</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Current</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">1-30</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">31-60</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">61-90</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">90+</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Total</th>
+            <tr className="border-b border-gray-200">
+              <th className="py-3 text-left text-xs font-bold text-gray-400 uppercase">Vendor</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">Current</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">1-30</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">31-60</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">61-90</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">90+</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -1179,27 +1179,27 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               });
               
               return (
-                <tr key={vendor.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-3 text-sm font-medium text-slate-700">{vendor.name}</td>
-                  <td className="py-3 text-right text-sm font-mono text-teal-600">{buckets.current > 0 ? formatCurrency(buckets.current) : '-'}</td>
-                  <td className="py-3 text-right text-sm font-mono text-teal-600">{buckets.d30 > 0 ? formatCurrency(buckets.d30) : '-'}</td>
-                  <td className="py-3 text-right text-sm font-mono text-teal-600">{buckets.d60 > 0 ? formatCurrency(buckets.d60) : '-'}</td>
-                  <td className="py-3 text-right text-sm font-mono text-teal-600">{buckets.d90 > 0 ? formatCurrency(buckets.d90) : '-'}</td>
+                <tr key={vendor.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 text-sm font-medium text-gray-700">{vendor.name}</td>
+                  <td className="py-3 text-right text-sm font-mono text-[#F47721]">{buckets.current > 0 ? formatCurrency(buckets.current) : '-'}</td>
+                  <td className="py-3 text-right text-sm font-mono text-[#F47721]">{buckets.d30 > 0 ? formatCurrency(buckets.d30) : '-'}</td>
+                  <td className="py-3 text-right text-sm font-mono text-[#F47721]">{buckets.d60 > 0 ? formatCurrency(buckets.d60) : '-'}</td>
+                  <td className="py-3 text-right text-sm font-mono text-[#F47721]">{buckets.d90 > 0 ? formatCurrency(buckets.d90) : '-'}</td>
                   <td className="py-3 text-right text-sm font-mono text-rose-600">{buckets.d120 > 0 ? formatCurrency(buckets.d120) : '-'}</td>
-                  <td className="py-3 text-right text-sm font-mono font-bold text-slate-800">{formatCurrency(balance)}</td>
+                  <td className="py-3 text-right text-sm font-mono font-bold text-gray-800">{formatCurrency(balance)}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-slate-50">
-              <td className="py-3 text-sm font-bold text-slate-800">TOTAL</td>
-              <td className="py-3 text-right text-sm font-mono font-bold text-teal-600">{formatCurrency(agingBuckets.current.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-bold text-teal-600">{formatCurrency(agingBuckets.days30.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-bold text-teal-600">{formatCurrency(agingBuckets.days60.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-bold text-teal-600">{formatCurrency(agingBuckets.days90.amount)}</td>
+            <tr className="bg-gray-50">
+              <td className="py-3 text-sm font-bold text-gray-800">TOTAL</td>
+              <td className="py-3 text-right text-sm font-mono font-bold text-[#F47721]">{formatCurrency(agingBuckets.current.amount)}</td>
+              <td className="py-3 text-right text-sm font-mono font-bold text-[#F47721]">{formatCurrency(agingBuckets.days30.amount)}</td>
+              <td className="py-3 text-right text-sm font-mono font-bold text-[#F47721]">{formatCurrency(agingBuckets.days60.amount)}</td>
+              <td className="py-3 text-right text-sm font-mono font-bold text-[#F47721]">{formatCurrency(agingBuckets.days90.amount)}</td>
               <td className="py-3 text-right text-sm font-mono font-bold text-rose-600">{formatCurrency(agingBuckets.days120Plus.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-black text-teal-600">{formatCurrency(totalApSubledger)}</td>
+              <td className="py-3 text-right text-sm font-mono font-semibold text-[#F47721]">{formatCurrency(totalApSubledger)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1211,68 +1211,68 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     <div className="space-y-6">
       {/* GL vs Subledger Summary */}
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="bg-white rounded border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-teal-100 rounded-xl">
-              <PieChart className="text-teal-600" size={20} />
+            <div className="p-2 bg-orange-100 rounded">
+              <PieChart className="text-[#F47721]" size={20} />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800">AP Subledger Total</h3>
+            <h3 className="text-lg font-semibold text-gray-800">AP Subledger Total</h3>
           </div>
-          <p className="text-3xl font-black text-teal-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</p>
-          <p className="text-xs text-slate-500 mt-2">Sum of all vendor balances</p>
+          <p className="text-xl font-semibold text-[#F47721]">{"\u20B1"}{formatCurrency(totalApSubledger)}</p>
+          <p className="text-xs text-gray-500 mt-2">Sum of all vendor balances</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="bg-white rounded border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-teal-100 rounded-xl">
-              <BookOpen className="text-teal-600" size={20} />
+            <div className="p-2 bg-orange-100 rounded">
+              <BookOpen className="text-[#F47721]" size={20} />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800">AP Control Account</h3>
+            <h3 className="text-lg font-semibold text-gray-800">AP Control Account</h3>
           </div>
-          <p className="text-3xl font-black text-teal-600">
+          <p className="text-xl font-semibold text-[#F47721]">
             {"\u20B1"}{formatCurrency(apControlAccount ? summaryMetrics.total : 0)}
           </p>
-          <p className="text-xs text-slate-500 mt-2">{apControlAccount?.name || 'Not configured'}</p>
+          <p className="text-xs text-gray-500 mt-2">{apControlAccount?.name || 'Not configured'}</p>
         </div>
       </div>
 
       {/* Vendor Balances */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <Building className="text-teal-600" size={20} />
+      <div className="bg-white rounded border border-gray-200 p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Building className="text-[#F47721]" size={20} />
           Vendor Balances (Subledger)
         </h3>
         <table className="min-w-full">
           <thead>
-            <tr className="border-b border-slate-200">
-              <th className="py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Vendor</th>
-              <th className="py-3 text-left text-[10px] font-bold text-slate-400 uppercase">TIN</th>
-              <th className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase">Invoices</th>
-              <th className="py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Balance</th>
+            <tr className="border-b border-gray-200">
+              <th className="py-3 text-left text-xs font-bold text-gray-400 uppercase">Vendor</th>
+              <th className="py-3 text-left text-xs font-bold text-gray-400 uppercase">TIN</th>
+              <th className="py-3 text-center text-xs font-bold text-gray-400 uppercase">Invoices</th>
+              <th className="py-3 text-right text-xs font-bold text-gray-400 uppercase">Balance</th>
             </tr>
           </thead>
           <tbody>
             {vendorBalances.map(({ vendor, balance, invoiceCount }) => (
-              <tr key={vendor.id} className="border-b border-slate-100 hover:bg-slate-50">
+              <tr key={vendor.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs">
                       {vendor.name.charAt(0)}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{vendor.name}</span>
+                    <span className="text-sm font-medium text-gray-700">{vendor.name}</span>
                   </div>
                 </td>
-                <td className="py-3 text-sm font-mono text-slate-500">{vendor.tin || '-'}</td>
-                <td className="py-3 text-center text-sm text-slate-600">{invoiceCount}</td>
-                <td className={`py-3 text-right text-sm font-mono font-semibold ${balance > 0 ? 'text-teal-600' : balance < 0 ? 'text-teal-600' : 'text-slate-400'}`}>
+                <td className="py-3 text-sm font-mono text-gray-500">{vendor.tin || '-'}</td>
+                <td className="py-3 text-center text-sm text-gray-600">{invoiceCount}</td>
+                <td className={`py-3 text-right text-sm font-mono font-semibold ${balance > 0 ? 'text-[#F47721]' : balance < 0 ? 'text-[#F47721]' : 'text-gray-400'}`}>
                   {"\u20B1"}{formatCurrency(balance)}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-slate-50">
-              <td colSpan={3} className="py-3 text-sm font-bold text-slate-800">TOTAL SUBLEDGER</td>
-              <td className="py-3 text-right text-sm font-mono font-black text-teal-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</td>
+            <tr className="bg-gray-50">
+              <td colSpan={3} className="py-3 text-sm font-bold text-gray-800">TOTAL SUBLEDGER</td>
+              <td className="py-3 text-right text-sm font-mono font-semibold text-[#F47721]">{"\u20B1"}{formatCurrency(totalApSubledger)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1288,13 +1288,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Accounts Payable</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Manage vendor invoices, process payments, and track aging.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Accounts Payable</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Manage vendor invoices, process payments, and track aging.</p>
         </div>
         <div className="flex gap-3">
           <button 
             onClick={() => { resetForm(); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-medium text-sm active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
           >
             <Plus size={18} /> New Invoice
           </button>
@@ -1302,7 +1302,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 border-b border-gray-200">
         {[
           { key: 'list', label: 'Invoice List', icon: FileText },
           { key: 'aging', label: 'Aging Report', icon: BarChart3 },
@@ -1313,8 +1313,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             onClick={() => setActiveTab(tab.key as APTab)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === tab.key 
-                ? 'text-teal-600 border-teal-600' 
-                : 'text-slate-500 border-transparent hover:text-slate-700'
+                ? 'text-[#F47721] border-orange-500' 
+                : 'text-gray-500 border-transparent hover:text-gray-700'
             }`}
           >
             <tab.icon size={16} />
@@ -1325,12 +1325,12 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <SummaryCard label="Total Open" value={formatCurrency(summaryMetrics.total)} color="text-teal-600" icon={Coins} />
-        <SummaryCard label="For Approval" value={formatCurrency(summaryMetrics.forApproval)} color="text-teal-600" icon={Clock} />
-        <SummaryCard label="Approved" value={formatCurrency(summaryMetrics.approved)} color="text-teal-600" icon={CheckCircle} />
+        <SummaryCard label="Total Open" value={formatCurrency(summaryMetrics.total)} color="text-[#F47721]" icon={Coins} />
+        <SummaryCard label="For Approval" value={formatCurrency(summaryMetrics.forApproval)} color="text-[#F47721]" icon={Clock} />
+        <SummaryCard label="Approved" value={formatCurrency(summaryMetrics.approved)} color="text-[#F47721]" icon={CheckCircle} />
         <SummaryCard label="Due Soon (7d)" value={formatCurrency(summaryMetrics.dueSoon)} color="text-violet-600" icon={Calendar} />
         <SummaryCard label="Overdue" value={formatCurrency(summaryMetrics.overdue)} color="text-rose-600" icon={AlertCircle} />
-        <SummaryCard label="Total Paid" value={formatCurrency(summaryMetrics.paid)} color="text-teal-600" icon={CreditCard} />
+        <SummaryCard label="Total Paid" value={formatCurrency(summaryMetrics.paid)} color="text-[#F47721]" icon={CreditCard} />
       </div>
 
       {/* Tab Content */}
@@ -1388,36 +1388,36 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Post to GL Modal */}
       {showPostGLModal && selectedPayable && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded shadow-md w-full max-w-lg p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center">
-                <BookOpen className="text-teal-600" size={24} />
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <BookOpen className="text-[#F47721]" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Post to General Ledger</h3>
-                <p className="text-sm text-slate-500">{selectedPayable.payableNumber}</p>
+                <h3 className="text-lg font-bold text-gray-800">Post to General Ledger</h3>
+                <p className="text-sm text-gray-500">{selectedPayable.payableNumber}</p>
               </div>
             </div>
             
-            <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2 text-sm">
-              <p className="font-semibold text-slate-700">Journal Entry Preview:</p>
+            <div className="bg-gray-50 rounded p-4 mb-4 space-y-2 text-sm">
+              <p className="font-semibold text-gray-700">Journal Entry Preview:</p>
               <div className="space-y-1 font-mono text-xs">
                 {selectedPayable.invoiceType !== 'credit_memo' ? (
                   <>
-                    <p className="text-slate-600">DR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
+                    <p className="text-gray-600">DR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
                     {selectedPayable.inputVatAmount > 0 && (
-                      <p className="text-slate-600">DR Input VAT ... {"\u20B1"}{formatCurrency(selectedPayable.inputVatAmount)}</p>
+                      <p className="text-gray-600">DR Input VAT ... {"\u20B1"}{formatCurrency(selectedPayable.inputVatAmount)}</p>
                     )}
                     {selectedPayable.withholdingAmount > 0 && (
-                      <p className="text-slate-600 pl-4">CR Withholding Tax Payable ... {"\u20B1"}{formatCurrency(selectedPayable.withholdingAmount)}</p>
+                      <p className="text-gray-600 pl-4">CR Withholding Tax Payable ... {"\u20B1"}{formatCurrency(selectedPayable.withholdingAmount)}</p>
                     )}
-                    <p className="text-slate-600 pl-4">CR Accounts Payable ... {"\u20B1"}{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}</p>
+                    <p className="text-gray-600 pl-4">CR Accounts Payable ... {"\u20B1"}{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-slate-600">DR Accounts Payable ... {"\u20B1"}{formatCurrency(Math.abs(selectedPayable.netPayable || selectedPayable.amount))}</p>
-                    <p className="text-slate-600 pl-4">CR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
+                    <p className="text-gray-600">DR Accounts Payable ... {"\u20B1"}{formatCurrency(Math.abs(selectedPayable.netPayable || selectedPayable.amount))}</p>
+                    <p className="text-gray-600 pl-4">CR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
                   </>
                 )}
               </div>
@@ -1426,13 +1426,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowPostGLModal(false); setSelectedPayable(null); }}
-                className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePostToGL}
-                className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors"
+                className="flex-1 py-2.5 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors"
               >
                 Post to GL
               </button>
@@ -1443,29 +1443,29 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Payment Modal */}
       {showPaymentModal && selectedPayable && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <Landmark size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">Process Payment</h3>
-                  <p className="text-xs text-slate-500">{selectedPayable.payableNumber} • {getVendorName(selectedPayable.vendorId)}</p>
+                  <h3 className="text-lg font-semibold text-gray-800">Process Payment</h3>
+                  <p className="text-xs text-gray-500">{selectedPayable.payableNumber} • {getVendorName(selectedPayable.vendorId)}</p>
                 </div>
               </div>
-              <button onClick={() => { setShowPaymentModal(false); setSelectedPayable(null); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setShowPaymentModal(false); setSelectedPayable(null); }} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
               {/* Outstanding Balance */}
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+              <div className="bg-amber-50 rounded p-4 border border-amber-100">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-800">Outstanding Balance</span>
-                  <span className="text-xl font-black text-teal-600">
+                  <span className="text-xl font-semibold text-[#F47721]">
                     {"\u20B1"}{formatCurrency((selectedPayable.netPayable || selectedPayable.amount) - (selectedPayable.paidAmount || 0))}
                   </span>
                 </div>
@@ -1473,9 +1473,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
               {/* Payment Method */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Method</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Method</label>
                 <select 
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium appearance-none"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium appearance-none"
                   value={paymentData.paymentMethod}
                   onChange={e => setPaymentData({...paymentData, paymentMethod: e.target.value as PaymentMethod})}
                 >
@@ -1487,9 +1487,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
               {/* Bank Account */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Pay From (Bank Account)</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pay From (Bank Account)</label>
                 <select 
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium appearance-none"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium appearance-none"
                   value={paymentData.bankAccountId}
                   onChange={e => setPaymentData({...paymentData, bankAccountId: e.target.value})}
                 >
@@ -1504,20 +1504,20 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               {paymentData.paymentMethod === 'check' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Check Number</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Number</label>
                     <input 
                       type="text"
                       placeholder="Check #"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                       value={paymentData.checkNumber}
                       onChange={e => setPaymentData({...paymentData, checkNumber: e.target.value})}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Check Date</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Date</label>
                     <input 
                       type="date"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                       value={paymentData.checkDate}
                       onChange={e => setPaymentData({...paymentData, checkDate: e.target.value})}
                     />
@@ -1528,21 +1528,21 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               {/* Amount & Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Amount</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Amount</label>
                   <input 
                     type="number"
                     step="0.01"
                     min="0"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                     value={paymentData.amountPaid}
                     onChange={e => setPaymentData({...paymentData, amountPaid: parseFloat(e.target.value) || 0})}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payment Date</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Date</label>
                   <input 
                     type="date"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={paymentData.paymentDate}
                     onChange={e => setPaymentData({...paymentData, paymentDate: e.target.value})}
                   />
@@ -1553,13 +1553,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               <div className="flex gap-3 pt-4">
                 <button 
                   onClick={() => { setShowPaymentModal(false); setSelectedPayable(null); resetPaymentForm(); }}
-                  className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleProcessPayment}
-                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
                 >
                   <Landmark size={16} /> Process Payment
                 </button>
@@ -1571,27 +1571,27 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Delete Confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertCircle className="text-rose-600" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Delete Payable?</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <h3 className="text-lg font-bold text-gray-800">Delete Payable?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(confirmDelete)}
-                className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors"
+                className="flex-1 py-2.5 bg-rose-600 text-white rounded text-sm font-bold hover:bg-rose-700 transition-colors"
               >
                 Delete
               </button>
@@ -1634,16 +1634,16 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
   isEdit = false,
 }) => {
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-        <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+    <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+      <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+            <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
               <Calculator size={20} />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
           </button>
         </div>
@@ -1651,17 +1651,17 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
         <form onSubmit={onSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Invoice Type */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Document Type</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document Type</label>
             <div className="flex gap-2">
               {INVOICE_TYPES.map(type => (
                 <button
                   key={type.value}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, invoiceType: type.value }))}
-                  className={`flex-1 py-2 px-3 text-xs font-semibold rounded-xl border transition-all ${
+                  className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${
                     formData.invoiceType === type.value
-                      ? 'bg-teal-600 text-white border-teal-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
+                      ? 'bg-[#F47721] text-white border-orange-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
                   }`}
                 >
                   {type.label}
@@ -1672,13 +1672,13 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
 
           {/* Vendor Selection */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
               <Building size={12} /> Vendor *
             </label>
             <select 
               required
               disabled={isEdit}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none disabled:opacity-60"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium appearance-none disabled:opacity-60"
               value={formData.vendorId || ''}
               onChange={e => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
             >
@@ -1692,34 +1692,34 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Reference & Date Row */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Document # *</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document # *</label>
               <input 
                 type="text"
                 required
                 placeholder="BILL-2026-00001"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                 value={formData.payableNumber || ''}
                 onChange={e => setFormData(prev => ({ ...prev, payableNumber: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                 <Calendar size={12} /> Invoice Date *
               </label>
               <input 
                 type="date"
                 required
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                 value={formData.billDate || ''}
                 onChange={e => setFormData(prev => ({ ...prev, billDate: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Due Date *</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Due Date *</label>
               <input 
                 type="date"
                 required
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                 value={formData.dueDate || ''}
                 onChange={e => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
               />
@@ -1729,10 +1729,10 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Expense Account & Category */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest">Expense Account *</label>
+              <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">Expense Account *</label>
               <select 
                 required={formData.invoiceType === 'standard'}
-                className="w-full px-4 py-2.5 bg-teal-50/50 border border-teal-100 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-orange-50/50 border border-orange-100 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium appearance-none"
                 value={formData.expenseAccountId || ''}
                 onChange={e => setFormData(prev => ({ ...prev, expenseAccountId: e.target.value }))}
               >
@@ -1743,9 +1743,9 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Category</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</label>
               <select 
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium appearance-none"
                 value={formData.category || 'general'}
                 onChange={e => setFormData(prev => ({ ...prev, category: e.target.value as PayableCategory }))}
               >
@@ -1758,11 +1758,11 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Description</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</label>
             <input 
               type="text"
               placeholder="Brief description of the invoice..."
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
               value={formData.description || ''}
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
             />
@@ -1771,32 +1771,32 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Amount & VAT */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Gross Amount *</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gross Amount *</label>
               <input 
                 type="number"
                 step="0.01"
                 min="0"
                 required
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                 value={formData.amount || ''}
                 onChange={e => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Input VAT</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Input VAT</label>
               <input 
                 type="number"
                 step="0.01"
                 min="0"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                 value={formData.inputVatAmount || ''}
                 onChange={e => setFormData(prev => ({ ...prev, inputVatAmount: parseFloat(e.target.value) || 0 }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest">Withholding Type</label>
+              <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">Withholding Type</label>
               <select 
-                className="w-full px-4 py-2.5 bg-teal-50/50 border border-teal-100 rounded-xl outline-none text-sm appearance-none"
+                className="w-full px-4 py-2.5 bg-orange-50/50 border border-orange-100 rounded outline-none text-sm appearance-none"
                 value={formData.withholdingType || ''}
                 onChange={e => setFormData(prev => ({ ...prev, withholdingType: (e.target.value || undefined) as WithholdingType | undefined }))}
               >
@@ -1809,34 +1809,34 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
 
           {/* Withholding Details */}
           {formData.withholdingType && (
-            <div className="grid grid-cols-3 gap-4 bg-teal-50/30 p-4 rounded-xl border border-teal-100">
+            <div className="grid grid-cols-3 gap-4 bg-orange-50/30 p-4 rounded border border-orange-100">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Rate (%)</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate (%)</label>
                 <input 
                   type="number"
                   step="0.0001"
                   min="0"
                   max="1"
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none font-mono text-sm"
                   value={formData.appliedRatePercent || ''}
                   onChange={e => setFormData(prev => ({ ...prev, appliedRatePercent: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">WHT Amount</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">WHT Amount</label>
                 <input 
                   type="text"
                   readOnly
-                  className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded outline-none font-mono text-sm"
                   value={(formData.withholdingAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest">Net Payable</label>
+                <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">Net Payable</label>
                 <input 
                   type="text"
                   readOnly
-                  className="w-full px-4 py-2.5 bg-teal-50 border border-teal-100 rounded-xl outline-none font-mono text-sm font-bold text-teal-700"
+                  className="w-full px-4 py-2.5 bg-orange-50 border border-orange-100 rounded outline-none font-mono text-sm font-bold text-orange-700"
                   value={(formData.netPayable || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 />
               </div>
@@ -1846,21 +1846,21 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Reference Document & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Reference Document</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Reference Document</label>
               <input 
                 type="text"
                 placeholder="Vendor Invoice #, OR #, etc."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                 value={formData.referenceDocument || ''}
                 onChange={e => setFormData(prev => ({ ...prev, referenceDocument: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Notes</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</label>
               <input 
                 type="text"
                 placeholder="Additional notes..."
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                 value={formData.notes || ''}
                 onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               />
@@ -1870,9 +1870,9 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Status (Edit mode) */}
           {isEdit && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</label>
               <select 
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium appearance-none"
                 value={formData.status || 'for_approval'}
                 onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as PayableStatus }))}
               >
@@ -1888,13 +1888,13 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             <button 
               type="button" 
               onClick={onClose} 
-              className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors"
+              className="flex-1 py-3.5 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              className="flex-1 py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all"
+              className="flex-1 py-3.5 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 active:scale-95 transition-all"
             >
               {submitLabel}
             </button>
@@ -1939,19 +1939,19 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   const remainingBalance = (payable.netPayable || payable.amount) - (payable.paidAmount || 0);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
-        <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+    <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+      <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+            <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
               <FileText size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-800">{payable.payableNumber}</h3>
-              <p className="text-xs text-slate-500">{vendor?.name || 'Unknown Vendor'}</p>
+              <h3 className="text-lg font-semibold text-gray-800">{payable.payableNumber}</h3>
+              <p className="text-xs text-gray-500">{vendor?.name || 'Unknown Vendor'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
           </button>
         </div>
@@ -1968,9 +1968,9 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
               </span>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-black text-slate-800">{"\u20B1"}{formatCurrency(payable.netPayable || payable.amount)}</p>
+              <p className="text-lg font-semibold text-gray-800">{"\u20B1"}{formatCurrency(payable.netPayable || payable.amount)}</p>
               {remainingBalance !== (payable.netPayable || payable.amount) && (
-                <p className="text-xs text-teal-600 font-semibold">Balance: {"\u20B1"}{formatCurrency(remainingBalance)}</p>
+                <p className="text-xs text-[#F47721] font-semibold">Balance: {"\u20B1"}{formatCurrency(remainingBalance)}</p>
               )}
             </div>
           </div>
@@ -1978,63 +1978,63 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Category</p>
-              <p className="text-slate-700 font-medium">{PAYABLE_CATEGORIES.find(c => c.value === payable.category)?.label || payable.category}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Category</p>
+              <p className="text-gray-700 font-medium">{PAYABLE_CATEGORIES.find(c => c.value === payable.category)?.label || payable.category}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Expense Account</p>
-              <p className="text-slate-700 font-medium">{expenseAccount ? `${expenseAccount.code} - ${expenseAccount.name}` : 'N/A'}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Expense Account</p>
+              <p className="text-gray-700 font-medium">{expenseAccount ? `${expenseAccount.code} - ${expenseAccount.name}` : 'N/A'}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Invoice Date</p>
-              <p className="text-slate-700 font-medium">{payable.billDate}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Invoice Date</p>
+              <p className="text-gray-700 font-medium">{payable.billDate}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Due Date</p>
-              <p className="text-slate-700 font-medium">{payable.dueDate}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Due Date</p>
+              <p className="text-gray-700 font-medium">{payable.dueDate}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gross Amount</p>
-              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.amount)}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Gross Amount</p>
+              <p className="text-gray-700 font-mono">{"\u20B1"}{formatCurrency(payable.amount)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Input VAT</p>
-              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.inputVatAmount || 0)}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Input VAT</p>
+              <p className="text-gray-700 font-mono">{"\u20B1"}{formatCurrency(payable.inputVatAmount || 0)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Withholding</p>
-              <p className="text-slate-700 font-mono">{"\u20B1"}{formatCurrency(payable.withholdingAmount || 0)}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Withholding</p>
+              <p className="text-gray-700 font-mono">{"\u20B1"}{formatCurrency(payable.withholdingAmount || 0)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paid Amount</p>
-              <p className="text-teal-600 font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.paidAmount || 0)}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Paid Amount</p>
+              <p className="text-[#F47721] font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.paidAmount || 0)}</p>
             </div>
             {payable.referenceDocument && (
               <div className="col-span-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Reference Document</p>
-                <p className="text-slate-700 font-medium">{payable.referenceDocument}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Reference Document</p>
+                <p className="text-gray-700 font-medium">{payable.referenceDocument}</p>
               </div>
             )}
             {payable.description && (
               <div className="col-span-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Description</p>
-                <p className="text-slate-700">{payable.description}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Description</p>
+                <p className="text-gray-700">{payable.description}</p>
               </div>
             )}
           </div>
 
           {/* GL Status */}
           {payable.journalEntryId && (
-            <div className="bg-teal-50 rounded-xl p-4 border border-teal-100">
+            <div className="bg-orange-50 rounded p-4 border border-orange-100">
               <div className="flex items-center gap-2">
-                <BookOpen className="text-teal-600" size={16} />
-                <span className="text-sm font-semibold text-teal-700">Posted to General Ledger</span>
+                <BookOpen className="text-[#F47721]" size={16} />
+                <span className="text-sm font-semibold text-orange-700">Posted to General Ledger</span>
               </div>
             </div>
           )}
 
           {/* Timestamps */}
-          <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-1">
+          <div className="bg-gray-50 rounded p-4 text-xs text-gray-500 space-y-1">
             <p>Created: {new Date(payable.createdAt).toLocaleString()}</p>
             {payable.approvedAt && <p>Approved: {new Date(payable.approvedAt).toLocaleString()}</p>}
             {payable.paidAt && <p>Paid: {new Date(payable.paidAt).toLocaleString()}</p>}
@@ -2044,14 +2044,14 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
           <div className="flex gap-3">
             <button 
               onClick={onClose} 
-              className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+              className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
             >
               Close
             </button>
             {canPost && (
               <button 
                 onClick={onPostGL} 
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
               >
                 <BookOpen size={16} /> Post to GL
               </button>
@@ -2059,7 +2059,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             {payable.status === 'for_approval' && !canPost && (
               <button 
                 onClick={onApprove} 
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
               >
                 <CheckCircle size={16} /> Approve
               </button>
@@ -2067,7 +2067,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             {canPay && (
               <button 
                 onClick={onProcessPayment} 
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
               >
                 <Landmark size={16} /> Pay
               </button>

@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
 import { AccountingService } from '../accountingService';
@@ -285,28 +285,28 @@ const ARView: React.FC<ARViewProps> = ({
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Receivables & Revenue Cycle</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Monitor institutional cash inflows and analyzed aging debt buckets.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Receivables & Revenue Cycle</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Monitor institutional cash inflows and analyzed aging debt buckets.</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-             <button onClick={() => setActiveTab('invoices')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'invoices' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+           <div className="flex bg-gray-100 p-1 rounded border border-gray-200">
+             <button onClick={() => setActiveTab('invoices')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'invoices' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <FileText size={14} className="inline mr-1.5" /> Invoices
              </button>
-             <button onClick={() => setActiveTab('collections')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'collections' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+             <button onClick={() => setActiveTab('collections')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'collections' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <Receipt size={14} className="inline mr-1.5" /> Collections
              </button>
-             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging Report
              </button>
            </div>
-           <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
-           <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
+           <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
+           <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryBox label="Gross Receivables" value={formatCurrency(totalReceivables)} color="teal" />
+        <SummaryBox label="Gross Receivables" value={formatCurrency(totalReceivables)} color="orange" />
         <SummaryBox label="Collections (MTD)" value={formatCurrency(arCollections.filter(c => {
           const entryDate = new Date(c.date);
           const now = new Date();
@@ -316,42 +316,42 @@ const ARView: React.FC<ARViewProps> = ({
           return s + (l?.debit || 0);
         }, 0))} color="emerald" />
         <SummaryBox label="Output VAT Due" value={formatCurrency(totalOutputVat)} color="amber" />
-        <SummaryBox label="Collection Efficiency" value="84%" color="slate" />
+        <SummaryBox label="Collection Efficiency" value="84%" color="gray" />
       </div>
 
       {activeTab === 'invoices' && (
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
+        <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+          <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-teal-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded text-xs outline-none w-72 focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer / Sponsor</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Invoice #</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount Due</th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer / Sponsor</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Invoice #</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount Due</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-gray-100">
               {filteredInvoices.length > 0 ? filteredInvoices.reverse().map(inv => {
                 const arLine = lines.find(l => l.journalEntryId === inv.id && l.debit > 0);
                 return (
-                  <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-5"><div className="text-sm font-bold text-slate-800">{inv.description.split(': ')[1]}</div></td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-teal-600">{inv.reference}</td>
-                    <td className="px-6 py-5 text-xs text-slate-600">{inv.date}</td>
-                    <td className="px-6 py-5 text-right font-mono font-bold text-slate-900">{formatCurrency(arLine?.debit || 0)}</td>
+                  <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-5"><div className="text-sm font-bold text-gray-800">{inv.description.split(': ')[1]}</div></td>
+                    <td className="px-6 py-5 text-xs font-mono font-bold text-[#F47721]">{inv.reference}</td>
+                    <td className="px-6 py-5 text-xs text-gray-600">{inv.date}</td>
+                    <td className="px-6 py-5 text-right font-mono font-bold text-gray-900">{formatCurrency(arLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
-                      <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border ${
+                      <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full border ${
                         inv.status === 'POSTED' 
-                          ? 'bg-teal-50 text-teal-600 border-teal-100' 
-                          : 'bg-amber-50 text-teal-600 border-amber-100'
+                          ? 'bg-orange-50 text-[#F47721] border-orange-100' 
+                          : 'bg-amber-50 text-[#F47721] border-amber-100'
                       }`}>
                         {inv.status || 'DRAFT'}
                       </span>
@@ -361,13 +361,13 @@ const ARView: React.FC<ARViewProps> = ({
                         {inv.status !== 'POSTED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
                           <button 
                             onClick={() => onApproveInvoice?.(inv.id)}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1 bg-[#F47721] hover:bg-[#E06610] text-white rounded-lg text-xs font-bold transition-all shadow-sm"
                             title="Approve and Post to Ledger"
                           >
                             <CheckCircle2 size={12} /> Approve
                           </button>
                         )}
-                        <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors">
+                        <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-300 transition-colors">
                           <MoreVertical size={16} />
                         </button>
                       </div>
@@ -375,7 +375,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </tr>
                 )
               }) : (
-                <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">No sales invoices recorded.</td></tr>
+                <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sales invoices recorded.</td></tr>
               )}
             </tbody>
           </table>
@@ -383,48 +383,48 @@ const ARView: React.FC<ARViewProps> = ({
       )}
 
       {activeTab === 'collections' && (
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
-            <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest px-2">Recent Official Receipts</h3>
+        <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+          <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+            <h3 className="text-xs font-semibold uppercase text-gray-400 tracking-wide px-2">Recent Official Receipts</h3>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input placeholder="Find by OR# or Payer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-teal-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input placeholder="Find by OR# or Payer..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded text-xs outline-none w-72 focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payer Entity</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">OR # / Ref</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Collected Amount</th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Deposit Account</th>
-                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Payer Entity</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">OR # / Ref</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Collected Amount</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Deposit Account</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-gray-100">
               {filteredCollections.length > 0 ? filteredCollections.reverse().map(coll => {
                 const cashLine = lines.find(l => l.journalEntryId === coll.id && l.debit > 0);
                 const bankAcc = bankAccounts.find(b => b.glAccountId === cashLine?.accountId);
                 return (
-                  <tr key={coll.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={coll.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-5 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center"><CheckCircle size={14} /></div>
-                      <div className="text-sm font-bold text-slate-800">{coll.description.split(': ')[1]}</div>
+                      <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#F47721] flex items-center justify-center"><CheckCircle size={14} /></div>
+                      <div className="text-sm font-bold text-gray-800">{coll.description.split(': ')[1]}</div>
                     </td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-teal-600">{coll.reference}</td>
-                    <td className="px-6 py-5 text-xs text-slate-600">{coll.date}</td>
-                    <td className="px-6 py-5 text-right font-mono font-bold text-teal-600">{formatCurrency(cashLine?.debit || 0)}</td>
+                    <td className="px-6 py-5 text-xs font-mono font-bold text-[#F47721]">{coll.reference}</td>
+                    <td className="px-6 py-5 text-xs text-gray-600">{coll.date}</td>
+                    <td className="px-6 py-5 text-right font-mono font-bold text-[#F47721]">{formatCurrency(cashLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
-                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded text-xs font-bold text-gray-500 uppercase">
                         <Landmark size={10} /> {bankAcc?.bankName || 'Treasury'}
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-right"><MoreVertical size={16} className="text-slate-300 inline" /></td>
+                    <td className="px-6 py-5 text-right"><MoreVertical size={16} className="text-gray-300 inline" /></td>
                   </tr>
                 )
               }) : (
-                <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">No collections recorded yet.</td></tr>
+                <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No collections recorded yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -433,40 +433,40 @@ const ARView: React.FC<ARViewProps> = ({
 
       {activeTab === 'aging' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
              <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><Calendar size={20} /></div>
+                <div className="p-2 bg-orange-50 text-[#F47721] rounded"><Calendar size={20} /></div>
                 <div>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Effective Aging Date</p>
-                   <input type="date" className="bg-transparent border-none outline-none font-bold text-slate-800 text-lg p-0 focus:ring-0" value={agingAsOf} onChange={e => setAgingAsOf(e.target.value)} />
+                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Effective Aging Date</p>
+                   <input type="date" className="bg-transparent border-none outline-none font-bold text-gray-800 text-lg p-0 focus:ring-0" value={agingAsOf} onChange={e => setAgingAsOf(e.target.value)} />
                 </div>
              </div>
           </div>
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="min-w-full divide-y divide-slate-100">
-              <thead className="bg-slate-50/50">
+          <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Debtor Identity</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current (0-30)</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">31 - 60 Days</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">61 - 90 Days</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-rose-500 uppercase tracking-widest">Over 90 Days</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-900 uppercase tracking-widest">Total Balance</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Debtor Identity</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Current (0-30)</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">31 - 60 Days</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">61 - 90 Days</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-rose-500 uppercase tracking-wide">Over 90 Days</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-900 uppercase tracking-wide">Total Balance</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-gray-100">
                 {agingReport.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-5 text-sm font-bold text-slate-800">{row.name}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.current)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.thirty)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-teal-600">{formatCurrency(row.sixty)}</td>
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-5 text-sm font-bold text-gray-800">{row.name}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-[#F47721]">{formatCurrency(row.current)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-[#F47721]">{formatCurrency(row.thirty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-[#F47721]">{formatCurrency(row.sixty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-bold bg-rose-50/20">{formatCurrency(row.ninety)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-sm font-black text-slate-900">{formatCurrency(row.total)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-sm font-semibold text-gray-900">{formatCurrency(row.total)}</td>
                   </tr>
                 ))}
                 {agingReport.length === 0 && (
-                   <tr><td colSpan={6} className="py-20 text-center text-slate-400 italic">No outstanding receivables found as of this date.</td></tr>
+                   <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No outstanding receivables found as of this date.</td></tr>
                 )}
               </tbody>
             </table>
@@ -476,36 +476,36 @@ const ARView: React.FC<ARViewProps> = ({
 
       {/* Invoice Modal */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl"><FileText size={24} /></div>
-                  <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Generate Sales Invoice</h3>
+                  <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><FileText size={24} /></div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Generate Sales Invoice</h3>
                </div>
-               <button onClick={() => setShowInvoiceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
+               <button onClick={() => setShowInvoiceModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
             </div>
 
-            <form onSubmit={handlePostInvoice} className="p-10 space-y-10">
+            <form onSubmit={handlePostInvoice} className="p-5 space-y-10">
                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Invoice Date</label>
-                    <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} />
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Invoice Date</label>
+                    <input type="date" required className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Sequential #</label>
-                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-teal-600 font-mono" value={invoiceRef} />
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Sequential #</label>
+                    <input readOnly className="w-full px-5 py-3.5 bg-gray-100 border border-gray-200 rounded text-sm font-semibold text-[#F47721] font-mono" value={invoiceRef} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Recipient Type</label>
-                    <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); }}>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Recipient Type</label>
+                    <select className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); }}>
                       <option value="SPONSOR">Corporate Sponsor</option>
                       <option value="STUDENT">Individual Learner</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Select Entity</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-teal-100 rounded-2xl text-sm font-black text-teal-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Select Entity</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-orange-100 rounded text-sm font-semibold text-orange-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
                       <option value="">Choose...</option>
                       {recipientType === 'SPONSOR' 
                         ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
@@ -514,14 +514,14 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-teal-50/30 rounded-3xl border border-teal-100/50">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-orange-50/30 rounded-md border border-orange-100/50">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                    <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide flex items-center gap-2 px-1">
                       <BookOpen size={12} /> Target G/L Receivable Account
                     </label>
                     <select 
                       required 
-                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm"
+                      className="w-full px-5 py-3.5 bg-white border border-gray-200 rounded text-sm font-bold shadow-sm"
                       value={selectedArAccountId}
                       onChange={e => setSelectedArAccountId(e.target.value)}
                     >
@@ -532,17 +532,17 @@ const ARView: React.FC<ARViewProps> = ({
                         </option>
                       ))}
                     </select>
-                    <p className="text-[9px] text-slate-500 italic mt-1 px-1">
+                    <p className="text-xs text-gray-500 italic mt-1 px-1">
                       This defines where the debit entry will be recorded in the general ledger.
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 text-slate-400 italic text-xs pt-4">
-                    <AlertCircle size={14} className="text-teal-400" />
+                  <div className="flex items-center gap-4 text-gray-400 italic text-xs pt-4">
+                    <AlertCircle size={14} className="text-orange-400" />
                     <span>Selected account is automatically synced with {recipientType === 'SPONSOR' ? 'Sponsor' : 'Individual'} defaults but can be overridden here.</span>
                   </div>
                </div>
                <div className="space-y-4">
-                  <div className="grid grid-cols-12 gap-4 px-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  <div className="grid grid-cols-12 gap-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                     <div className="col-span-5">Item / Service</div>
                     <div className="col-span-2 text-center">Qty</div>
                     <div className="col-span-2 text-right">Rate</div>
@@ -550,41 +550,41 @@ const ARView: React.FC<ARViewProps> = ({
                     <div className="col-span-1"></div>
                   </div>
                   {invoiceLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-teal-100 transition-all">
+                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded border border-gray-100 hover:border-orange-100 transition-all">
                       <div className="col-span-5">
-                        <select required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
+                        <select required className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
                           <option value="">Select Item...</option>
                           {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                         </select>
                       </div>
-                      <div className="col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-center text-xs font-black" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
-                      <div className="col-span-2"><input type="number" step="0.01" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-right text-xs font-mono font-bold" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
-                      <div className="col-span-2 text-right font-mono font-black text-sm">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                      <div className="col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+                      <div className="col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-center text-xs font-semibold" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
+                      <div className="col-span-2"><input type="number" step="0.01" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-right text-xs font-mono font-bold" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
+                      <div className="col-span-2 text-right font-mono font-semibold text-sm">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                      <div className="col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-gray-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
                     </div>
                   ))}
-                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase text-teal-600 hover:bg-teal-50 rounded-xl transition-colors border-2 border-dashed border-teal-100"><Plus size={14}/> Add Invoice Line</button>
+                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase text-[#F47721] hover:bg-orange-50 rounded transition-colors border-2 border-dashed border-orange-100"><Plus size={14}/> Add Invoice Line</button>
                </div>
 
-               <div className="p-10 bg-slate-900 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
-                  <div className="flex gap-10">
+               <div className="p-5 bg-gray-800 rounded-md flex flex-col md:flex-row justify-between items-center gap-5 shadow-md">
+                  <div className="flex gap-5">
                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subtotal (Net)</p>
-                        <p className="text-xl font-mono font-black text-white">{"\u20B1"} {totalInvoiceNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Subtotal (Net)</p>
+                        <p className="text-xl font-mono font-semibold text-white">{"\u20B1"} {totalInvoiceNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      </div>
                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Output VAT (12%)</p>
-                        <p className="text-xl font-mono font-black text-white">{"\u20B1"} {totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Output VAT (12%)</p>
+                        <p className="text-xl font-mono font-semibold text-white">{"\u20B1"} {totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      </div>
                      <div className="w-px h-12 bg-white/10"></div>
                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-brand uppercase tracking-widest">Gross Invoice Value</p>
-                        <p className="text-3xl font-mono font-black text-white tracking-tighter">{"\u20B1"} {grossInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-semibold text-brand uppercase tracking-wide">Gross Invoice Value</p>
+                        <p className="text-xl font-mono font-semibold text-white tracking-tighter">{"\u20B1"} {grossInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      </div>
                   </div>
                   <div className="flex gap-4 w-full md:w-auto">
-                    <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Discard</button>
-                    <button type="submit" className="flex-1 px-12 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-900/40 hover:bg-teal-500 active:scale-95 transition-all">Authorize & Post SI</button>
+                    <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-white transition-colors">Discard</button>
+                    <button type="submit" className="flex-1 px-12 py-4 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#F47721] active:scale-95 transition-all">Authorize & Post SI</button>
                   </div>
                </div>
             </form>
@@ -594,39 +594,39 @@ const ARView: React.FC<ARViewProps> = ({
 
       {/* Collection Modal */}
       {showCollectionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-200"><Landmark size={24} /></div>
-                  <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Record Receipt (OR)</h3>
+                  <div className="p-3 bg-[#F47721] text-white rounded shadow-sm shadow-gray-200"><Landmark size={24} /></div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Record Receipt (OR)</h3>
                </div>
-               <button onClick={() => setShowCollectionModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
+               <button onClick={() => setShowCollectionModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
             </div>
 
-            <form onSubmit={handlePostCollection} className="p-10 space-y-8">
+            <form onSubmit={handlePostCollection} className="p-5 space-y-8">
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Receipt Date</label>
-                    <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collDate} onChange={e => setCollDate(e.target.value)} />
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Receipt Date</label>
+                    <input type="date" required className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={collDate} onChange={e => setCollDate(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">OR # / Reference</label>
-                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-teal-600 font-mono" value={collRef} />
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">OR # / Reference</label>
+                    <input readOnly className="w-full px-5 py-3.5 bg-gray-100 border border-gray-200 rounded text-sm font-semibold text-[#F47721] font-mono" value={collRef} />
                   </div>
                </div>
 
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Payer Category</label>
-                    <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold" value={collPayerType} onChange={e => { setCollPayerType(e.target.value as any); setCollPayerId(''); }}>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Payer Category</label>
+                    <select className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={collPayerType} onChange={e => { setCollPayerType(e.target.value as any); setCollPayerId(''); }}>
                       <option value="SPONSOR">Corporate Sponsor</option>
                       <option value="STUDENT">Individual Learner</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Entity Identity</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-teal-100 rounded-2xl text-sm font-black text-teal-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Entity Identity</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-orange-100 rounded text-sm font-semibold text-orange-700" value={collPayerId} onChange={e => setCollPayerId(e.target.value)}>
                       <option value="">Select Payer...</option>
                       {collPayerType === 'SPONSOR' 
                         ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name} (Bal: {formatCurrency(subsidiaryBalances[s.id] || 0)})</option>)
@@ -636,14 +636,14 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-teal-50/30 rounded-3xl border border-teal-100/50">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-orange-50/30 rounded-md border border-orange-100/50">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                    <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide flex items-center gap-2 px-1">
                       <BookOpen size={12} /> Source G/L Receivable Account
                     </label>
                     <select 
                       required 
-                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm"
+                      className="w-full px-5 py-3.5 bg-white border border-gray-200 rounded text-sm font-bold shadow-sm"
                       value={selectedCollArAccountId}
                       onChange={e => setSelectedCollArAccountId(e.target.value)}
                     >
@@ -656,8 +656,8 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest px-1">Deposit Target</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
+                    <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide px-1">Deposit Target</label>
+                    <select required className="w-full px-5 py-3.5 bg-white border border-gray-200 rounded text-sm font-bold shadow-sm" value={collBankId} onChange={e => setCollBankId(e.target.value)}>
                       <option value="">Select Treasury Account...</option>
                       {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} ({b.currency})</option>)}
                     </select>
@@ -665,23 +665,23 @@ const ARView: React.FC<ARViewProps> = ({
                </div>
 
                <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Total Collection Amount</label>
+                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Total Collection Amount</label>
                  <div className="relative">
-                    <input type="number" step="0.01" required className="w-full px-6 py-5 bg-slate-50 border-none rounded-[2rem] text-4xl font-mono font-black text-slate-900 outline-none focus:ring-4 focus:ring-teal-500/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
-                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-black text-slate-300">PHP</span>
+                    <input type="number" step="0.01" required className="w-full px-6 py-5 bg-gray-50 border-none rounded text-xl font-mono font-semibold text-gray-900 outline-none focus:ring-4 focus:ring-orange-400/10 transition-all" value={collAmount || ''} onChange={e => setCollAmount(Number(e.target.value))} placeholder="0.00" />
+                    <span className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-300">PHP</span>
                  </div>
                </div>
 
-               <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
-                  <CheckCircle size={24} className="text-teal-600 shrink-0" />
-                  <p className="text-[11px] text-teal-800 leading-relaxed font-bold">
+               <div className="bg-orange-50 p-6 rounded border border-orange-100 flex gap-4">
+                  <CheckCircle size={24} className="text-[#F47721] shrink-0" />
+                  <p className="text-xs text-orange-800 leading-relaxed font-bold">
                     Receipting will reduce the debtor subsidiary ledger balance and increase the institutional liquid assets. This entry is cryptographic and final.
                   </p>
                </div>
 
                <div className="pt-4 flex gap-4">
-                  <button type="button" onClick={() => setShowCollectionModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-800 transition-colors">Discard</button>
-                  <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-100 active:scale-95 transition-all">Confirm Collection</button>
+                  <button type="button" onClick={() => setShowCollectionModal(false)} className="flex-1 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-gray-800 transition-colors">Discard</button>
+                  <button type="submit" className="flex-1 py-4 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-100 active:scale-95 transition-all">Confirm Collection</button>
                </div>
             </form>
           </div>
@@ -692,9 +692,9 @@ const ARView: React.FC<ARViewProps> = ({
 };
 
 const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
-  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-     <p className={`text-2xl font-mono font-black text-${color === 'rose' ? 'rose-600' : 'teal-600'} tracking-tighter`}>{value}</p>
+  <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
+     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+     <p className={`text-lg font-mono font-semibold text-${color === 'rose' ? 'rose-600' : 'orange-600'} tracking-tighter`}>{value}</p>
   </div>
 );
 

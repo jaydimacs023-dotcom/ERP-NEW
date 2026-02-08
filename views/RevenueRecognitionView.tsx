@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RevenueRecognitionView
  * 
  * Manages deferred revenue and revenue recognition schedules.
@@ -395,8 +395,8 @@ export default function RevenueRecognitionView({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Revenue Recognition</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Manage deferred revenue and recognition schedules</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Revenue Recognition</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Manage deferred revenue and recognition schedules</p>
         </div>
         <div className="flex gap-2">
           {summary.dueForRecognition > 0 && (
@@ -410,7 +410,7 @@ export default function RevenueRecognitionView({
           )}
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Schedule
@@ -425,7 +425,7 @@ export default function RevenueRecognitionView({
             <DollarSign className="w-4 h-4" />
             Deferred Balance
           </div>
-          <div className="text-2xl font-bold text-teal-600">
+          <div className="text-lg font-bold text-[#F47721]">
             {formatCurrency(summary.totalDeferred)}
           </div>
         </div>
@@ -434,7 +434,7 @@ export default function RevenueRecognitionView({
             <TrendingUp className="w-4 h-4" />
             Total Recognized
           </div>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-lg font-bold text-green-600">
             {formatCurrency(summary.totalRecognized)}
           </div>
         </div>
@@ -443,7 +443,7 @@ export default function RevenueRecognitionView({
             <Calendar className="w-4 h-4" />
             Active Schedules
           </div>
-          <div className="text-2xl font-bold text-teal-600">
+          <div className="text-lg font-bold text-[#F47721]">
             {summary.activeCount}
           </div>
         </div>
@@ -452,7 +452,7 @@ export default function RevenueRecognitionView({
             <Clock className="w-4 h-4" />
             Due for Recognition
           </div>
-          <div className="text-2xl font-bold text-purple-600">
+          <div className="text-lg font-bold text-purple-600">
             {summary.dueForRecognition}
           </div>
         </div>
@@ -471,7 +471,7 @@ export default function RevenueRecognitionView({
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-teal-600 text-teal-600'
+                  ? 'border-orange-500 text-[#F47721]'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -492,7 +492,7 @@ export default function RevenueRecognitionView({
               placeholder="Search schedules..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function RevenueRecognitionView({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
             >
               <option value="ALL">All Status</option>
               {STATUS_OPTIONS.map(opt => (
@@ -549,7 +549,7 @@ export default function RevenueRecognitionView({
 
                   return (
                     <React.Fragment key={schedule.id}>
-                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-teal-50' : ''}`}>
+                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-orange-50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -576,7 +576,7 @@ export default function RevenueRecognitionView({
                           {formatCurrency(schedule.recognizedAmount)}
                           <div className="text-xs text-gray-400">{progressPercent}%</div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-teal-600">
+                        <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
                           {formatCurrency(schedule.deferredBalance)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
@@ -621,7 +621,7 @@ export default function RevenueRecognitionView({
                             </button>
                             <button
                               onClick={() => handleEdit(schedule)}
-                              className="p-1.5 text-teal-600 hover:bg-teal-100 rounded-lg"
+                              className="p-1.5 text-[#F47721] hover:bg-orange-100 rounded-lg"
                               title="Edit"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -818,7 +818,7 @@ export default function RevenueRecognitionView({
                       <td className="px-4 py-3 text-sm text-green-600">
                         {formatCurrency(summary.totalRecognized)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-teal-600">
+                      <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
                         {formatCurrency(summary.totalRemaining)}
                       </td>
                       <td className="px-4 py-3">
@@ -844,7 +844,7 @@ export default function RevenueRecognitionView({
       {/* Create/Edit Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded shadow-sm max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-4 border-b">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editingSchedule ? 'Edit Revenue Schedule' : 'New Revenue Schedule'}
@@ -861,7 +861,7 @@ export default function RevenueRecognitionView({
                 <select
                   value={formData.customerId}
                   onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   required
                 >
                   <option value="">Select Customer</option>
@@ -878,7 +878,7 @@ export default function RevenueRecognitionView({
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   placeholder="e.g., Tuition Fee - First Semester"
                   required
                 />
@@ -892,7 +892,7 @@ export default function RevenueRecognitionView({
                     type="number"
                     value={formData.totalAmount}
                     onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     min="0"
                     step="0.01"
                     required
@@ -904,7 +904,7 @@ export default function RevenueRecognitionView({
                     type="text"
                     value={formData.currency}
                     onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     placeholder="PHP"
                   />
                 </div>
@@ -916,7 +916,7 @@ export default function RevenueRecognitionView({
                 <select
                   value={formData.recognitionMethod}
                   onChange={(e) => setFormData({ ...formData, recognitionMethod: e.target.value as RecognitionMethod })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                 >
                   {RECOGNITION_METHODS.map(m => (
                     <option key={m.value} value={m.value}>{m.label}</option>
@@ -934,7 +934,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.recognitionPeriod}
                     onChange={(e) => setFormData({ ...formData, recognitionPeriod: e.target.value as RecognitionPeriod })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   >
                     {RECOGNITION_PERIODS.map(p => (
                       <option key={p.value} value={p.value}>{p.label}</option>
@@ -951,7 +951,7 @@ export default function RevenueRecognitionView({
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     required
                   />
                 </div>
@@ -961,7 +961,7 @@ export default function RevenueRecognitionView({
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     required
                   />
                 </div>
@@ -974,7 +974,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.deferredRevenueAccountId}
                     onChange={(e) => setFormData({ ...formData, deferredRevenueAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     required
                   >
                     <option value="">Select Liability Account</option>
@@ -988,7 +988,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.revenueAccountId}
                     onChange={(e) => setFormData({ ...formData, revenueAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     required
                   >
                     <option value="">Select Revenue Account</option>
@@ -1006,7 +1006,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.sourceType}
                     onChange={(e) => setFormData({ ...formData, sourceType: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   >
                     <option value="MANUAL">Manual Entry</option>
                     <option value="INVOICE">From Invoice</option>
@@ -1019,7 +1019,7 @@ export default function RevenueRecognitionView({
                     type="text"
                     value={formData.sourceReference}
                     onChange={(e) => setFormData({ ...formData, sourceReference: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                     placeholder="e.g., INV-2024-001"
                   />
                 </div>
@@ -1031,7 +1031,7 @@ export default function RevenueRecognitionView({
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   rows={2}
                   placeholder="Internal notes..."
                 />
@@ -1048,7 +1048,7 @@ export default function RevenueRecognitionView({
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] transition-colors"
                 >
                   <Check className="w-4 h-4" />
                   {editingSchedule ? 'Update Schedule' : 'Create Schedule'}

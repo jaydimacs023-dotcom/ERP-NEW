@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo } from 'react';
 import { Trainer, TrainerSchedule, DaySlot, Location } from '../types';
 import { generateUUID } from '../utils/uuid';
@@ -166,29 +166,29 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Institutional Capacity Engine</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Trainer workload matrix and resource allocation optimization.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Institutional Capacity Engine</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Trainer workload matrix and resource allocation optimization.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-8 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition-all shadow-xl shadow-teal-100 font-black text-xs active:scale-95 uppercase tracking-widest"
+          className="flex items-center gap-2 px-8 py-3 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-sm shadow-gray-100 font-semibold text-xs active:scale-95 uppercase tracking-wide"
         >
           <Plus size={18} /> Schedule Session
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
+      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             placeholder="Find profile by instructor name..." 
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-teal-500/20 outline-none font-bold"
+            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-2 focus:ring-orange-400/20 outline-none font-bold"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-           <div className="flex items-center gap-2 px-4 py-3 bg-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 border border-slate-200">
+           <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded text-xs font-semibold uppercase tracking-wide text-gray-500 border border-gray-200">
               <Activity size={14} /> Total Profiles: {filteredSchedules.length}
            </div>
         </div>
@@ -201,42 +201,42 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
           const weeklyHours = sch.slots.reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0);
           
           return (
-            <div key={sch.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all group overflow-hidden flex flex-col md:flex-row">
-               <div className="p-8 md:w-80 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/30 flex flex-col justify-between">
+            <div key={sch.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm transition-all group overflow-hidden flex flex-col md:flex-row">
+               <div className="p-8 md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50 flex flex-col justify-between">
                   <div className="space-y-6">
                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-xl shadow-slate-200 border-2 border-white">
+                        <div className="w-14 h-14 rounded bg-gray-800 text-white flex items-center justify-center font-semibold text-lg shadow-sm shadow-gray-200 border-2 border-white">
                            {trainer?.lastName[0]}{trainer?.firstName[0]}
                         </div>
                         <div>
-                           <p className="text-sm font-black text-slate-800 uppercase leading-none">{trainer?.lastName}, {trainer?.firstName}</p>
-                           <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Trainer Schedule</p>
+                           <p className="text-sm font-semibold text-gray-800 uppercase leading-none">{trainer?.lastName}, {trainer?.firstName}</p>
+                           <p className="text-xs text-gray-400 font-bold uppercase mt-1 tracking-wide">Trainer Schedule</p>
                         </div>
                      </div>
 
                      <div className="space-y-4">
-                        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Primary Station</p>
+                        <div className="p-4 bg-white rounded border border-gray-100 shadow-sm">
+                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Primary Station</p>
                            <div className="flex items-center gap-2">
-                              <MapPin size={16} className="text-teal-600" />
-                              <span className="text-xs font-bold text-slate-700">{location?.name || 'Mobile/Remote'}</span>
+                              <MapPin size={16} className="text-[#F47721]" />
+                              <span className="text-xs font-bold text-gray-700">{location?.name || 'Mobile/Remote'}</span>
                            </div>
                         </div>
 
-                        <div className="p-4 bg-slate-900 rounded-2xl border border-white/5 shadow-xl">
-                           <p className="text-[9px] font-black text-teal-400 uppercase tracking-widest mb-1">Resource Load</p>
+                        <div className="p-4 bg-gray-800 rounded border border-white/5 shadow-sm">
+                           <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">Resource Load</p>
                            <div className="flex items-baseline gap-2">
-                              <span className="text-2xl font-mono font-black text-white">{weeklyHours.toFixed(1)}</span>
-                              <span className="text-[10px] font-black text-slate-500 uppercase">Hrs / Week</span>
+                              <span className="text-lg font-mono font-semibold text-white">{weeklyHours.toFixed(1)}</span>
+                              <span className="text-xs font-semibold text-gray-500 uppercase">Hrs / Week</span>
                            </div>
                         </div>
                      </div>
                   </div>
 
-                  <div className="mt-8 pt-6 border-t border-slate-100 flex gap-2">
+                  <div className="mt-8 pt-6 border-t border-gray-100 flex gap-2">
                      <button 
                        onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
-                       className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-teal-600 hover:text-teal-600 transition-all flex items-center justify-center gap-2"
+                       className="flex-1 py-3 bg-white border border-gray-200 rounded text-xs font-semibold uppercase tracking-wide text-gray-600 hover:border-orange-500 hover:text-[#F47721] transition-all flex items-center justify-center gap-2"
                        disabled={deletingId === sch.id}
                      >
                         <Edit2Icon size={14} /> Adjust Profile
@@ -244,7 +244,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                      <button 
                        onClick={() => handleDelete(sch.id)}
                        disabled={deletingId === sch.id}
-                       className="p-3 bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                       className="p-3 bg-rose-50 text-rose-400 rounded hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
                      >
                         {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                      </button>
@@ -255,17 +255,17 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   {DAYS.map((day, idx) => {
                     const slot = sch.slots.find(s => s.dayIndex === idx);
                     return (
-                      <div key={day} className={`p-4 rounded-3xl border-2 flex flex-col items-center justify-center transition-all ${slot ? 'bg-teal-600 border-teal-700 text-white shadow-lg shadow-teal-100' : 'bg-slate-50 border-slate-50 text-slate-300 opacity-40'}`}>
-                         <p className="text-[10px] font-black uppercase tracking-widest mb-3">{day.slice(0, 3)}</p>
+                      <div key={day} className={`p-4 rounded-md border-2 flex flex-col items-center justify-center transition-all ${slot ? 'bg-[#F47721] border-orange-600 text-white shadow-lg shadow-gray-100' : 'bg-gray-50 border-gray-50 text-gray-300 opacity-40'}`}>
+                         <p className="text-xs font-semibold uppercase tracking-wide mb-3">{day.slice(0, 3)}</p>
                          {slot ? (
                            <>
-                              <div className="p-2 bg-white/10 rounded-xl mb-3"><Clock size={16} /></div>
-                              <p className="text-xs font-mono font-black">{slot.startTime}</p>
+                              <div className="p-2 bg-white/10 rounded mb-3"><Clock size={16} /></div>
+                              <p className="text-xs font-mono font-semibold">{slot.startTime}</p>
                               <div className="h-2 w-px bg-white/20 my-1"></div>
-                              <p className="text-xs font-mono font-black">{slot.endTime}</p>
+                              <p className="text-xs font-mono font-semibold">{slot.endTime}</p>
                            </>
                          ) : (
-                            <div className="text-[10px] font-black uppercase italic">Off</div>
+                            <div className="text-xs font-semibold uppercase italic">Off</div>
                          )}
                       </div>
                     )
@@ -274,44 +274,44 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
             </div>
           );
         }) : (
-          <div className="py-32 text-center bg-white rounded-[3rem] border border-dashed border-slate-200">
-             <CalendarDays size={64} strokeWidth={1} className="mx-auto mb-6 text-slate-200" />
-             <h3 className="text-xl font-black text-slate-400 uppercase tracking-tight">No trainer profiles established</h3>
-             <p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">Schedules are mandatory for computing program terminal dates and institutional instructional hours.</p>
+          <div className="py-16 text-center bg-white rounded-md border border-dashed border-gray-200">
+             <CalendarDays size={64} strokeWidth={1} className="mx-auto mb-6 text-gray-200" />
+             <h3 className="text-xl font-semibold text-gray-400 uppercase tracking-tight">No trainer profiles established</h3>
+             <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">Schedules are mandatory for computing program terminal dates and institutional instructional hours.</p>
           </div>
         )}
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 flex flex-col md:flex-row h-full max-h-[90vh]">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col md:flex-row h-full max-h-[90vh]">
             
-            <div className="flex-1 overflow-y-auto p-10 border-r border-slate-100 bg-white">
-               <div className="flex items-center justify-between mb-10">
+            <div className="flex-1 overflow-y-auto p-5 border-r border-gray-100 bg-white">
+               <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-4">
-                     <div className="p-4 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><CalendarClock size={28} /></div>
+                     <div className="p-4 bg-[#F47721] text-white rounded shadow-sm shadow-gray-100"><CalendarClock size={28} /></div>
                      <div>
-                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Configuration Console</h3>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Institutional Labor Matrix v4.1</p>
+                        <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Configuration Console</h3>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Institutional Labor Matrix v4.1</p>
                      </div>
                   </div>
-                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400"><X size={32} /></button>
+                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X size={32} /></button>
                </div>
 
                <form onSubmit={handleSubmit} className="space-y-12">
                   <section className="space-y-8">
                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><GraduationCap size={18} /></div>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">I. Personnel Allocation</h4>
+                        <div className="p-2 bg-orange-50 text-[#F47721] rounded"><GraduationCap size={18} /></div>
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personnel Allocation</h4>
                      </div>
 
                      <div className="grid grid-cols-2 gap-8">
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lead Instructor</label>
+                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Lead Instructor</label>
                            <select 
                               required 
                               disabled={!!editingSchedule}
-                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-teal-500/10 outline-none text-sm font-black text-slate-800 appearance-none disabled:opacity-50"
+                              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-4 focus:ring-orange-400/10 outline-none text-sm font-semibold text-gray-800 appearance-none disabled:opacity-50"
                               value={formData.trainerId}
                               onChange={e => setFormData({...formData, trainerId: e.target.value})}
                            >
@@ -320,9 +320,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                            </select>
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Primary Deployment Station</label>
+                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Primary Deployment Station</label>
                            <select 
-                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-teal-500/10 outline-none text-sm font-black text-slate-800 appearance-none"
+                              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:ring-4 focus:ring-orange-400/10 outline-none text-sm font-semibold text-gray-800 appearance-none"
                               value={formData.locationId}
                               onChange={e => setFormData({...formData, locationId: e.target.value})}
                            >
@@ -335,31 +335,31 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
                   <section className="space-y-8">
                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><Timer size={18} /></div>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">II. Shift Definition Matrix</h4>
+                        <div className="p-2 bg-orange-50 text-[#F47721] rounded"><Timer size={18} /></div>
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Shift Definition Matrix</h4>
                      </div>
 
-                     <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-10 opacity-5"><Sparkles size={120} /></div>
+                     <div className="p-8 bg-gray-800 rounded-md border border-gray-700 shadow-md relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-5 opacity-5"><Sparkles size={120} /></div>
                         <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                            <div className="md:col-span-2 space-y-2">
-                              <label className="text-[10px] font-black text-teal-400 uppercase tracking-widest px-1">Target Work Day</label>
+                              <label className="text-xs font-semibold text-orange-400 uppercase tracking-wide px-1">Target Work Day</label>
                               <select 
-                                 className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded-2xl outline-none text-sm font-black text-white focus:border-brand"
+                                 className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-semibold text-white focus:border-brand"
                                  value={activeSlot.dayIndex}
                                  onChange={e => setActiveSlot({...activeSlot, dayIndex: Number(e.target.value)})}
                               >
-                                 {DAYS.map((d, i) => <option key={i} value={i} className="bg-slate-900">{d}</option>)}
+                                 {DAYS.map((d, i) => <option key={i} value={i} className="bg-gray-800">{d}</option>)}
                               </select>
                            </div>
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Commencement</label>
-                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded-2xl outline-none text-sm font-mono font-black text-white focus:border-brand"
+                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Commencement</label>
+                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-mono font-semibold text-white focus:border-brand"
                                  value={activeSlot.startTime} onChange={e => setActiveSlot({...activeSlot, startTime: e.target.value})} />
                            </div>
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Termination</label>
-                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded-2xl outline-none text-sm font-mono font-black text-white focus:border-brand"
+                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Termination</label>
+                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-mono font-semibold text-white focus:border-brand"
                                  value={activeSlot.endTime} onChange={e => setActiveSlot({...activeSlot, endTime: e.target.value})} />
                            </div>
                         </div>
@@ -367,7 +367,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                            <button 
                               type="button" 
                               onClick={addSlot}
-                              className="w-full py-4 bg-brand text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-brand/90 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brand/20 active:scale-95"
+                              className="w-full py-4 bg-brand text-white rounded text-xs font-semibold uppercase tracking-wide hover:bg-brand/90 transition-all flex items-center justify-center gap-3 shadow-sm shadow-brand/20 active:scale-95"
                            >
                               <Check size={18} strokeWidth={4} /> Update Capacity Matrix
                            </button>
@@ -377,13 +377,13 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                </form>
             </div>
 
-            <div className="w-full md:w-[400px] bg-slate-50 p-10 flex flex-col shrink-0">
+            <div className="w-full md:w-[400px] bg-gray-50 p-5 flex flex-col shrink-0">
                <div className="flex items-center justify-between mb-8">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                     <ShieldCheck size={20} className="text-teal-600" />
+                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                     <ShieldCheck size={20} className="text-[#F47721]" />
                      Live Profile Load
                   </h4>
-                  <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                  <div className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     SYNC_ID: {Date.now().toString().slice(-6)}
                   </div>
                </div>
@@ -392,50 +392,50 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   {(formData.slots || []).length > 0 ? (formData.slots || []).map(s => {
                      const hrs = getSlotHours(s.startTime, s.endTime);
                      return (
-                        <div key={s.dayIndex} className="group p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-teal-600 transition-all">
+                        <div key={s.dayIndex} className="group p-6 bg-white rounded border border-gray-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-orange-500 transition-all">
                            <div className="flex justify-between items-start mb-4">
-                              <span className="text-[11px] font-black text-teal-600 uppercase tracking-[0.2em]">{DAYS[s.dayIndex]}</span>
-                              <button onClick={() => removeSlot(s.dayIndex)} className="text-slate-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                              <span className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">{DAYS[s.dayIndex]}</span>
+                              <button onClick={() => removeSlot(s.dayIndex)} className="text-gray-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                            </div>
                            <div className="flex justify-between items-end">
                               <div className="space-y-1">
-                                 <p className="text-lg font-mono font-black text-slate-800 tracking-tighter">{s.startTime} — {s.endTime}</p>
-                                 <p className="text-[9px] font-black text-slate-400 uppercase">Operational Shift</p>
+                                 <p className="text-lg font-mono font-semibold text-gray-800 tracking-tighter">{s.startTime} — {s.endTime}</p>
+                                 <p className="text-xs font-semibold text-gray-400 uppercase">Operational Shift</p>
                               </div>
-                              <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl font-black text-xs group-hover:bg-teal-600 group-hover:text-white transition-all">
+                              <div className="p-3 bg-orange-50 text-[#F47721] rounded font-semibold text-xs group-hover:bg-[#F47721] group-hover:text-white transition-all">
                                  {hrs.toFixed(1)}h
                               </div>
                            </div>
                         </div>
                      )
                   }) : (
-                     <div className="py-20 text-center bg-white/50 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4">
-                        <Activity size={40} className="text-slate-200" />
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Matrix is Unassigned</p>
+                     <div className="py-20 text-center bg-white/50 rounded-md border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-4">
+                        <Activity size={40} className="text-gray-200" />
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide italic">Matrix is Unassigned</p>
                      </div>
                   )}
                </div>
 
-               <div className="mt-8 pt-8 border-t-2 border-slate-200">
+               <div className="mt-8 pt-8 border-t-2 border-gray-200">
                   <div className="space-y-6">
                      <div className="flex justify-between items-end">
                         <div>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cumulative Load</p>
+                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cumulative Load</p>
                            <div className="flex items-baseline gap-2">
-                              <h5 className="text-4xl font-mono font-black text-slate-900 tracking-tighter">{totalWeeklyHours.toFixed(1)}</h5>
-                              <span className="text-xs font-black text-teal-600 uppercase">Hours / Week</span>
+                              <h5 className="text-xl font-mono font-semibold text-gray-900 tracking-tighter">{totalWeeklyHours.toFixed(1)}</h5>
+                              <span className="text-xs font-semibold text-[#F47721] uppercase">Hours / Week</span>
                            </div>
                         </div>
                         {totalWeeklyHours > 40 && (
-                          <div className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-[8px] font-black uppercase flex items-center gap-1.5 animate-pulse">
+                          <div className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-semibold uppercase flex items-center gap-1.5 animate-pulse">
                              <AlertCircle size={10} /> Over-Capacity
                           </div>
                         )}
                      </div>
 
-                     <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
-                        <Info size={24} className="text-teal-600 shrink-0" />
-                        <p className="text-[10px] text-teal-800 leading-relaxed font-bold">
+                     <div className="bg-orange-50 p-6 rounded border border-orange-100 flex gap-4">
+                        <Info size={24} className="text-[#F47721] shrink-0" />
+                        <p className="text-xs text-orange-800 leading-relaxed font-bold">
                            Instructional hour metrics feed the <strong>Projected Completion Engine</strong>. Modifying this schedule re-forecasts terminal dates for all linked training batches.
                         </p>
                      </div>
@@ -443,7 +443,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                      <button 
                        onClick={handleSubmit}
                        disabled={!formData.trainerId || !formData.slots?.length || isSubmitting}
-                       className="w-full py-5 bg-teal-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-teal-900/40 hover:bg-teal-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
+                       className="w-full py-5 bg-[#F47721] text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#E06610] active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
                      >
                         {isSubmitting ? (
                           <>
@@ -468,10 +468,10 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 };
 
 const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.ReactNode }> = ({ label, value, icon }) => (
-  <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
-     <div className="p-2 bg-teal-500/20 rounded-lg text-teal-400">{icon}</div>
-     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
-     <span className="text-xs font-black text-white">{value}</span>
+  <div className="flex items-center justify-between p-4 bg-white/5 rounded border border-white/10">
+     <div className="p-2 bg-[#F47721]/20 rounded-lg text-orange-400">{icon}</div>
+     <span className="text-xs font-bold text-gray-400 uppercase tracking-tight">{label}</span>
+     <span className="text-xs font-semibold text-white">{value}</span>
   </div>
 );
 

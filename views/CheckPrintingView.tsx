@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   CheckVoucher, CheckStatus, BankAccount, Vendor, Payable, 
   JournalEntry, JournalLine, ChartOfAccount
@@ -28,10 +28,10 @@ interface CheckPrintingViewProps {
 }
 
 const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; bgColor: string }> = {
-  DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100' },
-  PRINTED: { label: 'Printed', color: 'text-teal-600', bgColor: 'bg-teal-50' },
+  DRAFT: { label: 'Draft', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+  PRINTED: { label: 'Printed', color: 'text-[#F47721]', bgColor: 'bg-orange-50' },
   RELEASED: { label: 'Released', color: 'text-violet-600', bgColor: 'bg-violet-50' },
-  CLEARED: { label: 'Cleared', color: 'text-teal-600', bgColor: 'bg-emerald-50' },
+  CLEARED: { label: 'Cleared', color: 'text-[#F47721]', bgColor: 'bg-emerald-50' },
   VOIDED: { label: 'Voided', color: 'text-rose-600', bgColor: 'bg-rose-50' },
   STALE: { label: 'Stale', color: 'text-amber-600', bgColor: 'bg-amber-50' },
 };
@@ -404,14 +404,14 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Check Voucher Management</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Prepare, print, and track check payments.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Check Voucher Management</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Prepare, print, and track check payments.</p>
         </div>
         <div className="flex gap-2">
           <button 
             onClick={() => openSettings()}
             disabled={orgBankAccounts.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             title="Check Number Settings"
           >
             <Hash size={18} /> Settings
@@ -419,7 +419,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
           <button 
             onClick={() => { resetForm(); setShowCreateModal(true); }}
             disabled={orgBankAccounts.length === 0}
-            className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={18} /> New Check Voucher
           </button>
@@ -428,9 +428,9 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* No Bank Accounts Warning */}
       {orgBankAccounts.length === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+        <div className="bg-amber-50 border border-amber-200 rounded p-5">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-amber-100 rounded-xl">
+            <div className="p-3 bg-amber-100 rounded">
               <AlertCircle className="text-amber-600" size={24} />
             </div>
             <div className="flex-1">
@@ -449,83 +449,83 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Draft</p>
-          <p className="text-2xl font-black mt-1 text-slate-600">{summaryMetrics.draftCount}</p>
-          <p className="text-xs text-slate-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Draft</p>
+          <p className="text-lg font-semibold mt-1 text-gray-600">{summaryMetrics.draftCount}</p>
+          <p className="text-xs text-gray-500">{"\u20B1"}{formatCurrency(summaryMetrics.draftAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest">Printed</p>
-          <p className="text-2xl font-black mt-1 text-teal-600">{summaryMetrics.printedCount}</p>
-          <p className="text-xs text-teal-500">{"\u20B1"}{formatCurrency(summaryMetrics.printedAmount)}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-orange-400 uppercase tracking-wide">Printed</p>
+          <p className="text-lg font-semibold mt-1 text-[#F47721]">{summaryMetrics.printedCount}</p>
+          <p className="text-xs text-orange-500">{"\u20B1"}{formatCurrency(summaryMetrics.printedAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Released</p>
-          <p className="text-2xl font-black mt-1 text-violet-600">{summaryMetrics.releasedCount}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-violet-400 uppercase tracking-wide">Released</p>
+          <p className="text-lg font-semibold mt-1 text-violet-600">{summaryMetrics.releasedCount}</p>
           <p className="text-xs text-violet-500">{"\u20B1"}{formatCurrency(summaryMetrics.releasedAmount)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Cleared (Total)</p>
-          <p className="text-2xl font-black mt-1 text-teal-600">{"\u20B1"}{formatCurrency(summaryMetrics.clearedAmount)}</p>
+        <div className="bg-white rounded border border-gray-200 p-5 shadow-sm">
+          <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Cleared (Total)</p>
+          <p className="text-lg font-semibold mt-1 text-[#F47721]">{"\u20B1"}{formatCurrency(summaryMetrics.clearedAmount)}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl border shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded border shadow-sm">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             type="text" 
             placeholder="Search checks..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as CheckStatus | 'all')}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm appearance-none"
+            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded outline-none text-sm appearance-none"
           >
             <option value="all">All Statuses</option>
             {Object.entries(STATUS_CONFIG).map(([value, config]) => (
               <option key={value} value={value}>{config.label}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>
         <div className="relative">
-          <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <select
             value={bankFilter}
             onChange={e => setBankFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm appearance-none"
+            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded outline-none text-sm appearance-none"
           >
             <option value="all">All Banks</option>
             {orgBankAccounts.map(b => (
               <option key={b.id} value={b.id}>{b.bankName}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
         </div>
       </div>
 
       {/* Checks Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Check #</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bank / Date</th>
-              <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payee</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Check #</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Bank / Date</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Payee</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
+              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {filteredChecks.length > 0 ? (
               filteredChecks
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -533,23 +533,23 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                   const statusConfig = STATUS_CONFIG[check.status];
                   
                   return (
-                    <tr key={check.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={check.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <span className="font-mono font-bold text-teal-600">{check.checkNumber}</span>
+                        <span className="font-mono font-bold text-[#F47721]">{check.checkNumber}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-700">{getBankName(check.bankAccountId)}</p>
-                        <p className="text-xs text-slate-400">{check.checkDate}</p>
+                        <p className="text-sm font-medium text-gray-700">{getBankName(check.bankAccountId)}</p>
+                        <p className="text-xs text-gray-400">{check.checkDate}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-800">{check.payeeName}</p>
-                        <p className="text-xs text-slate-400">{check.payeeType}</p>
+                        <p className="text-sm font-medium text-gray-800">{check.payeeName}</p>
+                        <p className="text-xs text-gray-400">{check.payeeType}</p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(check.amount)}</span>
+                        <span className="font-mono font-semibold text-gray-700">{"\u20B1"}{formatCurrency(check.amount)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
+                        <span className={`inline-flex px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
                           {statusConfig.label}
                         </span>
                       </td>
@@ -559,7 +559,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                             <>
                               <button
                                 onClick={() => handlePrint(check)}
-                                className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                                className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                                 title="Print"
                               >
                                 <Printer size={16} />
@@ -579,7 +579,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                             <>
                               <button
                                 onClick={() => handlePrint(check)}
-                                className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
+                                className="p-1.5 hover:bg-orange-50 rounded-lg text-[#F47721] transition-colors"
                                 title="Reprint"
                               >
                                 <Printer size={16} />
@@ -596,7 +596,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                           {check.status === 'RELEASED' && (
                             <button
                               onClick={() => handleClear(check)}
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
+                              className="p-1.5 hover:bg-emerald-50 rounded-lg text-[#F47721] transition-colors"
                               title="Clear"
                             >
                               <CheckCircle size={16} />
@@ -620,7 +620,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               <tr>
                 <td colSpan={6} className="py-16 text-center">
                   <EmptyState 
-                    icon={<FileText className="text-slate-300" size={48} />}
+                    icon={<FileText className="text-gray-300" size={48} />}
                     title="No checks found"
                     description="Create your first check voucher to get started."
                   />
@@ -633,16 +633,16 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <FileText size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">New Check Voucher</h3>
+                <h3 className="text-lg font-semibold text-gray-800">New Check Voucher</h3>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -650,10 +650,10 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             <form onSubmit={handleCreate} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bank Account *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Account *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.bankAccountId}
                     onChange={e => handleBankAccountChange(e.target.value)}
                   >
@@ -664,24 +664,24 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Check Number *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Number *</label>
                   <input 
                     type="text"
                     required
                     placeholder="000001"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                     value={formData.checkNumber}
                     onChange={e => setFormData({...formData, checkNumber: e.target.value})}
                   />
-                  <p className="text-[10px] text-slate-400">Auto-filled from sequence or enter manually</p>
+                  <p className="text-xs text-gray-400">Auto-filled from sequence or enter manually</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payee Type</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payee Type</label>
                   <select 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.payeeType}
                     onChange={e => setFormData({...formData, payeeType: e.target.value as 'VENDOR' | 'EMPLOYEE' | 'OTHER', payeeId: '', payeeName: ''})}
                   >
@@ -691,11 +691,11 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Check Date *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Date *</label>
                   <input 
                     type="date"
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.checkDate}
                     onChange={e => setFormData({...formData, checkDate: e.target.value})}
                   />
@@ -704,9 +704,9 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
               {formData.payeeType === 'VENDOR' && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Select Vendor</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Vendor</label>
                   <select 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.payeeId}
                     onChange={e => {
                       const vendor = orgVendors.find(v => v.id === e.target.value);
@@ -722,30 +722,30 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Payee Name *</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payee Name *</label>
                 <input 
                   type="text"
                   required
                   placeholder="Pay to the order of..."
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                   value={formData.payeeName}
                   onChange={e => setFormData({...formData, payeeName: e.target.value})}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Amount *</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount *</label>
                 <input 
                   type="number"
                   step="0.01"
                   min="0"
                   required
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-sm"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                   value={formData.amount || ''}
                   onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
                 />
                 {formData.amount > 0 && (
-                  <p className="text-xs text-slate-500 italic mt-1">{numberToWords(formData.amount)}</p>
+                  <p className="text-xs text-gray-500 italic mt-1">{numberToWords(formData.amount)}</p>
                 )}
               </div>
 
@@ -753,13 +753,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 <button 
                   type="button" 
                   onClick={() => setShowCreateModal(false)} 
-                  className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100"
+                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100"
                 >
                   Create Check
                 </button>
@@ -771,57 +771,57 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Print Preview Modal */}
       {showPrintPreview && selectedCheck && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50 no-print">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50 no-print">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <Printer size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">Check Print Preview</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Check Print Preview</h3>
               </div>
-              <button onClick={() => setShowPrintPreview(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowPrintPreview(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
 
             {/* Check Template */}
             <div className="p-8 print:p-4" id="check-print-area">
-              <div className="border-2 border-slate-300 rounded-xl p-6 bg-[#f8f8e8] font-serif">
+              <div className="border-2 border-gray-300 rounded p-6 bg-[#f8f8e8] font-serif">
                 {/* Bank Header */}
-                <div className="flex justify-between items-start mb-6 border-b border-slate-300 pb-4">
+                <div className="flex justify-between items-start mb-6 border-b border-gray-300 pb-4">
                   <div>
-                    <p className="text-lg font-bold text-slate-800">{getBankName(selectedCheck.bankAccountId)}</p>
-                    <p className="text-xs text-slate-500">Account: {orgBankAccounts.find(b => b.id === selectedCheck.bankAccountId)?.accountNumber}</p>
+                    <p className="text-lg font-bold text-gray-800">{getBankName(selectedCheck.bankAccountId)}</p>
+                    <p className="text-xs text-gray-500">Account: {orgBankAccounts.find(b => b.id === selectedCheck.bankAccountId)?.accountNumber}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Check No.</p>
-                    <p className="text-xl font-mono font-bold text-teal-600">{selectedCheck.checkNumber}</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase">Check No.</p>
+                    <p className="text-xl font-mono font-bold text-[#F47721]">{selectedCheck.checkNumber}</p>
                   </div>
                 </div>
 
                 {/* Date */}
                 <div className="flex justify-end mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600">Date:</span>
-                    <span className="font-mono font-bold border-b border-slate-400 px-4">{selectedCheck.checkDate}</span>
+                    <span className="text-sm text-gray-600">Date:</span>
+                    <span className="font-mono font-bold border-b border-gray-400 px-4">{selectedCheck.checkDate}</span>
                   </div>
                 </div>
 
                 {/* Pay To */}
                 <div className="mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600 whitespace-nowrap">Pay to the order of:</span>
-                    <span className="flex-1 font-bold text-lg border-b border-slate-400 px-2">{selectedCheck.payeeName}</span>
+                    <span className="text-sm text-gray-600 whitespace-nowrap">Pay to the order of:</span>
+                    <span className="flex-1 font-bold text-lg border-b border-gray-400 px-2">{selectedCheck.payeeName}</span>
                   </div>
                 </div>
 
                 {/* Amount */}
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="flex-1 border-b border-slate-400 px-2 py-1">
+                  <div className="flex-1 border-b border-gray-400 px-2 py-1">
                     <span className="text-sm italic">{selectedCheck.amountInWords}</span>
                   </div>
-                  <div className="border-2 border-slate-400 px-4 py-2 bg-white">
+                  <div className="border-2 border-gray-400 px-4 py-2 bg-white">
                     <span className="font-mono font-bold text-xl">{"\u20B1"}{formatCurrency(selectedCheck.amount)}</span>
                   </div>
                 </div>
@@ -829,23 +829,23 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 {/* Signature Line */}
                 <div className="flex justify-end mt-8">
                   <div className="w-48 text-center">
-                    <div className="border-b border-slate-400 mb-1 h-8"></div>
-                    <p className="text-[10px] text-slate-500 uppercase">Authorized Signature</p>
+                    <div className="border-b border-gray-400 mb-1 h-8"></div>
+                    <p className="text-xs text-gray-500 uppercase">Authorized Signature</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t bg-slate-50/50 flex gap-3 no-print">
+            <div className="p-6 border-t bg-gray-50 flex gap-3 no-print">
               <button 
                 onClick={() => setShowPrintPreview(false)}
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmPrint}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
               >
                 <Printer size={16} /> Print Check
               </button>
@@ -856,27 +856,27 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Void Confirmation */}
       {confirmVoid && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertCircle className="text-rose-600" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Void Check?</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <h3 className="text-lg font-bold text-gray-800">Void Check?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setConfirmVoid(null)}
-                className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleVoid(confirmVoid, 'Voided by user')}
-                className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors"
+                className="flex-1 py-2.5 bg-rose-600 text-white rounded text-sm font-bold hover:bg-rose-700 transition-colors"
               >
                 Void Check
               </button>
@@ -887,22 +887,22 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Delete Check?</h3>
-            <p className="text-sm text-slate-600 mb-4">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded p-6 max-w-sm w-full shadow-md">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Check?</h3>
+            <p className="text-sm text-gray-600 mb-4">
               Are you sure you want to delete check #{orgChecks.find(c => c.id === confirmDelete)?.checkNumber}? This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button 
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors"
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded text-sm font-bold hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={() => handleDelete(confirmDelete)}
-                className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors"
+                className="flex-1 py-2.5 bg-rose-600 text-white rounded text-sm font-bold hover:bg-rose-700 transition-colors"
               >
                 Delete
               </button>
@@ -913,25 +913,25 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Check Number Settings Modal */}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <Hash size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">Check Number Settings</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Check Number Settings</h3>
               </div>
-              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-6 space-y-5">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bank Account</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Account</label>
                 <select 
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                   value={settingsBank}
                   onChange={e => {
                     const bank = e.target.value;
@@ -948,31 +948,31 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Check Number Prefix (Optional)</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Number Prefix (Optional)</label>
                 <input 
                   type="text"
                   placeholder="e.g., CHK-"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                   value={settingsPrefix}
                   onChange={e => setSettingsPrefix(e.target.value)}
                 />
-                <p className="text-[10px] text-slate-400">Prefix will be added before the check number</p>
+                <p className="text-xs text-gray-400">Prefix will be added before the check number</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Starting Check Number</label>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Starting Check Number</label>
                 <input 
                   type="number"
                   min="1"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-mono"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                   value={settingsStartNumber}
                   onChange={e => setSettingsStartNumber(parseInt(e.target.value) || 1)}
                 />
-                <p className="text-[10px] text-slate-400">Next check will use this number (or higher if checks already exist)</p>
+                <p className="text-xs text-gray-400">Next check will use this number (or higher if checks already exist)</p>
               </div>
 
-              <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
-                <p className="text-sm text-teal-800">
+              <div className="bg-orange-50 border border-orange-100 rounded p-4">
+                <p className="text-sm text-orange-800">
                   <strong>Preview:</strong> Next check number will be <span className="font-mono font-bold">{settingsPrefix}{String(settingsStartNumber).padStart(6, '0')}</span>
                 </p>
               </div>
@@ -980,13 +980,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => setShowSettingsModal(false)}
-                  className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200"
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded text-sm font-bold hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={saveSettings}
-                  className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700"
+                  className="flex-1 py-2.5 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610]"
                 >
                   Save Settings
                 </button>

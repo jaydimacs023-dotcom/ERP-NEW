@@ -107,29 +107,29 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Secure Archive Repository</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Centralized decommissioning and recovery zone for all system entities.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Secure Archive Repository</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Centralized decommissioning and recovery zone for all system entities.</p>
         </div>
         <div className="flex gap-3">
-           <div className="bg-slate-900 px-6 py-3 rounded-2xl flex items-center gap-3 text-white shadow-lg shadow-slate-900/20">
-              <Database size={16} className="text-teal-400" />
+           <div className="bg-gray-800 px-6 py-3 rounded flex items-center gap-3 text-white shadow-lg shadow-gray-300/20">
+              <Database size={16} className="text-orange-400" />
               <div className="leading-none">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cold Storage</p>
-                 <p className="text-sm font-black text-white leading-none">{archivedItems.length} OBJECTS</p>
+                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Cold Storage</p>
+                 <p className="text-sm font-semibold text-white leading-none">{archivedItems.length} OBJECTS</p>
               </div>
            </div>
         </div>
       </header>
 
-      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-[2rem] w-fit">
+      <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 rounded w-fit">
         {categories.map(cat => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
-            className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`px-6 py-3 rounded text-xs font-semibold uppercase tracking-wide transition-all ${
               activeCategory === cat.id 
-                ? 'bg-white text-teal-600 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-[#F47721] shadow-sm' 
+                : 'text-gray-500 hover:text-gray-800'
             }`}
           >
             {cat.label}
@@ -137,72 +137,72 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
         ))}
       </div>
 
-      <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+      <div className="p-8 bg-white rounded-md border border-gray-200 shadow-sm space-y-6">
          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="Search archive indices..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800"
+              className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
             />
          </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Archived Object</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type Classification</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Decommission Date</th>
-                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Recovery Actions</th>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-8 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Archived Object</th>
+                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Type Classification</th>
+                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Decommission Date</th>
+                <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Recovery Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-gray-50">
               {filteredItems.length === 0 ? (
                 <tr>
-                   <td colSpan={4} className="px-8 py-20 text-center text-slate-400 italic font-medium">
+                   <td colSpan={4} className="px-8 py-20 text-center text-gray-400 italic font-medium">
                       Archive index is empty for the current selection.
                    </td>
                 </tr>
               ) : (
                 filteredItems.map((item, i) => (
-                  <tr key={`${item.archiveType}-${item.id}`} className="hover:bg-slate-50/50 transition-colors group">
+                  <tr key={`${item.archiveType}-${item.id}`} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-8 py-5">
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors border border-slate-200">
+                          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721] transition-colors border border-gray-200">
                              {item.archiveIcon}
                           </div>
                           <div>
-                             <p className="text-xs font-black text-slate-900 tracking-tight">{item.displayName}</p>
-                             <p className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">ID: {item.id.substring(0, 8)}...</p>
+                             <p className="text-xs font-semibold text-gray-900 tracking-tight">{item.displayName}</p>
+                             <p className="text-xs font-bold text-gray-400 uppercase truncate max-w-[200px]">ID: {item.id.substring(0, 8)}...</p>
                           </div>
                        </div>
                     </td>
                     <td className="px-6 py-5">
-                       <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-slate-200">
+                       <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold uppercase tracking-wide border border-gray-200">
                           {item.archiveLabel}
                        </span>
                     </td>
                     <td className="px-6 py-5">
-                       <p className="text-xs font-bold text-slate-600">{item.deletedAt ? new Date(item.deletedAt).toLocaleDateString() : 'N/A'}</p>
+                       <p className="text-xs font-bold text-gray-600">{item.deletedAt ? new Date(item.deletedAt).toLocaleDateString() : 'N/A'}</p>
                     </td>
                     <td className="px-8 py-5 text-right">
                        <div className="flex justify-end gap-2">
                           <button
                             disabled={isProcessing}
                             onClick={() => handleAction('restore', item)}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50"
                           >
                              <RotateCcw size={12} /> RESTORE
                           </button>
                           <button
                             disabled={isProcessing}
                             onClick={() => handleAction('delete', item)}
-                            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                            className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all disabled:opacity-50"
                           >
                              <Trash2 size={16} />
                           </button>
@@ -215,19 +215,19 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
           </table>
         </div>
 
-        <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+        <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
-               <div className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm"><ShieldCheck size={16} className="text-teal-600" /></div>
+               <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><ShieldCheck size={16} className="text-[#F47721]" /></div>
                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cold Storage Security</p>
-                  <p className="text-xs font-bold text-slate-600">Archived indices are encrypted and segregated from active transaction nodes.</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Cold Storage Security</p>
+                  <p className="text-xs font-bold text-gray-600">Archived indices are encrypted and segregated from active transaction nodes.</p>
                </div>
             </div>
             <div className="text-right">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-1.5">
+               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5">
                   <Database size={12} /> ARCHIVE_ACTIVE
                </p>
-               <p className="text-[9px] font-bold text-slate-300 italic mt-1 uppercase">Log cursor verified: {new Date().toLocaleTimeString()}</p>
+               <p className="text-xs font-bold text-gray-300 italic mt-1 uppercase">Log cursor verified: {new Date().toLocaleTimeString()}</p>
             </div>
         </div>
       </div>

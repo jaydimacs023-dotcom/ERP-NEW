@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import { ChartOfAccount, JournalEntry, JournalLine, AccountClass, Vendor, Student, Trainer, Employee, Batch, Qualification } from '../types';
 import { Download, Printer, Plus, Trash2, GripVertical, Filter, Columns, ArrowUpDown, Save, FolderOpen, Play, X, ChevronDown, ChevronRight, BarChart3, Table, PieChart, Calendar, Eye, EyeOff } from 'lucide-react';
 
@@ -491,20 +491,20 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Custom Report Builder</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Design and generate custom analytical and compliance reports.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Custom Report Builder</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Design and generate custom analytical and compliance reports.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={() => setShowLoadModal(true)} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-black uppercase tracking-widest">
+          <button onClick={() => setShowLoadModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide">
             <FolderOpen size={16} /> Load
           </button>
-          <button onClick={() => setShowSaveModal(true)} className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-teal-600 transition-colors text-xs font-black uppercase tracking-widest">
+          <button onClick={() => setShowSaveModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide">
             <Save size={16} /> Save
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm">
-            <Printer size={18} className="text-teal-600" /> Print
+          <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
+            <Printer size={18} className="text-[#F47721]" /> Print
           </button>
-          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-lg font-bold text-sm">
+          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg font-bold text-sm">
             <Download size={18} /> Export CSV
           </button>
         </div>
@@ -512,36 +512,36 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
       {/* Data Source & Date Range */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Data Source</label>
+        <div className="lg:col-span-2 bg-white p-5 rounded border border-gray-200">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Data Source</label>
           <div className="flex gap-2 flex-wrap">
             {DATA_SOURCES.map(source => (
               <button
                 key={source.id}
                 onClick={() => handleDataSourceChange(source.id as any)}
-                className={`flex-1 min-w-[150px] p-4 rounded-xl border-2 text-left transition-all ${dataSource === source.id ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-slate-300'}`}
+                className={`flex-1 min-w-[150px] p-4 rounded border-2 text-left transition-all ${dataSource === source.id ? 'border-orange-400 bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
               >
-                <div className="text-sm font-bold text-slate-900">{source.label}</div>
-                <div className="text-[10px] text-slate-500 mt-1">{source.description}</div>
+                <div className="text-sm font-bold text-gray-900">{source.label}</div>
+                <div className="text-xs text-gray-500 mt-1">{source.description}</div>
               </button>
             ))}
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <div className="bg-white p-5 rounded border border-gray-200">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
             <Calendar size={12} /> Date Range
           </label>
           <div className="space-y-3">
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
           </div>
         </div>
       </div>
 
       {/* Builder Panels */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded border border-gray-200 overflow-hidden">
         {/* Panel Tabs */}
-        <div className="flex border-b border-slate-100">
+        <div className="flex border-b border-gray-100">
           {[
             { id: 'columns', icon: <Columns size={14} />, label: 'Columns', count: visibleColumns.length },
             { id: 'filters', icon: <Filter size={14} />, label: 'Filters', count: filters.length },
@@ -551,11 +551,11 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <button
               key={tab.id}
               onClick={() => setActivePanel(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-teal-500 text-teal-600 bg-teal-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-orange-400 text-[#F47721] bg-orange-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               {tab.icon}
               {tab.label}
-              {tab.count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-slate-100 rounded text-[10px]">{tab.count}</span>}
+              {tab.count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs">{tab.count}</span>}
             </button>
           ))}
         </div>
@@ -565,18 +565,18 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           {/* Columns Panel */}
           {activePanel === 'columns' && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600 mb-4">Select which columns to include in your report. Click to toggle visibility.</p>
+              <p className="text-sm text-gray-600 mb-4">Select which columns to include in your report. Click to toggle visibility.</p>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {columns.map(col => (
                   <button
                     key={col.id}
                     onClick={() => toggleColumn(col.id)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${col.visible ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-slate-300'}`}
+                    className={`flex items-center gap-3 p-3 rounded border-2 text-left transition-all ${col.visible ? 'border-orange-400 bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
                   >
-                    {col.visible ? <Eye size={14} className="text-teal-600" /> : <EyeOff size={14} className="text-slate-400" />}
+                    {col.visible ? <Eye size={14} className="text-[#F47721]" /> : <EyeOff size={14} className="text-gray-400" />}
                     <div>
-                      <div className="text-sm font-bold text-slate-900">{col.label}</div>
-                      <div className="text-[10px] text-slate-500 uppercase">{col.type}</div>
+                      <div className="text-sm font-bold text-gray-900">{col.label}</div>
+                      <div className="text-xs text-gray-500 uppercase">{col.type}</div>
                     </div>
                   </button>
                 ))}
@@ -588,25 +588,25 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           {activePanel === 'filters' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-slate-600">Add conditions to filter your report data.</p>
-                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-700 transition-colors">
+                <p className="text-sm text-gray-600">Add conditions to filter your report data.</p>
+                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded text-xs font-bold hover:bg-[#E06610] transition-colors">
                   <Plus size={14} /> Add Filter
                 </button>
               </div>
               
               {filters.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
+                <div className="text-center py-12 text-gray-400">
                   <Filter size={32} className="mx-auto mb-3 opacity-50" />
                   <p className="text-sm">No filters applied. Click "Add Filter" to add conditions.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {filters.map(filter => (
-                    <div key={filter.id} className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                    <div key={filter.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded">
                       <select
                         value={filter.field}
                         onChange={e => updateFilter(filter.id, { field: e.target.value })}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium"
                       >
                         {columns.map(col => (
                           <option key={col.id} value={col.field}>{col.label}</option>
@@ -615,7 +615,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                       <select
                         value={filter.operator}
                         onChange={e => updateFilter(filter.id, { operator: e.target.value as any })}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
                       >
                         {Object.entries(FILTER_OPERATORS).map(([key, op]) => (
                           <option key={key} value={key}>{op.label}</option>
@@ -627,7 +627,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                           value={filter.value}
                           onChange={e => updateFilter(filter.id, { value: e.target.value })}
                           placeholder="Value..."
-                          className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                         />
                       )}
                       {FILTER_OPERATORS[filter.operator]?.requiresValue2 && (
@@ -636,7 +636,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                           value={filter.value2 || ''}
                           onChange={e => updateFilter(filter.id, { value2: e.target.value })}
                           placeholder="To value..."
-                          className="w-32 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                         />
                       )}
                       <button onClick={() => removeFilter(filter.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
@@ -656,27 +656,27 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Group By</h3>
-                    <p className="text-xs text-slate-500 mt-1">Organize data into groups with subtotals</p>
+                    <h3 className="text-sm font-bold text-gray-900">Group By</h3>
+                    <p className="text-xs text-gray-500 mt-1">Organize data into groups with subtotals</p>
                   </div>
-                  <button onClick={addGroup} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">
+                  <button onClick={addGroup} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">
                     <Plus size={12} /> Add Group
                   </button>
                 </div>
                 {groups.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                  <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded">
                     <BarChart3 size={24} className="mx-auto mb-2 opacity-50" />
                     <p className="text-xs">No grouping applied</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {groups.map((group, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                        <GripVertical size={14} className="text-slate-300" />
+                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded">
+                        <GripVertical size={14} className="text-gray-300" />
                         <select
                           value={group.field}
                           onChange={e => updateGroup(index, e.target.value)}
-                          className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                         >
                           {columns.map(col => (
                             <option key={col.id} value={col.field}>{col.label}</option>
@@ -695,21 +695,21 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Sort By</h3>
-                    <p className="text-xs text-slate-500 mt-1">Order results by column values</p>
+                    <h3 className="text-sm font-bold text-gray-900">Sort By</h3>
+                    <p className="text-xs text-gray-500 mt-1">Order results by column values</p>
                   </div>
-                  <button onClick={addSort} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">
+                  <button onClick={addSort} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors">
                     <Plus size={12} /> Add Sort
                   </button>
                 </div>
                 <div className="space-y-2">
                   {sorts.map((sort, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                      <ArrowUpDown size={14} className="text-slate-400" />
+                    <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded">
+                      <ArrowUpDown size={14} className="text-gray-400" />
                       <select
                         value={sort.field}
                         onChange={e => updateSort(index, { field: e.target.value })}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                       >
                         {columns.map(col => (
                           <option key={col.id} value={col.field}>{col.label}</option>
@@ -718,7 +718,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                       <select
                         value={sort.direction}
                         onChange={e => updateSort(index, { direction: e.target.value as any })}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
                       >
                         <option value="asc">Ascending</option>
                         <option value="desc">Descending</option>
@@ -739,47 +739,47 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           {activePanel === 'preview' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <p className="text-sm text-slate-600">
-                  Showing <span className="font-bold text-teal-600">{totalRows}</span> records
+                <p className="text-sm text-gray-600">
+                  Showing <span className="font-bold text-[#F47721]">{totalRows}</span> records
                   {groups.length > 0 && <span> in <span className="font-bold">{Object.keys(groupedData).length}</span> groups</span>}
                 </p>
               </div>
 
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-gray-200 rounded overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-slate-50">
+                      <tr className="bg-gray-50">
                         {visibleColumns.map(col => (
-                          <th key={col.id} className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
+                          <th key={col.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                             {col.label}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-gray-100">
                       {Object.entries(groupedData).map(([groupKey, rows]) => (
                         <React.Fragment key={groupKey}>
                           {groups.length > 0 && groupKey !== 'ungrouped' && (
-                            <tr className="bg-teal-50">
-                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-teal-900">
+                            <tr className="bg-orange-50">
+                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-orange-900">
                                 <ChevronRight size={14} className="inline mr-2" />
                                 {groupKey}
-                                <span className="ml-2 text-xs font-normal text-teal-600">({(rows as any[]).length} items)</span>
+                                <span className="ml-2 text-xs font-normal text-[#F47721]">({(rows as any[]).length} items)</span>
                               </td>
                             </tr>
                           )}
                           {(rows as any[]).slice(0, 50).map((row, idx) => (
-                            <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                            <tr key={row.id || idx} className="hover:bg-gray-50 transition-colors">
                               {visibleColumns.map(col => (
-                                <td key={col.id} className={`px-4 py-3 text-sm whitespace-nowrap ${col.type === 'currency' ? 'font-mono text-right' : 'text-slate-700'}`}>
+                                <td key={col.id} className={`px-4 py-3 text-sm whitespace-nowrap ${col.type === 'currency' ? 'font-mono text-right' : 'text-gray-700'}`}>
                                   {formatValue(row[col.field], col)}
                                 </td>
                               ))}
                             </tr>
                           ))}
                           {groups.length > 0 && (
-                            <tr className="bg-slate-100 font-bold">
+                            <tr className="bg-gray-100 font-bold">
                               {visibleColumns.map(col => (
                                 <td key={col.id} className={`px-4 py-2 text-xs ${col.type === 'currency' ? 'font-mono text-right' : ''}`}>
                                   {col.aggregation === 'sum' && col.type === 'currency' ? (
@@ -794,7 +794,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                     </tbody>
                     {groups.length === 0 && totalRows > 0 && (
                       <tfoot>
-                        <tr className="bg-slate-900 text-white font-bold">
+                        <tr className="bg-gray-800 text-white font-bold">
                           {visibleColumns.map(col => (
                             <td key={col.id} className={`px-4 py-3 text-xs ${col.type === 'currency' ? 'font-mono text-right' : ''}`}>
                               {col.aggregation === 'sum' && col.type === 'currency' ? (
@@ -821,36 +821,36 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       {/* Save Template Modal */}
       {showSaveModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded p-6 w-full max-w-md shadow-md">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black text-slate-900">Save Report Template</h3>
-              <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900">Save Report Template</h3>
+              <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <X size={18} />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 block">Template Name</label>
+                <label className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2 block">Template Name</label>
                 <input
                   type="text"
                   value={templateName}
                   onChange={e => setTemplateName(e.target.value)}
                   placeholder="e.g., Monthly Expense Report"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm"
+                  className="w-full px-4 py-3 border border-gray-200 rounded text-sm"
                   autoFocus
                 />
               </div>
-              <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-xl">
+              <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded">
                 <p><strong>Data Source:</strong> {DATA_SOURCES.find(d => d.id === dataSource)?.label}</p>
                 <p><strong>Columns:</strong> {visibleColumns.length} visible</p>
                 <p><strong>Filters:</strong> {filters.length} conditions</p>
                 <p><strong>Groups:</strong> {groups.length} levels</p>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowSaveModal(false)} className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                <button onClick={() => setShowSaveModal(false)} className="flex-1 px-4 py-3 border border-gray-200 rounded text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
-                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors">
+                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors">
                   Save Template
                 </button>
               </div>
@@ -862,16 +862,16 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       {/* Load Template Modal */}
       {showLoadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded p-6 w-full max-w-lg shadow-md max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black text-slate-900">Load Report Template</h3>
-              <button onClick={() => setShowLoadModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900">Load Report Template</h3>
+              <button onClick={() => setShowLoadModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <X size={18} />
               </button>
             </div>
             <div className="overflow-y-auto flex-1">
               {savedTemplates.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
+                <div className="text-center py-12 text-gray-400">
                   <FolderOpen size={32} className="mx-auto mb-3 opacity-50" />
                   <p className="text-sm">No saved templates yet</p>
                   <p className="text-xs mt-1">Save your first report configuration to reuse it later</p>
@@ -879,16 +879,16 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
               ) : (
                 <div className="space-y-3">
                   {savedTemplates.map(template => (
-                    <div key={template.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div key={template.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded hover:bg-gray-50 transition-colors">
                       <div className="flex-1">
-                        <div className="text-sm font-bold text-slate-900">{template.name}</div>
-                        <div className="text-[10px] text-slate-500 mt-1">
+                        <div className="text-sm font-bold text-gray-900">{template.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">
                           {DATA_SOURCES.find(d => d.id === template.dataSource)?.label} • 
                           {template.columns.filter(c => c.visible).length} columns • 
                           {template.filters.length} filters
                         </div>
                       </div>
-                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-bold hover:bg-teal-700 transition-colors">
+                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-bold hover:bg-[#E06610] transition-colors">
                         Load
                       </button>
                       <button onClick={() => deleteTemplate(template.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
@@ -899,8 +899,8 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                 </div>
               )}
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <button onClick={() => setShowLoadModal(false)} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <button onClick={() => setShowLoadModal(false)} className="w-full px-4 py-3 border border-gray-200 rounded text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 Close
               </button>
             </div>

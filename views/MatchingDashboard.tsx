@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Three-Way Matching Dashboard Component
  * 
  * Displays matching status of invoices against their corresponding POs and GRs
@@ -122,20 +122,20 @@ const MatchingDashboard: React.FC<MatchingDashboardProps> = ({
     <div className="space-y-6 p-6 bg-white rounded-lg">
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-4">
-        <div className="p-4 rounded-lg bg-teal-50 border border-teal-200">
-          <div className="text-2xl font-bold text-teal-700">{summaryStats.totalInvoices}</div>
-          <div className="text-sm text-teal-600">Total Invoices</div>
+        <div className="p-4 rounded-lg bg-orange-50 border border-orange-200">
+          <div className="text-lg font-bold text-orange-700">{summaryStats.totalInvoices}</div>
+          <div className="text-sm text-[#F47721]">Total Invoices</div>
         </div>
         <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-          <div className="text-2xl font-bold text-green-700">{summaryStats.fullyMatched}</div>
+          <div className="text-lg font-bold text-green-700">{summaryStats.fullyMatched}</div>
           <div className="text-sm text-green-600">Fully Matched</div>
         </div>
         <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
-          <div className="text-2xl font-bold text-amber-700">{summaryStats.partiallyMatched}</div>
+          <div className="text-lg font-bold text-amber-700">{summaryStats.partiallyMatched}</div>
           <div className="text-sm text-amber-600">Partially Matched</div>
         </div>
         <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-          <div className="text-2xl font-bold text-red-700">{summaryStats.unmatched}</div>
+          <div className="text-lg font-bold text-red-700">{summaryStats.unmatched}</div>
           <div className="text-sm text-red-600">Unmatched</div>
         </div>
         <div className="p-4 rounded-lg bg-red-100 border border-red-300">
@@ -168,13 +168,13 @@ const MatchingDashboard: React.FC<MatchingDashboardProps> = ({
             placeholder="Search invoice, vendor, PO, or GR..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400"
           />
         </div>
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as FilterStatus)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400"
         >
           <option value="all">All Invoices</option>
           <option value="fully_matched">Fully Matched</option>
@@ -252,7 +252,7 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
       case MatchingStatus.UNMATCHED:
         return <AlertCircle className="text-red-600" size={20} />;
       default:
-        return <Info className="text-teal-600" size={20} />;
+        return <Info className="text-[#F47721]" size={20} />;
     }
   };
 
@@ -315,9 +315,9 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
           </div>
 
           {/* Amount Matching Summary */}
-          <div className="p-3 bg-teal-50 border border-teal-200 rounded text-sm">
-            <div className="font-semibold text-teal-900 mb-2">Amount Reconciliation</div>
-            <div className="space-y-1 text-teal-800">
+          <div className="p-3 bg-orange-50 border border-orange-200 rounded text-sm">
+            <div className="font-semibold text-orange-900 mb-2">Amount Reconciliation</div>
+            <div className="space-y-1 text-orange-800">
               <div>
                 <span className="font-medium">PO Total:</span> ${result.totalPOAmount.toFixed(2)}
               </div>
@@ -455,13 +455,13 @@ const DiscrepancySection: React.FC<DiscrepancySectionProps> = ({
   const bgColor = {
     danger: 'bg-red-50 border-red-200',
     warning: 'bg-amber-50 border-amber-200',
-    info: 'bg-teal-50 border-teal-200'
+    info: 'bg-orange-50 border-orange-200'
   }[variant];
 
   const textColor = {
     danger: 'text-red-900',
     warning: 'text-amber-900',
-    info: 'text-teal-900'
+    info: 'text-orange-900'
   }[variant];
 
   return (

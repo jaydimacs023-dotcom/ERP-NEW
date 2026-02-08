@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ChartOfAccount, AccountClass, JournalLine, Qualification } from '../types';
 import { Plus, ChevronRight, ChevronDown, Edit2, Trash2, FolderPlus, FilePlus, AlertTriangle, ShieldCheck, X, Link, Award } from 'lucide-react';
 
@@ -148,14 +148,14 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
     return (
       <React.Fragment key={acc.id}>
-        <tr className={`hover:bg-slate-50 border-b group transition-all duration-200 ${acc.isHeader ? 'bg-slate-50/40' : 'bg-white'} ${!acc.isActive ? 'bg-slate-50/80 grayscale-[0.5]' : ''}`}>
-          <td className={`px-6 py-3 whitespace-nowrap text-sm font-mono ${!acc.isActive ? 'text-slate-400' : 'text-slate-500'}`}>
+        <tr className={`hover:bg-gray-50 border-b group transition-all duration-200 ${acc.isHeader ? 'bg-gray-50/40' : 'bg-white'} ${!acc.isActive ? 'bg-gray-50/80 grayscale-[0.5]' : ''}`}>
+          <td className={`px-6 py-3 whitespace-nowrap text-sm font-mono ${!acc.isActive ? 'text-gray-400' : 'text-gray-500'}`}>
             {acc.code}
           </td>
           <td className="px-6 py-3 whitespace-nowrap">
             <div className="flex items-center" style={{ paddingLeft: `${depth * 1.5}rem` }}>
               {acc.isHeader ? (
-                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-slate-400 hover:text-teal-600 transition-colors">
+                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-gray-400 hover:text-[#F47721] transition-colors">
                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
               ) : (
@@ -163,40 +163,40 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               )}
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm ${acc.isHeader ? 'font-bold text-slate-900 uppercase tracking-tight' : acc.isActive ? 'text-slate-700 font-medium' : 'text-slate-400 line-through decoration-slate-300'}`}>
+                  <span className={`text-sm ${acc.isHeader ? 'font-bold text-gray-900 uppercase tracking-tight' : acc.isActive ? 'text-gray-700 font-medium' : 'text-gray-400 line-through decoration-gray-300'}`}>
                     {acc.name}
                   </span>
                   {linkedQual && (
-                    <span className="text-[9px] font-bold bg-amber-50 text-teal-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span className="text-xs font-bold bg-amber-50 text-orange-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
                       <Award size={8} /> {linkedQual.code}
                     </span>
                   )}
                 </div>
                 {hasPostings && acc.isHeader && (
-                  <span className="text-[9px] text-teal-600 font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
+                  <span className="text-xs text-[#F47721] font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
                 )}
               </div>
             </div>
           </td>
           <td className="px-6 py-3 whitespace-nowrap">
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-              !acc.isActive ? 'bg-slate-200 text-slate-500' :
-              acc.class === AccountClass.ASSET ? 'bg-teal-100 text-teal-700' :
+            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+              !acc.isActive ? 'bg-gray-200 text-gray-500' :
+              acc.class === AccountClass.ASSET ? 'bg-orange-100 text-orange-700' :
               acc.class === AccountClass.LIABILITY ? 'bg-rose-100 text-rose-700' :
-              acc.class === AccountClass.EQUITY ? 'bg-amber-100 text-teal-700' :
-              acc.class === AccountClass.REVENUE ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700'
+              acc.class === AccountClass.EQUITY ? 'bg-amber-100 text-orange-700' :
+              acc.class === AccountClass.REVENUE ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-700'
             }`}>
               {acc.class}
             </span>
           </td>
           <td className="px-6 py-3 whitespace-nowrap text-center">
              <div className="flex justify-center items-center gap-3">
-                <span className={`text-[10px] font-black uppercase tracking-tighter w-12 text-right ${acc.isActive ? 'text-green-600' : 'text-slate-400'}`}>
+                <span className={`text-xs font-semibold uppercase tracking-tighter w-12 text-right ${acc.isActive ? 'text-green-600' : 'text-gray-400'}`}>
                   {acc.isActive ? 'Active' : 'Disabled'}
                 </span>
                 <button 
                   onClick={() => handleToggleClick(acc)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-teal-600' : 'bg-slate-200'}`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-[#F47721]' : 'bg-gray-200'}`}
                 >
                   <span
                     aria-hidden="true"
@@ -210,7 +210,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               {!acc.isHeader && (
                  <button 
                   onClick={() => handleEditClick(acc)}
-                  className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
                   title="Edit Account"
                 >
                   <Edit2 size={16} />
@@ -220,21 +220,21 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 <>
                   <button 
                     onClick={() => handleAddClick(acc.id, false)}
-                    className="p-1.5 hover:bg-teal-50 text-teal-600 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-orange-50 text-[#F47721] rounded-lg transition-colors"
                     title="Add Sub-account"
                   >
                     <FilePlus size={16} />
                   </button>
                   <button 
                     onClick={() => handleAddClick(acc.id, true)}
-                    className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
                     title="Add Folder"
                   >
                     <FolderPlus size={16} />
                   </button>
                   <button 
                     onClick={() => handleEditClick(acc)}
-                    className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
                     title="Edit Folder"
                   >
                     <Edit2 size={16} />
@@ -264,32 +264,32 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Chart of Accounts</h2>
-          <p className="text-sm font-normal italic text-slate-500">Configure your financial reporting hierarchy and manage sub-account availability.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Chart of Accounts</h2>
+          <p className="text-sm font-normal italic text-gray-500">Configure your financial reporting hierarchy and manage sub-account availability.</p>
         </div>
         <button 
           onClick={() => handleAddClick(undefined, true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-lg shadow-teal-100 font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg shadow-gray-100 font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> New Root Category
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
+          <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Code</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Account Name</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Class</th>
-              <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-40">Visibility</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Code</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account Name</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Class</th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">Visibility</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
             {topLevel.length > 0 ? topLevel.map(acc => renderAccountRow(acc)) : (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No accounts defined for this organization.</td>
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">No accounts defined for this organization.</td>
               </tr>
             )}
           </tbody>
@@ -298,18 +298,18 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
       {/* Confirmation Modal */}
       {confirmation && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className={`p-6 flex flex-col items-center text-center ${confirmation.type === 'delete' ? 'bg-rose-50/30' : 'bg-amber-50/30'}`}>
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-teal-600'}`}>
+              <div className={`w-16 h-16 rounded flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-[#F47721]'}`}>
                 <AlertTriangle size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+              <h3 className="text-xl font-semibold text-gray-900 uppercase tracking-tight">
                 {confirmation.type === 'delete' ? 'Confirm Deletion' : 'Confirm Deactivation'}
               </h3>
-              <p className="mt-2 text-slate-500 text-sm font-medium px-4">
+              <p className="mt-2 text-gray-500 text-sm font-medium px-4">
                 You are about to {confirmation.type} 
-                <span className="text-slate-900 font-bold block mt-1">
+                <span className="text-gray-900 font-bold block mt-1">
                   [{confirmation.account.code}] {confirmation.account.name}
                 </span>
               </p>
@@ -317,13 +317,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
             <div className="p-8 space-y-4">
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-teal-500'}`}>
+                <div className="flex items-center gap-3 p-3 rounded bg-gray-50 border border-gray-100">
+                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-orange-500'}`}>
                     {confirmation.hasEntries ? <X size={20} /> : <ShieldCheck size={20} />}
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-slate-900">Journal Entries</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-xs font-bold text-gray-900">Journal Entries</p>
+                    <p className="text-xs text-gray-500">
                       {confirmation.hasEntries 
                         ? 'This account has linked transactions. Use extreme caution.' 
                         : 'No transactions found for this account.'}
@@ -332,13 +332,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 </div>
 
                 {confirmation.account.isHeader && (
-                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-teal-500'}`}>
+                  <div className="flex items-center gap-3 p-3 rounded bg-gray-50 border border-gray-100">
+                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-orange-500'}`}>
                       {confirmation.hasChildren ? <X size={20} /> : <ShieldCheck size={20} />}
                     </div>
                     <div className="flex-1">
-                      <p className="text-xs font-bold text-slate-900">Child Accounts</p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-xs font-bold text-gray-900">Child Accounts</p>
+                      <p className="text-xs text-gray-500">
                         {confirmation.hasChildren 
                           ? 'This category contains other accounts. Move them first.' 
                           : 'This category is empty.'}
@@ -351,17 +351,17 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               <div className="flex gap-3 pt-4">
                 <button 
                   onClick={() => setConfirmation(null)}
-                  className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Go Back
                 </button>
                 <button 
                   onClick={confirmAction}
                   disabled={confirmation.type === 'delete' && (confirmation.hasEntries || confirmation.hasChildren)}
-                  className={`flex-1 py-3 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${
+                  className={`flex-1 py-3 rounded text-sm font-bold text-white shadow-lg transition-all ${
                     confirmation.type === 'delete' 
-                      ? (confirmation.hasEntries || confirmation.hasChildren ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-100') 
-                      : 'bg-teal-600 hover:bg-teal-700 shadow-teal-100'
+                      ? (confirmation.hasEntries || confirmation.hasChildren ? 'bg-gray-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-100') 
+                      : 'bg-[#F47721] hover:bg-[#E06610] shadow-gray-100'
                   }`}
                 >
                   {confirmation.type === 'delete' ? 'Delete Permanently' : 'Deactivate'}
@@ -374,26 +374,26 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
       {/* Account Modal (Add/Edit) */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-              <h3 className="text-lg font-black text-slate-900 uppercase">
+        <div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-semibold text-gray-900 uppercase">
                 {editingAccountId ? 'Edit' : 'New'} {formData.isHeader ? 'Category' : 'Sub-Account'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                   <Link size={12} /> Hierarchical Path
                 </label>
-                <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-teal-600 bg-teal-50 p-2 rounded-lg border border-teal-100">
+                <div className="flex flex-wrap items-center gap-1 text-xs font-bold text-[#F47721] bg-orange-50 p-2 rounded-lg border border-orange-100">
                   <span>Root</span>
                   {parentPath.map((p, i) => (
                     <React.Fragment key={i}>
-                      <ChevronRight size={10} className="text-teal-300" />
+                      <ChevronRight size={10} className="text-orange-300" />
                       <span className="truncate max-w-[120px]">{p}</span>
                     </React.Fragment>
                   ))}
@@ -401,21 +401,21 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-1 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Account Code</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Account Code</label>
                   <input 
                     required 
                     placeholder="1000"
-                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none font-mono text-sm"
+                    className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none font-mono text-sm"
                     value={formData.code || ''}
                     onChange={e => setFormData({...formData, code: e.target.value})}
                   />
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Name</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Name</label>
                   <input 
                     required 
                     placeholder="e.g. Savings - Main"
-                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-medium"
+                    className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-medium"
                     value={formData.name || ''}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
@@ -423,9 +423,9 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Financial Classification</label>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Financial Classification</label>
                 <select 
-                  className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm appearance-none bg-white"
+                  className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm appearance-none bg-white"
                   value={formData.class}
                   onChange={e => setFormData({...formData, class: e.target.value as AccountClass})}
                 >
@@ -435,11 +435,11 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
               {isNominal && !formData.isHeader && (
                 <div className="space-y-1.5 animate-in slide-in-from-top-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                     <Award size={12} /> Link to Qualification
                   </label>
                   <select 
-                    className="w-full px-3 py-2.5 border border-teal-100 bg-teal-50/30 rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm appearance-none"
+                    className="w-full px-3 py-2.5 border border-orange-100 bg-orange-50/30 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm appearance-none"
                     value={formData.qualificationId}
                     onChange={e => setFormData({...formData, qualificationId: e.target.value})}
                   >
@@ -448,13 +448,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                       <option key={q.id} value={q.id}>[{q.code}] {q.name}</option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-400 italic">Assigning a qualification allows for granular filtering in Profit & Loss reports.</p>
+                  <p className="text-xs text-gray-400 italic">Assigning a qualification allows for granular filtering in Profit & Loss reports.</p>
                 </div>
               )}
 
               <div className="pt-6 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors">Discard</button>
+                <button type="submit" className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 active:scale-95 transition-all">
                   {editingAccountId ? 'Update Account' : 'Create Account'}
                 </button>
               </div>

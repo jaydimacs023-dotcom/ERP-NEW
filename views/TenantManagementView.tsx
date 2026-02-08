@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo } from 'react';
 import { 
   Terminal, Building2, Plus, Globe, ShieldCheck, 
@@ -78,10 +78,10 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
     switch (status) {
       case 'ACTIVE': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
       case 'SUSPENDED': return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
-      case 'TRIAL': return 'text-teal-500 bg-teal-500/10 border-teal-500/20';
+      case 'TRIAL': return 'text-orange-500 bg-[#F47721]/10 border-orange-400/20';
       case 'EXPIRED': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
       case 'PENDING': return 'text-amber-500 bg-amber-500/10 border-amber-500/20 animate-pulse';
-      default: return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
+      default: return 'text-gray-500 bg-gray-500/10 border-gray-500/20';
     }
   };
 
@@ -93,13 +93,13 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
             <div className="p-2 bg-rose-600 text-white rounded-lg shadow-lg">
               <Terminal size={24} />
             </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Provisioning & Subscriptions</h1>
+            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Provisioning & Subscriptions</h1>
           </div>
-          <p className="text-slate-500 font-medium italic">Developer Operations Console: Multi-Tenant Lifecycle Management</p>
+          <p className="text-gray-500 font-medium italic">Developer Operations Console: Multi-Tenant Lifecycle Management</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-2xl active:scale-95"
+          className="flex items-center gap-2 px-8 py-3 bg-gray-800 text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-700 transition-all shadow-md active:scale-95"
         >
           <Plus size={18} /> Provision New Tenant
         </button>
@@ -107,17 +107,17 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatsCard label="Active Instances" value={stats.active.toString()} icon={<Activity size={20} />} color="emerald" />
-        <StatsCard label="Platform Tenants" value={stats.total.toString()} icon={<Layers size={20} />} color="teal" />
-        <StatsCard label="Live Sessions" value="14" icon={<Users size={20} />} color="teal" />
+        <StatsCard label="Platform Tenants" value={stats.total.toString()} icon={<Layers size={20} />} color="orange" />
+        <StatsCard label="Live Sessions" value="14" icon={<Users size={20} />} color="orange" />
         <StatsCard label="Est. Platform MRR" value={`$${stats.mrr}`} icon={<DollarSign size={20} />} color="rose" />
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
-         <div className="p-8 border-b bg-slate-50/50 flex items-center gap-3">
-            <Info size={20} className="text-teal-600" />
-            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Internal Service Matrix (Admin)</h3>
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+         <div className="p-8 border-b bg-gray-50 flex items-center gap-3">
+            <Info size={20} className="text-[#F47721]" />
+            <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Internal Service Matrix (Admin)</h3>
          </div>
-         <div className="grid grid-cols-3 divide-x divide-slate-100">
+         <div className="grid grid-cols-3 divide-x divide-gray-100">
             <PlanInfo 
               tier="BASIC" 
               price="$49/mo" 
@@ -142,13 +142,13 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
          </div>
       </div>
 
-      <div className="bg-slate-950 rounded-[2.5rem] shadow-2xl border border-slate-800 overflow-hidden">
-        <div className="p-6 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/50">
+      <div className="bg-gray-900 rounded-md shadow-md border border-gray-700 overflow-hidden">
+        <div className="p-6 border-b border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800/50">
            <div className="relative w-full md:w-96">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input 
                 placeholder="Filter Tenant Ledger..." 
-                className="w-full pl-12 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-2xl text-sm text-slate-200 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
+                className="w-full pl-12 pr-4 py-2.5 bg-gray-700 border border-gray-600 rounded text-sm text-gray-200 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -156,7 +156,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
         </div>
 
         <table className="min-w-full text-left">
-           <thead className="bg-slate-900 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800">
+           <thead className="bg-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-700">
              <tr>
                <th className="px-8 py-5">Tenant Organization</th>
                <th className="px-8 py-5">Subscription Plan</th>
@@ -164,17 +164,17 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                <th className="px-8 py-5 text-right">Dev Actions</th>
              </tr>
            </thead>
-           <tbody className="divide-y divide-slate-800">
+           <tbody className="divide-y divide-gray-700">
              {filteredOrgs.map(org => (
-               <tr key={org.id} className="hover:bg-slate-900/50 transition-colors group">
+               <tr key={org.id} className="hover:bg-gray-800/50 transition-colors group">
                  <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-rose-500 transition-colors border border-slate-700 shadow-xl">
+                       <div className="w-12 h-12 rounded bg-gray-700 flex items-center justify-center text-gray-400 group-hover:text-rose-500 transition-colors border border-gray-600 shadow-sm">
                           <Building2 size={24} />
                        </div>
                        <div className="flex-1">
-                          <div className="text-sm font-black text-slate-200 group-hover:text-white">{org.name}</div>
-                          <div className="text-[10px] font-mono font-bold text-slate-500 mt-1 tracking-tighter uppercase flex items-center gap-2 group-hover:text-slate-400 transition-colors">
+                          <div className="text-sm font-semibold text-gray-200 group-hover:text-white">{org.name}</div>
+                          <div className="text-xs font-mono font-bold text-gray-500 mt-1 tracking-tighter uppercase flex items-center gap-2 group-hover:text-gray-400 transition-colors">
                             {org.id}
                             <button 
                               type="button"
@@ -182,7 +182,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                                 navigator.clipboard.writeText(org.id);
                                 alert('Organization UUID copied!');
                               }}
-                              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[8px] font-bold text-amber-400 transition-colors"
+                              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold text-amber-400 transition-colors"
                               title="Copy UUID"
                             >
                               COPY
@@ -194,20 +194,20 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                  <td className="px-8 py-6">
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                            <CreditCard size={14} className="text-slate-500" />
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-rose-500' : org.planType === 'PROFESSIONAL' ? 'text-teal-500' : 'text-teal-500'}`}>
+                            <CreditCard size={14} className="text-gray-500" />
+                            <span className={`text-xs font-semibold uppercase tracking-wide ${org.planType === 'ENTERPRISE' ? 'text-rose-500' : org.planType === 'PROFESSIONAL' ? 'text-orange-500' : 'text-orange-500'}`}>
                                 {org.planType} Tier
                             </span>
                         </div>
                         {org.subscriptionStatus === 'PENDING' && (
-                            <div className="flex items-center gap-2 text-[9px] font-black text-amber-500 uppercase animate-pulse">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-500 uppercase animate-pulse">
                                 <ShieldAlert size={10} /> Verify Upgrade: {org.pendingPlanType}
                             </div>
                         )}
                     </div>
                  </td>
                  <td className="px-8 py-6">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${getStatusColor(org.subscriptionStatus)}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wide ${getStatusColor(org.subscriptionStatus)}`}>
                        <CheckCircle2 size={12} /> {org.subscriptionStatus}
                     </span>
                  </td>
@@ -216,18 +216,18 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                        {org.subscriptionStatus === 'PENDING' && (
                           <button 
                             onClick={() => handleVerifyPayment(org)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-900/40 hover:bg-amber-500 transition-all"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold uppercase tracking-wide shadow-sm shadow-amber-900/40 hover:bg-amber-500 transition-all"
                           >
                              <Hash size={12} /> Confirm {org.paymentReference}
                           </button>
                        )}
                        <button 
                         onClick={() => toggleStatus(org)}
-                        className={`p-2 rounded-xl border border-slate-700 hover:border-slate-500 transition-all ${org.subscriptionStatus === 'ACTIVE' ? 'text-rose-500' : 'text-emerald-500'}`}
+                        className={`p-2 rounded border border-gray-600 hover:border-gray-500 transition-all ${org.subscriptionStatus === 'ACTIVE' ? 'text-rose-500' : 'text-emerald-500'}`}
                        >
                           {org.subscriptionStatus === 'ACTIVE' ? <Pause size={16} /> : <Play size={16} />}
                        </button>
-                       <button className="p-2 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-400 transition-all">
+                       <button className="p-2 rounded border border-gray-600 hover:border-gray-500 text-gray-400 transition-all">
                           <MoreVertical size={16} />
                        </button>
                     </div>
@@ -239,31 +239,31 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200">
-             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200">
+             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-4">
-                   <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-xl"><Building2 size={24} /></div>
-                   <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Direct Provisioning</h3>
+                   <div className="p-3 bg-gray-800 text-white rounded shadow-sm"><Building2 size={24} /></div>
+                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Direct Provisioning</h3>
                 </div>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
+                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
              </div>
 
-             <form onSubmit={handleSubmit} className="p-10 space-y-8">
+             <form onSubmit={handleSubmit} className="p-5 space-y-8">
                 <div className="space-y-6">
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Institutional Title</label>
+                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Institutional Title</label>
                       <input 
                         required autoFocus placeholder="e.g. Philippine Skills Center"
-                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-rose-500 font-bold text-slate-800"
+                        className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-md outline-none focus:ring-2 focus:ring-rose-500 font-bold text-gray-800"
                         value={newOrgName} onChange={e => setNewOrgName(e.target.value)}
                       />
                    </div>
 
                    <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">G/L Currency</label>
-                         <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none font-bold text-slate-800 appearance-none"
+                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">G/L Currency</label>
+                         <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-md outline-none font-bold text-gray-800 appearance-none"
                            value={currency} onChange={e => setCurrency(e.target.value)}>
                             <option value="PHP">PHP</option>
                             <option value="USD">USD</option>
@@ -271,8 +271,8 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                          </select>
                       </div>
                       <div className="space-y-2">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">License Tier</label>
-                         <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none font-bold text-slate-800 appearance-none"
+                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">License Tier</label>
+                         <select className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-md outline-none font-bold text-gray-800 appearance-none"
                            value={plan} onChange={e => setPlan(e.target.value as PlanType)}>
                             <option value="BASIC">Basic</option>
                             <option value="PROFESSIONAL">Professional</option>
@@ -282,16 +282,16 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                    </div>
                 </div>
 
-                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex gap-4">
+                <div className="bg-amber-50 p-6 rounded border border-amber-100 flex gap-4">
                    <AlertCircle size={24} className="text-amber-600 shrink-0" />
-                   <p className="text-[11px] text-amber-900 leading-relaxed font-bold">
+                   <p className="text-xs text-amber-900 leading-relaxed font-bold">
                      Manual provisioning bypasses the payment gateway. Use only for internal institutional testing or direct-billed Enterprise clients.
                    </p>
                 </div>
 
                 <div className="pt-4 flex gap-4">
-                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl">Discard</button>
-                   <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-3xl text-sm font-black shadow-2xl active:scale-95 transition-all">Launch Environment</button>
+                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-semibold text-gray-500 hover:bg-gray-50 rounded">Discard</button>
+                   <button type="submit" className="flex-1 py-4 bg-gray-800 text-white rounded-md text-sm font-semibold shadow-md active:scale-95 transition-all">Launch Environment</button>
                 </div>
              </form>
           </div>
@@ -303,26 +303,26 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
 
 const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: string[], locked: string[] }> = ({ tier, price, desc, features, locked }) => (
   <div className="p-8">
-     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{tier}</p>
+     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{tier}</p>
      <div className="flex items-baseline gap-2 mb-2">
-        <span className="text-2xl font-black text-slate-900 tracking-tight">{price}</span>
+        <span className="text-lg font-semibold text-gray-900 tracking-tight">{price}</span>
      </div>
-     <p className="text-xs text-teal-600 font-bold italic mb-6">{desc}</p>
+     <p className="text-xs text-[#F47721] font-bold italic mb-6">{desc}</p>
      <div className="space-y-3">
         {features.map((f, i) => (
           <div key={i} className="flex items-center gap-2">
-             <div className="w-4 h-4 rounded-full bg-emerald-50 text-teal-600 flex items-center justify-center shrink-0">
+             <div className="w-4 h-4 rounded-full bg-emerald-50 text-[#F47721] flex items-center justify-center shrink-0">
                 <Check size={10} strokeWidth={4} />
              </div>
-             <span className="text-[11px] font-medium text-slate-600">{f}</span>
+             <span className="text-xs font-medium text-gray-600">{f}</span>
           </div>
         ))}
         {locked.map((f, i) => (
           <div key={i} className="flex items-center gap-2 opacity-50">
-             <div className="w-4 h-4 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+             <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center shrink-0">
                 <Lock size={10} strokeWidth={4} />
              </div>
-             <span className="text-[11px] font-medium text-slate-400 line-through decoration-slate-300">{f}</span>
+             <span className="text-xs font-medium text-gray-400 line-through decoration-gray-300">{f}</span>
           </div>
         ))}
      </div>
@@ -330,17 +330,17 @@ const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: 
 );
 
 const StatsCard: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string }> = ({ label, value, icon, color }) => (
-  <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5">
-    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 shadow-sm transition-all ${
-      color === 'emerald' ? 'bg-emerald-50 text-teal-600 border-emerald-100' :
+  <div className="bg-white p-6 rounded border border-gray-200 shadow-sm flex items-center gap-5">
+    <div className={`w-14 h-14 rounded flex items-center justify-center border shrink-0 shadow-sm transition-all ${
+      color === 'emerald' ? 'bg-emerald-50 text-[#F47721] border-emerald-100' :
       color === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-      'bg-teal-50 text-teal-600 border-teal-100'
+      'bg-orange-50 text-[#F47721] border-orange-100'
     }`}>
        {icon}
     </div>
     <div>
-       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-       <p className="text-2xl font-black text-slate-900 tracking-tight">{value}</p>
+       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+       <p className="text-lg font-semibold text-gray-900 tracking-tight">{value}</p>
     </div>
   </div>
 );

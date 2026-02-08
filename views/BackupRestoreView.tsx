@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   Download, Upload, AlertCircle, CheckCircle2, Clock, Database,
   Shield, FileJson, Trash2, RotateCw, Info, ChevronDown, ChevronUp,
@@ -204,21 +204,21 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Data Backup & Restore</h2>
-          <p className="text-sm text-slate-500 font-normal italic mt-2">
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Data Backup & Restore</h2>
+          <p className="text-sm text-gray-500 font-normal italic mt-2">
             Comprehensive per-organization backup and disaster recovery
           </p>
         </div>
 
         {/* Organization Selector */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+        <div className="bg-white rounded border border-gray-200 p-4">
+          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
             Select Organization
           </label>
           <select
             value={selectedOrgId}
             onChange={(e) => setSelectedOrgId(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
             {organizations
               .filter(o => !o.isDeleted)
@@ -232,12 +232,12 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       </div>
 
       {/* Info Banner */}
-      <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded-r-lg">
+      <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
         <div className="flex gap-3">
-          <Info size={20} className="text-teal-600 shrink-0 mt-0.5" />
+          <Info size={20} className="text-[#F47721] shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-semibold text-teal-900">Backup & Restore</p>
-            <p className="text-teal-700 text-xs mt-1">
+            <p className="font-semibold text-orange-900">Backup & Restore</p>
+            <p className="text-orange-700 text-xs mt-1">
               Create snapshots of your organization's data (students, accounts, transactions, etc.) and restore from previous backups.
               Backups are stored locally and encrypted.
             </p>
@@ -247,20 +247,20 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Create Backup Section */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded border border-gray-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-100 rounded-lg">
-              <Download size={20} className="text-teal-600" />
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <Download size={20} className="text-[#F47721]" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 uppercase tracking-tight">Create Backup</h3>
-              <p className="text-xs text-slate-500 mt-1">Export current organization data</p>
+              <h3 className="font-semibold text-gray-900 uppercase tracking-tight">Create Backup</h3>
+              <p className="text-xs text-gray-500 mt-1">Export current organization data</p>
             </div>
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-slate-100">
+          <div className="space-y-3 pt-4 border-t border-gray-100">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                 Backup Description (Optional)
               </label>
               <textarea
@@ -268,19 +268,19 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
                 onChange={(e) => setBackupDescription(e.target.value)}
                 placeholder="e.g., Full year-end backup, Before major changes, etc."
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
               />
             </div>
 
             {selectedOrg && (
-              <div className="bg-slate-50 p-3 rounded-lg space-y-1">
-                <p className="text-xs font-semibold text-slate-700">
-                  <span className="text-slate-500">Organization:</span> {selectedOrg.name}
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+                <p className="text-xs font-semibold text-gray-700">
+                  <span className="text-gray-500">Organization:</span> {selectedOrg.name}
                 </p>
-                <p className="text-xs font-semibold text-slate-700">
-                  <span className="text-slate-500">Created By:</span> {currentUserName}
+                <p className="text-xs font-semibold text-gray-700">
+                  <span className="text-gray-500">Created By:</span> {currentUserName}
                 </p>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-gray-600">
                   Will include all students, employees, accounts, transactions, inventory, and configuration data.
                 </p>
               </div>
@@ -289,7 +289,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
             <button
               onClick={handleCreateBackup}
               disabled={isCreatingBackup || !selectedOrg}
-              className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold text-sm hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-[#F47721] text-white rounded-lg font-bold text-sm hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               {isCreatingBackup ? (
                 <>
@@ -304,25 +304,25 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
               )}
             </button>
 
-            <p className="text-xs text-slate-500 text-center">
+            <p className="text-xs text-gray-500 text-center">
               Backup will be saved to your downloads folder
             </p>
           </div>
         </div>
 
         {/* Restore Backup Section */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded border border-gray-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-100 rounded-lg">
-              <Upload size={20} className="text-teal-600" />
+              <Upload size={20} className="text-[#F47721]" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 uppercase tracking-tight">Restore Backup</h3>
-              <p className="text-xs text-slate-500 mt-1">Import from previous backup file</p>
+              <h3 className="font-semibold text-gray-900 uppercase tracking-tight">Restore Backup</h3>
+              <p className="text-xs text-gray-500 mt-1">Import from previous backup file</p>
             </div>
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-slate-100">
+          <div className="space-y-3 pt-4 border-t border-gray-100">
             <div className="bg-red-50 p-3 rounded-lg border border-red-200">
               <p className="text-xs font-bold text-red-700">⚠️ Warning</p>
               <p className="text-xs text-red-600 mt-1">
@@ -348,12 +348,12 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
             </button>
 
             {selectedBackup && (
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                <p className="text-xs font-semibold text-slate-700">Selected: {selectedBackup.metadata.organizationName}</p>
-                <p className="text-xs text-slate-600">Date: {selectedBackup.metadata.backupDate}</p>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                <p className="text-xs font-semibold text-gray-700">Selected: {selectedBackup.metadata.organizationName}</p>
+                <p className="text-xs text-gray-600">Date: {selectedBackup.metadata.backupDate}</p>
                 <button
                   onClick={() => setSelectedBackup(null)}
-                  className="text-xs text-slate-500 hover:text-slate-700 font-semibold"
+                  className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
                 >
                   ✕ Clear Selection
                 </button>
@@ -384,23 +384,23 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       {/* Restore Confirmation Dialog */}
       {showRestoreConfirm && selectedBackup && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white rounded shadow-md max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3 text-red-600">
               <AlertCircle size={24} />
-              <h3 className="font-black text-lg uppercase">Confirm Restore</h3>
+              <h3 className="font-semibold text-lg uppercase">Confirm Restore</h3>
             </div>
 
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-gray-700">
               This will restore all data from the backup dated <strong>{selectedBackup.metadata.backupDate}</strong> for organization <strong>{selectedBackup.metadata.organizationName}</strong>.
             </p>
 
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-gray-700">
               All current data will be permanently replaced. Make sure you have a backup of your current data first.
             </p>
 
-            <div className="bg-slate-50 p-3 rounded-lg space-y-1">
-              <p className="text-xs font-semibold text-slate-700">Backup Summary:</p>
-              <p className="text-xs text-slate-600">
+            <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+              <p className="text-xs font-semibold text-gray-700">Backup Summary:</p>
+              <p className="text-xs text-gray-600">
                 {selectedBackup.metadata.recordCount && Object.values(selectedBackup.metadata.recordCount).reduce((a, b) => a + b, 0)} total records
               </p>
             </div>
@@ -409,7 +409,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
               <button
                 onClick={() => setShowRestoreConfirm(false)}
                 disabled={isRestoringBackup}
-                className="flex-1 py-2 border border-slate-200 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-50 disabled:opacity-50"
+                className="flex-1 py-2 border border-gray-200 text-gray-700 rounded-lg font-bold text-sm hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -436,67 +436,67 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       )}
 
       {/* Backup History */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-white rounded border border-gray-200 p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-slate-100 rounded-lg">
-            <HardDrive size={20} className="text-slate-600" />
+          <div className="p-2 bg-gray-100 rounded-lg">
+            <HardDrive size={20} className="text-gray-600" />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 uppercase tracking-tight">Backup History</h3>
-            <p className="text-xs text-slate-500 mt-1">{backups.length} backup(s) stored</p>
+            <h3 className="font-semibold text-gray-900 uppercase tracking-tight">Backup History</h3>
+            <p className="text-xs text-gray-500 mt-1">{backups.length} backup(s) stored</p>
           </div>
         </div>
 
         {backups.length === 0 ? (
           <div className="py-8 text-center">
-            <Database size={32} className="mx-auto text-slate-300 mb-3" />
-            <p className="text-slate-500 text-sm">No backups created yet</p>
-            <p className="text-slate-400 text-xs mt-1">Create your first backup to see it here</p>
+            <Database size={32} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 text-sm">No backups created yet</p>
+            <p className="text-gray-400 text-xs mt-1">Create your first backup to see it here</p>
           </div>
         ) : (
           <div className="space-y-3">
             {backups.map((backup) => (
-              <div key={backup.id} className="border border-slate-200 rounded-lg overflow-hidden">
+              <div key={backup.id} className="border border-gray-200 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setExpandedBackupId(expandedBackupId === backup.id ? null : backup.id)}
-                  className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3 flex-1 text-left">
-                    <FileJson size={18} className="text-slate-400" />
+                    <FileJson size={18} className="text-gray-400" />
                     <div>
-                      <p className="font-semibold text-slate-900 text-sm">{backup.filename}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="font-semibold text-gray-900 text-sm">{backup.filename}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {formatDate(backup.uploadedAt)} • {formatFileSize(backup.size)}
                       </p>
                     </div>
                   </div>
                   {expandedBackupId === backup.id ? (
-                    <ChevronUp size={18} className="text-slate-400" />
+                    <ChevronUp size={18} className="text-gray-400" />
                   ) : (
-                    <ChevronDown size={18} className="text-slate-400" />
+                    <ChevronDown size={18} className="text-gray-400" />
                   )}
                 </button>
 
                 {expandedBackupId === backup.id && backup.metadata && (
-                  <div className="border-t border-slate-200 p-4 bg-slate-50 space-y-3">
+                  <div className="border-t border-gray-200 p-4 bg-gray-50 space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-xs font-semibold text-slate-600">Organization</p>
-                        <p className="text-sm text-slate-900">{backup.metadata.organizationName}</p>
+                        <p className="text-xs font-semibold text-gray-600">Organization</p>
+                        <p className="text-sm text-gray-900">{backup.metadata.organizationName}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600">Created By</p>
-                        <p className="text-sm text-slate-900">{backup.metadata.createdBy}</p>
+                        <p className="text-xs font-semibold text-gray-600">Created By</p>
+                        <p className="text-sm text-gray-900">{backup.metadata.createdBy}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600">Date & Time</p>
-                        <p className="text-sm text-slate-900">
+                        <p className="text-xs font-semibold text-gray-600">Date & Time</p>
+                        <p className="text-sm text-gray-900">
                           {backup.metadata.backupDate} {backup.metadata.backupTime}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600">Total Records</p>
-                        <p className="text-sm text-slate-900 font-mono">
+                        <p className="text-xs font-semibold text-gray-600">Total Records</p>
+                        <p className="text-sm text-gray-900 font-mono">
                           {Object.values(backup.metadata.recordCount).reduce((a: number, b: number) => a + b, 0)}
                         </p>
                       </div>
@@ -504,20 +504,20 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
                     {backup.metadata.description && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-600">Description</p>
-                        <p className="text-sm text-slate-700">{backup.metadata.description}</p>
+                        <p className="text-xs font-semibold text-gray-600">Description</p>
+                        <p className="text-sm text-gray-700">{backup.metadata.description}</p>
                       </div>
                     )}
 
                     <div className="bg-white rounded p-3 space-y-1 text-xs">
-                      <p className="font-semibold text-slate-700 mb-2">Record Summary:</p>
+                      <p className="font-semibold text-gray-700 mb-2">Record Summary:</p>
                       <div className="grid grid-cols-2 gap-2">
                         {Object.entries(backup.metadata.recordCount)
                           .filter(([, count]) => count > 0)
                           .map(([type, count]) => (
-                            <div key={type} className="text-slate-600">
+                            <div key={type} className="text-gray-600">
                               <span className="capitalize">{type.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                              <span className="font-mono font-bold text-slate-900 ml-1">{count}</span>
+                              <span className="font-mono font-bold text-gray-900 ml-1">{count}</span>
                             </div>
                           ))}
                       </div>
@@ -536,7 +536,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
                           );
                           setShowRestoreConfirm(true);
                         }}
-                        className="flex-1 py-2 bg-emerald-50 text-teal-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 py-2 bg-emerald-50 text-orange-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1"
                       >
                         <Upload size={12} />
                         Restore
@@ -558,12 +558,12 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       </div>
 
       {/* Best Practices */}
-      <div className="bg-teal-50 border border-teal-200 rounded-xl p-6">
-        <h4 className="font-black text-slate-900 uppercase tracking-tight mb-3 flex items-center gap-2">
-          <Shield size={18} className="text-teal-600" />
+      <div className="bg-orange-50 border border-orange-200 rounded p-6">
+        <h4 className="font-semibold text-gray-900 uppercase tracking-tight mb-3 flex items-center gap-2">
+          <Shield size={18} className="text-[#F47721]" />
           Best Practices
         </h4>
-        <ul className="space-y-2 text-sm text-slate-700">
+        <ul className="space-y-2 text-sm text-gray-700">
           <li>✓ Create backups before making major changes (data migrations, period closings, etc.)</li>
           <li>✓ Schedule regular backups (daily/weekly) for disaster recovery</li>
           <li>✓ Store backups in multiple locations (cloud storage, external drives)</li>

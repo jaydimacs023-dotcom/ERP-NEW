@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   RecurringBill,
   RecurringBillHistory,
@@ -117,9 +117,9 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
   }, [filteredBills]);
 
   const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-    ACTIVE: { label: 'Active', color: 'text-teal-600', bgColor: 'bg-teal-50' },
-    PAUSED: { label: 'Paused', color: 'text-teal-600', bgColor: 'bg-amber-50' },
-    COMPLETED: { label: 'Completed', color: 'text-slate-600', bgColor: 'bg-slate-100' },
+    ACTIVE: { label: 'Active', color: 'text-[#F47721]', bgColor: 'bg-orange-50' },
+    PAUSED: { label: 'Paused', color: 'text-[#F47721]', bgColor: 'bg-amber-50' },
+    COMPLETED: { label: 'Completed', color: 'text-gray-600', bgColor: 'bg-gray-100' },
     CANCELLED: { label: 'Cancelled', color: 'text-rose-600', bgColor: 'bg-rose-50' }
   };
 
@@ -227,67 +227,67 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
     <div className="space-y-8">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Recurring Bills & Automation</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Automate monthly institutional expenses and recurring vendor obligations.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Recurring Bills & Automation</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Automate monthly institutional expenses and recurring vendor obligations.</p>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-6 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Total Bills</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">{stats.totalRecurringBills}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Total Bills</p>
+          <p className="text-lg font-semibold text-gray-900 mt-1">{stats.totalRecurringBills}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Active</p>
-          <p className="text-2xl font-black text-teal-600 mt-1">{stats.activeBills}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Active</p>
+          <p className="text-lg font-semibold text-[#F47721] mt-1">{stats.activeBills}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Monthly</p>
-          <p className="text-lg font-black text-slate-900 mt-1">${stats.totalMonthlyAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Monthly</p>
+          <p className="text-lg font-semibold text-gray-900 mt-1">${stats.totalMonthlyAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Annual</p>
-          <p className="text-lg font-black text-slate-900 mt-1">${stats.totalAnnualAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Annual</p>
+          <p className="text-lg font-semibold text-gray-900 mt-1">${stats.totalAnnualAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Due</p>
-          <p className="text-2xl font-black text-rose-600 mt-1">{dueBills.length}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Due</p>
+          <p className="text-lg font-semibold text-rose-600 mt-1">{dueBills.length}</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Next 30 Days</p>
-          <p className="text-2xl font-black text-violet-600 mt-1">{upcomingBills.length}</p>
+        <div className="bg-white rounded p-4 border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase">Next 30 Days</p>
+          <p className="text-lg font-semibold text-violet-600 mt-1">{upcomingBills.length}</p>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+      <div className="bg-white rounded p-4 border border-gray-200 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
             <Filter size={16} /> Filters & Search
           </h3>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-white bg-[#F47721] rounded-lg hover:bg-[#E06610] transition-all"
           >
             <Plus size={14} /> Add Recurring Bill
           </button>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search bill name or vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
           >
             <option value="all">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -301,14 +301,14 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">
+          <div className="bg-white rounded max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-sm">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">
                 {editingId ? 'Edit Recurring Bill' : 'Create Recurring Bill'}
               </h2>
               <button
                 onClick={resetForm}
-                className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={20} />
               </button>
@@ -317,18 +317,18 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
             <div className="p-6 space-y-4">
               {/* Bill Details */}
               <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-900">Bill Details</h3>
+                <h3 className="text-sm font-bold text-gray-900">Bill Details</h3>
                 <input
                   type="text"
                   placeholder="Bill Name (e.g., 'Office Rent', 'SaaS Subscription')"
                   value={formData.billName}
                   onChange={(e) => setFormData(f => ({ ...f, billName: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
                 <select
                   value={formData.vendorId}
                   onChange={(e) => setFormData(f => ({ ...f, vendorId: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
                   <option value="">Select Vendor</option>
                   {vendors.map(v => (
@@ -340,28 +340,28 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                   value={formData.description}
                   onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
 
               {/* Amount & Frequency */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Amount</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Amount</label>
                   <input
                     type="number"
                     placeholder="0.00"
                     value={formData.amount}
                     onChange={(e) => setFormData(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Frequency</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Frequency</label>
                   <select
                     value={formData.frequency}
                     onChange={(e) => setFormData(f => ({ ...f, frequency: e.target.value as RecurrenceFrequency }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   >
                     <option value="WEEKLY">Weekly</option>
                     <option value="BIWEEKLY">Bi-weekly</option>
@@ -376,21 +376,21 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Start Date</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Start Date</label>
                   <input
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData(f => ({ ...f, startDate: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">End Date (Optional)</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">End Date (Optional)</label>
                   <input
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData(f => ({ ...f, endDate: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
               </div>
@@ -398,20 +398,20 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
               {/* Payment Terms & GL Account */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Payment Terms (Days)</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">Payment Terms (Days)</label>
                   <input
                     type="number"
                     value={formData.paymentTermsDays}
                     onChange={(e) => setFormData(f => ({ ...f, paymentTermsDays: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">GL Account</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">GL Account</label>
                   <select
                     value={formData.glAccountId}
                     onChange={(e) => setFormData(f => ({ ...f, glAccountId: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   >
                     <option value="">Select Account</option>
                     {accounts.filter(a => !a.isHeader && !a.isDeleted).map(a => (
@@ -422,15 +422,15 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
               </div>
 
               {/* Withholding */}
-              <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
+              <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={formData.includeWithholding}
                     onChange={(e) => setFormData(f => ({ ...f, includeWithholding: e.target.checked }))}
-                    className="w-4 h-4 rounded border-slate-300 text-teal-600"
+                    className="w-4 h-4 rounded border-gray-300 text-[#F47721]"
                   />
-                  <span className="text-sm font-bold text-slate-700">Include Withholding</span>
+                  <span className="text-sm font-bold text-gray-700">Include Withholding</span>
                 </label>
                 {formData.includeWithholding && (
                   <input
@@ -438,33 +438,33 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     placeholder="0.00"
                     value={formData.appliedRatePercent}
                     onChange={(e) => setFormData(f => ({ ...f, appliedRatePercent: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 )}
               </div>
 
               {/* Auto-create */}
-              <label className="flex items-center gap-2 p-3 bg-teal-50 rounded-lg border border-teal-200">
+              <label className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
                 <input
                   type="checkbox"
                   checked={formData.autoCreatePayable}
                   onChange={(e) => setFormData(f => ({ ...f, autoCreatePayable: e.target.checked }))}
-                  className="w-4 h-4 rounded border-emerald-300 text-teal-600"
+                  className="w-4 h-4 rounded border-emerald-300 text-[#F47721]"
                 />
-                <span className="text-sm font-bold text-teal-700">Automatically create payables when due</span>
+                <span className="text-sm font-bold text-orange-700">Automatically create payables when due</span>
               </label>
             </div>
 
-            <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-end gap-3">
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
               <button
                 onClick={resetForm}
-                className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-[#F47721] rounded-lg hover:bg-[#E06610] transition-colors"
               >
                 <Save size={14} /> Save Bill
               </button>
@@ -490,24 +490,24 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
             const isExpanded = expandedBillId === bill.id;
 
             return (
-              <div key={bill.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={bill.id} className="bg-white rounded border border-gray-200 shadow-sm overflow-hidden">
                 {/* Bill Header */}
                 <div
-                  className="p-4 flex items-start justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="p-4 flex items-start justify-between cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => setExpandedBillId(isExpanded ? null : bill.id)}
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-sm font-bold text-slate-900">{bill.billName}</h3>
+                      <h3 className="text-sm font-bold text-gray-900">{bill.billName}</h3>
                       <span className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-full ${config.bgColor} ${config.color}`}>
                         {config.label}
                       </span>
-                      <span className="text-xs font-semibold text-slate-500">{RecurringBillService.formatFrequency(bill.frequency)}</span>
+                      <span className="text-xs font-semibold text-gray-500">{RecurringBillService.formatFrequency(bill.frequency)}</span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-600">
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>💰 {vendor?.name || 'Unknown Vendor'}</span>
                       <span>${bill.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      <span className="text-xs text-slate-500">Next: {new Date(bill.nextBillDate).toLocaleDateString()}</span>
+                      <span className="text-xs text-gray-500">Next: {new Date(bill.nextBillDate).toLocaleDateString()}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -517,7 +517,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                           e.stopPropagation();
                           onUpdateBill(bill.id, { status: 'PAUSED' });
                         }}
-                        className="p-2 text-slate-400 hover:text-teal-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-[#F47721] hover:bg-amber-50 rounded-lg transition-colors"
                       >
                         <Pause size={16} />
                       </button>
@@ -528,7 +528,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                           e.stopPropagation();
                           onUpdateBill(bill.id, { status: 'ACTIVE' });
                         }}
-                        className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-[#F47721] hover:bg-orange-50 rounded-lg transition-colors"
                       >
                         <Play size={16} />
                       </button>
@@ -538,7 +538,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                         e.stopPropagation();
                         handleEdit(bill);
                       }}
-                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-[#F47721] hover:bg-orange-50 rounded-lg transition-colors"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -549,48 +549,48 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                           onDeleteBill(bill.id);
                         }
                       }}
-                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>
                     <ChevronDown
                       size={18}
-                      className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                     />
                   </div>
                 </div>
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-4">
+                  <div className="bg-gray-50 border-t border-gray-200 p-4 space-y-4">
                     {/* Details Grid */}
                     <div className="grid grid-cols-4 gap-4">
                       <div>
-                        <p className="text-xs font-semibold text-slate-600 uppercase">Annual Amount</p>
-                        <p className="text-lg font-bold text-slate-900 mt-1">
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Annual Amount</p>
+                        <p className="text-lg font-bold text-gray-900 mt-1">
                           ${(bill.amount * RecurringBillService.getAnnualMultiplier(bill.frequency)).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600 uppercase">Total Generated</p>
-                        <p className="text-lg font-bold text-slate-900 mt-1">{bill.totalBillsGenerated}</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Total Generated</p>
+                        <p className="text-lg font-bold text-gray-900 mt-1">{bill.totalBillsGenerated}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600 uppercase">GL Account</p>
-                        <p className="text-sm text-slate-900 mt-1">{getAccountName(bill.glAccountId || '')}</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">GL Account</p>
+                        <p className="text-sm text-gray-900 mt-1">{getAccountName(bill.glAccountId || '')}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-600 uppercase">Payment Terms</p>
-                        <p className="text-sm text-slate-900 mt-1">{bill.paymentTermsDays} days</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase">Payment Terms</p>
+                        <p className="text-sm text-gray-900 mt-1">{bill.paymentTermsDays} days</p>
                       </div>
                     </div>
 
                     {/* Next Dates */}
                     <div>
-                      <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Upcoming Bills</h4>
+                      <h4 className="text-xs font-bold text-gray-700 uppercase mb-2">Upcoming Bills</h4>
                       <div className="flex flex-wrap gap-2">
                         {nextDates.map((date, i) => (
-                          <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-teal-100 text-teal-700 rounded-lg">
+                          <span key={i} className="px-2.5 py-1 text-xs font-semibold bg-orange-100 text-orange-700 rounded-lg">
                             {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </span>
                         ))}
@@ -600,13 +600,13 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                     {/* Recent History */}
                     {billHistory.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">Recent Activity</h4>
+                        <h4 className="text-xs font-bold text-gray-700 uppercase mb-2">Recent Activity</h4>
                         <div className="space-y-1 text-xs">
                           {billHistory.map((h, i) => (
-                            <div key={i} className="flex items-center justify-between p-2 bg-white rounded border border-slate-200">
+                            <div key={i} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
                               <span>{new Date(h.billDate).toLocaleDateString()}</span>
-                              <span className="font-semibold text-slate-900">${h.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${h.status === 'CREATED' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'}`}>
+                              <span className="font-semibold text-gray-900">${h.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${h.status === 'CREATED' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>
                                 {h.status}
                               </span>
                             </div>

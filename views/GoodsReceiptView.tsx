@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { 
   GoodsReceipt, GoodsReceiptLine, GoodsReceiptStatus, PurchaseOrder, 
   Vendor, ChartOfAccount, JournalEntry, JournalLine
@@ -25,8 +25,8 @@ interface GoodsReceiptViewProps {
 }
 
 const STATUS_CONFIG: Record<GoodsReceiptStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <FileText size={14} /> },
-  POSTED: { label: 'Posted', color: 'text-teal-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
+  DRAFT: { label: 'Draft', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: <FileText size={14} /> },
+  POSTED: { label: 'Posted', color: 'text-[#F47721]', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
   CANCELLED: { label: 'Cancelled', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
 };
 
@@ -295,50 +295,50 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Goods Receipt (GR/IR)</h2>
-          <p className="text-sm text-slate-500 font-normal italic">Receive goods against Purchase Orders with GR/IR clearing integration.</p>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Goods Receipt (GR/IR)</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Receive goods against Purchase Orders with GR/IR clearing integration.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-teal-900/20 hover:bg-teal-700 hover:-translate-y-0.5 transition-all"
+          className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all"
         >
           <Plus size={18} /> New Goods Receipt
         </button>
       </header>
 
       {/* GR/IR Explanation Card */}
-      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-[2.5rem] p-8 shadow-sm">
+      <div className="bg-gradient-to-r from-orange-50 to-cyan-50 border border-orange-200 rounded-md p-8 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-teal-100 rounded-xl">
-            <Link className="text-teal-600" size={24} />
+          <div className="p-3 bg-orange-100 rounded">
+            <Link className="text-[#F47721]" size={24} />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-black text-teal-800 mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
-            <p className="text-sm text-teal-700 leading-relaxed font-medium">
-              When goods are received, the system debits <strong className="font-black">Inventory</strong> and credits <strong className="font-black">GR/IR Clearing</strong>. 
-              When the vendor invoice is posted, it debits <strong className="font-black">GR/IR Clearing</strong> and credits <strong className="font-black">Accounts Payable</strong>. 
+            <h3 className="text-lg font-semibold text-orange-800 mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
+            <p className="text-sm text-orange-700 leading-relaxed font-medium">
+              When goods are received, the system debits <strong className="font-semibold">Inventory</strong> and credits <strong className="font-semibold">GR/IR Clearing</strong>. 
+              When the vendor invoice is posted, it debits <strong className="font-semibold">GR/IR Clearing</strong> and credits <strong className="font-semibold">Accounts Payable</strong>. 
               This ensures proper matching between receipts and invoices.
             </p>
-            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-teal-200/50">
+            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-orange-200/50">
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-teal-200/50 flex items-center justify-center">
-                    <Package size={14} className="text-teal-700" />
+                 <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
+                    <Package size={14} className="text-orange-700" />
                  </div>
-                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Goods Receipt</span>
+                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Goods Receipt</span>
               </div>
-              <ArrowRight size={14} className="text-teal-400" />
+              <ArrowRight size={14} className="text-orange-400" />
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-teal-200/50 flex items-center justify-center">
-                    <FileText size={14} className="text-teal-700" />
+                 <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
+                    <FileText size={14} className="text-orange-700" />
                  </div>
-                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Invoice Match</span>
+                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Invoice Match</span>
               </div>
-              <ArrowRight size={14} className="text-teal-400" />
+              <ArrowRight size={14} className="text-orange-400" />
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-teal-500 text-white flex items-center justify-center shadow-lg shadow-teal-500/20">
+                 <div className="w-8 h-8 rounded-lg bg-[#F47721] text-white flex items-center justify-center shadow-lg shadow-gray-300/20">
                     <CheckCircle size={14} />
                  </div>
-                 <span className="text-[10px] font-black text-teal-800 uppercase tracking-widest">Clearing Complete</span>
+                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Clearing Complete</span>
               </div>
             </div>
           </div>
@@ -347,119 +347,119 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-teal-200 transition-all">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-             <Clock size={12} className="text-slate-400" /> Draft Index
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+             <Clock size={12} className="text-gray-400" /> Draft Index
           </p>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">
+              <p className="text-xl font-semibold text-gray-900 tracking-tighter">
                 {summaryMetrics.draftCount}
               </p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">PENDING_POST</p>
+              <p className="text-xs font-bold text-gray-400 uppercase mt-1">PENDING_POST</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-black text-slate-600 font-mono">
+              <p className="text-sm font-semibold text-gray-600 font-mono">
                 {"\u20B1"}{formatCurrency(summaryMetrics.draftValue)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-900 p-6 rounded-[2.5rem] shadow-xl shadow-slate-900/20 flex flex-col justify-between group relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-full -mr-8 -mt-8 blur-2xl" />
-          <p className="text-[10px] font-black text-teal-400/80 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-             <CheckCircle size={12} className="text-teal-400" /> Posted Ledger
+        <div className="bg-gray-800 p-6 rounded-md shadow-sm shadow-gray-300/20 flex flex-col justify-between group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#F47721]/10 rounded-full -mr-8 -mt-8 blur-2xl" />
+          <p className="text-xs font-semibold text-orange-400/80 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+             <CheckCircle size={12} className="text-orange-400" /> Posted Ledger
           </p>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-black text-white tracking-tighter">
+              <p className="text-xl font-semibold text-white tracking-tighter">
                 {summaryMetrics.postedCount}
               </p>
-              <p className="text-[10px] font-bold text-teal-500 uppercase mt-1">CLEARED_RECORDS</p>
+              <p className="text-xs font-bold text-orange-500 uppercase mt-1">CLEARED_RECORDS</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-black text-teal-400 font-mono">
+              <p className="text-sm font-semibold text-orange-400 font-mono">
                 {"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between group hover:border-teal-200 transition-all">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-             <Layers size={12} className="text-teal-600" /> Total Lines
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+             <Layers size={12} className="text-[#F47721]" /> Total Lines
           </p>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">
+              <p className="text-xl font-semibold text-gray-900 tracking-tighter">
                 {summaryMetrics.totalLineItems}
               </p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">RECEIPT_ENTRIES</p>
+              <p className="text-xs font-bold text-gray-400 uppercase mt-1">RECEIPT_ENTRIES</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-teal-600 p-6 rounded-[2.5rem] shadow-xl shadow-teal-900/20 flex flex-col justify-between group">
-          <p className="text-[10px] font-black text-teal-100 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-             <ShoppingCart size={12} className="text-teal-100" /> Open POs
+        <div className="bg-[#F47721] p-6 rounded-md shadow-sm shadow-gray-300/30 flex flex-col justify-between group">
+          <p className="text-xs font-semibold text-orange-100 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+             <ShoppingCart size={12} className="text-orange-100" /> Open POs
           </p>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-black text-white tracking-tighter">
+              <p className="text-xl font-semibold text-white tracking-tighter">
                 {orgPOs.length}
               </p>
-              <p className="text-[10px] font-bold text-teal-200 uppercase mt-1">ELIGIBLE_FOR_GR</p>
+              <p className="text-xs font-bold text-orange-200 uppercase mt-1">ELIGIBLE_FOR_GR</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Registry Filters */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-md border border-gray-200 shadow-sm">
          <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input 
                type="text" 
                placeholder="Search goods receipts..." 
-               className="w-full pl-11 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-sm font-bold text-slate-800"
+               className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
                value={searchTerm}
                onChange={e => setSearchTerm(e.target.value)}
             />
          </div>
          <div className="flex items-center gap-3">
             <div className="relative font-bold">
-               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
-                  className="pl-10 pr-10 py-3 bg-slate-50 border-2 border-transparent rounded-2xl outline-none focus:border-teal-500/20 focus:bg-white transition-all text-[10px] font-black uppercase tracking-widest text-slate-600 appearance-none min-w-[160px]"
+                  className="pl-10 pr-10 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-xs font-semibold uppercase tracking-wide text-gray-600 appearance-none min-w-[160px]"
                >
                   <option value="all">All Statuses</option>
                   {Object.entries(STATUS_CONFIG).map(([value, config]) => (
                      <option key={value} value={value}>{config.label}</option>
                   ))}
                </select>
-               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
             </div>
          </div>
       </div>
 
       {/* GRs Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50 border-b border-slate-100">
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">GR Number</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">PO / Vendor</th>
-              <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Receipt Date</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Lines</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</th>
-              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GR Number</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">PO / Vendor</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Receipt Date</th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">Lines</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Value</th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {filteredGRs.length > 0 ? (
               filteredGRs
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -467,28 +467,28 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                   const statusConfig = STATUS_CONFIG[gr.status];
                   
                   return (
-                    <tr key={gr.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={gr.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <span className="font-mono font-bold text-teal-600">{gr.grNumber}</span>
+                        <span className="font-mono font-bold text-[#F47721]">{gr.grNumber}</span>
                         {gr.deliveryNote && (
-                          <p className="text-xs text-slate-400 mt-0.5">DN: {gr.deliveryNote}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">DN: {gr.deliveryNote}</p>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-700">{getPONumber(gr.purchaseOrderId)}</p>
-                        <p className="text-xs text-slate-400">{getVendorName(gr.vendorId)}</p>
+                        <p className="text-sm font-medium text-gray-700">{getPONumber(gr.purchaseOrderId)}</p>
+                        <p className="text-xs text-gray-400">{getVendorName(gr.vendorId)}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm text-slate-600">{gr.receiptDate}</p>
+                        <p className="text-sm text-gray-600">{gr.receiptDate}</p>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-mono font-semibold text-slate-600">{gr.lines.length}</span>
+                        <span className="font-mono font-semibold text-gray-600">{gr.lines.length}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-semibold text-slate-700">{"\u20B1"}{formatCurrency(gr.totalValue)}</span>
+                        <span className="font-mono font-semibold text-gray-700">{"\u20B1"}{formatCurrency(gr.totalValue)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
                           {statusConfig.icon}
                           {statusConfig.label}
                         </span>
@@ -497,7 +497,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => { setSelectedGR(gr); setShowDetailModal(true); }}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors"
                             title="View Details"
                           >
                             <Eye size={16} />
@@ -506,7 +506,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                             <>
                               <button
                                 onClick={() => handlePost(gr)}
-                                className="p-1.5 hover:bg-emerald-50 rounded-lg text-teal-600 transition-colors"
+                                className="p-1.5 hover:bg-emerald-50 rounded-lg text-[#F47721] transition-colors"
                                 title="Post"
                               >
                                 <CheckCircle size={16} />
@@ -536,7 +536,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               <tr>
                 <td colSpan={7} className="py-16 text-center">
                   <EmptyState 
-                    icon={<Package className="text-slate-300" size={48} />}
+                    icon={<Package className="text-gray-300" size={48} />}
                     title="No goods receipts found"
                     description="Create a goods receipt from an approved Purchase Order."
                   />
@@ -544,26 +544,26 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               </tr>
             )}
           </tbody>
-          <tfoot className="border-t-4 border-slate-900">
-             <tr className="bg-slate-50">
+          <tfoot className="border-t-4 border-gray-800">
+             <tr className="bg-gray-50">
                 <td colSpan={4} className="px-8 py-6">
                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                      <p className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Institutional Receipt Intelligence Active</p>
+                      <div className="w-2 h-2 rounded-full bg-[#F47721] animate-pulse" />
+                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Institutional Receipt Intelligence Active</p>
                    </div>
                 </td>
                 <td className="px-6 py-6 text-right">
                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregated Valuation</p>
-                      <p className="text-xl font-black text-slate-900 font-mono">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Aggregated Valuation</p>
+                      <p className="text-xl font-semibold text-gray-900 font-mono">
                          {"\u20B1"}{formatCurrency(filteredGRs.reduce((sum, gr) => sum + gr.totalValue, 0))}
                       </p>
                    </div>
                 </td>
                 <td colSpan={2} className="px-8 py-6 text-right">
                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Records</p>
-                      <p className="text-sm font-black text-slate-900 uppercase">{filteredGRs.length} TRANSACTIONS</p>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Records</p>
+                      <p className="text-sm font-semibold text-gray-900 uppercase">{filteredGRs.length} TRANSACTIONS</p>
                    </div>
                 </td>
              </tr>
@@ -573,16 +573,16 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <Package size={20} />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-800">New Goods Receipt</h3>
+                <h3 className="text-lg font-semibold text-gray-800">New Goods Receipt</h3>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -590,10 +590,10 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             <form onSubmit={handleCreate} className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Purchase Order *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Purchase Order *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.purchaseOrderId}
                     onChange={e => handlePOSelect(e.target.value)}
                   >
@@ -606,11 +606,11 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Receipt Date *</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receipt Date *</label>
                   <input 
                     type="date"
                     required
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.receiptDate}
                     onChange={e => setFormData({...formData, receiptDate: e.target.value})}
                   />
@@ -619,21 +619,21 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Delivery Note #</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Delivery Note #</label>
                   <input 
                     type="text"
                     placeholder="Vendor's delivery note number..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.deliveryNote}
                     onChange={e => setFormData({...formData, deliveryNote: e.target.value})}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Warehouse Location</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Warehouse Location</label>
                   <input 
                     type="text"
                     placeholder="Where goods are stored..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.warehouseLocation}
                     onChange={e => setFormData({...formData, warehouseLocation: e.target.value})}
                   />
@@ -643,55 +643,55 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               {/* Line Items */}
               {formData.lines.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Receipt Lines ({formData.lines.length} items)
                   </label>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <table className="min-w-full divide-y divide-slate-200">
-                      <thead className="bg-slate-50">
+                  <div className="border border-gray-200 rounded overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Item</th>
-                          <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">Ordered</th>
-                          <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">Received *</th>
-                          <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Unit Price</th>
-                          <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Total</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">Item</th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-400 uppercase">Ordered</th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-gray-400 uppercase">Received *</th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">Unit Price</th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-gray-100">
                         {formData.lines.map((line, idx) => (
                           <tr key={idx}>
                             <td className="px-4 py-3">
-                              <p className="text-sm font-medium text-slate-700">{line.itemDescription}</p>
+                              <p className="text-sm font-medium text-gray-700">{line.itemDescription}</p>
                               {line.itemCode && (
-                                <p className="text-xs text-slate-400">{line.itemCode}</p>
+                                <p className="text-xs text-gray-400">{line.itemCode}</p>
                               )}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className="font-mono text-sm text-slate-600">{line.orderedQuantity}</span>
+                              <span className="font-mono text-sm text-gray-600">{line.orderedQuantity}</span>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <input
                                 type="number"
                                 min="0"
                                 max={line.orderedQuantity}
-                                className="w-20 px-2 py-1 text-center font-mono text-sm bg-white border border-slate-200 rounded-lg"
+                                className="w-20 px-2 py-1 text-center font-mono text-sm bg-white border border-gray-200 rounded-lg"
                                 value={line.receivedQuantity || 0}
                                 onChange={e => handleLineQuantityChange(idx, parseFloat(e.target.value) || 0)}
                               />
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className="font-mono text-sm text-slate-600">{"\u20B1"}{formatCurrency(line.unitPrice || 0)}</span>
+                              <span className="font-mono text-sm text-gray-600">{"\u20B1"}{formatCurrency(line.unitPrice || 0)}</span>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className="font-mono font-semibold text-sm text-slate-700">{"\u20B1"}{formatCurrency(line.totalValue || 0)}</span>
+                              <span className="font-mono font-semibold text-sm text-gray-700">{"\u20B1"}{formatCurrency(line.totalValue || 0)}</span>
                             </td>
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-slate-50">
+                      <tfoot className="bg-gray-50">
                         <tr>
-                          <td colSpan={4} className="px-4 py-3 text-right font-semibold text-slate-600">Total:</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
+                          <td colSpan={4} className="px-4 py-3 text-right font-semibold text-gray-600">Total:</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">
                             {"\u20B1"}{formatCurrency(formData.lines.reduce((sum, l) => sum + (l.totalValue || 0), 0))}
                           </td>
                         </tr>
@@ -702,24 +702,24 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               )}
 
               {!formData.purchaseOrderId && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+                <div className="bg-amber-50 border border-amber-200 rounded p-4 text-center">
                   <p className="text-sm text-amber-700">Select a Purchase Order to load items for receipt.</p>
                 </div>
               )}
             </form>
 
-            <div className="p-6 border-t bg-slate-50/50 flex gap-3">
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
               <button 
                 type="button" 
                 onClick={() => setShowCreateModal(false)} 
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleCreate as any}
                 disabled={!formData.purchaseOrderId || formData.lines.length === 0}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Goods Receipt
               </button>
@@ -730,19 +730,19 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Detail Modal */}
       {showDetailModal && selectedGR && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
                   <Package size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-800">{selectedGR.grNumber}</h3>
-                  <p className="text-xs text-slate-500">PO: {getPONumber(selectedGR.purchaseOrderId)} • {getVendorName(selectedGR.vendorId)}</p>
+                  <h3 className="text-lg font-semibold text-gray-800">{selectedGR.grNumber}</h3>
+                  <p className="text-xs text-gray-500">PO: {getPONumber(selectedGR.purchaseOrderId)} • {getVendorName(selectedGR.vendorId)}</p>
                 </div>
               </div>
-              <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -750,38 +750,38 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             <div className="flex-1 overflow-y-auto p-6">
               {/* GR Info */}
               <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Receipt Date</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{selectedGR.receiptDate}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Receipt Date</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{selectedGR.receiptDate}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Delivery Note</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{selectedGR.deliveryNote || '-'}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Delivery Note</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{selectedGR.deliveryNote || '-'}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Warehouse</p>
-                  <p className="text-sm font-medium text-slate-700 mt-1">{selectedGR.warehouseLocation || '-'}</p>
+                <div className="bg-gray-50 rounded p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Warehouse</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{selectedGR.warehouseLocation || '-'}</p>
                 </div>
               </div>
 
               {/* Lines */}
-              <h4 className="text-sm font-bold text-slate-700 mb-3">Received Items</h4>
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50">
+              <h4 className="text-sm font-bold text-gray-700 mb-3">Received Items</h4>
+              <div className="border border-gray-200 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">Item</th>
-                      <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase">Qty</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Unit Price</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">Item</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-400 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">Unit Price</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-400 uppercase">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-gray-100">
                     {selectedGR.lines.map(line => (
                       <tr key={line.id}>
                         <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-slate-700">{line.itemDescription}</p>
-                          {line.itemCode && <p className="text-xs text-slate-400">{line.itemCode}</p>}
+                          <p className="text-sm font-medium text-gray-700">{line.itemDescription}</p>
+                          {line.itemCode && <p className="text-xs text-gray-400">{line.itemCode}</p>}
                         </td>
                         <td className="px-4 py-3 text-center font-mono text-sm">{line.receivedQuantity}</td>
                         <td className="px-4 py-3 text-right font-mono text-sm">{"\u20B1"}{formatCurrency(line.unitPrice)}</td>
@@ -789,10 +789,10 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-slate-50">
+                  <tfoot className="bg-gray-50">
                     <tr>
-                      <td colSpan={3} className="px-4 py-3 text-right font-semibold text-slate-600">Total:</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">
+                      <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-600">Total:</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">
                         {"\u20B1"}{formatCurrency(selectedGR.totalValue)}
                       </td>
                     </tr>
@@ -802,26 +802,26 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
               {/* Audit Info */}
               {selectedGR.status === 'POSTED' && (
-                <div className="mt-6 bg-emerald-50 border border-teal-200 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-teal-700 mb-1">Posted</p>
-                  <p className="text-sm text-teal-600">
+                <div className="mt-6 bg-emerald-50 border border-orange-200 rounded p-4">
+                  <p className="text-xs font-semibold text-orange-700 mb-1">Posted</p>
+                  <p className="text-sm text-[#F47721]">
                     {selectedGR.postedAt && new Date(selectedGR.postedAt).toLocaleString()}
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t bg-slate-50/50 flex gap-3">
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
               <button 
                 onClick={() => setShowDetailModal(false)}
-                className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Close
               </button>
               {selectedGR.status === 'DRAFT' && (
                 <button 
                   onClick={() => { handlePost(selectedGR); setShowDetailModal(false); }}
-                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-emerald-600 text-white rounded text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <CheckCircle size={16} /> Post GR
                 </button>
@@ -833,27 +833,27 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Delete Confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+          <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertCircle className="text-rose-600" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Delete Goods Receipt?</h3>
-                <p className="text-sm text-slate-500">This action cannot be undone.</p>
+                <h3 className="text-lg font-bold text-gray-800">Delete Goods Receipt?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(confirmDelete)}
-                className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors"
+                className="flex-1 py-2.5 bg-rose-600 text-white rounded text-sm font-bold hover:bg-rose-700 transition-colors"
               >
                 Delete
               </button>

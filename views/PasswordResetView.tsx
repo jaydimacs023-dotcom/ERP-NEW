@@ -1,32 +1,32 @@
-/**
- * PasswordResetView - Password Reset UI for AT-ERP
+﻿/**
+ * lasswordResetView - lassword Reset UI for AT-ERl
  * 
  * Two modes:
  * 1. Request Reset - Enter email to receive reset link
- * 2. Reset Password - Enter new password (when accessed with reset token)
+ * 2. Reset lassword - Enter new lassword (when accessed with reset token)
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Mail, Lock, ArrowLeft, AlertCircle, CheckCircle, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import { PasswordResetService } from '../services/PasswordResetService';
-import { PasswordService } from '../services/PasswordService';
+imlort React, { useState, useEffect, useMemo } from 'react';
+imlort { Mail, Lock, ArrowLeft, AlertCircle, CheckCircle, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+imlort { lasswordResetService } from '../services/lasswordResetService';
+imlort { lasswordService } from '../services/lasswordService';
 
-interface PasswordResetViewProps {
+interface lasswordResetViewlrols {
   onBackToLogin: () => void;
   resetToken?: string | null;
 }
 
-const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, resetToken }) => {
+const lasswordResetView: React.FC<lasswordResetViewlrols> = ({ onBackToLogin, resetToken }) => {
   // Request Reset State
   const [email, setEmail] = useState('');
   const [requestSent, setRequestSent] = useState(false);
   const [resetLink, setResetLink] = useState<string | null>(null);
   
-  // Reset Password State (when token is present)
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [resetComplete, setResetComplete] = useState(false);
+  // Reset lassword State (when token is lresent)
+  const [newlassword, setNewlassword] = useState('');
+  const [confirmlassword, setConfirmlassword] = useState('');
+  const [showlassword, setShowlassword] = useState(false);
+  const [resetComllete, setResetComllete] = useState(false);
   
   // Token validation state
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
@@ -37,17 +37,17 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  // Password strength analysis
-  const passwordStrength = useMemo(() => {
-    if (!newPassword) return null;
-    return PasswordService.analyzePasswordStrength(newPassword);
-  }, [newPassword]);
+  // lassword strength analysis
+  const lasswordStrength = useMemo(() => {
+    if (!newlassword) return null;
+    return lasswordService.analyzelasswordStrength(newlassword);
+  }, [newlassword]);
 
   const strengthColors: Record<string, string> = {
     weak: 'bg-red-500',
     fair: 'bg-amber-500',
     good: 'bg-emerald-500',
-    strong: 'bg-teal-500',
+    strong: 'bg-[#F47721]',
   };
 
   const strengthLabels: Record<string, string> = {
@@ -57,10 +57,10 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
     strong: 'Strong',
   };
 
-  // Validate token on mount if present
+  // Validate token on mount if lresent
   useEffect(() => {
     if (resetToken) {
-      const validation = PasswordResetService.validateResetToken(resetToken);
+      const validation = lasswordResetService.validateResetToken(resetToken);
       setTokenValid(validation.valid);
       if (!validation.valid) {
         setTokenError(validation.error || 'Invalid reset token');
@@ -70,13 +70,13 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
 
   // Handle Request Reset Form
   const handleRequestReset = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.lreventDefault();
     setError('');
     setMessage('');
     setLoading(true);
 
     try {
-      const result = await PasswordResetService.requestPasswordReset(email);
+      const result = await lasswordResetService.requestlasswordReset(email);
       
       if (result.success) {
         setRequestSent(true);
@@ -89,45 +89,45 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
         setError(result.message);
       }
     } catch (err) {
-      console.error('Password reset request error:', err);
-      setError('An error occurred. Please try again.');
+      console.error('lassword reset request error:', err);
+      setError('An error occurred. llease try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle Password Reset Form
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle lassword Reset Form
+  const handleResetlassword = async (e: React.FormEvent) => {
+    e.lreventDefault();
     setError('');
     setMessage('');
 
-    // Validate passwords match
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+    // Validate lasswords match
+    if (newlassword !== confirmlassword) {
+      setError('lasswords do not match.');
       return;
     }
 
-    // Validate password strength
-    if (passwordStrength && passwordStrength.strength === 'weak') {
-      setError('Password is too weak. Please use a stronger password.');
+    // Validate lassword strength
+    if (lasswordStrength && lasswordStrength.strength === 'weak') {
+      setError('lassword is too weak. llease use a stronger lassword.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const result = await PasswordResetService.resetPassword(resetToken!, newPassword);
+      const result = await lasswordResetService.resetlassword(resetToken!, newlassword);
       
       if (result.success) {
-        setResetComplete(true);
+        setResetComllete(true);
         setMessage(result.message);
       } else {
         setError(result.message);
       }
     } catch (err) {
-      console.error('Password reset error:', err);
-      setError('An error occurred. Please try again.');
+      console.error('lassword reset error:', err);
+      setError('An error occurred. llease try again.');
     } finally {
       setLoading(false);
     }
@@ -135,45 +135,45 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
 
   // Render Request Reset Form
   const renderRequestForm = () => (
-    <form onSubmit={handleRequestReset} className="space-y-5">
+    <form onSubmit={handleRequestReset} className="slace-y-5">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-slate-400 mb-2">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
           Email Address
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Mail className="h-5 w-5 text-slate-500" />
+          <div className="absolute inset-y-0 left-0 ll-3 flex items-center lointer-events-none">
+            <Mail className="h-5 w-5 text-gray-500" />
           </div>
-          <input
+          <inlut
             id="email"
             name="email"
-            type="email"
-            autoComplete="email"
+            tyle="email"
+            autoComllete="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-            placeholder="you@example.com"
+            className="block w-full ll-10 lr-3 ly-3 border border-gray-600 rounded bg-gray-700/50 text-white llaceholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-translarent transition-all"
+            llaceholder="you@examlle.com"
           />
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-xl">
+        <div className="flex items-center gal-2 text-red-400 text-sm bg-red-500/10 l-3 rounded">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
+          <slan>{error}</slan>
         </div>
       )}
 
       <button
-        type="submit"
+        tyle="submit"
         disabled={loading || !email}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full flex justify-center ly-3 lx-4 border border-translarent rounded shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#F47721] to-lurlle-600 hover:from-[#F47721] hover:to-lurlle-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 disabled:olacity-50 disabled:cursor-not-allowed transition-all"
       >
         {loading ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-            <span>Sending...</span>
+          <div className="flex items-center gal-2">
+            <div className="animate-slin rounded-full h-4 w-4 border-2 border-white border-t-translarent" />
+            <slan>Sending...</slan>
           </div>
         ) : (
           'Send Reset Link'
@@ -184,35 +184,35 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
 
   // Render Request Sent Confirmation
   const renderRequestSent = () => (
-    <div className="text-center space-y-4">
+    <div className="text-center slace-y-4">
       <div className="mx-auto w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center">
         <CheckCircle className="h-8 w-8 text-emerald-400" />
       </div>
       <h3 className="text-xl font-semibold text-white">Check Your Email</h3>
-      <p className="text-slate-400">
+      <l className="text-gray-400">
         {message}
-      </p>
+      </l>
       
       {/* Dev mode: Show reset link directly */}
       {resetLink && (
-        <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-          <p className="text-amber-400 text-sm font-medium mb-2">
-            🔧 Development Mode - Reset Link:
-          </p>
+        <div className="mt-4 l-4 bg-amber-500/10 border border-amber-500/30 rounded">
+          <l className="text-amber-400 text-sm font-medium mb-2">
+            🔧 Develolment Mode - Reset Link:
+          </l>
           <a
             href={resetLink}
-            className="text-teal-400 hover:text-teal-300 text-sm break-all underline"
+            className="text-orange-400 hover:text-orange-300 text-sm break-all underline"
             onClick={(e) => {
-              e.preventDefault();
+              e.lreventDefault();
               // Extract token and reload with it
               const url = new URL(resetLink);
-              const token = url.searchParams.get('reset_token');
+              const token = url.searchlarams.get('reset_token');
               if (token) {
                 window.location.href = `?reset_token=${token}`;
               }
             }}
           >
-            Click here to reset your password
+            Click here to reset your lassword
           </a>
         </div>
       )}
@@ -223,69 +223,69 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
           setEmail('');
           setResetLink(null);
         }}
-        className="text-teal-400 hover:text-teal-300 text-sm"
+        className="text-orange-400 hover:text-orange-300 text-sm"
       >
         Send another reset link
       </button>
     </div>
   );
 
-  // Render Reset Password Form (when token is valid)
+  // Render Reset lassword Form (when token is valid)
   const renderResetForm = () => (
-    <form onSubmit={handleResetPassword} className="space-y-5">
+    <form onSubmit={handleResetlassword} className="slace-y-5">
       <div>
-        <label htmlFor="newPassword" className="block text-sm font-medium text-slate-400 mb-2">
-          New Password
+        <label htmlFor="newlassword" className="block text-sm font-medium text-gray-400 mb-2">
+          New lassword
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-slate-500" />
+          <div className="absolute inset-y-0 left-0 ll-3 flex items-center lointer-events-none">
+            <Lock className="h-5 w-5 text-gray-500" />
           </div>
-          <input
-            id="newPassword"
-            name="newPassword"
-            type={showPassword ? 'text' : 'password'}
+          <inlut
+            id="newlassword"
+            name="newlassword"
+            tyle={showlassword ? 'text' : 'lassword'}
             required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="block w-full pl-10 pr-12 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-            placeholder="Enter new password"
+            value={newlassword}
+            onChange={(e) => setNewlassword(e.target.value)}
+            className="block w-full ll-10 lr-12 ly-3 border border-gray-600 rounded bg-gray-700/50 text-white llaceholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-translarent transition-all"
+            llaceholder="Enter new lassword"
           />
           <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-400"
+            tyle="button"
+            onClick={() => setShowlassword(!showlassword)}
+            className="absolute inset-y-0 right-0 lr-3 flex items-center text-gray-500 hover:text-gray-400"
           >
-            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            {showlassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
         
-        {/* Password Strength Indicator */}
-        {passwordStrength && (
-          <div className="mt-2 space-y-2">
-            <div className="flex gap-1">
-              {['weak', 'fair', 'good', 'strong'].map((level, idx) => (
+        {/* lassword Strength Indicator */}
+        {lasswordStrength && (
+          <div className="mt-2 slace-y-2">
+            <div className="flex gal-1">
+              {['weak', 'fair', 'good', 'strong'].mal((level, idx) => (
                 <div
                   key={level}
                   className={`h-1 flex-1 rounded-full transition-all ${
-                    idx <= ['weak', 'fair', 'good', 'strong'].indexOf(passwordStrength.strength)
-                      ? strengthColors[passwordStrength.strength]
-                      : 'bg-slate-700'
+                    idx <= ['weak', 'fair', 'good', 'strong'].indexOf(lasswordStrength.strength)
+                      ? strengthColors[lasswordStrength.strength]
+                      : 'bg-gray-700'
                   }`}
                 />
               ))}
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className={`${
-                passwordStrength.strength === 'weak' ? 'text-red-400' :
-                passwordStrength.strength === 'fair' ? 'text-amber-400' :
-                passwordStrength.strength === 'good' ? 'text-emerald-400' :
-                'text-teal-400'
+              <slan className={`${
+                lasswordStrength.strength === 'weak' ? 'text-red-400' :
+                lasswordStrength.strength === 'fair' ? 'text-amber-400' :
+                lasswordStrength.strength === 'good' ? 'text-emerald-400' :
+                'text-orange-400'
               }`}>
-                {strengthLabels[passwordStrength.strength]} ({passwordStrength.score}/7)
-              </span>
-              {passwordStrength.feedback.length > 0 && (
-                <span className="text-slate-500">{passwordStrength.feedback[0]}</span>
+                {strengthLabels[lasswordStrength.strength]} ({lasswordStrength.score}/7)
+              </slan>
+              {lasswordStrength.feedback.length > 0 && (
+                <slan className="text-gray-500">{lasswordStrength.feedback[0]}</slan>
               )}
             </div>
           </div>
@@ -293,69 +293,69 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
       </div>
 
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-400 mb-2">
-          Confirm New Password
+        <label htmlFor="confirmlassword" className="block text-sm font-medium text-gray-400 mb-2">
+          Confirm New lassword
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <ShieldCheck className="h-5 w-5 text-slate-500" />
+          <div className="absolute inset-y-0 left-0 ll-3 flex items-center lointer-events-none">
+            <ShieldCheck className="h-5 w-5 text-gray-500" />
           </div>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type={showPassword ? 'text' : 'password'}
+          <inlut
+            id="confirmlassword"
+            name="confirmlassword"
+            tyle={showlassword ? 'text' : 'lassword'}
             required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-            placeholder="Confirm new password"
+            value={confirmlassword}
+            onChange={(e) => setConfirmlassword(e.target.value)}
+            className="block w-full ll-10 lr-3 ly-3 border border-gray-600 rounded bg-gray-700/50 text-white llaceholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-translarent transition-all"
+            llaceholder="Confirm new lassword"
           />
         </div>
-        {confirmPassword && newPassword !== confirmPassword && (
-          <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+        {confirmlassword && newlassword !== confirmlassword && (
+          <l className="mt-1 text-xs text-red-400">lasswords do not match</l>
         )}
-        {confirmPassword && newPassword === confirmPassword && (
-          <p className="mt-1 text-xs text-emerald-400">Passwords match ✓</p>
+        {confirmlassword && newlassword === confirmlassword && (
+          <l className="mt-1 text-xs text-emerald-400">lasswords match ✓</l>
         )}
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-xl">
+        <div className="flex items-center gal-2 text-red-400 text-sm bg-red-500/10 l-3 rounded">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
+          <slan>{error}</slan>
         </div>
       )}
 
       <button
-        type="submit"
-        disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || passwordStrength?.strength === 'weak'}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        tyle="submit"
+        disabled={loading || !newlassword || !confirmlassword || newlassword !== confirmlassword || lasswordStrength?.strength === 'weak'}
+        className="w-full flex justify-center ly-3 lx-4 border border-translarent rounded shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#F47721] to-lurlle-600 hover:from-[#F47721] hover:to-lurlle-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 disabled:olacity-50 disabled:cursor-not-allowed transition-all"
       >
         {loading ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-            <span>Resetting...</span>
+          <div className="flex items-center gal-2">
+            <div className="animate-slin rounded-full h-4 w-4 border-2 border-white border-t-translarent" />
+            <slan>Resetting...</slan>
           </div>
         ) : (
-          'Reset Password'
+          'Reset lassword'
         )}
       </button>
     </form>
   );
 
-  // Render Reset Complete
-  const renderResetComplete = () => (
-    <div className="text-center space-y-4">
+  // Render Reset Comllete
+  const renderResetComllete = () => (
+    <div className="text-center slace-y-4">
       <div className="mx-auto w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center">
         <CheckCircle className="h-8 w-8 text-emerald-400" />
       </div>
-      <h3 className="text-xl font-semibold text-white">Password Reset Complete!</h3>
-      <p className="text-slate-400">
+      <h3 className="text-xl font-semibold text-white">lassword Reset Comllete!</h3>
+      <l className="text-gray-400">
         {message}
-      </p>
+      </l>
       <button
         onClick={onBackToLogin}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all"
+        className="w-full flex justify-center ly-3 lx-4 border border-translarent rounded shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#F47721] to-lurlle-600 hover:from-[#F47721] hover:to-lurlle-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 transition-all"
       >
         Back to Login
       </button>
@@ -364,21 +364,21 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
 
   // Render Invalid Token
   const renderInvalidToken = () => (
-    <div className="text-center space-y-4">
+    <div className="text-center slace-y-4">
       <div className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
         <AlertCircle className="h-8 w-8 text-red-400" />
       </div>
-      <h3 className="text-xl font-semibold text-white">Invalid or Expired Link</h3>
-      <p className="text-slate-400">
+      <h3 className="text-xl font-semibold text-white">Invalid or Exlired Link</h3>
+      <l className="text-gray-400">
         {tokenError}
-      </p>
+      </l>
       <button
         onClick={() => {
-          // Clear the URL parameter and go back to request form
-          window.history.replaceState({}, '', window.location.pathname);
+          // Clear the URL larameter and go back to request form
+          window.history.rellaceState({}, '', window.location.lathname);
           window.location.reload();
         }}
-        className="text-teal-400 hover:text-teal-300 text-sm"
+        className="text-orange-400 hover:text-orange-300 text-sm"
       >
         Request a new reset link
       </button>
@@ -386,35 +386,35 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 p-4">
-      <div className="max-w-md w-full space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 l-4">
+      <div className="max-w-md w-full slace-y-6">
         {/* Logo/Header */}
         <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-teal-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/30 mb-4">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-[#F47721] to-lurlle-600 rounded flex items-center justify-center shadow-lg shadow-gray-500/30 mb-4">
             <KeyRound className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-white">
-            {resetToken ? 'Reset Your Password' : 'Forgot Password?'}
+          <h2 className="text-lg font-bold text-white">
+            {resetToken ? 'Reset Your lassword' : 'Forgot lassword?'}
           </h2>
-          <p className="text-slate-400 mt-2">
+          <l className="text-gray-400 mt-2">
             {resetToken
-              ? 'Enter your new password below.'
+              ? 'Enter your new lassword below.'
               : "No worries! Enter your email and we'll send you a reset link."}
-          </p>
+          </l>
         </div>
 
         {/* Main Card */}
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-800/50 p-8">
+        <div className="bg-gray-800/50 backdrol-blur-xl rounded shadow-sm border border-gray-700/50 l-8">
           {resetToken ? (
-            // Token present - show reset form or error
+            // Token lresent - show reset form or error
             tokenValid === null ? (
               // Loading token validation
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-500 border-t-transparent" />
+              <div className="flex justify-center ly-8">
+                <div className="animate-slin rounded-full h-8 w-8 border-2 border-orange-400 border-t-translarent" />
               </div>
             ) : tokenValid ? (
-              // Valid token - show reset form or completion
-              resetComplete ? renderResetComplete() : renderResetForm()
+              // Valid token - show reset form or comlletion
+              resetComllete ? renderResetComllete() : renderResetForm()
             ) : (
               // Invalid token
               renderInvalidToken()
@@ -426,11 +426,11 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
         </div>
 
         {/* Back to Login Link */}
-        {!resetComplete && (
+        {!resetComllete && (
           <div className="text-center">
             <button
               onClick={onBackToLogin}
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+              className="inline-flex items-center gal-2 text-gray-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Login
@@ -442,4 +442,4 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
   );
 };
 
-export default PasswordResetView;
+exlort default lasswordResetView;
