@@ -161,12 +161,12 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     switch (role) {
       case 'ADMIN': return 'bg-rose-50 text-rose-600 border-rose-100';
       case 'SYSTEM_ADMIN': return 'bg-purple-50 text-purple-600 border-purple-100';
-      case 'ACCOUNTANT': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+      case 'ACCOUNTANT': return 'bg-teal-50 text-teal-600 border-teal-100';
       case 'REGISTRAR': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
       case 'FINANCE_MANAGER': return 'bg-amber-50 text-amber-600 border-amber-100';
       case 'AP_SPECIALIST': return 'bg-cyan-50 text-cyan-600 border-cyan-100';
       case 'AR_SPECIALIST': return 'bg-teal-50 text-teal-600 border-teal-100';
-      case 'STUDENT': return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'STUDENT': return 'bg-teal-50 text-teal-600 border-teal-100';
       case 'TRAINER': return 'bg-orange-50 text-orange-600 border-orange-100';
       default: return 'bg-slate-50 text-slate-500 border-slate-100';
     }
@@ -191,14 +191,14 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <UserCog className="text-indigo-600" size={28} />
+            <UserCog className="text-teal-600" size={28} />
             Users & Security
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Institutional identity management and role-based access control (RBAC).</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> Onboard New User
         </button>
@@ -209,7 +209,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             placeholder="Search by name or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -231,7 +231,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm border-2 border-white ${user.role === 'ADMIN' ? 'bg-rose-500' : 'bg-indigo-500'}`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm border-2 border-white ${user.role === 'ADMIN' ? 'bg-rose-500' : 'bg-teal-500'}`}>
                       <UserCircle size={24} />
                     </div>
                     <div>
@@ -269,7 +269,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     >
                       <Trash2 size={18} />
                     </button>
-                    <button className="p-2 hover:bg-slate-100 text-slate-300 hover:text-indigo-600 rounded-xl transition-all">
+                    <button className="p-2 hover:bg-slate-100 text-slate-300 hover:text-teal-600 rounded-xl transition-all">
                       <ChevronRight size={18} />
                     </button>
                   </div>
@@ -298,7 +298,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100">
+                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100">
                   <Plus size={24} />
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Onboard User</h3>
@@ -334,8 +334,8 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                             isDisabled 
                               ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
                               : formData.role === r.id 
-                                ? 'bg-indigo-600 border-indigo-700 text-white shadow-lg' 
-                                : 'bg-white border-slate-100 hover:border-indigo-200'
+                                ? 'bg-teal-600 border-teal-700 text-white shadow-lg' 
+                                : 'bg-white border-slate-100 hover:border-teal-200'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -344,7 +344,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                               <div className={`text-xs font-black uppercase tracking-tight ${formData.role === r.id ? 'text-white' : isDisabled ? 'text-slate-300' : 'text-slate-800'}`}>
                                 {r.label}
                               </div>
-                              <div className={`text-[10px] mt-0.5 ${formData.role === r.id ? 'text-indigo-100' : 'text-slate-400'}`}>
+                              <div className={`text-[10px] mt-0.5 ${formData.role === r.id ? 'text-teal-100' : 'text-slate-400'}`}>
                                 {isDisabled ? 'No unlinked records available' : r.desc}
                               </div>
                             </div>
@@ -364,7 +364,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       required
                       value={formData.studentId}
                       onChange={e => handleStudentSelect(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
                     >
                       <option value="">-- Select a student --</option>
                       {availableStudents.map(s => (
@@ -387,7 +387,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       required
                       value={formData.trainerId}
                       onChange={e => handleTrainerSelect(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
                     >
                       <option value="">-- Select a trainer --</option>
                       {availableTrainers.map(t => (
@@ -407,7 +407,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                   <input 
                     required 
                     placeholder="e.g. Maria Clara" 
-                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
                     value={formData.name} 
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                   />
@@ -420,7 +420,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       required 
                       type="email" 
                       placeholder="name@institution.edu" 
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
                       value={formData.email} 
                       onChange={e => setFormData({...formData, email: e.target.value})} 
                     />
@@ -436,7 +436,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       type="password" 
                       placeholder="••••••••" 
                       minLength={8}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-800"
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none font-bold text-slate-800"
                       value={formData.password} 
                       onChange={e => setFormData({...formData, password: e.target.value})} 
                     />
@@ -448,9 +448,9 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex gap-4">
-                <Lock size={24} className="text-blue-600 shrink-0" />
-                <p className="text-[11px] text-blue-900 leading-relaxed font-bold">
+              <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
+                <Lock size={24} className="text-teal-600 shrink-0" />
+                <p className="text-[11px] text-teal-900 leading-relaxed font-bold">
                   {formData.role === 'STUDENT' 
                     ? 'Student users can only access their own portal with enrollment info, grades, and attendance.'
                     : formData.role === 'TRAINER'
@@ -461,7 +461,7 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-4 text-sm font-black text-slate-500 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all">Onboard to System</button>
+                <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 active:scale-95 transition-all">Onboard to System</button>
               </div>
             </form>
           </div>

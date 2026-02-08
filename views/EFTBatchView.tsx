@@ -27,7 +27,7 @@ type BatchStatus = 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'PROCESSED' | 'PARTIALLY_
 const BATCH_STATUS_CONFIG: Record<BatchStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
   DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <FileText size={14} /> },
   PENDING: { label: 'Pending', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: <Clock size={14} /> },
-  SUBMITTED: { label: 'Submitted', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: <Send size={14} /> },
+  SUBMITTED: { label: 'Submitted', color: 'text-teal-600', bgColor: 'bg-teal-50', icon: <Send size={14} /> },
   PROCESSED: { label: 'Processed', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
   PARTIALLY_PROCESSED: { label: 'Partial', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: <AlertCircle size={14} /> },
   FAILED: { label: 'Failed', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
@@ -514,7 +514,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
                           {(batch.status === 'DRAFT' || batch.status === 'PENDING' || batch.status === 'SUBMITTED') && (
                             <button
                               onClick={() => handleDownloadFile(batch)}
-                              className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
+                              className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
                               title="Download EFT File"
                             >
                               <Download size={16} />
@@ -796,7 +796,7 @@ const EFTBatchView: React.FC<EFTBatchViewProps> = ({
               {(selectedBatch.status === 'DRAFT' || selectedBatch.status === 'PENDING' || selectedBatch.status === 'SUBMITTED') && (
                 <button 
                   onClick={() => { handleDownloadFile(selectedBatch); setShowDetailModal(false); }}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={16} /> Download EFT File
                 </button>

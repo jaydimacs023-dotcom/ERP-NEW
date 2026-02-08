@@ -78,7 +78,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
     switch (status) {
       case 'ACTIVE': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
       case 'SUSPENDED': return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
-      case 'TRIAL': return 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+      case 'TRIAL': return 'text-teal-500 bg-teal-500/10 border-teal-500/20';
       case 'EXPIRED': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
       case 'PENDING': return 'text-amber-500 bg-amber-500/10 border-amber-500/20 animate-pulse';
       default: return 'text-slate-500 bg-slate-500/10 border-slate-500/20';
@@ -107,14 +107,14 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatsCard label="Active Instances" value={stats.active.toString()} icon={<Activity size={20} />} color="emerald" />
-        <StatsCard label="Platform Tenants" value={stats.total.toString()} icon={<Layers size={20} />} color="indigo" />
-        <StatsCard label="Live Sessions" value="14" icon={<Users size={20} />} color="blue" />
+        <StatsCard label="Platform Tenants" value={stats.total.toString()} icon={<Layers size={20} />} color="teal" />
+        <StatsCard label="Live Sessions" value="14" icon={<Users size={20} />} color="teal" />
         <StatsCard label="Est. Platform MRR" value={`$${stats.mrr}`} icon={<DollarSign size={20} />} color="rose" />
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
          <div className="p-8 border-b bg-slate-50/50 flex items-center gap-3">
-            <Info size={20} className="text-indigo-600" />
+            <Info size={20} className="text-teal-600" />
             <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Internal Service Matrix (Admin)</h3>
          </div>
          <div className="grid grid-cols-3 divide-x divide-slate-100">
@@ -195,7 +195,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                             <CreditCard size={14} className="text-slate-500" />
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-rose-500' : org.planType === 'PROFESSIONAL' ? 'text-indigo-500' : 'text-blue-500'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${org.planType === 'ENTERPRISE' ? 'text-rose-500' : org.planType === 'PROFESSIONAL' ? 'text-teal-500' : 'text-teal-500'}`}>
                                 {org.planType} Tier
                             </span>
                         </div>
@@ -307,7 +307,7 @@ const PlanInfo: React.FC<{ tier: string, price: string, desc: string, features: 
      <div className="flex items-baseline gap-2 mb-2">
         <span className="text-2xl font-black text-slate-900 tracking-tight">{price}</span>
      </div>
-     <p className="text-xs text-indigo-600 font-bold italic mb-6">{desc}</p>
+     <p className="text-xs text-teal-600 font-bold italic mb-6">{desc}</p>
      <div className="space-y-3">
         {features.map((f, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -333,9 +333,8 @@ const StatsCard: React.FC<{ label: string, value: string, icon: React.ReactNode,
   <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-5">
     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shrink-0 shadow-sm transition-all ${
       color === 'emerald' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-      color === 'indigo' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
       color === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-      'bg-blue-50 text-blue-600 border-blue-100'
+      'bg-teal-50 text-teal-600 border-teal-100'
     }`}>
        {icon}
     </div>

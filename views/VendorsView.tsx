@@ -230,7 +230,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
         
         <div className="space-y-1.5">
           <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Business Name / Legal Entity *</label>
-          <input required placeholder="e.g. Acme Office Supplies Inc." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-slate-800"
+          <input required placeholder="e.g. Acme Office Supplies Inc." className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-bold text-slate-800"
             value={data.name || ''} onChange={e => setData({...data, name: e.target.value})} />
         </div>
 
@@ -239,12 +239,12 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
               <FileText size={12} /> TIN (Tax ID)
             </label>
-            <input placeholder="000-000-000-000" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-mono"
+            <input placeholder="000-000-000-000" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-mono"
               value={data.tin || ''} onChange={e => setData({...data, tin: e.target.value})} />
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Category</label>
-            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
               value={data.category || 'Supplies'} onChange={e => setData({...data, category: e.target.value})}>
               {VENDOR_CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -258,7 +258,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
               <Globe size={12} /> Type
             </label>
-            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
               value={data.vendorType || 'local'} onChange={e => setData({...data, vendorType: e.target.value as VendorType})}>
               <option value="local">Local</option>
               <option value="foreign">Foreign</option>
@@ -266,7 +266,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Currency</label>
-            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
               value={data.currency || 'PHP'} onChange={e => setData({...data, currency: e.target.value})}>
               {CURRENCIES.map(cur => (
                 <option key={cur} value={cur}>{cur}</option>
@@ -275,7 +275,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</label>
-            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
               value={data.status || 'active'} onChange={e => setData({...data, status: e.target.value as VendorStatus})}>
               <option value="active">Active</option>
               <option value="blocked">Blocked</option>
@@ -294,14 +294,14 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
               <Mail size={12} /> Billing Email *
             </label>
-            <input required type="email" placeholder="billing@vendor.com" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+            <input required type="email" placeholder="billing@vendor.com" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
               value={data.email || ''} onChange={e => setData({...data, email: e.target.value})} />
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
               <Phone size={12} /> Contact Number
             </label>
-            <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+            <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
               value={data.contactNumber || ''} onChange={e => setData({...data, contactNumber: e.target.value})} />
           </div>
         </div>
@@ -310,22 +310,22 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
             <MapPin size={12} /> Business Address
           </label>
-          <textarea rows={2} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium resize-none"
+          <textarea rows={2} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium resize-none"
             value={data.address || ''} onChange={e => setData({...data, address: e.target.value})} />
         </div>
       </div>
 
       {/* Accounting Section */}
       <div className="space-y-4">
-        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Accounting Settings</p>
+        <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest border-b border-teal-100 pb-2">Accounting Settings</p>
         
         <div className="space-y-1.5">
-          <label className="text-[10px] font-semibold uppercase tracking-widest text-indigo-600 flex items-center gap-1.5">
+          <label className="text-[10px] font-semibold uppercase tracking-widest text-teal-600 flex items-center gap-1.5">
             <LinkIcon size={12} /> Default G/L Payables Account *
           </label>
           <select 
             required
-            className="w-full px-4 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-bold text-indigo-700 appearance-none"
+            className="w-full px-4 py-2.5 bg-teal-50/50 border border-teal-100 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-bold text-teal-700 appearance-none"
             value={data.apAccountId || ''} 
             onChange={e => setData({...data, apAccountId: e.target.value})}
           >
@@ -340,7 +340,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
             <Calendar size={12} /> Payment Terms
           </label>
-          <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+          <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
             value={data.paymentTermsDays ?? 30} onChange={e => setData({...data, paymentTermsDays: parseInt(e.target.value)})}>
             {PAYMENT_TERMS.map(term => (
               <option key={term.value} value={term.value}>{term.label}</option>
@@ -358,12 +358,12 @@ const VendorsView: React.FC<VendorsViewProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Bank Name</label>
-            <input placeholder="e.g. BDO, BPI, Metrobank" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+            <input placeholder="e.g. BDO, BPI, Metrobank" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
               value={data.bankName || ''} onChange={e => setData({...data, bankName: e.target.value})} />
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Branch</label>
-            <input placeholder="e.g. Makati Main" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+            <input placeholder="e.g. Makati Main" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
               value={data.bankBranch || ''} onChange={e => setData({...data, bankBranch: e.target.value})} />
           </div>
         </div>
@@ -372,7 +372,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
             <CreditCard size={12} /> Account Number
           </label>
-          <input placeholder="Bank Account Number" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-mono"
+          <input placeholder="Bank Account Number" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-mono"
             value={data.bankAccountNumber || ''} onChange={e => setData({...data, bankAccountNumber: e.target.value})} />
         </div>
       </div>
@@ -385,14 +385,14 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <Truck className="text-indigo-600" size={28} />
+            <Truck className="text-teal-600" size={28} />
             Vendor Master Registry
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage procurement partners, payment terms, and track outstanding payables.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> Add New Supplier
         </button>
@@ -454,7 +454,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <input 
               type="text" 
               placeholder="Search by name, TIN, email, or category..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -464,7 +464,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as VendorStatus | 'all')}
-              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm appearance-none cursor-pointer"
+              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -508,7 +508,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-800 leading-tight">{vendor.name}</div>
-                        <div className="text-[9px] font-bold text-indigo-500 mt-1 uppercase tracking-tighter flex items-center gap-1">
+                        <div className="text-[9px] font-bold text-teal-500 mt-1 uppercase tracking-tighter flex items-center gap-1">
                           <LinkIcon size={10} /> {linkedAcc ? `[${linkedAcc.code}] ${linkedAcc.name}` : 'No G/L Linked'}
                         </div>
                       </div>
@@ -555,7 +555,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                       </button>
                       <button 
                         onClick={() => openEditModal(vendor)}
-                        className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                        className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
                         title="Edit vendor">
                         <Edit size={16} />
                       </button>
@@ -594,7 +594,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Truck size={20} /></div>
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md"><Truck size={20} /></div>
                 <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">Onboard Supplier</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
@@ -612,7 +612,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
               <div className="pt-4 flex gap-3 mt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Create Vendor</button>
+                <button type="submit" className="flex-1 py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all">Create Vendor</button>
               </div>
             </form>
           </div>
@@ -625,7 +625,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Edit size={20} /></div>
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md"><Edit size={20} /></div>
                 <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">Edit Vendor</h3>
               </div>
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={24} /></button>
@@ -636,7 +636,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
               <div className="pt-4 flex gap-3 mt-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-2xl transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">Save Changes</button>
+                <button type="submit" className="flex-1 py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all">Save Changes</button>
               </div>
             </form>
           </div>
@@ -649,7 +649,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
                   {viewingVendor.vendorType === 'foreign' ? <Globe size={20} /> : <Building size={20} />}
                 </div>
                 <div>
@@ -748,7 +748,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                 </button>
                 <button 
                   onClick={() => { setShowViewModal(false); openEditModal(viewingVendor); }}
-                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <Edit size={16} /> Edit Vendor
                 </button>

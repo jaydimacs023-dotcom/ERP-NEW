@@ -2,7 +2,7 @@ import React from 'react';
 import { useNotifications } from './NotificationContext';
 
 const typeColors: Record<string, string> = {
-  info: 'bg-blue-500',
+  info: 'bg-teal-500',
   success: 'bg-emerald-500',
   error: 'bg-red-500',
   warning: 'bg-amber-500',

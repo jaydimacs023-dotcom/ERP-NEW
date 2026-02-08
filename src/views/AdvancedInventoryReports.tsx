@@ -102,20 +102,20 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   return (
     <div className="space-y-6 p-6 bg-slate-50 min-h-screen">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-teal-600 to-purple-600 rounded-2xl p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">Advanced Inventory Analytics</h1>
-        <p className="text-indigo-100">Real-time stock valuation, aging, trends, and variance analysis</p>
+        <p className="text-teal-100">Real-time stock valuation, aging, trends, and variance analysis</p>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-blue-500">
+        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-teal-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500 uppercase font-semibold">Total Inventory Value</p>
               <p className="text-xl font-bold text-slate-900">{currency} {metricsReport.totalInventoryValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
             </div>
-            <DollarSign size={28} className="text-blue-500" />
+            <DollarSign size={28} className="text-teal-500" />
           </div>
         </div>
 
@@ -175,7 +175,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             onClick={() => setActiveTab(tab.id as any)}
             className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition flex items-center gap-2 ${
               activeTab === tab.id
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-teal-600 text-white'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
@@ -203,7 +203,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportAgingReport(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -266,7 +266,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       <td className="px-4 py-3 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                           item.ageCategory === 'Fresh' ? 'bg-green-100 text-green-700' :
-                          item.ageCategory === 'Active' ? 'bg-blue-100 text-blue-700' :
+                          item.ageCategory === 'Active' ? 'bg-teal-100 text-teal-700' :
                           item.ageCategory === 'Slow' ? 'bg-amber-100 text-amber-700' :
                           'bg-red-100 text-red-700'
                         }`}>
@@ -300,7 +300,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportValuationComparison(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -322,7 +322,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">{item.itemCode}</td>
                       <td className="px-4 py-3 text-right text-slate-700">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-blue-600 font-semibold">{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right text-teal-600 font-semibold">{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-green-600 font-semibold">{currency} {item.lifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-purple-600 font-semibold">{currency} {item.weightedAvgValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-slate-700">{currency} {item.currentCostPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
@@ -351,7 +351,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportMovementTrends(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -387,7 +387,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportVarianceAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -471,7 +471,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportABCAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -518,7 +518,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       <td className="px-4 py-3 text-right font-semibold text-slate-900">{item.cumulativePercent.toFixed(1)}%</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          item.category === 'A' ? 'bg-blue-100 text-blue-700' :
+                          item.category === 'A' ? 'bg-teal-100 text-teal-700' :
                           item.category === 'B' ? 'bg-green-100 text-green-700' :
                           'bg-amber-100 text-amber-700'
                         }`}>
@@ -586,7 +586,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       ['Code', 'Item', 'Current Qty', 'Min Level', 'Deficit', 'Reorder Point']
                     );
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
                 >
                   <Download size={14} /> Export CSV
                 </button>

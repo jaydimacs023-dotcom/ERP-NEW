@@ -66,7 +66,7 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 
 const STATUS_CONFIG: Record<PayableStatus, { label: string; color: string; bgColor: string; borderColor: string }> = {
   for_approval: { label: 'For Approval', color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
-  approved: { label: 'Approved', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
+  approved: { label: 'Approved', color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
   paid: { label: 'Paid', color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
   partially_paid: { label: 'Partially Paid', color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200' },
   cancelled: { label: 'Cancelled', color: 'text-slate-500', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },
@@ -900,7 +900,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <input 
               type="text" 
               placeholder="Search payables..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -910,7 +910,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as PayableStatus | 'all')}
-              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm appearance-none cursor-pointer"
+              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
             >
               <option value="all">All Statuses</option>
               {Object.entries(STATUS_CONFIG).map(([value, config]) => (
@@ -924,7 +924,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <select
               value={vendorFilter}
               onChange={(e) => setVendorFilter(e.target.value)}
-              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm appearance-none cursor-pointer"
+              className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
             >
               <option value="all">All Vendors</option>
               {orgVendors.map(v => (
@@ -968,7 +968,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                     <tr key={payable.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center font-bold text-xs">
+                          <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-500 flex items-center justify-center font-bold text-xs">
                             {getVendorName(payable.vendorId).charAt(0)}
                           </div>
                           <div>
@@ -979,7 +979,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs font-mono font-semibold text-indigo-600">{payable.payableNumber}</span>
+                          <span className="text-xs font-mono font-semibold text-teal-600">{payable.payableNumber}</span>
                           <span className={`text-[10px] font-semibold ${invoiceTypeConfig?.color || 'text-slate-500'}`}>
                             {invoiceTypeConfig?.label || 'Standard'}
                           </span>
@@ -1032,7 +1032,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {!isPosted && (
                                 <button
                                   onClick={() => openEditModal(payable)}
-                                  className="p-1.5 hover:bg-slate-100 rounded-lg text-blue-500 transition-colors"
+                                  className="p-1.5 hover:bg-slate-100 rounded-lg text-teal-500 transition-colors"
                                   title="Edit"
                                 >
                                   <Edit size={16} />
@@ -1059,7 +1059,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {payable.status === 'for_approval' && (
                                 <button
                                   onClick={() => handleStatusChange(payable.id, 'approved')}
-                                  className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
+                                  className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
                                   title="Approve"
                                 >
                                   <CheckCircle size={16} />
@@ -1068,7 +1068,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               {(payable.status === 'approved' || payable.status === 'partially_paid') && onPostJournal && (
                                 <button
                                   onClick={() => openPaymentModal(payable)}
-                                  className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-600 transition-colors"
+                                  className="p-1.5 hover:bg-teal-50 rounded-lg text-teal-600 transition-colors"
                                   title="Process Payment"
                                 >
                                   <Landmark size={16} />
@@ -1107,7 +1107,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <select
             value={vendorFilter}
             onChange={(e) => setVendorFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm appearance-none cursor-pointer"
+            className="pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm appearance-none cursor-pointer"
           >
             <option value="all">All Vendors</option>
             {orgVendors.map(v => (
@@ -1141,7 +1141,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Aging Summary */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <BarChart3 className="text-indigo-600" size={20} />
+          <BarChart3 className="text-teal-600" size={20} />
           Aging Summary by Vendor
         </h3>
         <table className="min-w-full">
@@ -1182,7 +1182,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 <tr key={vendor.id} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="py-3 text-sm font-medium text-slate-700">{vendor.name}</td>
                   <td className="py-3 text-right text-sm font-mono text-emerald-600">{buckets.current > 0 ? formatCurrency(buckets.current) : '-'}</td>
-                  <td className="py-3 text-right text-sm font-mono text-blue-600">{buckets.d30 > 0 ? formatCurrency(buckets.d30) : '-'}</td>
+                  <td className="py-3 text-right text-sm font-mono text-teal-600">{buckets.d30 > 0 ? formatCurrency(buckets.d30) : '-'}</td>
                   <td className="py-3 text-right text-sm font-mono text-amber-600">{buckets.d60 > 0 ? formatCurrency(buckets.d60) : '-'}</td>
                   <td className="py-3 text-right text-sm font-mono text-orange-600">{buckets.d90 > 0 ? formatCurrency(buckets.d90) : '-'}</td>
                   <td className="py-3 text-right text-sm font-mono text-rose-600">{buckets.d120 > 0 ? formatCurrency(buckets.d120) : '-'}</td>
@@ -1195,11 +1195,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <tr className="bg-slate-50">
               <td className="py-3 text-sm font-bold text-slate-800">TOTAL</td>
               <td className="py-3 text-right text-sm font-mono font-bold text-emerald-600">{formatCurrency(agingBuckets.current.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-bold text-blue-600">{formatCurrency(agingBuckets.days30.amount)}</td>
+              <td className="py-3 text-right text-sm font-mono font-bold text-teal-600">{formatCurrency(agingBuckets.days30.amount)}</td>
               <td className="py-3 text-right text-sm font-mono font-bold text-amber-600">{formatCurrency(agingBuckets.days60.amount)}</td>
               <td className="py-3 text-right text-sm font-mono font-bold text-orange-600">{formatCurrency(agingBuckets.days90.amount)}</td>
               <td className="py-3 text-right text-sm font-mono font-bold text-rose-600">{formatCurrency(agingBuckets.days120Plus.amount)}</td>
-              <td className="py-3 text-right text-sm font-mono font-black text-indigo-600">{formatCurrency(totalApSubledger)}</td>
+              <td className="py-3 text-right text-sm font-mono font-black text-teal-600">{formatCurrency(totalApSubledger)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1213,12 +1213,12 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       <div className="grid grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-indigo-100 rounded-xl">
-              <PieChart className="text-indigo-600" size={20} />
+            <div className="p-2 bg-teal-100 rounded-xl">
+              <PieChart className="text-teal-600" size={20} />
             </div>
             <h3 className="text-lg font-semibold text-slate-800">AP Subledger Total</h3>
           </div>
-          <p className="text-3xl font-black text-indigo-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</p>
+          <p className="text-3xl font-black text-teal-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</p>
           <p className="text-xs text-slate-500 mt-2">Sum of all vendor balances</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -1238,7 +1238,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Vendor Balances */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <Building className="text-indigo-600" size={20} />
+          <Building className="text-teal-600" size={20} />
           Vendor Balances (Subledger)
         </h3>
         <table className="min-w-full">
@@ -1272,7 +1272,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <tfoot>
             <tr className="bg-slate-50">
               <td colSpan={3} className="py-3 text-sm font-bold text-slate-800">TOTAL SUBLEDGER</td>
-              <td className="py-3 text-right text-sm font-mono font-black text-indigo-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</td>
+              <td className="py-3 text-right text-sm font-mono font-black text-teal-600">{"\u20B1"}{formatCurrency(totalApSubledger)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1289,7 +1289,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <Coins className="text-indigo-600" size={28} />
+            <Coins className="text-teal-600" size={28} />
             Accounts Payable
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage vendor invoices, process payments, and track aging.</p>
@@ -1297,7 +1297,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         <div className="flex gap-3">
           <button 
             onClick={() => { resetForm(); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 font-medium text-sm active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-medium text-sm active:scale-95"
           >
             <Plus size={18} /> New Invoice
           </button>
@@ -1316,7 +1316,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             onClick={() => setActiveTab(tab.key as APTab)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === tab.key 
-                ? 'text-indigo-600 border-indigo-600' 
+                ? 'text-teal-600 border-teal-600' 
                 : 'text-slate-500 border-transparent hover:text-slate-700'
             }`}
           >
@@ -1328,9 +1328,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <SummaryCard label="Total Open" value={formatCurrency(summaryMetrics.total)} color="text-indigo-600" icon={Coins} />
+        <SummaryCard label="Total Open" value={formatCurrency(summaryMetrics.total)} color="text-teal-600" icon={Coins} />
         <SummaryCard label="For Approval" value={formatCurrency(summaryMetrics.forApproval)} color="text-amber-600" icon={Clock} />
-        <SummaryCard label="Approved" value={formatCurrency(summaryMetrics.approved)} color="text-blue-600" icon={CheckCircle} />
+        <SummaryCard label="Approved" value={formatCurrency(summaryMetrics.approved)} color="text-teal-600" icon={CheckCircle} />
         <SummaryCard label="Due Soon (7d)" value={formatCurrency(summaryMetrics.dueSoon)} color="text-violet-600" icon={Calendar} />
         <SummaryCard label="Overdue" value={formatCurrency(summaryMetrics.overdue)} color="text-rose-600" icon={AlertCircle} />
         <SummaryCard label="Total Paid" value={formatCurrency(summaryMetrics.paid)} color="text-emerald-600" icon={CreditCard} />
@@ -1450,7 +1450,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
                   <Landmark size={20} />
                 </div>
                 <div>
@@ -1562,7 +1562,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 </button>
                 <button 
                   onClick={handleProcessPayment}
-                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <Landmark size={16} /> Process Payment
                 </button>
@@ -1641,7 +1641,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
         <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+            <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
               <Calculator size={20} />
             </div>
             <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
@@ -1663,8 +1663,8 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
                   onClick={() => setFormData(prev => ({ ...prev, invoiceType: type.value }))}
                   className={`flex-1 py-2 px-3 text-xs font-semibold rounded-xl border transition-all ${
                     formData.invoiceType === type.value
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                      ? 'bg-teal-600 text-white border-teal-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
                   }`}
                 >
                   {type.label}
@@ -1681,7 +1681,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             <select 
               required
               disabled={isEdit}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none disabled:opacity-60"
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none disabled:opacity-60"
               value={formData.vendorId || ''}
               onChange={e => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
             >
@@ -1732,10 +1732,10 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
           {/* Expense Account & Category */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-indigo-600 uppercase tracking-widest">Expense Account *</label>
+              <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest">Expense Account *</label>
               <select 
                 required={formData.invoiceType === 'standard'}
-                className="w-full px-4 py-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-teal-50/50 border border-teal-100 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
                 value={formData.expenseAccountId || ''}
                 onChange={e => setFormData(prev => ({ ...prev, expenseAccountId: e.target.value }))}
               >
@@ -1748,7 +1748,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             <div className="space-y-1.5">
               <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Category</label>
               <select 
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
                 value={formData.category || 'general'}
                 onChange={e => setFormData(prev => ({ ...prev, category: e.target.value as PayableCategory }))}
               >
@@ -1835,11 +1835,11 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-indigo-600 uppercase tracking-widest">Net Payable</label>
+                <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest">Net Payable</label>
                 <input 
                   type="text"
                   readOnly
-                  className="w-full px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl outline-none font-mono text-sm font-bold text-indigo-700"
+                  className="w-full px-4 py-2.5 bg-teal-50 border border-teal-100 rounded-xl outline-none font-mono text-sm font-bold text-teal-700"
                   value={(formData.netPayable || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 />
               </div>
@@ -1875,7 +1875,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             <div className="space-y-1.5">
               <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Status</label>
               <select 
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium appearance-none"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium appearance-none"
                 value={formData.status || 'for_approval'}
                 onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as PayableStatus }))}
               >
@@ -1897,7 +1897,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             </button>
             <button 
               type="submit" 
-              className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+              className="flex-1 py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all"
             >
               {submitLabel}
             </button>
@@ -1946,7 +1946,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
         <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+            <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
               <FileText size={20} />
             </div>
             <div>
@@ -2062,7 +2062,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             {payable.status === 'for_approval' && !canPost && (
               <button 
                 onClick={onApprove} 
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
               >
                 <CheckCircle size={16} /> Approve
               </button>
@@ -2070,7 +2070,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             {canPay && (
               <button 
                 onClick={onProcessPayment} 
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
               >
                 <Landmark size={16} /> Pay
               </button>

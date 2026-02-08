@@ -74,7 +74,8 @@ import {
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
-  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp, Archive
+  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp, Archive,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 
 export default function App() {
@@ -85,6 +86,14 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    financial: true,
+    operations: true,
+    registries: false,
+    inventory: false,
+    admin: false,
+    sysadmin: false
+  });
   
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -569,13 +578,20 @@ export default function App() {
 
   // Derived Accounting Context
   const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
-  const brandColor = currentOrg?.primaryColor || '#4f46e5';
+  const brandColor = useMemo(() => {
+    // Applying Teal Greenish Cyan Motif globally
+    return '#0d9488'; // teal-600 logic
+  }, []);
 
   const filteredAccounts = useMemo(() => accounts.filter(a => a.orgId === currentOrgId && !a.isDeleted), [accounts, currentOrgId]);
   const activeJournalEntries = useMemo(() => journalEntries.filter(e => e.orgId === currentOrgId && !e.isDeleted), [journalEntries, currentOrgId]);
   const activeEntryIds = useMemo(() => new Set(activeJournalEntries.map(e => e.id)), [activeJournalEntries]);
   const filteredLines = useMemo(() => journalLines.filter(l => activeEntryIds.has(l.journalEntryId)), [journalLines, activeEntryIds]);
-  const summaries = useMemo(() => AccountingService.getLedgerSummaries(filteredAccounts, filteredLines), [filteredAccounts, filteredLines]);
+  
+  // Only POSTED entries affect the Ledger Summaries
+  const postedEntryIds = useMemo(() => new Set(activeJournalEntries.filter(e => e.status === 'POSTED').map(e => e.id)), [activeJournalEntries]);
+  const postedLines = useMemo(() => journalLines.filter(l => postedEntryIds.has(l.journalEntryId)), [journalLines, postedEntryIds]);
+  const summaries = useMemo(() => AccountingService.getLedgerSummaries(filteredAccounts, postedLines), [filteredAccounts, postedLines]);
 
   // RBAC Controls - Using centralized permissions config
   const isSysAdmin = checkSysAdmin(currentUser?.role);
@@ -643,7 +659,7 @@ export default function App() {
       ...entry,
       id: entry.id || `je-${Date.now()}`,
       orgId: currentOrgId,
-      status: 'POSTED',
+      status: entry.status || 'POSTED',
       createdBy: currentUser?.id || 'system',
       createdAt: new Date().toISOString()
     } as JournalEntry;
@@ -688,6 +704,39 @@ export default function App() {
         fullEntry.id,
         `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
       );
+    }
+  };
+
+  const handleApproveJournal = async (entryId: string) => {
+    try {
+      const entry = journalEntries.find(e => e.id === entryId);
+      if (!entry) return;
+
+      const updatedEntry = {
+        ...entry,
+        status: 'POSTED' as const,
+        approvedBy: currentUser?.id,
+        approvedAt: new Date().toISOString()
+      };
+
+      const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
+      
+      setJournalEntries(prev => prev.map(e => e.id === entryId ? savedEntry : e));
+      handleNotify('success', 'Journal entry approved and posted');
+      
+      // Audit
+      AuditService.post(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        entryId,
+        entryId,
+        `Approved and posted draft journal: ${entry.reference}`
+      );
+    } catch (error) {
+      console.error('[App] Error approving journal entry:', error);
+      handleNotify('error', 'Failed to approve journal entry');
     }
   };
 
@@ -3084,11 +3133,11 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
-        <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-500/20 animate-pulse">
+        <div className="p-5 bg-teal-600 rounded-[2rem] shadow-2xl shadow-teal-500/20 animate-pulse">
            <Building2 size={40} />
         </div>
         <div className="flex items-center gap-3">
-           <Loader2 className="animate-spin text-indigo-400" size={24} />
+           <Loader2 className="animate-spin text-teal-400" size={24} />
            <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
         </div>
       </div>
@@ -3132,12 +3181,12 @@ export default function App() {
             className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${
               toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
               toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-              'bg-blue-50 border-blue-200 text-blue-800'
+              'bg-teal-50 border-teal-200 text-teal-800'
             }`}
           >
             {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
             {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="text-blue-500 shrink-0" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="text-teal-500 shrink-0" />}
             <span className="text-sm font-medium">{toast.message}</span>
             <button 
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
@@ -3149,8 +3198,8 @@ export default function App() {
         ))}
       </div>
 
-      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
-        <div className="p-6 flex items-center justify-center border-b border-white/5 bg-slate-900/50">
+      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white flex flex-col transition-all duration-500 z-50 border-r border-slate-200`}>
+        <div className="p-6 flex items-center justify-center border-b border-slate-100 bg-slate-50/30">
            {sidebarOpen ? (
              <div className="flex flex-col items-center gap-3 w-full">
                 <div 
@@ -3160,8 +3209,8 @@ export default function App() {
                    {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
                 </div>
                 <div className="w-full text-center">
-                   <h1 className="text-sm font-black text-white uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
-                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
+                   <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
+                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
            ) : (
@@ -3178,21 +3227,25 @@ export default function App() {
            {/* Navigation Items (unchanged logic) */}
            {currentUser.role === 'STUDENT' && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-400 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
                <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {currentUser.role === 'TRAINER' && (
              <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
+               {sidebarOpen && <p className="text-[10px] text-slate-400 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
                <NavItem icon={<LayoutDashboard size={20}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
              </div>
            )}
 
            {isFinance && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Financial Core</p>}
+             <NavSection 
+               label="Financial Core" 
+               isOpen={openSections.financial} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<LayoutDashboard size={20}/>} label="Executive Console" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<BookText size={20}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<PieChart size={20}/>} label="Reporting Hub" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -3207,34 +3260,46 @@ export default function App() {
                {isAP && <NavItem icon={<Package size={20}/>} label="Goods Receipt (GR)" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
                <NavItem icon={<Briefcase size={20}/>} label="Payroll Engine" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Calculator size={20}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isRegistrar && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
+             <NavSection 
+               label="Operations" 
+               isOpen={openSections.operations} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isFinance && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
+             <NavSection 
+               label="Registries" 
+               isOpen={openSections.registries} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isFinance && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Inventory Management</p>}
+             <NavSection 
+               label="Inventory Management" 
+               isOpen={openSections.inventory} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Package size={20}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Box size={20}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -3243,12 +3308,16 @@ export default function App() {
                <NavItem icon={<Zap size={20}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<TrendingUp size={20}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isTenantAdmin && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
+             <NavSection 
+               label="Administration" 
+               isOpen={openSections.admin} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, admin: !prev.admin }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarCheck size={20}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -3265,38 +3334,42 @@ export default function App() {
                <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Archive size={20}/>} label="Archived Items" active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isSysAdmin && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
+             <NavSection 
+               label="System Administration" 
+               isOpen={openSections.sysadmin} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, sysadmin: !prev.sysadmin }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<HardDrive size={20}/>} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<BarChart2 size={20}/>} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
         </nav>
 
         {/* System Data Engine Status Badge - SYSTEM_ADMIN only */}
         {sidebarOpen && isSysAdmin && (
-          <div className="px-8 mb-4">
-             <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+          <div className="px-6 mb-4">
+             <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-teal-50 border-teal-100 text-teal-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'}`}>
                 {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
                 <div className="min-w-0">
                    <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
-                   <p className="text-[10px] uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
+                   <p className="text-[10px] uppercase truncate font-bold">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
                 </div>
              </div>
           </div>
         )}
 
-        <div className="p-6 mt-auto border-t border-white/5">
-           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
+        <div className="p-6 mt-auto border-t border-slate-100">
+           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-slate-400 hover:text-slate-900 transition-colors rounded-2xl hover:bg-slate-50">
               <LogOut size={20} />
-              {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
+              {sidebarOpen && <span className="text-[11px] uppercase tracking-widest truncate">Logout</span>}
            </button>
         </div>
       </aside>
@@ -3365,13 +3438,13 @@ export default function App() {
           )}
 
           {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
-          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} />}
           {activeTab === 'recurring-invoices' && <RecurringInvoicesView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} recurringInvoices={recurringInvoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} recurringInvoiceHistory={recurringInvoiceHistory.filter(h => h.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} onCreateRecurringInvoice={handleAddRecurringInvoice} onUpdateRecurringInvoice={handleUpdateRecurringInvoice} onDeleteRecurringInvoice={handleDeleteRecurringInvoice} onRunRecurringInvoice={handleRunRecurringInvoice} onNotify={handleNotify} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
+          {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} currency={currentOrg?.currency} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
@@ -3486,15 +3559,48 @@ interface NavItemProps {
   brandColor: string;
 }
 
+interface NavSectionProps {
+  label: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  compact: boolean;
+  children: React.ReactNode;
+}
+
+function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
+  if (compact) {
+    return <div className="flex flex-col gap-1.5 mb-6">{children}</div>;
+  }
+
+  return (
+    <div className="mb-4">
+      <button 
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-2 text-slate-400 hover:text-slate-600 transition-colors group"
+      >
+        <span className="text-[10px] uppercase tracking-[0.3em] font-bold">{label}</span>
+        <div className="text-slate-300 group-hover:text-slate-500 transition-colors">
+          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </div>
+      </button>
+      {isOpen && (
+        <div className="mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemProps) {
   return (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
-      style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
+      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-lg' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+      style={active ? { backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}44` } : {}}
     >
-      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</div>
-      {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
+      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110 group-hover:text-slate-900'}`}>{icon}</div>
+      {!compact && <span className="text-[11px] font-medium uppercase tracking-widest truncate">{label}</span>}
     </button>
   );
 }

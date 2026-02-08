@@ -1,14 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  CheckVoucher, BankAccount, Vendor, Payable, 
-  CheckStatus
+  CheckVoucher, BankAccount, Vendor, Payable, CheckStatus
 } from '../types';
-import EmptyState from '../components/EmptyState';
-import {
-  Download, Search, Filter, ChevronDown, Eye,
-  AlertCircle, Clock, CheckCircle, XCircle, Plus,
-  Calendar, DollarSign, Hash, Building, Trash2,
-  TrendingUp, TrendingDown
+import { 
+  Search, Filter, Calendar, Printer, Download, ChevronUp, ChevronDown, 
+  CheckCircle, XCircle, Clock, FileText, AlertCircle, Eye, Calculator, ArrowUpDown
 } from 'lucide-react';
 
 interface CheckRegisterViewProps {
@@ -16,403 +12,389 @@ interface CheckRegisterViewProps {
   bankAccounts: BankAccount[];
   vendors: Vendor[];
   payables: Payable[];
-  onViewCheck?: (checkId: string) => void;
-  onExportCSV?: (checks: CheckVoucher[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
+  currency?: string;
 }
 
 interface CheckRegisterFilter {
   status: CheckStatus | 'all';
   bankAccountId: string;
-  startDate?: string;
-  endDate?: string;
+  startDate: string;
+  endDate: string;
   searchTerm: string;
 }
 
 const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
-  checks,
-  bankAccounts,
-  vendors,
-  payables,
-  onViewCheck,
-  onExportCSV,
-  onNotify
+  checks = [],
+  bankAccounts = [],
+  vendors = [],
+  payables = [],
+  onNotify,
+  currency = '₱'
 }) => {
   const [filters, setFilters] = useState<CheckRegisterFilter>({
     status: 'all',
     bankAccountId: 'all',
-    startDate: undefined,
-    endDate: undefined,
+    startDate: '',
+    endDate: '',
     searchTerm: ''
   });
 
-  const [sortBy, setSortBy] = useState<'date' | 'number' | 'amount'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState<'checkDate' | 'checkNumber' | 'amount'>('checkDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Filter and sort checks
+  const formatCurrency = (val: number) => {
+    const symbol = currency === 'PHP' ? '\u20B1' : currency === 'USD' ? '$' : '';
+    return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   const filteredChecks = useMemo(() => {
-    let result = checks.filter(c => !c.isDeleted);
+    return checks.filter(check => {
+      const matchStatus = filters.status === 'all' || check.status === filters.status;
+      const matchBank = filters.bankAccountId === 'all' || check.bankAccountId === filters.bankAccountId;
+      const matchSearch = filters.searchTerm === '' || 
+        check.checkNumber.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        check.payeeName.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        check.amount.toString().includes(filters.searchTerm);
+      
+      const checkDate = new Date(check.checkDate);
+      const matchStart = !filters.startDate || checkDate >= new Date(filters.startDate);
+      const matchEnd = !filters.endDate || checkDate <= new Date(filters.endDate);
 
-    // Status filter
-    if (filters.status !== 'all') {
-      result = result.filter(c => c.status === filters.status);
-    }
+      return matchStatus && matchBank && matchSearch && matchStart && matchEnd;
+    });
+  }, [checks, filters]);
 
-    // Bank account filter
-    if (filters.bankAccountId !== 'all') {
-      result = result.filter(c => c.bankAccountId === filters.bankAccountId);
-    }
-
-    // Date range filter
-    if (filters.startDate) {
-      result = result.filter(c => new Date(c.checkDate) >= new Date(filters.startDate!));
-    }
-    if (filters.endDate) {
-      result = result.filter(c => new Date(c.checkDate) <= new Date(filters.endDate!));
-    }
-
-    // Search filter
-    if (filters.searchTerm.trim()) {
-      const term = filters.searchTerm.toLowerCase();
-      result = result.filter(c =>
-        c.checkNumber.toLowerCase().includes(term) ||
-        c.payeeName.toLowerCase().includes(term) ||
-        c.amount.toString().includes(term)
-      );
-    }
-
-    // Sort
-    result.sort((a, b) => {
+  const sortedChecks = useMemo(() => {
+    return [...filteredChecks].sort((a, b) => {
       let comparison = 0;
-      switch (sortBy) {
-        case 'date':
-          comparison = new Date(a.checkDate).getTime() - new Date(b.checkDate).getTime();
-          break;
-        case 'number':
-          comparison = parseInt(a.checkNumber) - parseInt(b.checkNumber);
-          break;
-        case 'amount':
-          comparison = a.amount - b.amount;
-          break;
+      if (sortField === 'checkDate') {
+        comparison = new Date(a.checkDate).getTime() - new Date(b.checkDate).getTime();
+      } else if (sortField === 'checkNumber') {
+        comparison = a.checkNumber.localeCompare(b.checkNumber, undefined, { numeric: true });
+      } else if (sortField === 'amount') {
+        comparison = a.amount - b.amount;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
+  }, [filteredChecks, sortField, sortDirection]);
 
-    return result;
-  }, [checks, filters, sortBy, sortOrder]);
-
-  // Calculate summary statistics
-  const statistics = useMemo(() => {
-    const stats = {
-      totalChecks: filteredChecks.length,
-      totalAmount: 0,
-      byStatus: {
-        draft: 0,
-        printed: 0,
-        released: 0,
-        cleared: 0,
-        voided: 0,
-        stale: 0
-      },
-      pendingClearing: 0,
-      pendingAmount: 0
+  const stats = useMemo(() => {
+    return {
+      totalCount: filteredChecks.length,
+      totalAmount: filteredChecks.reduce((sum, c) => sum + c.amount, 0),
+      released: filteredChecks.filter(c => c.status === 'RELEASED'),
+      cleared: filteredChecks.filter(c => c.status === 'CLEARED'),
+      voided: filteredChecks.filter(c => c.status === 'VOIDED'),
     };
-
-    filteredChecks.forEach(check => {
-      stats.totalAmount += check.amount;
-      stats.byStatus[check.status.toLowerCase() as keyof typeof stats.byStatus]++;
-      if (check.status === 'RELEASED') {
-        stats.pendingClearing++;
-        stats.pendingAmount += check.amount;
-      }
-    });
-
-    return stats;
   }, [filteredChecks]);
 
-  const statusConfig: Record<CheckStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-    DRAFT: { label: 'Draft', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: <Clock size={14} /> },
-    PRINTED: { label: 'Printed', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: <FileText size={14} /> },
-    RELEASED: { label: 'Released', color: 'text-violet-600', bgColor: 'bg-violet-50', icon: <CheckCircle size={14} /> },
-    CLEARED: { label: 'Cleared', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
-    VOIDED: { label: 'Voided', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
-    STALE: { label: 'Stale', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: <AlertCircle size={14} /> }
-  };
-
-  const handleExport = () => {
-    if (onExportCSV) {
-      onExportCSV(filteredChecks);
-      onNotify('success', `Exported ${filteredChecks.length} checks to CSV`);
+  const toggleSort = (field: 'checkDate' | 'checkNumber' | 'amount') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
     }
   };
 
-  const getVendorName = (vendorId: string) => {
-    return vendors.find(v => v.id === vendorId)?.name || 'Unknown Vendor';
+  const exportToCSV = () => {
+    if (sortedChecks.length === 0) {
+      onNotify('info', 'No checks to export');
+      return;
+    }
+
+    const headers = ['Check #', 'Date', 'Bank Account', 'Payee', 'Amount', 'Status'];
+    const rows = sortedChecks.map(c => [
+      c.checkNumber,
+      c.checkDate,
+      bankAccounts.find(ba => ba.id === c.bankAccountId)?.accountName || 'Unknown',
+      c.payeeName,
+      c.amount.toFixed(2),
+      c.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `check_register_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onNotify('success', `Exported ${sortedChecks.length} checks to CSV`);
   };
 
-  const getBankAccountName = (bankId: string) => {
-    return bankAccounts.find(b => b.id === bankId)?.accountName || 'Unknown Account';
+  const getStatusStyle = (status: CheckStatus) => {
+    switch (status) {
+      case 'DRAFT': return 'bg-slate-100 text-slate-600 border-slate-200';
+      case 'PRINTED': return 'bg-teal-50 text-teal-600 border-teal-200'; // Changed from blue to teal
+      case 'RELEASED': return 'bg-purple-50 text-purple-600 border-purple-200';
+      case 'CLEARED': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+      case 'VOIDED': return 'bg-rose-50 text-rose-600 border-rose-200';
+      case 'STALE': return 'bg-amber-50 text-amber-600 border-amber-200';
+      default: return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
   };
 
-  const FileText = () => <Clock size={14} />;
+  const getStatusIcon = (status: CheckStatus) => {
+    switch (status) {
+      case 'DRAFT': return <Clock size={12} />;
+      case 'PRINTED': return <Printer size={12} />;
+      case 'RELEASED': return <FileText size={12} />;
+      case 'CLEARED': return <CheckCircle size={12} />;
+      case 'VOIDED': return <XCircle size={12} />;
+      case 'STALE': return <AlertCircle size={12} />;
+      default: return null;
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Summary Cards */}
-      <div className="grid grid-cols-5 gap-4">
-        {/* Total Checks */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Total Checks</p>
-              <p className="text-2xl font-black text-slate-900 mt-2">{statistics.totalChecks}</p>
-            </div>
-            <div className="p-2.5 bg-blue-50 rounded-lg">
-              <Hash size={18} className="text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Amount */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Total Amount</p>
-              <p className="text-2xl font-black text-slate-900 mt-2">${statistics.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-            <div className="p-2.5 bg-emerald-50 rounded-lg">
-              <DollarSign size={18} className="text-emerald-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Released Checks */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Released</p>
-              <p className="text-2xl font-black text-violet-600 mt-2">{statistics.byStatus.released}</p>
-              <p className="text-xs text-slate-500 mt-1">${statistics.pendingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-            <div className="p-2.5 bg-violet-50 rounded-lg">
-              <TrendingUp size={18} className="text-violet-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Cleared Checks */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Cleared</p>
-              <p className="text-2xl font-black text-emerald-600 mt-2">{statistics.byStatus.cleared}</p>
-            </div>
-            <div className="p-2.5 bg-emerald-50 rounded-lg">
-              <CheckCircle size={18} className="text-emerald-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Voided Checks */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Voided</p>
-              <p className="text-2xl font-black text-rose-600 mt-2">{statistics.byStatus.voided}</p>
-            </div>
-            <div className="p-2.5 bg-rose-50 rounded-lg">
-              <XCircle size={18} className="text-rose-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Filter size={16} /> Filters & Search
-          </h3>
-          <button
-            onClick={handleExport}
-            disabled={filteredChecks.length === 0}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-all disabled:opacity-50"
-          >
-            <Download size={14} /> Export CSV
-          </button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-3">
-          {/* Search */}
-          <div className="col-span-2 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Check #, Payee name, Amount..."
-              value={filters.searchTerm}
-              onChange={(e) => setFilters(f => ({ ...f, searchTerm: e.target.value }))}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters(f => ({ ...f, status: (e.target.value as any) }))}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="PRINTED">Printed</option>
-            <option value="RELEASED">Released</option>
-            <option value="CLEARED">Cleared</option>
-            <option value="VOIDED">Voided</option>
-            <option value="STALE">Stale</option>
-          </select>
-
-          {/* Bank Account Filter */}
-          <select
-            value={filters.bankAccountId}
-            onChange={(e) => setFilters(f => ({ ...f, bankAccountId: e.target.value }))}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="all">All Bank Accounts</option>
-            {bankAccounts
-              .filter(b => b.type !== 'CASH' && !b.isDeleted)
-              .map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.accountName}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        {/* Date Range */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-1 relative">
-            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="date"
-              value={filters.startDate || ''}
-              onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value || undefined }))}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="flex items-center justify-center text-slate-400">→</div>
-          <div className="col-span-1 relative">
-            <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="date"
-              value={filters.endDate || ''}
-              onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value || undefined }))}
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Sort Controls */}
-      <div className="flex items-center gap-2 bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
-        <span className="text-xs font-semibold text-slate-600 uppercase">Sort by:</span>
-        <button
-          onClick={() => { setSortBy('date'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${sortBy === 'date' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-        >
-          Date {sortBy === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
-        </button>
-        <button
-          onClick={() => { setSortBy('number'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${sortBy === 'number' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-        >
-          Check # {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
-        </button>
-        <button
-          onClick={() => { setSortBy('amount'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${sortBy === 'amount' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-        >
-          Amount {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
-        </button>
-      </div>
-
-      {/* Check Register Table */}
-      {filteredChecks.length === 0 ? (
-        <EmptyState
-          icon={<AlertCircle size={48} />}
-          title="No Checks Found"
-          description={filters.searchTerm || filters.status !== 'all' ? 'Try adjusting your filters' : 'No checks have been created yet'}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <SummaryCard 
+          label="Total Checks" 
+          value={stats.totalCount.toString()} 
+          icon={<Calculator size={20} />} 
+          color="teal" 
         />
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-tight">Check #</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-tight">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-tight">Bank Account</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-tight">Payee</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-700 uppercase tracking-tight">Amount</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-tight">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-tight">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredChecks.map((check) => {
-                  const config = statusConfig[check.status];
-                  return (
-                    <tr key={check.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-bold text-slate-900">#{check.checkNumber}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-slate-600">
-                          {new Date(check.checkDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Building size={14} className="text-slate-400" />
-                          <span className="text-sm text-slate-600">{getBankAccountName(check.bankAccountId)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-slate-900 font-medium">{check.payeeName}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-bold text-slate-900">
-                          ${check.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full ${config.bgColor} ${config.color}`}>
-                          {config.icon}
-                          {config.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => onViewCheck && onViewCheck(check.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-all"
-                        >
-                          <Eye size={14} /> View
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <SummaryCard 
+          label="Total Amount" 
+          value={formatCurrency(stats.totalAmount)} 
+          icon={<FileText size={20} />} 
+          color="teal" 
+        />
+        <SummaryCard 
+          label="Released" 
+          value={stats.released.length.toString()} 
+          subValue={formatCurrency(stats.released.reduce((s, c) => s + c.amount, 0))}
+          icon={<Clock size={20} />} 
+          color="purple" 
+        />
+        <SummaryCard 
+          label="Cleared" 
+          value={stats.cleared.length.toString()} 
+          subValue={formatCurrency(stats.cleared.reduce((s, c) => s + c.amount, 0))}
+          icon={<CheckCircle size={20} />} 
+          color="emerald" 
+        />
+        <SummaryCard 
+          label="Voided" 
+          value={stats.voided.length.toString()} 
+          subValue={formatCurrency(stats.voided.reduce((s, c) => s + c.amount, 0))}
+          icon={<XCircle size={20} />} 
+          color="rose" 
+        />
+      </div>
 
-          {/* Table Footer */}
-          <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-            <span>Showing {filteredChecks.length} of {checks.length} checks</span>
-            <span className="font-bold text-slate-900">
-              Total: ${filteredChecks.reduce((sum, c) => sum + c.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+      {/* Filters & Actions */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text"
+              placeholder="Search check #, payee, or amount..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all text-sm font-medium"
+              value={filters.searchTerm}
+              onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
+            />
+          </div>
+          <div className="flex gap-2">
+            <select 
+              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm font-medium"
+              value={filters.status}
+              onChange={(e) => setFilters({...filters, status: e.target.value as any})}
+            >
+              <option value="all">All Statuses</option>
+              <option value="DRAFT">Draft</option>
+              <option value="PRINTED">Printed</option>
+              <option value="RELEASED">Released</option>
+              <option value="CLEARED">Cleared</option>
+              <option value="VOIDED">Voided</option>
+              <option value="STALE">Stale</option>
+            </select>
+            <select 
+              className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm font-medium"
+              value={filters.bankAccountId}
+              onChange={(e) => setFilters({...filters, bankAccountId: e.target.value})}
+            >
+              <option value="all">All Bank Accounts</option>
+              {bankAccounts.map(ba => (
+                <option key={ba.id} value={ba.id}>{ba.accountName}</option>
+              ))}
+            </select>
+            <button 
+              onClick={exportToCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all text-sm font-bold shadow-sm"
+            >
+              <Download size={16} /> Export
+            </button>
           </div>
         </div>
-      )}
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <Calendar size={16} className="text-slate-400" />
+            <input 
+              type="date" 
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              value={filters.startDate}
+              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+            />
+            <span className="text-slate-400">to</span>
+            <input 
+              type="date" 
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+              value={filters.endDate}
+              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+            />
+          </div>
+          <div className="hidden md:block h-4 w-px bg-slate-200 mx-2" />
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Sort by:
+            <button 
+              onClick={() => toggleSort('checkDate')}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkDate' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+            >
+              Date {sortField === 'checkDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button 
+              onClick={() => toggleSort('checkNumber')}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'checkNumber' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+            >
+              Number {sortField === 'checkNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button 
+              onClick={() => toggleSort('amount')}
+              className={`px-2 py-1 rounded transition-colors ${sortField === 'amount' ? 'bg-teal-100 text-teal-700' : 'hover:bg-slate-100 '}`}
+            >
+              Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Register Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Check #</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Bank Account</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Payee</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+              <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedChecks.length > 0 ? (
+              sortedChecks.map((check) => (
+                <tr key={check.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-mono font-bold text-teal-600">{check.checkNumber}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-bold text-slate-600">
+                      {new Date(check.checkDate).toLocaleDateString()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-slate-800">
+                        {bankAccounts.find(ba => ba.id === check.bankAccountId)?.accountName || 'Unknown Account'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {bankAccounts.find(ba => ba.id === check.bankAccountId)?.accountNumber}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                      {check.payeeName}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="text-sm font-mono font-black text-slate-900">
+                      {formatCurrency(check.amount)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${getStatusStyle(check.status)}`}>
+                        {getStatusIcon(check.status)}
+                        {check.status}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all">
+                      <Eye size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 bg-slate-50/50">
+                  <div className="flex flex-col items-center gap-2">
+                    <AlertCircle size={40} className="text-slate-300" />
+                    <p className="text-lg font-bold">No Records Found</p>
+                    <p className="text-sm">Try adjusting your filters or search terms.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {sortedChecks.length > 0 && (
+            <tfoot className="bg-slate-50/50 border-t border-slate-200">
+              <tr>
+                <td colSpan={4} className="px-6 py-4 text-sm font-bold text-slate-500 uppercase tracking-widest">
+                  Showing {sortedChecks.length} of {checks.length} records
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Filtered</span>
+                    <span className="text-lg font-mono font-black text-teal-600">{formatCurrency(stats.totalAmount)}</span>
+                  </div>
+                </td>
+                <td colSpan={2}></td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const SummaryCard: React.FC<{ label: string; value: string; subValue?: string; icon: React.ReactNode; color: string }> = ({ 
+  label, value, subValue, icon, color 
+}) => {
+  const colorMap: Record<string, string> = {
+    teal: 'bg-teal-50 text-teal-600 border-teal-100',
+    purple: 'bg-purple-50 text-purple-600 border-purple-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4 group hover:border-teal-300 transition-all">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 group-hover:scale-110 transition-transform ${colorMap[color] || colorMap.teal}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-xl font-black text-slate-900 tracking-tight truncate">{value}</p>
+        {subValue && <p className="text-[10px] font-mono font-bold text-slate-500 truncate">{subValue}</p>}
+      </div>
     </div>
   );
 };

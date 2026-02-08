@@ -42,7 +42,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
       case PurchaseOrderStatus.DRAFT: return 'bg-slate-100 text-slate-600 border-slate-200';
       // Corrected PEND_APPROVAL to PENDING_APPROVAL
       case PurchaseOrderStatus.PENDING_APPROVAL: return 'bg-amber-50 text-amber-700 border-amber-100';
-      case PurchaseOrderStatus.APPROVED: return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+      case PurchaseOrderStatus.APPROVED: return 'bg-teal-50 text-teal-700 border-teal-100';
       case PurchaseOrderStatus.REJECTED: return 'bg-rose-50 text-rose-700 border-rose-100';
       case PurchaseOrderStatus.BILLED: return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case PurchaseOrderStatus.CLOSED: return 'bg-slate-200 text-slate-800 border-slate-300';
@@ -124,14 +124,14 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <ShoppingCart className="text-indigo-600" size={28} />
+            <ShoppingCart className="text-teal-600" size={28} />
             Procurement & POs
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Authorized purchase commitments for vendor fulfillment.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> New Purchase Order
         </button>
@@ -143,7 +143,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 placeholder="Search POs..." 
-                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-indigo-600"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-teal-600"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -170,11 +170,11 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
               return (
                 <tr key={po.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-5">
-                    <div className="text-sm font-black text-indigo-600 font-mono">{po.reference}</div>
+                    <div className="text-sm font-black text-teal-600 font-mono">{po.reference}</div>
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                       <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-400 flex items-center justify-center font-bold text-[10px]">V</div>
+                       <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-400 flex items-center justify-center font-bold text-[10px]">V</div>
                        <div className="text-sm font-bold text-slate-800">{vendor?.name || 'Unknown Vendor'}</div>
                     </div>
                   </td>
@@ -189,7 +189,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     <div className="flex justify-end gap-2">
                        <button 
                         onClick={() => setViewPO(po)}
-                        className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all"
+                        className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-xl transition-all"
                        >
                           <ChevronRight size={18} />
                        </button>
@@ -210,10 +210,10 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 flex flex-col h-[85vh]">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><FileStack size={24} /></div>
+                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><FileStack size={24} /></div>
                   <div>
                     <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Purchase Order Detail</h3>
-                    <p className="text-xs font-mono font-bold text-indigo-600">{viewPO.reference}</p>
+                    <p className="text-xs font-mono font-bold text-teal-600">{viewPO.reference}</p>
                   </div>
                </div>
                <div className="flex items-center gap-3">
@@ -282,14 +282,14 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
 
             <div className="p-8 bg-slate-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
                <div className="flex items-center gap-3">
-                  <AlertCircle className="text-indigo-500" size={20} />
+                  <AlertCircle className="text-teal-500" size={20} />
                   <p className="text-[11px] text-slate-500 font-medium">Internal approval controls authorized spend levels.</p>
                </div>
                <div className="flex gap-4 w-full md:w-auto">
                   {viewPO.status === PurchaseOrderStatus.DRAFT && (
                     <button 
                       onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.PENDING_APPROVAL); setViewPO(null); }}
-                      className="flex-1 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 px-8 py-3 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-teal-700 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                        <Send size={18} /> Submit for Approval
                     </button>
@@ -299,7 +299,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     <>
                       <button 
                         onClick={() => { onUpdateStatus(viewPO.id, PurchaseOrderStatus.APPROVED); setViewPO(null); }}
-                        className="flex-1 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 px-8 py-3 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg hover:bg-teal-700 active:scale-95 transition-all flex items-center justify-center gap-2"
                       >
                          <ShieldCheck size={18} /> Approve PO
                       </button>
@@ -341,7 +341,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><ShoppingCart size={24} /></div>
+                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><ShoppingCart size={24} /></div>
                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Draft Purchase Order</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={28} /></button>
@@ -353,7 +353,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Vendor / Partner</label>
                     <select 
                        required 
-                       className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800 appearance-none"
+                       className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800 appearance-none"
                        value={formData.vendorId}
                        onChange={e => setFormData({...formData, vendorId: e.target.value})}
                     >
@@ -368,7 +368,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Reference #</label>
-                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-mono font-black text-sm text-indigo-600"
+                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-mono font-black text-sm text-teal-600"
                       value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} />
                   </div>
                </div>
@@ -383,11 +383,11 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                   </div>
 
                   {(formData.lines || []).map((line) => (
-                    <div key={line.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-200 transition-colors shadow-sm">
+                    <div key={line.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-teal-200 transition-colors shadow-sm">
                        <div className="col-span-5">
                           <select 
                             required 
-                            className="w-full px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-700 outline-none appearance-none"
+                            className="w-full px-3 py-2 bg-teal-50 border border-teal-100 rounded-xl text-xs font-bold text-teal-700 outline-none appearance-none"
                             value={line.itemId}
                             onChange={e => updateLine(line.id!, { itemId: e.target.value })}
                           >
@@ -412,7 +412,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     </div>
                   ))}
 
-                  <button type="button" onClick={addLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border-2 border-dashed border-indigo-100"><Plus size={14} /> Add Line Item</button>
+                  <button type="button" onClick={addLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-teal-600 hover:bg-teal-50 rounded-xl transition-colors border-2 border-dashed border-teal-100"><Plus size={14} /> Add Line Item</button>
                </div>
 
                <div className="p-10 bg-slate-900 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
@@ -426,7 +426,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                      <p className="text-4xl font-mono font-black text-white tracking-tighter">PHP {poTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                      <div className="pt-8 flex gap-4">
                         <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-white transition-colors">Discard</button>
-                        <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 transition-all">Authorize PO</button>
+                        <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition-all">Authorize PO</button>
                      </div>
                   </div>
                </div>

@@ -10,7 +10,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Century Gothic', 'CenturyGothic', 'AppleGothic', 'Futura', 'sans-serif'],
+        sans: ['Open Sans', 'sans-serif'],
       },
     },
   },

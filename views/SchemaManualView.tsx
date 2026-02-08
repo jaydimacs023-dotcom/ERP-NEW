@@ -66,7 +66,7 @@ const SchemaManualView: React.FC = () => {
     {
       id: 'financial',
       title: 'II. Financial Core Engine',
-      icon: <Database size={24} className="text-indigo-600" />,
+      icon: <Database size={24} className="text-teal-600" />,
       colorClass: 'indigo',
       entities: [
         {
@@ -291,7 +291,7 @@ const SchemaManualView: React.FC = () => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-slate-900 text-white rounded-3xl shadow-2xl shadow-indigo-200">
+            <div className="p-4 bg-slate-900 text-white rounded-3xl shadow-2xl shadow-teal-200">
               <Binary size={40} />
             </div>
             <div>
@@ -309,7 +309,7 @@ const SchemaManualView: React.FC = () => {
       </header>
 
       {/* Explicit Inventory Policy Declaration */}
-      <div className="p-10 bg-indigo-900 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-10">
+      <div className="p-10 bg-teal-900 rounded-[3rem] text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-10">
          <div className="relative z-10 flex-1 space-y-4">
             <div className="flex items-center gap-4">
                <div className="p-3 bg-white/10 rounded-2xl border border-white/10">
@@ -317,14 +317,14 @@ const SchemaManualView: React.FC = () => {
                </div>
                <h4 className="text-2xl font-black tracking-tight uppercase">Architectural Boundary: No Valuated Inventory</h4>
             </div>
-            <p className="text-sm text-indigo-200 leading-relaxed font-medium">
+            <p className="text-sm text-teal-200 leading-relaxed font-medium">
                 AccounTech is architected strictly as a <strong>Service-Ledger ERP</strong>. It does not contain an Inventory Sub-Ledger. 
                Materials are recognized as expenses at the point of procurement (Periodic Method). Cost of Goods Sold (COGS) tracking is omitted 
                to maintain lean GAAP compliance for institutional service providers.
             </p>
          </div>
          <div className="shrink-0 relative z-10">
-            <div className="px-6 py-3 bg-white text-indigo-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+            <div className="px-6 py-3 bg-white text-teal-900 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                <Info size={16} /> Technical Decision v4.0
             </div>
          </div>
@@ -388,7 +388,7 @@ const SchemaCard: React.FC<SchemaCardProps> = ({ title, desc, rows, logic }) => 
     <div className="p-10 border-b bg-slate-50/50 group-hover:bg-white transition-colors">
       <div className="flex items-center justify-between">
         <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
-        <span className="px-4 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">Master Entity</span>
+        <span className="px-4 py-1 bg-teal-50 border border-teal-100 text-teal-600 rounded-full text-[10px] font-black uppercase tracking-widest">Master Entity</span>
       </div>
       <p className="text-base text-slate-500 font-medium mt-2 max-w-2xl leading-relaxed">{desc}</p>
     </div>
@@ -404,8 +404,8 @@ const SchemaCard: React.FC<SchemaCardProps> = ({ title, desc, rows, logic }) => 
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-indigo-50/20 transition-colors">
-              <td className="px-10 py-5 font-mono text-xs font-bold text-indigo-600">{row.field}</td>
+            <tr key={i} className="hover:bg-teal-50/20 transition-colors">
+              <td className="px-10 py-5 font-mono text-xs font-bold text-teal-600">{row.field}</td>
               <td className="px-10 py-5 text-slate-700 font-bold">{row.type}</td>
               <td className="px-10 py-5">
                 <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-tighter">
@@ -418,13 +418,13 @@ const SchemaCard: React.FC<SchemaCardProps> = ({ title, desc, rows, logic }) => 
         </tbody>
       </table>
     </div>
-    <div className="p-10 bg-indigo-50/30 border-t flex gap-6 items-start">
-      <div className="p-2 bg-white rounded-xl shadow-sm text-indigo-600 border border-indigo-100 shrink-0">
+    <div className="p-10 bg-teal-50/30 border-t flex gap-6 items-start">
+      <div className="p-2 bg-white rounded-xl shadow-sm text-teal-600 border border-teal-100 shrink-0">
         <Calculator size={24} />
       </div>
       <div>
-        <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-2">Core Business Logic Layer</p>
-        <p className="text-sm text-indigo-900 font-bold leading-relaxed">{logic}</p>
+        <p className="text-[11px] font-black text-teal-400 uppercase tracking-[0.3em] mb-2">Core Business Logic Layer</p>
+        <p className="text-sm text-teal-900 font-bold leading-relaxed">{logic}</p>
       </div>
     </div>
   </div>

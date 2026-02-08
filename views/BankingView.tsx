@@ -245,11 +245,11 @@ const BankingView: React.FC<BankingViewProps> = ({
             onClick={() => { resetEntryForm(); setShowTransferModal(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-bold text-xs shadow-sm"
           >
-            <ArrowRightLeft size={16} className="text-indigo-600" /> Transfer
+            <ArrowRightLeft size={16} className="text-teal-600" /> Transfer
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 font-bold text-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-bold text-xs"
           >
             <Plus size={16} /> Link Account
           </button>
@@ -269,11 +269,11 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div 
                 key={bank.id} 
                 onClick={() => setSelectedBank(bank)}
-                className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all overflow-hidden cursor-pointer group flex flex-col"
+                className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-teal-200 transition-all overflow-hidden cursor-pointer group flex flex-col"
               >
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center border border-slate-100 transition-all shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-teal-600 group-hover:text-white flex items-center justify-center border border-slate-100 transition-all shadow-sm">
                       {bank.type === 'CASH' ? <Wallet size={28} /> : <Landmark size={28} />}
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -304,17 +304,17 @@ const BankingView: React.FC<BankingViewProps> = ({
                         {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </div>
-                    <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 uppercase">
+                    <div className="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-1 rounded border border-teal-100 uppercase">
                       {bank.currency}
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-slate-50/80 px-8 py-5 flex items-center justify-between border-t border-slate-100">
-                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-teal-600 transition-colors">
                     <History size={16} /> Open Treasury Console
                   </div>
-                  <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                  <ChevronRight size={20} className="text-slate-300 group-hover:text-teal-600 group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
             );
@@ -325,9 +325,9 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
             <button 
               onClick={() => { setSelectedBank(null); setActiveTab('ledger'); }}
-              className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors group"
+              className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-teal-600 transition-colors group"
             >
-              <div className="p-1.5 rounded-lg border border-slate-200 group-hover:border-indigo-200 transition-all">
+              <div className="p-1.5 rounded-lg border border-slate-200 group-hover:border-teal-200 transition-all">
                 <ChevronRight size={14} className="rotate-180" />
               </div>
               Exit Console
@@ -337,7 +337,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                 <>
                   <button 
                     onClick={() => openEditModal(selectedBank)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 transition-all font-bold text-xs"
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-xl hover:bg-teal-100 transition-all font-bold text-xs"
                   >
                     <Save size={14} /> Edit Account
                   </button>
@@ -352,7 +352,7 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
                  <button 
                   onClick={() => setActiveTab('ledger')}
-                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                    <History size={14} /> Account History
                  </button>
@@ -371,7 +371,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                <>
                  <div className="p-10 border-b bg-slate-50/30 flex flex-col lg:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-6">
-                       <div className="w-20 h-20 rounded-[2rem] bg-indigo-600 text-white flex items-center justify-center shadow-2xl shadow-indigo-200 border-4 border-white">
+                       <div className="w-20 h-20 rounded-[2rem] bg-teal-600 text-white flex items-center justify-center shadow-2xl shadow-teal-200 border-4 border-white">
                          {selectedBank.type === 'CASH' ? <Wallet size={36} /> : <Landmark size={36} />}
                        </div>
                        <div>
@@ -379,14 +379,14 @@ const BankingView: React.FC<BankingViewProps> = ({
                           <div className="flex items-center gap-3 mt-2">
                              <span className="text-sm font-mono text-slate-400 font-medium">{selectedBank.accountNumber}</span>
                              <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-                             <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">{selectedBank.type} TRUST ACCOUNT</span>
+                             <span className="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em]">{selectedBank.type} TRUST ACCOUNT</span>
                           </div>
                        </div>
                     </div>
                     <div className="text-center lg:text-right">
                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Ledger Snapshot</p>
                        <div className="flex items-baseline justify-center lg:justify-end gap-2">
-                         <span className="text-lg font-black text-indigo-600">{selectedBank.currency}</span>
+                         <span className="text-lg font-black text-teal-600">{selectedBank.currency}</span>
                          <span className="text-5xl font-mono font-black text-slate-900 tracking-tighter">
                            {reconciliationData?.bookBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                          </span>
@@ -461,12 +461,12 @@ const BankingView: React.FC<BankingViewProps> = ({
                            <div className="flex items-center gap-4">
                               <div className="space-y-1">
                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Period End</label>
-                                 <input type="date" className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500" value={reconcileAsOf} onChange={e => setReconcileAsOf(e.target.value)} />
+                                 <input type="date" className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-teal-500" value={reconcileAsOf} onChange={e => setReconcileAsOf(e.target.value)} />
                               </div>
                               <div className="space-y-1">
                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Actual Statement Balance</label>
                                  <div className="relative">
-                                    <input type="number" step="0.01" className="bg-white border-2 border-indigo-600/20 rounded-xl pl-8 pr-4 py-1.5 text-base font-mono font-black text-slate-900 outline-none focus:border-indigo-600" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
+                                    <input type="number" step="0.01" className="bg-white border-2 border-teal-600/20 rounded-xl pl-8 pr-4 py-1.5 text-base font-mono font-black text-slate-900 outline-none focus:border-teal-600" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-black">{"\u20B1"}</span>
                                  </div>
                               </div>
@@ -496,7 +496,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                   <div className="p-10 space-y-6 bg-white">
                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                           <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><ListChecks size={18} /></div>
+                           <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><ListChecks size={18} /></div>
                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Audit Checklist</h4>
                         </div>
                         <div className="flex items-center gap-4">
@@ -505,7 +505,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                            </p>
                            <button 
                              onClick={handleBulkClear}
-                             className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                             className="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-100 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-teal-100 transition-colors"
                            >
                              Clear All
                            </button>
@@ -525,14 +525,14 @@ const BankingView: React.FC<BankingViewProps> = ({
                             <button 
                               key={line.id}
                               onClick={() => onToggleClearLine(line.id)}
-                              className="w-full flex items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 hover:border-indigo-600 hover:shadow-lg transition-all text-left group"
+                              className="w-full flex items-center justify-between p-6 bg-white rounded-2xl border border-slate-100 hover:border-teal-600 hover:shadow-lg transition-all text-left group"
                             >
                                <div className="flex items-center gap-5">
-                                  <div className="w-12 h-12 rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-200 group-hover:border-indigo-600 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
+                                  <div className="w-12 h-12 rounded-2xl border-2 border-slate-100 flex items-center justify-center text-slate-200 group-hover:border-teal-600 group-hover:text-teal-600 group-hover:bg-teal-50 transition-all">
                                      <Check size={24} strokeWidth={4} />
                                   </div>
                                   <div>
-                                     <p className="text-[10px] font-mono font-black text-indigo-600">{entry?.date} • {entry?.reference}</p>
+                                     <p className="text-[10px] font-mono font-black text-teal-600">{entry?.date} • {entry?.reference}</p>
                                      <p className="text-sm font-bold text-slate-800 uppercase tracking-tight">{entry?.description}</p>
                                   </div>
                                </div>
@@ -563,7 +563,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                               <button 
                                 onClick={handleSaveReconciliation}
                                 disabled={Math.abs(reconciliationData?.difference || 0) > 0.01}
-                                className="px-12 py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                                className="px-12 py-5 bg-teal-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:bg-teal-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
                               >
                                  Anchor Balance Snapshot
                               </button>
@@ -603,7 +603,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{showEntryModal === 'IN' ? 'Target Account' : 'Source Account'}</label>
-                  <select required className="w-full px-4 py-3 bg-white border-2 border-indigo-100 rounded-2xl outline-none font-black text-sm text-indigo-700"
+                  <select required className="w-full px-4 py-3 bg-white border-2 border-teal-100 rounded-2xl outline-none font-black text-sm text-teal-700"
                     value={targetBankId} onChange={e => setTargetBankId(e.target.value)}>
                     <option value="">Select Account...</option>
                     {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}
@@ -654,7 +654,7 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl">
+                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl">
                   <ArrowRightLeft size={24} />
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Internal Transfer</h3>
@@ -709,7 +709,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowTransferModal(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" disabled={entryAmount <= 0 || !targetBankId || !entryAccountId} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale">Post Transfer</button>
+                <button type="submit" disabled={entryAmount <= 0 || !targetBankId || !entryAccountId} className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale">Post Transfer</button>
               </div>
             </form>
           </div>
@@ -721,7 +721,7 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl">
+                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl">
                   <Plus size={24} />
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Connect Account</h3>
@@ -753,10 +753,10 @@ const BankingView: React.FC<BankingViewProps> = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <label className="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em] flex items-center gap-2">
                     <BookOpen size={16} /> G/L Ledger Mapping
                   </label>
-                  <select required className="w-full px-4 py-3 bg-indigo-50/50 border-2 border-indigo-100 rounded-2xl outline-none font-black text-sm text-indigo-700 appearance-none"
+                  <select required className="w-full px-4 py-3 bg-teal-50/50 border-2 border-teal-100 rounded-2xl outline-none font-black text-sm text-teal-700 appearance-none"
                     value={newBank.glAccountId} onChange={e => setNewBank({...newBank, glAccountId: e.target.value})}>
                     <option value="">Select Asset Account...</option>
                     {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
@@ -766,16 +766,16 @@ const BankingView: React.FC<BankingViewProps> = ({
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex gap-4">
-                 <ShieldCheck className="text-blue-600 shrink-0" size={24} />
-                 <p className="text-[11px] text-blue-800 leading-relaxed font-medium">
+              <div className="bg-teal-50 p-5 rounded-3xl border border-teal-100 flex gap-4">
+                 <ShieldCheck className="text-teal-600 shrink-0" size={24} />
+                 <p className="text-[11px] text-teal-800 leading-relaxed font-medium">
                    Establishing this link creates a dedicated sub-ledger. All General Ledger postings to the selected account will automatically populate this bank's transaction history.
                  </p>
               </div>
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-indigo-100 transition-all active:scale-95">Link Ledger</button>
+                <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 transition-all active:scale-95">Link Ledger</button>
               </div>
             </form>
           </div>
@@ -787,7 +787,7 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-xl">
+                <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl">
                   <Save size={24} />
                 </div>
                 <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Edit Account</h3>
@@ -831,10 +831,10 @@ const BankingView: React.FC<BankingViewProps> = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <label className="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em] flex items-center gap-2">
                     <BookOpen size={16} /> G/L Ledger Mapping
                   </label>
-                  <select required className="w-full px-4 py-3 bg-indigo-50/50 border-2 border-indigo-100 rounded-2xl outline-none font-black text-sm text-indigo-700 appearance-none"
+                  <select required className="w-full px-4 py-3 bg-teal-50/50 border-2 border-teal-100 rounded-2xl outline-none font-black text-sm text-teal-700 appearance-none"
                     value={editingBank.glAccountId} onChange={e => setEditingBank({...editingBank, glAccountId: e.target.value})}>
                     <option value="">Select Asset Account...</option>
                     {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
@@ -846,7 +846,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-4 text-sm font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Cancel</button>
-                <button type="submit" className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-blue-100 transition-all active:scale-95">Save Changes</button>
+                <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-2xl shadow-teal-100 transition-all active:scale-95">Save Changes</button>
               </div>
             </form>
           </div>

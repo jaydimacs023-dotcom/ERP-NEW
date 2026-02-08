@@ -155,7 +155,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
           <td className="px-6 py-3 whitespace-nowrap">
             <div className="flex items-center" style={{ paddingLeft: `${depth * 1.5}rem` }}>
               {acc.isHeader ? (
-                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-slate-400 hover:text-teal-600 transition-colors">
                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
               ) : (
@@ -196,7 +196,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 </span>
                 <button 
                   onClick={() => handleToggleClick(acc)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-teal-600' : 'bg-slate-200'}`}
                 >
                   <span
                     aria-hidden="true"
@@ -210,7 +210,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               {!acc.isHeader && (
                  <button 
                   onClick={() => handleEditClick(acc)}
-                  className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
                   title="Edit Account"
                 >
                   <Edit2 size={16} />
@@ -220,7 +220,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 <>
                   <button 
                     onClick={() => handleAddClick(acc.id, false)}
-                    className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-teal-50 text-teal-600 rounded-lg transition-colors"
                     title="Add Sub-account"
                   >
                     <FilePlus size={16} />
@@ -234,7 +234,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   </button>
                   <button 
                     onClick={() => handleEditClick(acc)}
-                    className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
                     title="Edit Folder"
                   >
                     <Edit2 size={16} />
@@ -269,7 +269,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
         </div>
         <button 
           onClick={() => handleAddClick(undefined, true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-lg shadow-teal-100 font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> New Root Category
         </button>
@@ -389,11 +389,11 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                   <Link size={12} /> Hierarchical Path
                 </label>
-                <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+                <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-teal-600 bg-teal-50 p-2 rounded-lg border border-teal-100">
                   <span>Root</span>
                   {parentPath.map((p, i) => (
                     <React.Fragment key={i}>
-                      <ChevronRight size={10} className="text-indigo-300" />
+                      <ChevronRight size={10} className="text-teal-300" />
                       <span className="truncate max-w-[120px]">{p}</span>
                     </React.Fragment>
                   ))}
@@ -405,7 +405,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   <input 
                     required 
                     placeholder="1000"
-                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none font-mono text-sm"
+                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none font-mono text-sm"
                     value={formData.code || ''}
                     onChange={e => setFormData({...formData, code: e.target.value})}
                   />
@@ -415,7 +415,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   <input 
                     required 
                     placeholder="e.g. Savings - Main"
-                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-medium"
+                    className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-medium"
                     value={formData.name || ''}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
@@ -425,7 +425,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Financial Classification</label>
                 <select 
-                  className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm appearance-none bg-white"
+                  className="w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm appearance-none bg-white"
                   value={formData.class}
                   onChange={e => setFormData({...formData, class: e.target.value as AccountClass})}
                 >
@@ -439,7 +439,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                     <Award size={12} /> Link to Qualification
                   </label>
                   <select 
-                    className="w-full px-3 py-2.5 border border-indigo-100 bg-indigo-50/30 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm appearance-none"
+                    className="w-full px-3 py-2.5 border border-teal-100 bg-teal-50/30 rounded-xl focus:ring-2 focus:ring-teal-600 outline-none text-sm appearance-none"
                     value={formData.qualificationId}
                     onChange={e => setFormData({...formData, qualificationId: e.target.value})}
                   >
@@ -454,7 +454,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
               <div className="pt-6 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">
+                <button type="submit" className="flex-1 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-100 active:scale-95 transition-all">
                   {editingAccountId ? 'Update Account' : 'Create Account'}
                 </button>
               </div>

@@ -24,9 +24,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 
   // Analytical Data for Charts
   const classDistributionData = [
-    { name: 'Assets', value: Math.abs(assets), color: '#4f46e5' },
-    { name: 'Liabilities', value: Math.abs(liabilities), color: '#e11d48' },
-    { name: 'Equity', value: Math.abs(assets - liabilities), color: '#059669' },
+    { name: 'Assets', value: Math.abs(assets), color: '#0d9488' }, // Teal
+    { name: 'Liabilities', value: Math.abs(liabilities), color: '#f43f5e' }, // Rose
+    { name: 'Equity', value: Math.abs(assets - liabilities), color: '#10b981' }, // Emerald
   ];
 
   // Simulated Time-Series Data for Trend analysis
@@ -38,12 +38,13 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
   ];
 
   const formatCurrency = (val: number) => {
-    return val.toLocaleString(undefined, { 
-      style: 'currency', 
-      currency: currency, 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: 0 
+    // Explicitly handle symbols to avoid "PHP" glitch
+    const symbol = currency === 'PHP' ? '\u20B1' : currency === 'USD' ? '$' : '';
+    const formatted = Math.abs(val).toLocaleString(undefined, { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
     });
+    return `${val < 0 ? '-' : ''}${symbol}${formatted}`;
   };
 
   const handlePrint = () => {
@@ -74,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={20} />} color="indigo" />
+        <StatCard title="Gross Assets" value={formatCurrency(assets)} icon={<DollarSign size={20} />} color="teal" />
         <StatCard title="Net Income" value={formatCurrency(netIncome)} icon={<TrendingUp size={20} />} color="emerald" />
         <StatCard title="Liabilities" value={formatCurrency(liabilities)} icon={<TrendingDown size={20} />} color="rose" />
         <StatCard title="Current Ratio" value={currentRatio} icon={<Activity size={20} />} color="amber" />

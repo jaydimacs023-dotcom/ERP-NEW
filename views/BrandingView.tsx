@@ -8,6 +8,7 @@ interface BrandingViewProps {
 }
 
 const PALETTES = [
+  { name: 'Endonela Teal', color: '#0d9488', desc: 'Official Brand Motif' },
   { name: 'Royal Indigo', color: '#4f46e5', desc: 'Default Professional' },
   { name: 'Accounting Rose', color: '#e11d48', desc: 'Financial Clarity' },
   { name: 'Midnight Slate', color: '#0f172a', desc: 'Serious & Robust' },
@@ -19,7 +20,7 @@ const PALETTES = [
 ];
 
 const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) => {
-  const [selectedColor, setSelectedColor] = useState(organization.primaryColor || '#4f46e5');
+  const [selectedColor, setSelectedColor] = useState(organization.primaryColor || '#0d9488');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleColorSelect = (hex: string) => {
@@ -168,7 +169,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) =
                  </div>
                  <div className="space-y-6">
                     <div className="flex items-center gap-6">
-                       <div className="w-[1in] h-[1in] rounded-full border-4 border-brand bg-white flex items-center justify-center shadow-2xl shadow-brand/20 text-indigo-600 overflow-hidden shrink-0">
+                       <div className="w-[1in] h-[1in] rounded-full border-4 border-brand bg-white flex items-center justify-center shadow-2xl shadow-brand/20 text-teal-600 overflow-hidden shrink-0">
                           {organization.logoUrl ? (
                             <img src={organization.logoUrl} className="w-full h-full object-cover" alt="Preview" />
                           ) : (

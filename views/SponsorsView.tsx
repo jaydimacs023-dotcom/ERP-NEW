@@ -159,7 +159,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                  : 'bg-teal-50 text-teal-800 border-teal-200'
               }`}
             >
               {toast.type === 'success' ? (
@@ -167,7 +167,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (
-                <AlertCircle size={18} className="text-blue-600" />
+                <AlertCircle size={18} className="text-teal-600" />
               )}
               <span className="text-sm font-semibold">{toast.message}</span>
               <button
@@ -184,14 +184,14 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <Handshake className="text-indigo-600" size={28} />
+            <Handshake className="text-teal-600" size={28} />
             Financial Sponsors
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage donors, corporate grants, and sponsorship records.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> New Sponsor
         </button>
@@ -203,7 +203,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           <input 
             type="text" 
             placeholder="Search sponsors by name, contact or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -229,7 +229,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               <tr key={sponsor.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 border border-teal-100 shadow-sm shrink-0">
                       <Building size={20} />
                     </div>
                     <div>
@@ -280,7 +280,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     <button 
                       onClick={() => openEditModal(sponsor)}
                       disabled={deletingId === sponsor.id}
-                      className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                      className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-lg transition-colors"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -306,7 +306,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-slate-200">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Handshake size={20} /></div>
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md"><Handshake size={20} /></div>
                 <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">
                   {editingSponsor ? 'Edit Sponsor' : 'Onboard Sponsor'}
                 </h3>
@@ -321,7 +321,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   <input 
                     required 
                     placeholder="e.g. Phoenix Foundation" 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
                     value={formData.name} 
                     onChange={e => setFormData({...formData, name: e.target.value})} 
                   />
@@ -331,7 +331,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Contact Person</label>
                   <input 
                     placeholder="Primary Contact Person" 
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
                     value={formData.contactPerson || ''} 
                     onChange={e => setFormData({...formData, contactPerson: e.target.value})} 
                   />
@@ -343,7 +343,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     <input 
                       type="email" 
                       placeholder="finance@sponsor.org" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
                       value={formData.email || ''} 
                       onChange={e => setFormData({...formData, email: e.target.value})} 
                     />
@@ -352,7 +352,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Phone Number</label>
                     <input 
                       placeholder="+63 XXX XXX XXXX" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
                       value={formData.phone || ''} 
                       onChange={e => setFormData({...formData, phone: e.target.value})} 
                     />
@@ -364,18 +364,18 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   <textarea 
                     placeholder="Complete business address" 
                     rows={2}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium resize-none"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium resize-none"
                     value={formData.address || ''} 
                     onChange={e => setFormData({...formData, address: e.target.value})} 
                   />
                 </div>
 
-                <div className="space-y-1.5 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                  <label className="text-[10px] font-semibold text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-2">
+                <div className="space-y-1.5 p-4 bg-teal-50/50 rounded-2xl border border-teal-100">
+                  <label className="text-[10px] font-semibold text-teal-600 uppercase tracking-widest flex items-center gap-2 mb-2">
                     <BookOpen size={12} /> Specific G/L Receivable Account
                   </label>
                   <select 
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-indigo-600 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-1 focus:ring-teal-600 text-sm font-medium"
                     value={formData.arAccountId || ''}
                     onChange={e => setFormData({ ...formData, arAccountId: e.target.value })}
                   >
@@ -403,7 +403,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                 <button 
                   type="submit" 
                   disabled={isSubmitting || !formData.name}
-                  className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-teal-600 text-white rounded-2xl text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>

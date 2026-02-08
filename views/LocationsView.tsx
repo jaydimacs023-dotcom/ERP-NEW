@@ -145,12 +145,12 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-blue-50 border border-blue-200 text-blue-800'
+                : 'bg-teal-50 border border-teal-200 text-teal-800'
             }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
             <span>{toast.message}</span>
             <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
@@ -165,14 +165,14 @@ const LocationsView: React.FC<LocationsViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 tracking-tight flex items-center gap-3">
-            <MapPin className="text-indigo-600" size={28} />
+            <MapPin className="text-teal-600" size={28} />
             Training Locations
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Manage physical facilities, classrooms, and satellite centers.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md shadow-teal-100 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> Add New Facility
         </button>
@@ -184,7 +184,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
           <input 
             type="text" 
             placeholder="Search by facility name or code..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -196,13 +196,13 @@ const LocationsView: React.FC<LocationsViewProps> = ({
           <div key={loc.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group overflow-hidden">
             <div className="p-6">
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+                <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center transition-colors group-hover:bg-teal-600 group-hover:text-white">
                   <Building size={24} />
                 </div>
                 <div className="flex gap-1">
                    <button 
                      onClick={() => openEditModal(loc)}
-                     className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors"
+                     className="p-2 hover:bg-teal-50 rounded-xl text-slate-400 hover:text-teal-600 transition-colors"
                      title="Edit"
                    >
                      <Edit2 size={16} />
@@ -240,7 +240,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 uppercase tracking-widest">
                   <ShieldCheck size={14} /> Operational
                </div>
-               <button className="text-indigo-600 text-xs font-semibold uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
+               <button className="text-teal-600 text-xs font-semibold uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
                   Facility Info <ChevronRight size={14} strokeWidth={2} />
                </button>
             </div>
@@ -261,7 +261,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md">
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md">
                   <MapPin size={20} />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-800 uppercase tracking-tight">
@@ -281,7 +281,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     required 
                     autoFocus
                     placeholder="e.g. Skills Development Hub"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none font-semibold text-slate-800"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-600 outline-none font-semibold text-slate-800"
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
@@ -293,7 +293,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     required 
                     rows={3}
                     placeholder="Provide exact location for learner navigation..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none text-sm font-medium resize-none"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-600 outline-none text-sm font-medium resize-none"
                     value={formData.address}
                     onChange={e => setFormData({...formData, address: e.target.value})}
                   />
@@ -305,16 +305,16 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     type="number"
                     min="0"
                     placeholder="e.g. 50"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 outline-none font-semibold text-slate-800"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-teal-600 outline-none font-semibold text-slate-800"
                     value={formData.capacity || ''}
                     onChange={e => setFormData({...formData, capacity: e.target.value === '' ? 0 : Number(e.target.value)})}
                   />
                 </div>
               </div>
 
-              <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex gap-3">
-                 <Globe className="text-indigo-600 shrink-0" size={20} />
-                 <p className="text-[11px] text-indigo-800 leading-relaxed font-medium">
+              <div className="bg-teal-50 p-4 rounded-2xl border border-teal-100 flex gap-3">
+                 <Globe className="text-teal-600 shrink-0" size={20} />
+                 <p className="text-[11px] text-teal-800 leading-relaxed font-medium">
                    Training locations are linked to scheduling and attendance tracking. Ensure addresses are verifiable for accreditation purposes.
                  </p>
               </div>
@@ -324,7 +324,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="flex-1 py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-semibold shadow-md shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-semibold shadow-md shadow-teal-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                   {editingLocation ? 'Apply Updates' : 'Confirm Registration'}

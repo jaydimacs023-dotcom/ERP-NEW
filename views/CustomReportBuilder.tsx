@@ -504,7 +504,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors">
             <Printer size={14} /> Print
           </button>
-          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
+          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-200">
             <Download size={14} /> Export CSV
           </button>
         </div>
@@ -519,7 +519,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
               <button
                 key={source.id}
                 onClick={() => handleDataSourceChange(source.id as any)}
-                className={`flex-1 min-w-[150px] p-4 rounded-xl border-2 text-left transition-all ${dataSource === source.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-slate-300'}`}
+                className={`flex-1 min-w-[150px] p-4 rounded-xl border-2 text-left transition-all ${dataSource === source.id ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-slate-300'}`}
               >
                 <div className="text-sm font-bold text-slate-900">{source.label}</div>
                 <div className="text-[10px] text-slate-500 mt-1">{source.description}</div>
@@ -551,7 +551,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <button
               key={tab.id}
               onClick={() => setActivePanel(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-teal-500 text-teal-600 bg-teal-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               {tab.icon}
               {tab.label}
@@ -571,9 +571,9 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                   <button
                     key={col.id}
                     onClick={() => toggleColumn(col.id)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${col.visible ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-slate-300'}`}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${col.visible ? 'border-teal-500 bg-teal-50' : 'border-slate-100 hover:border-slate-300'}`}
                   >
-                    {col.visible ? <Eye size={14} className="text-indigo-600" /> : <EyeOff size={14} className="text-slate-400" />}
+                    {col.visible ? <Eye size={14} className="text-teal-600" /> : <EyeOff size={14} className="text-slate-400" />}
                     <div>
                       <div className="text-sm font-bold text-slate-900">{col.label}</div>
                       <div className="text-[10px] text-slate-500 uppercase">{col.type}</div>
@@ -589,7 +589,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm text-slate-600">Add conditions to filter your report data.</p>
-                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors">
+                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-700 transition-colors">
                   <Plus size={14} /> Add Filter
                 </button>
               </div>
@@ -740,7 +740,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-slate-600">
-                  Showing <span className="font-bold text-indigo-600">{totalRows}</span> records
+                  Showing <span className="font-bold text-teal-600">{totalRows}</span> records
                   {groups.length > 0 && <span> in <span className="font-bold">{Object.keys(groupedData).length}</span> groups</span>}
                 </p>
               </div>
@@ -761,11 +761,11 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                       {Object.entries(groupedData).map(([groupKey, rows]) => (
                         <React.Fragment key={groupKey}>
                           {groups.length > 0 && groupKey !== 'ungrouped' && (
-                            <tr className="bg-indigo-50">
-                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-indigo-900">
+                            <tr className="bg-teal-50">
+                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-teal-900">
                                 <ChevronRight size={14} className="inline mr-2" />
                                 {groupKey}
-                                <span className="ml-2 text-xs font-normal text-indigo-600">({(rows as any[]).length} items)</span>
+                                <span className="ml-2 text-xs font-normal text-teal-600">({(rows as any[]).length} items)</span>
                               </td>
                             </tr>
                           )}
@@ -850,7 +850,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                 <button onClick={() => setShowSaveModal(false)} className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                   Cancel
                 </button>
-                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors">
+                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-colors">
                   Save Template
                 </button>
               </div>
@@ -888,7 +888,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                           {template.filters.length} filters
                         </div>
                       </div>
-                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors">
+                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-teal-600 text-white rounded-lg text-xs font-bold hover:bg-teal-700 transition-colors">
                         Load
                       </button>
                       <button onClick={() => deleteTemplate(template.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">

@@ -71,7 +71,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   }, [reportSummariesIS, accounts, lines, entries, startDate, endDate]);
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+    return `\u20B1 ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val)}`;
   };
 
   const handlePrint = () => {
@@ -207,12 +207,12 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
            {reportType === 'IS' && (
              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4">
-               <div className="p-2 bg-indigo-50 rounded-lg"><Award size={18} className={`text-indigo-600 ${selectedQualificationId ? 'animate-pulse' : ''}`} /></div>
+               <div className="p-2 bg-teal-50 rounded-lg"><Award size={18} className={`text-teal-600 ${selectedQualificationId ? 'animate-pulse' : ''}`} /></div>
                <div>
-                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Functional Segment</p>
+                 <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest leading-none mb-1">Functional Segment</p>
                  <div className="relative">
                     <select 
-                      className="bg-transparent border-none outline-none text-xs text-indigo-700 font-black p-0 pr-6 focus:ring-0 appearance-none cursor-pointer"
+                      className="bg-transparent border-none outline-none text-xs text-teal-700 font-black p-0 pr-6 focus:ring-0 appearance-none cursor-pointer"
                       value={selectedQualificationId}
                       onChange={(e) => setSelectedQualificationId(e.target.value)}
                     >
@@ -221,7 +221,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                         <option key={q.id} value={q.id}>{q.name}</option>
                       ))}
                     </select>
-                    <ChevronRight size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none rotate-90" />
+                    <ChevronRight size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-teal-300 pointer-events-none rotate-90" />
                  </div>
                </div>
              </div>
@@ -259,9 +259,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
         <div className="p-16 border-b border-slate-50 bg-slate-50/20 text-center print:bg-white print:p-8">
           <div className="flex items-center justify-center gap-2 mb-4 no-print">
-             <div className="w-12 h-1 bg-indigo-600 rounded-full"></div>
-             <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-             <div className="w-12 h-1 bg-indigo-600 rounded-full"></div>
+             <div className="w-12 h-1 bg-teal-600 rounded-full"></div>
+             <div className="w-2 h-2 bg-teal-600 rounded-full"></div>
+             <div className="w-12 h-1 bg-teal-600 rounded-full"></div>
           </div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">{orgName.toUpperCase()}</h2>
           <div className="text-[11px] text-slate-400 mt-2 font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-2">
@@ -269,13 +269,13 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             {activeQualification && (
               <>
                 <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                <span className="text-indigo-600">Qualification: {activeQualification.name}</span>
+                <span className="text-teal-600">Qualification: {activeQualification.name}</span>
               </>
             )}
           </div>
           
           <div className="mt-8">
-            <h1 className="text-lg font-black text-indigo-700 uppercase tracking-widest print:text-slate-900">
+            <h1 className="text-lg font-black text-teal-700 uppercase tracking-widest print:text-slate-900">
               {reportType === 'BS' ? 'Statement of Financial Position' : 
                reportType === 'IS' ? 'Statement of Comprehensive Income' : 
                reportType === 'CFS' ? 'Statement of Cash Flows' : 'Trial Balance Registry'}
@@ -330,7 +330,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             <div className="space-y-12 max-w-3xl mx-auto">
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
+                   <div className="w-2 h-2 bg-teal-600 rounded-full no-print"></div>
                    CASH FLOW FROM OPERATING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -366,7 +366,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
+                   <div className="w-2 h-2 bg-teal-600 rounded-full no-print"></div>
                    CASH FLOW FROM INVESTING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -383,7 +383,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
               <div>
                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                   <div className="w-2 h-2 bg-indigo-600 rounded-full no-print"></div>
+                   <div className="w-2 h-2 bg-teal-600 rounded-full no-print"></div>
                    CASH FLOW FROM FINANCING ACTIVITIES
                 </h4>
                 <div className="space-y-4 px-5">
@@ -400,7 +400,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
               <div className="pt-10 mt-10 border-t-4 border-double border-slate-900 bg-slate-50/50 p-8 rounded-3xl print:bg-white print:p-0">
                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-sm font-black text-indigo-700 uppercase tracking-[0.2em] print:text-slate-900">
+                    <div className="flex justify-between items-center text-sm font-black text-teal-700 uppercase tracking-[0.2em] print:text-slate-900">
                        <span>NET INCREASE / (DECREASE) IN CASH</span>
                        <span className="font-mono">{currencySymbol} {formatCurrency(cfsReport.netCashFlow)}</span>
                     </div>
@@ -477,7 +477,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           <div className="flex items-center gap-4 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] print:text-slate-900">
              <div className="flex items-center gap-1.5"><Clock size={14} /> SYS_SYNC: {new Date().toLocaleTimeString()}</div>
              <div className="w-1 h-1 bg-slate-200 rounded-full print:bg-slate-900"></div>
-             <div className="italic text-indigo-400 print:text-slate-900">AccounTech Engine v4.0.1</div>
+             <div className="italic text-teal-400 print:text-slate-900">AccounTech Engine v4.0.1</div>
           </div>
         </div>
       </div>
@@ -489,7 +489,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void, icon?: React.ReactNode }> = ({ active, label, onClick, icon }) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-indigo-600 shadow-md shadow-indigo-50 border border-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+    className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-teal-600 shadow-md shadow-teal-50 border border-teal-100' : 'text-slate-400 hover:text-slate-600'}`}
   >
     {icon}{label}
   </button>
@@ -509,7 +509,7 @@ const FinancialSection: React.FC<{ title: string, items: TransactionSummary[], t
         {visibleItems.length > 0 ? visibleItems.map(item => (
           <div key={item.accountId} className="flex justify-between items-center group">
             <div className="flex items-center gap-3">
-               <ChevronRight size={12} className="text-slate-200 group-hover:text-indigo-400 transition-colors print:text-slate-900" />
+               <ChevronRight size={12} className="text-slate-200 group-hover:text-teal-400 transition-colors print:text-slate-900" />
                <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors tracking-tight print:text-slate-900">{item.accountName}</span>
             </div>
             <span className="font-mono text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors print:text-slate-900">

@@ -58,7 +58,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <CreditCard className="text-indigo-600" size={28} />
+            <CreditCard className="text-teal-600" size={28} />
             Payment Monitoring Dashboard
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Master payment tracking across all tenant organizations.</p>
@@ -104,7 +104,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             placeholder="Search by tenant name, invoice, or description..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -114,7 +114,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <select 
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
-            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none"
+            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none"
           >
             <option value="ALL">All Statuses</option>
             <option value="PAID">Paid</option>
@@ -152,7 +152,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                   <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                        <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600">
                           <Building2 size={16} />
                         </div>
                         <div className="min-w-0">

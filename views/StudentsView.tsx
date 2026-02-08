@@ -321,12 +321,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-blue-50 border border-blue-200 text-blue-800'
+                : 'bg-teal-50 border border-teal-200 text-teal-800'
             }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-blue-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-teal-600" />}
             <span>{toast.message}</span>
             <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
@@ -344,14 +344,14 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
           <p className="text-sm text-slate-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.1)</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
+          <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-teal-600 transition-colors text-xs font-black uppercase tracking-widest">
             <Download size={16} /> Template
           </button>
           <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
           <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all border border-slate-200 font-bold text-sm">
             <FileSpreadsheet size={18} className="text-emerald-600" /> MIS Batch
           </button>
-          <button onClick={() => { setShowModal(true); setPhotoPreview(null); }} className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-lg font-bold text-sm">
+          <button onClick={() => { setShowModal(true); setPhotoPreview(null); }} className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-lg font-bold text-sm">
             <Plus size={18} /> Register Learner
           </button>
         </div>
@@ -377,18 +377,18 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-sm shrink-0">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-teal-50 flex items-center justify-center border border-teal-100 shadow-sm shrink-0">
                         {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
                           <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="S" className="w-full h-full object-cover" />
                         ) : (
-                          <UserCircle className="text-indigo-300" size={24} />
+                          <UserCircle className="text-teal-300" size={24} />
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-black text-slate-800 leading-tight">
                           {student.lastName.toUpperCase()}, {student.firstName}
                         </div>
-                        <div className="text-[9px] font-mono font-bold text-indigo-600 mt-1 uppercase">ULI: {student.uli}</div>
+                        <div className="text-[9px] font-mono font-bold text-teal-600 mt-1 uppercase">ULI: {student.uli}</div>
                       </div>
                     </div>
                   </td>
@@ -418,7 +418,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                       <button onClick={() => { setEditingStudent(student); setShowEditModal(true); setFormData(student); }} className="p-2 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all" title="Edit Student">
                         <RefreshCw size={16} />
                       </button>
-                      <button onClick={() => setAuditStudent(student)} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="View Audit">
+                      <button onClick={() => setAuditStudent(student)} className="p-2 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-600 hover:text-white transition-all" title="View Audit">
                         <Eye size={16} />
                       </button>
                     </div>
@@ -460,7 +460,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                        <td className="px-8 py-5">
                           <p className="text-sm font-black text-slate-800 uppercase">{p.lastName}, {p.firstName}</p>
-                          <p className="text-[10px] font-mono font-bold text-indigo-600 uppercase mt-0.5">{p.uli}</p>
+                          <p className="text-[10px] font-mono font-bold text-teal-600 uppercase mt-0.5">{p.uli}</p>
                        </td>
                        <td className="px-8 py-5">
                           <p className="text-xs font-bold text-slate-600">{p.dateOfBirth} ({p.age}y)</p>
@@ -518,7 +518,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                       {auditStudent.lastName.toUpperCase()}, {auditStudent.firstName}
                     </h3>
                     <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-mono font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
+                       <span className="text-[10px] font-mono font-black text-teal-600 uppercase tracking-widest bg-teal-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
                          (auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
@@ -541,7 +541,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                <div className="flex-1 overflow-y-auto p-10 space-y-12 scrollbar-hide border-r border-slate-100 bg-white">
                   <section className="space-y-6">
                     <div className="flex items-center gap-3">
-                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><User size={18}/></div>
+                       <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><User size={18}/></div>
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personal Registry Details</h4>
                     </div>
                     
@@ -558,7 +558,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
                   <section className="space-y-6">
                     <div className="flex items-center gap-3">
-                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><MapPin size={18}/></div>
+                       <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><MapPin size={18}/></div>
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Residence & Contact</h4>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -575,7 +575,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
                   <section className="space-y-6">
                     <div className="flex items-center gap-3">
-                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Heart size={18}/></div>
+                       <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><Heart size={18}/></div>
                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Family Background</h4>
                     </div>
                     <DataPoint label="Primary Guardian / Parent" value={auditStudent.guardian || 'Not Declared'} />
@@ -586,7 +586,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                <div className="w-full md:w-[450px] bg-slate-50 overflow-y-auto p-10 flex flex-col shrink-0">
                   <div className="flex items-center justify-between mb-8">
                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <ShieldCheck size={18} className="text-indigo-600" />
+                        <ShieldCheck size={18} className="text-teal-600" />
                         Compliance Audit
                      </h4>
                      <button 
@@ -611,13 +611,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                          <div key={doc.id} className={`p-6 rounded-[2rem] border transition-all ${
                            isVerified ? 'bg-emerald-50/50 border-emerald-100 shadow-sm' :
                            isRejected ? 'bg-rose-50 border-rose-100' :
-                           isUploaded ? 'bg-white border-indigo-100 shadow-xl' : 'bg-slate-100/50 border-slate-200 opacity-60'
+                           isUploaded ? 'bg-white border-teal-100 shadow-xl' : 'bg-slate-100/50 border-slate-200 opacity-60'
                          }`}>
                             <div className="flex justify-between items-start mb-4">
                                <div className="flex items-center gap-3 min-w-0">
                                   {isVerified ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0"/> : 
                                    isRejected ? <ShieldAlert size={20} className="text-rose-500 shrink-0"/> :
-                                   isUploaded ? <UploadCloud size={20} className="text-indigo-500 shrink-0 animate-bounce"/> :
+                                   isUploaded ? <UploadCloud size={20} className="text-teal-500 shrink-0 animate-bounce"/> :
                                    <Clock size={20} className="text-slate-300 shrink-0"/>}
                                   <div className="min-w-0">
                                      <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight truncate">{doc.name}</p>
@@ -625,7 +625,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                                   </div>
                                </div>
                                {doc.fileData && (
-                                 <button className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600"><ExternalLink size={16}/></button>
+                                 <button className="p-2 hover:bg-slate-100 rounded-lg text-teal-600"><ExternalLink size={16}/></button>
                                )}
                             </div>
 
@@ -681,7 +681,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
             <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><User size={20} /></div>
+                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><User size={20} /></div>
                   <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Manual Registry Entry</h3>
                 </div>
                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
@@ -698,30 +698,30 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">ULI (Learner ID)</label>
-                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-black text-indigo-600 font-mono" value={formData.uli} onChange={e => setFormData({...formData, uli: e.target.value})} />
+                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-black text-teal-600 font-mono" value={formData.uli} onChange={e => setFormData({...formData, uli: e.target.value})} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Last Name</label>
-                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">First Name</label>
-                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
                     </div>
                     <div className="md:col-span-2 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Middle</label>
-                      <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                      <input className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
                     </div>
                     <div className="md:col-span-1 space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Ext.</label>
-                      <input placeholder="Jr" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
+                      <input placeholder="Jr" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Birth Date</label>
-                        <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                        <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.dateOfBirth} onChange={handleDobChange} />
                      </div>
                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Computed Age</label>
@@ -729,14 +729,14 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                      </div>
                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sex</label>
-                        <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.sex} onChange={e => setFormData({...formData, sex: e.target.value as any})}>
+                        <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.sex} onChange={e => setFormData({...formData, sex: e.target.value as any})}>
                            <option value="Male">Male</option>
                            <option value="Female">Female</option>
                         </select>
                      </div>
                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Civil Status</label>
-                        <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.civilStatus} onChange={e => setFormData({...formData, civilStatus: e.target.value})}>
+                        <select className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.civilStatus} onChange={e => setFormData({...formData, civilStatus: e.target.value})}>
                            <option value="Single">Single</option>
                            <option value="Married">Married</option>
                            <option value="Widowed">Widowed</option>
@@ -756,30 +756,30 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Institutional Email</label>
-                         <input required type="email" placeholder="learner@manila.edu.ph" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                         <input required type="email" placeholder="learner@manila.edu.ph" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Contact Number</label>
-                         <input required placeholder="09XX XXX XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                         <input required placeholder="09XX XXX XXXX" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
                       </div>
                    </div>
 
                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
                       <div className="md:col-span-4 space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">House # / Street</label>
-                         <input required placeholder="Kalsada St. / Bldg 123" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
+                         <input required placeholder="Kalsada St. / Bldg 123" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
                       </div>
                       <div className="md:col-span-3 space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Barangay</label>
-                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
                       </div>
                       <div className="md:col-span-3 space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">City / Municipality</label>
-                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
                       </div>
                       <div className="md:col-span-2 space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Province</label>
-                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
                       </div>
                    </div>
                 </section>
@@ -794,7 +794,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Educational Attainment</label>
-                         <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
+                         <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
                             <option value="Elementary Graduate">Elementary Graduate</option>
                             <option value="High School Graduate">High School Graduate</option>
                             <option value="College Level">College Level</option>
@@ -805,44 +805,44 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                       </div>
                       <div className="space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nationality</label>
-                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
+                         <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
                       </div>
                       <div className="space-y-1">
                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
-                         <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
+                         <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-600 outline-none text-sm font-bold text-slate-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
                       </div>
                    </div>
                 </section>
 
                 <div className="pt-4">
-                  <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-3xl text-sm font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">Commit Registry Entry</button>
+                  <button type="submit" className="w-full py-5 bg-teal-600 text-white rounded-3xl text-sm font-black shadow-xl shadow-teal-100 hover:bg-teal-700 active:scale-95 transition-all">Commit Registry Entry</button>
                 </div>
               </form>
             </div>
 
             <div className="w-full md:w-[450px] bg-slate-50 overflow-y-auto p-8 flex flex-col border-l border-slate-100">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <FileText size={16} className="text-indigo-600" /> Compliance Folder
+                <FileText size={16} className="text-teal-600" /> Compliance Folder
               </h4>
               
               {/* Camera Hero Section */}
               <div className="mb-8 p-6 bg-slate-900 rounded-3xl text-white shadow-2xl relative overflow-hidden group">
                  <div className="relative z-10">
                     <div className="flex justify-between items-start mb-4">
-                       <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Official Portrait</h5>
+                       <h5 className="text-[10px] font-black text-teal-400 uppercase tracking-[0.2em]">Official Portrait</h5>
                        <span className="px-2 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase">Standard: 2x2</span>
                     </div>
                     {photoPreview ? (
-                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-indigo-500/30 overflow-hidden bg-black shadow-2xl transition-transform group-hover:scale-105">
+                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-teal-500/30 overflow-hidden bg-black shadow-2xl transition-transform group-hover:scale-105">
                          <img src={photoPreview} className="w-full h-full object-cover" alt="Passport" />
                       </div>
                     ) : (
-                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-slate-500 group-hover:border-indigo-400/50 transition-all">
+                      <div className="aspect-square w-32 mx-auto rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-slate-500 group-hover:border-teal-400/50 transition-all">
                          <User size={32} />
                          <span className="text-[8px] font-black uppercase mt-2">No Photo</span>
                       </div>
                     )}
-                    <button onClick={startCamera} className="w-full mt-6 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/40">
+                    <button onClick={startCamera} className="w-full mt-6 py-3 bg-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-teal-500 transition-all shadow-xl shadow-teal-900/40">
                        <Camera size={14} /> Open System Camera
                     </button>
                  </div>
@@ -856,7 +856,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   const status = mandatoryDocStatuses[doc];
                   const hasFile = status === 'UPLOADED' || status === 'VERIFIED';
                   return (
-                    <div key={doc} className={`p-4 rounded-3xl border transition-all ${hasFile ? 'bg-white border-indigo-100 shadow-sm' : 'bg-slate-100/50 border-slate-200'}`}>
+                    <div key={doc} className={`p-4 rounded-3xl border transition-all ${hasFile ? 'bg-white border-teal-100 shadow-sm' : 'bg-slate-100/50 border-slate-200'}`}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3 overflow-hidden">
                           {hasFile ? <CheckCircle size={18} className="text-emerald-500 shrink-0" /> : <Clock size={18} className="text-slate-300 shrink-0" />}
@@ -864,7 +864,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => fileInputRefs.current[doc]?.click()} className={`flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-600 hover:border-indigo-600 transition-colors`}>
+                        <button onClick={() => fileInputRefs.current[doc]?.click()} className={`flex-1 flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase text-slate-600 hover:border-teal-600 transition-colors`}>
                           <Upload size={14} /> {hasFile ? 'Replace' : 'Attach'}
                         </button>
                       </div>
@@ -1178,7 +1178,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 <h3 className="text-2xl font-black text-white uppercase tracking-tight">Identity Capture</h3>
                 <p className="text-slate-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
              </div>
-             <div className="relative aspect-square w-full bg-slate-900 rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl ring-24 ring-indigo-600/10">
+             <div className="relative aspect-square w-full bg-slate-900 rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl ring-24 ring-teal-600/10">
                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">

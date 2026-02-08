@@ -35,7 +35,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
     weak: 'bg-red-500',
     fair: 'bg-amber-500',
     good: 'bg-emerald-500',
-    strong: 'bg-indigo-500',
+    strong: 'bg-teal-500',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,7 +120,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
     <div className="w-screen h-screen bg-slate-950 flex items-center justify-center p-4 overflow-auto relative">
       {/* Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[160px] animate-pulse"></div>
+        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-teal-600/10 rounded-full blur-[160px] animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-[800px] h-[800px] bg-rose-600/10 rounded-full blur-[160px]"></div>
       </div>
 
@@ -130,10 +130,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
         {!isRegistering && (
           <div className="w-full max-w-sm space-y-6 animate-in slide-in-from-left-12 duration-700 hidden lg:block text-center lg:text-left">
             <div>
-              <div className="inline-flex items-center justify-center p-3 bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-500/20 mb-4 border-2 border-white/5 mx-auto lg:mx-0">
+              <div className="inline-flex items-center justify-center p-3 bg-teal-600 rounded-2xl shadow-2xl shadow-teal-500/20 mb-4 border-2 border-white/5 mx-auto lg:mx-0">
                 <Database className="text-white" size={28} />
               </div>
-              <h1 className="text-4xl font-black text-white tracking-tighter leading-none mb-3">AccounTech<span className="text-indigo-500">.</span></h1>
+              <h1 className="text-4xl font-black text-white tracking-tighter leading-none mb-3">AccounTech<span className="text-teal-500">.</span></h1>
               <p className="text-sm text-slate-400 font-medium leading-relaxed">
                 The world-class, multi-tenant ERP core for institutional compliance and financial oversight.
               </p>
@@ -154,10 +154,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Identity (Email)</label>
                   <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-500 transition-colors" size={18} />
                     <input 
                       type="email" required placeholder="staff@institution.ph"
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
                       value={email} onChange={e => setEmail(e.target.value)}
                     />
                   </div>
@@ -166,10 +166,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Access Token (Password)</label>
                   <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-500 transition-colors" size={18} />
                     <input 
                       type="password" required placeholder="••••••••"
-                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-800/50 border-2 border-slate-700 rounded-2xl text-slate-200 text-sm font-bold outline-none focus:ring-4 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
                       value={password} onChange={e => setPassword(e.target.value)}
                     />
                   </div>
@@ -185,7 +185,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
               <button 
                 disabled={loading}
-                className="w-full py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-indigo-900/40 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-teal-600 text-white rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-teal-900/40 hover:bg-teal-500 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -199,7 +199,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                 <button 
                   type="button"
                   onClick={onForgotPassword}
-                  className="text-[10px] font-bold text-slate-500 hover:text-indigo-400 transition-colors inline-flex items-center gap-1"
+                  className="text-[10px] font-bold text-slate-500 hover:text-teal-400 transition-colors inline-flex items-center gap-1"
                 >
                   <KeyRound size={12} /> Forgot Password?
                 </button>
@@ -209,7 +209,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                 <button 
                   type="button"
                   onClick={() => setIsRegistering(true)}
-                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-indigo-400 transition-colors flex items-center justify-center gap-2 mx-auto"
+                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-teal-400 transition-colors flex items-center justify-center gap-2 mx-auto"
                 >
                   <Database size={12} /> Provision New Ledger
                 </button>
@@ -234,7 +234,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Legal Institutional Title</label>
                   <input 
                     required placeholder="e.g. Phoenix Skills Center"
-                    className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                    className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-teal-500 transition-all"
                     value={regOrgName} onChange={e => setRegOrgName(e.target.value)}
                   />
                 </div>
@@ -243,7 +243,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Workspace Email (Primary Admin)</label>
                   <input 
                     type="email" required placeholder="admin@center.ph"
-                    className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                    className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-teal-500 transition-all"
                     value={regEmail} onChange={e => setRegEmail(e.target.value)}
                   />
                 </div>
@@ -264,7 +264,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Admin Pass</label>
                     <input 
                       type="password" required placeholder="••••••••" minLength={8}
-                      className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+                      className="w-full px-6 py-5 bg-slate-800/50 border-2 border-slate-700 rounded-3xl text-slate-200 text-sm font-bold outline-none focus:border-teal-500 transition-all"
                       value={regPassword} onChange={e => setRegPassword(e.target.value)}
                     />
                   </div>
@@ -281,7 +281,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                         passwordStrength.strength === 'weak' ? 'text-red-400' :
                         passwordStrength.strength === 'fair' ? 'text-amber-400' :
                         passwordStrength.strength === 'good' ? 'text-emerald-400' :
-                        'text-indigo-400'
+                        'text-teal-400'
                       }`}>
                         {passwordStrength.strength}
                       </span>
@@ -308,7 +308,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
               <button 
                 disabled={loading}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[2.2rem] text-sm font-black uppercase tracking-widest shadow-2xl hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center gap-3"
+                className="w-full py-5 bg-teal-600 text-white rounded-[2.2rem] text-sm font-black uppercase tracking-widest shadow-2xl hover:bg-teal-500 active:scale-95 transition-all flex items-center justify-center gap-3"
               >
                 {loading ? 'Initializing...' : 'Launch Professional Instance'}
               </button>

@@ -109,7 +109,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase flex items-center gap-3">
-            <Archive className="text-indigo-600" />
+            <Archive className="text-teal-600" />
             Archived Records
           </h2>
           <p className="text-sm text-slate-500 font-normal italic mt-1">
@@ -128,7 +128,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
               placeholder="Search archived items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
@@ -138,7 +138,7 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
                 onClick={() => setActiveCategory(cat.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                   activeCategory === cat.id 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                    ? 'bg-teal-600 text-white shadow-lg shadow-teal-200' 
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -154,13 +154,13 @@ const ArchiveView: React.FC<ArchiveViewProps> = ({
             filteredItems.map((item) => (
               <div key={`${item.archiveType}-${item.id}`} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-teal-100 group-hover:text-teal-600 transition-colors">
                     {item.archiveIcon}
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-800">{item.displayName}</h4>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-teal-500 bg-teal-50 px-2 py-0.5 rounded-full">
                         {item.archiveLabel}
                       </span>
                       <span className="text-[10px] text-slate-400 flex items-center gap-1">

@@ -531,7 +531,7 @@ const RecurringBillsView: React.FC<RecurringBillsViewProps> = ({
                         e.stopPropagation();
                         handleEdit(bill);
                       }}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                     >
                       <Edit2 size={16} />
                     </button>

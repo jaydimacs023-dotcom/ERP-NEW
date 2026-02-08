@@ -221,7 +221,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
           <select
             value={selectedOrgId}
             onChange={(e) => setSelectedOrgId(e.target.value)}
-            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             {organizations
               .filter(o => !o.isDeleted)
@@ -235,12 +235,12 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       </div>
 
       {/* Info Banner */}
-      <div className="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-lg">
+      <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded-r-lg">
         <div className="flex gap-3">
-          <Info size={20} className="text-indigo-600 shrink-0 mt-0.5" />
+          <Info size={20} className="text-teal-600 shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-semibold text-indigo-900">Backup & Restore</p>
-            <p className="text-indigo-700 text-xs mt-1">
+            <p className="font-semibold text-teal-900">Backup & Restore</p>
+            <p className="text-teal-700 text-xs mt-1">
               Create snapshots of your organization's data (students, accounts, transactions, etc.) and restore from previous backups.
               Backups are stored locally and encrypted.
             </p>
@@ -252,8 +252,8 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
         {/* Create Backup Section */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Download size={20} className="text-blue-600" />
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <Download size={20} className="text-teal-600" />
             </div>
             <div>
               <h3 className="font-black text-slate-900 uppercase tracking-tight">Create Backup</h3>
@@ -271,7 +271,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
                 onChange={(e) => setBackupDescription(e.target.value)}
                 placeholder="e.g., Full year-end backup, Before major changes, etc."
                 rows={3}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
               />
             </div>
 
@@ -292,7 +292,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
             <button
               onClick={handleCreateBackup}
               disabled={isCreatingBackup || !selectedOrg}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-teal-600 text-white rounded-lg font-bold text-sm hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               {isCreatingBackup ? (
                 <>
@@ -561,9 +561,9 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
       </div>
 
       {/* Best Practices */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-6">
         <h4 className="font-black text-slate-900 uppercase tracking-tight mb-3 flex items-center gap-2">
-          <Shield size={18} className="text-blue-600" />
+          <Shield size={18} className="text-teal-600" />
           Best Practices
         </h4>
         <ul className="space-y-2 text-sm text-slate-700">

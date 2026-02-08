@@ -80,7 +80,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm"
+          className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm"
         >
           <Plus size={18} /> Register Staff
         </button>
@@ -91,7 +91,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             placeholder="Search staff by name or role..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -128,7 +128,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-800">{emp.lastName.toUpperCase()}, {emp.firstName}</div>
-                        <div className="text-[9px] font-mono text-indigo-600 uppercase">EMP_ID: {emp.id.slice(-6)}</div>
+                        <div className="text-[9px] font-mono text-teal-600 uppercase">EMP_ID: {emp.id.slice(-6)}</div>
                       </div>
                     </div>
                   </td>
@@ -150,7 +150,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => { setEditingEmp(emp); setFormData(emp); setShowModal(true); }}
-                        className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg"
+                        className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-lg"
                       >
                         <ChevronRight size={18} />
                       </button>
@@ -174,7 +174,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Users size={20} /></div>
+                <div className="p-2 bg-teal-600 text-white rounded-xl shadow-md"><Users size={20} /></div>
                 <h3 className="text-xl font-semibold text-slate-800 uppercase tracking-tight">{editingEmp ? 'Update Profile' : 'Register Staff Member'}</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
@@ -183,7 +183,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             <form onSubmit={handleSubmit} className="p-8 space-y-10">
               <section className="space-y-6">
                 <div className="flex items-center gap-2">
-                   <Fingerprint size={16} className="text-indigo-600" />
+                   <Fingerprint size={16} className="text-teal-600" />
                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Personal & Job Info</h4>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
@@ -203,14 +203,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Basic Monthly Salary</label>
-                    <input type="number" step="0.01" required className="w-full px-4 py-3 bg-white border-2 border-indigo-100 rounded-xl text-lg font-mono font-black text-indigo-600" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: Number(e.target.value)})} />
+                    <input type="number" step="0.01" required className="w-full px-4 py-3 bg-white border-2 border-teal-100 rounded-xl text-lg font-mono font-black text-teal-600" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: Number(e.target.value)})} />
                   </div>
                 </div>
               </section>
 
               <section className="space-y-6">
                 <div className="flex items-center gap-2">
-                   <CreditCard size={16} className="text-indigo-600" />
+                   <CreditCard size={16} className="text-teal-600" />
                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Statutory & Disbursement</h4>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -245,7 +245,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
               <div className="pt-8 flex gap-4">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-bold text-slate-400 hover:bg-slate-100 rounded-2xl transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-100 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-teal-100 active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Save size={18} /> {editingEmp ? 'Apply Record Sync' : 'Finalize Registration'}
                 </button>
               </div>

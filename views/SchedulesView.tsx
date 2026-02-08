@@ -175,7 +175,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                  : 'bg-teal-50 text-teal-800 border-teal-200'
               }`}
             >
               {toast.type === 'success' ? (
@@ -183,7 +183,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (
-                <Info size={18} className="text-blue-600" />
+                <Info size={18} className="text-teal-600" />
               )}
               <span className="text-sm font-semibold">{toast.message}</span>
               <button
@@ -200,14 +200,14 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3 uppercase">
-            <CalendarClock className="text-indigo-600" size={32} />
+            <CalendarClock className="text-teal-600" size={32} />
             Institutional Capacity Engine
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Trainer workload matrix and resource allocation optimization.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 font-black text-xs active:scale-95 uppercase tracking-widest"
+          className="flex items-center gap-2 px-8 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition-all shadow-xl shadow-teal-100 font-black text-xs active:scale-95 uppercase tracking-widest"
         >
           <Plus size={16} /> Declare Capacity Profile
         </button>
@@ -218,7 +218,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             placeholder="Find profile by instructor name..." 
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none font-bold"
+            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-teal-500/20 outline-none font-bold"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -254,13 +254,13 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Primary Station</p>
                            <div className="flex items-center gap-2">
-                              <MapPin size={16} className="text-indigo-600" />
+                              <MapPin size={16} className="text-teal-600" />
                               <span className="text-xs font-bold text-slate-700">{location?.name || 'Mobile/Remote'}</span>
                            </div>
                         </div>
 
                         <div className="p-4 bg-slate-900 rounded-2xl border border-white/5 shadow-xl">
-                           <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Resource Load</p>
+                           <p className="text-[9px] font-black text-teal-400 uppercase tracking-widest mb-1">Resource Load</p>
                            <div className="flex items-baseline gap-2">
                               <span className="text-2xl font-mono font-black text-white">{weeklyHours.toFixed(1)}</span>
                               <span className="text-[10px] font-black text-slate-500 uppercase">Hrs / Week</span>
@@ -272,7 +272,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   <div className="mt-8 pt-6 border-t border-slate-100 flex gap-2">
                      <button 
                        onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
-                       className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-indigo-600 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                       className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-teal-600 hover:text-teal-600 transition-all flex items-center justify-center gap-2"
                        disabled={deletingId === sch.id}
                      >
                         <Edit2Icon size={14} /> Adjust Profile
@@ -291,7 +291,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   {DAYS.map((day, idx) => {
                     const slot = sch.slots.find(s => s.dayIndex === idx);
                     return (
-                      <div key={day} className={`p-4 rounded-3xl border-2 flex flex-col items-center justify-center transition-all ${slot ? 'bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 border-slate-50 text-slate-300 opacity-40'}`}>
+                      <div key={day} className={`p-4 rounded-3xl border-2 flex flex-col items-center justify-center transition-all ${slot ? 'bg-teal-600 border-teal-700 text-white shadow-lg shadow-teal-100' : 'bg-slate-50 border-slate-50 text-slate-300 opacity-40'}`}>
                          <p className="text-[10px] font-black uppercase tracking-widest mb-3">{day.slice(0, 3)}</p>
                          {slot ? (
                            <>
@@ -325,7 +325,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
             <div className="flex-1 overflow-y-auto p-10 border-r border-slate-100 bg-white">
                <div className="flex items-center justify-between mb-10">
                   <div className="flex items-center gap-4">
-                     <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><CalendarClock size={28} /></div>
+                     <div className="p-4 bg-teal-600 text-white rounded-2xl shadow-xl shadow-teal-100"><CalendarClock size={28} /></div>
                      <div>
                         <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Configuration Console</h3>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Institutional Labor Matrix v4.1</p>
@@ -337,7 +337,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                <form onSubmit={handleSubmit} className="space-y-12">
                   <section className="space-y-8">
                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><GraduationCap size={18} /></div>
+                        <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><GraduationCap size={18} /></div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">I. Personnel Allocation</h4>
                      </div>
 
@@ -347,7 +347,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                            <select 
                               required 
                               disabled={!!editingSchedule}
-                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm font-black text-slate-800 appearance-none disabled:opacity-50"
+                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-teal-500/10 outline-none text-sm font-black text-slate-800 appearance-none disabled:opacity-50"
                               value={formData.trainerId}
                               onChange={e => setFormData({...formData, trainerId: e.target.value})}
                            >
@@ -358,7 +358,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Primary Deployment Station</label>
                            <select 
-                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm font-black text-slate-800 appearance-none"
+                              className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-teal-500/10 outline-none text-sm font-black text-slate-800 appearance-none"
                               value={formData.locationId}
                               onChange={e => setFormData({...formData, locationId: e.target.value})}
                            >
@@ -371,7 +371,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
                   <section className="space-y-8">
                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Timer size={18} /></div>
+                        <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><Timer size={18} /></div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">II. Shift Definition Matrix</h4>
                      </div>
 
@@ -379,7 +379,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         <div className="absolute top-0 right-0 p-10 opacity-5"><Sparkles size={120} /></div>
                         <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                            <div className="md:col-span-2 space-y-2">
-                              <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest px-1">Target Work Day</label>
+                              <label className="text-[10px] font-black text-teal-400 uppercase tracking-widest px-1">Target Work Day</label>
                               <select 
                                  className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded-2xl outline-none text-sm font-black text-white focus:border-brand"
                                  value={activeSlot.dayIndex}
@@ -416,7 +416,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
             <div className="w-full md:w-[400px] bg-slate-50 p-10 flex flex-col shrink-0">
                <div className="flex items-center justify-between mb-8">
                   <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                     <ShieldCheck size={20} className="text-indigo-600" />
+                     <ShieldCheck size={20} className="text-teal-600" />
                      Live Profile Load
                   </h4>
                   <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest">
@@ -428,9 +428,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                   {(formData.slots || []).length > 0 ? (formData.slots || []).map(s => {
                      const hrs = getSlotHours(s.startTime, s.endTime);
                      return (
-                        <div key={s.dayIndex} className="group p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-indigo-600 transition-all">
+                        <div key={s.dayIndex} className="group p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-teal-600 transition-all">
                            <div className="flex justify-between items-start mb-4">
-                              <span className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.2em]">{DAYS[s.dayIndex]}</span>
+                              <span className="text-[11px] font-black text-teal-600 uppercase tracking-[0.2em]">{DAYS[s.dayIndex]}</span>
                               <button onClick={() => removeSlot(s.dayIndex)} className="text-slate-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                            </div>
                            <div className="flex justify-between items-end">
@@ -438,7 +438,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                                  <p className="text-lg font-mono font-black text-slate-800 tracking-tighter">{s.startTime} — {s.endTime}</p>
                                  <p className="text-[9px] font-black text-slate-400 uppercase">Operational Shift</p>
                               </div>
-                              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                              <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl font-black text-xs group-hover:bg-teal-600 group-hover:text-white transition-all">
                                  {hrs.toFixed(1)}h
                               </div>
                            </div>
@@ -459,7 +459,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cumulative Load</p>
                            <div className="flex items-baseline gap-2">
                               <h5 className="text-4xl font-mono font-black text-slate-900 tracking-tighter">{totalWeeklyHours.toFixed(1)}</h5>
-                              <span className="text-xs font-black text-indigo-600 uppercase">Hours / Week</span>
+                              <span className="text-xs font-black text-teal-600 uppercase">Hours / Week</span>
                            </div>
                         </div>
                         {totalWeeklyHours > 40 && (
@@ -469,9 +469,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         )}
                      </div>
 
-                     <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 flex gap-4">
-                        <Info size={24} className="text-indigo-600 shrink-0" />
-                        <p className="text-[10px] text-indigo-800 leading-relaxed font-bold">
+                     <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 flex gap-4">
+                        <Info size={24} className="text-teal-600 shrink-0" />
+                        <p className="text-[10px] text-teal-800 leading-relaxed font-bold">
                            Instructional hour metrics feed the <strong>Projected Completion Engine</strong>. Modifying this schedule re-forecasts terminal dates for all linked training batches.
                         </p>
                      </div>
@@ -479,7 +479,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                      <button 
                        onClick={handleSubmit}
                        disabled={!formData.trainerId || !formData.slots?.length || isSubmitting}
-                       className="w-full py-5 bg-indigo-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-indigo-900/40 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
+                       className="w-full py-5 bg-teal-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-teal-900/40 hover:bg-teal-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
                      >
                         {isSubmitting ? (
                           <>
@@ -505,7 +505,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
 const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.ReactNode }> = ({ label, value, icon }) => (
   <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
-     <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">{icon}</div>
+     <div className="p-2 bg-teal-500/20 rounded-lg text-teal-400">{icon}</div>
      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
      <span className="text-xs font-black text-white">{value}</span>
   </div>

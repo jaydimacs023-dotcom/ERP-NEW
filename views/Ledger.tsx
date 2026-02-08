@@ -16,13 +16,15 @@ interface LedgerProps {
   trainers: Trainer[];
   batches: Batch[];
   items: NonStockItem[];
+  currentUser?: any;
   onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onApproveJournal?: (entryId: string) => void;
   onReverseJournal?: (entryId: string) => void;
 }
 
 const Ledger: React.FC<LedgerProps> = ({ 
   accounts, entries, lines, students, sponsors, trainers, batches, items, 
-  onPostEntry, onReverseJournal 
+  currentUser, onPostEntry, onApproveJournal, onReverseJournal 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntryForm, setShowEntryForm] = useState(false);
@@ -45,14 +47,14 @@ const Ledger: React.FC<LedgerProps> = ({
             <input 
               type="text" 
               placeholder="Filter by ref or memo..." 
-              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500/20 transition-all font-bold text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <button 
             onClick={() => setShowEntryForm(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 shrink-0"
+            className="flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-200 hover:bg-teal-700 transition-all active:scale-95 shrink-0"
           >
             <Plus size={18} /> New Entry
           </button>
@@ -69,6 +71,7 @@ const Ledger: React.FC<LedgerProps> = ({
                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Account Detail</th>
                 <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Debit</th>
                 <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Credit</th>
+                <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
                 <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Audit</th>
               </tr>
             </thead>
@@ -79,7 +82,7 @@ const Ledger: React.FC<LedgerProps> = ({
                   <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-8 py-6 whitespace-nowrap align-top">
                       <div className="text-sm font-black text-slate-700">{entry.date}</div>
-                      <div className="text-[10px] text-indigo-600 font-mono font-black mt-1 uppercase tracking-tighter">{entry.reference}</div>
+                      <div className="text-[10px] text-teal-600 font-mono font-black mt-1 uppercase tracking-tighter">{entry.reference}</div>
                     </td>
                     <td className="px-8 py-6 align-top">
                       <div className="text-sm font-bold text-slate-800 line-clamp-1">{entry.description}</div>
@@ -120,10 +123,20 @@ const Ledger: React.FC<LedgerProps> = ({
                     <td className="px-8 py-6 text-center align-top">
                       <div className="flex flex-col items-center gap-2">
                         <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase border tracking-widest ${
-                          entry.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                          entry.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                          entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                          'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
                         }`}>
-                          {entry.status}
+                          {entry.status || 'DRAFT'}
                         </span>
+                        {entry.status === 'DRAFT' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
+                          <button
+                            onClick={() => onApproveJournal?.(entry.id)}
+                            className="px-2 py-1 bg-teal-600 text-white text-[8px] font-black uppercase rounded shadow-lg shadow-teal-100 hover:bg-teal-700 transition-all active:scale-95"
+                          >
+                            Approve
+                          </button>
+                        )}
                         {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (
                           <button 
                             onClick={() => onReverseJournal?.(entry.id)}

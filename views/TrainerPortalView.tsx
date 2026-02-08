@@ -112,7 +112,7 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                         <div key={batch.id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl transition-all duration-500">
                            <div className="p-8 border-b bg-slate-50/50 group-hover:bg-white transition-colors">
                               <div className="flex justify-between items-start mb-4">
-                                 <span className="px-4 py-1.5 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-[0.2em] rounded-full">
+                                 <span className="px-4 py-1.5 bg-teal-600 text-white text-[9px] font-black uppercase tracking-[0.2em] rounded-full">
                                     {batch.status.replace('_', ' ')}
                                  </span>
                                  <p className="text-[10px] font-mono font-black text-slate-400 uppercase">BATCH: {batch.name}</p>

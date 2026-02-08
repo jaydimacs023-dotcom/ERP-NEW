@@ -56,12 +56,12 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <CreditCard className="text-indigo-600" size={28} />
+            <CreditCard className="text-teal-600" size={28} />
             Payment History
           </h2>
           <p className="text-sm text-slate-500 font-normal italic">Track subscription payments and manage billing.</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95">
+        <button className="flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95">
           <Download size={18} /> Export Report
         </button>
       </div>
@@ -105,7 +105,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             placeholder="Search by description or invoice..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -115,7 +115,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <select 
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
-            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-indigo-600 outline-none"
+            className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-1 focus:ring-teal-600 outline-none"
           >
             <option value="ALL">All Statuses</option>
             <option value="PAID">Paid</option>

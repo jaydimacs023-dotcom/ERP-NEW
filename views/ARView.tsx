@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
 import { AccountingService } from '../accountingService';
@@ -19,13 +19,15 @@ interface ARViewProps {
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onApproveInvoice?: (entryId: string) => void;
+  currentUser?: any;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 type ARTab = 'invoices' | 'collections' | 'aging';
 
 const ARView: React.FC<ARViewProps> = ({ 
-  entries, lines, students, sponsors, items, accounts, bankAccounts, onPostInvoice, onNotify 
+  entries, lines, students, sponsors, items, accounts, bankAccounts, onPostInvoice, onApproveInvoice, currentUser, onNotify 
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -120,15 +122,33 @@ const ARView: React.FC<ARViewProps> = ({
   const subsidiaryBalances = useMemo(() => {
     const balances: Record<string, number> = {};
     const arAccounts = new Set(accounts.filter(a => a.class === AccountClass.ASSET && a.name.toLowerCase().includes('receivable')).map(a => a.id));
-    lines.forEach(l => {
+    
+    // Only use POSTED entries for confirmed subsidiary balances
+    const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
+    const postedLinesOnly = lines.filter(l => postedEntryIds.has(l.journalEntryId));
+
+    postedLinesOnly.forEach(l => {
       if (l.contactId && arAccounts.has(l.accountId)) {
         balances[l.contactId] = (balances[l.contactId] || 0) + (l.debit - l.credit);
       }
     });
     return balances;
-  }, [lines, accounts]);
+  }, [lines, entries, accounts]);
 
   const totalReceivables = (Object.values(subsidiaryBalances) as number[]).reduce((s, b) => s + b, 0);
+
+  const totalOutputVat = useMemo(() => {
+    // Find VAT Payable account(s)
+    const vatAccountIds = new Set(accounts.filter(a => 
+      a.name.toLowerCase().includes('vat payable') || 
+      a.name.toLowerCase().includes('output vat') ||
+      (a.code && a.code.startsWith('2400'))
+    ).map(a => a.id));
+    
+    // VAT should also only reflect POSTED tax liabilities
+    const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
+    return lines.filter(l => postedEntryIds.has(l.journalEntryId) && vatAccountIds.has(l.accountId)).reduce((sum, l) => sum + (l.credit - l.debit), 0);
+  }, [lines, entries, accounts]);
 
   const filteredInvoices = arInvoices.filter(inv => 
     inv.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -143,7 +163,8 @@ const ARView: React.FC<ARViewProps> = ({
   const agingReport = useMemo(() => {
     const targetAccounts = accounts.filter(a => a.class === AccountClass.ASSET && a.name.toLowerCase().includes('receivable'));
     const targetIds = new Set(targetAccounts.map(a => a.id));
-    const targetEntries = entries.filter(e => e.date <= agingAsOf && e.status !== 'REVERSED');
+    // ONLY POSTED entries for aging
+    const targetEntries = entries.filter(e => e.date <= agingAsOf && e.status === 'POSTED');
     const targetEntryIds = new Set(targetEntries.map(e => e.id));
     const targetLines = lines.filter(l => targetEntryIds.has(l.journalEntryId) && targetIds.has(l.accountId) && l.contactId);
     const referenceDate = new Date(agingAsOf);
@@ -196,7 +217,7 @@ const ARView: React.FC<ARViewProps> = ({
     return (item?.taxCategoryId === 'VAT') ? sum + (l.qty * l.price) : sum;
   }, 0), [invoiceLines, items]);
 
-  const totalVat = vatableSales * 0.12;
+  const totalVat = Math.round(vatableSales * 0.12 * 100) / 100;
   const grossInvoiceAmount = totalInvoiceNet + totalVat;
 
   const handlePostInvoice = (e: React.FormEvent) => {
@@ -229,7 +250,7 @@ const ARView: React.FC<ARViewProps> = ({
     });
     if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType });
 
-    onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description: `Sales Invoice: ${recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.name : students.find(s => s.id === recipientId)?.lastName}`, sourceType: 'INVOICE', status: 'POSTED' }, finalizedLines);
+    onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description: `Sales Invoice: ${recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.name : students.find(s => s.id === recipientId)?.lastName}`, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
     setShowInvoiceModal(false);
   };
 
@@ -269,28 +290,32 @@ const ARView: React.FC<ARViewProps> = ({
         </div>
         <div className="flex items-center gap-3 shrink-0">
            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-             <button onClick={() => setActiveTab('invoices')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'invoices' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+             <button onClick={() => setActiveTab('invoices')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'invoices' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <FileText size={14} className="inline mr-1.5" /> Invoices
              </button>
-             <button onClick={() => setActiveTab('collections')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'collections' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+             <button onClick={() => setActiveTab('collections')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'collections' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <Receipt size={14} className="inline mr-1.5" /> Collections
              </button>
-             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging Report
              </button>
            </div>
            <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
-           <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
+           <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryBox label="Gross Receivables" value={formatCurrency(totalReceivables)} color="indigo" />
-        <SummaryBox label="Collections (MTD)" value={formatCurrency(arCollections.filter(c => c.date.startsWith(new Date().toISOString().slice(0, 7))).reduce((s: number, c) => {
+        <SummaryBox label="Gross Receivables" value={formatCurrency(totalReceivables)} color="teal" />
+        <SummaryBox label="Collections (MTD)" value={formatCurrency(arCollections.filter(c => {
+          const entryDate = new Date(c.date);
+          const now = new Date();
+          return entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear();
+        }).reduce((s: number, c) => {
           const l = lines.find(line => line.journalEntryId === c.id && line.debit > 0);
           return s + (l?.debit || 0);
         }, 0))} color="emerald" />
-        <SummaryBox label="Output VAT Due" value={`\u20B1 0.00`} color="amber" />
+        <SummaryBox label="Output VAT Due" value={formatCurrency(totalOutputVat)} color="amber" />
         <SummaryBox label="Collection Efficiency" value="84%" color="slate" />
       </div>
 
@@ -299,7 +324,7 @@ const ARView: React.FC<ARViewProps> = ({
           <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-indigo-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-teal-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           <table className="min-w-full divide-y divide-slate-200">
@@ -319,11 +344,34 @@ const ARView: React.FC<ARViewProps> = ({
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-5"><div className="text-sm font-bold text-slate-800">{inv.description.split(': ')[1]}</div></td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-indigo-600">{inv.reference}</td>
+                    <td className="px-6 py-5 text-xs font-mono font-bold text-teal-600">{inv.reference}</td>
                     <td className="px-6 py-5 text-xs text-slate-600">{inv.date}</td>
                     <td className="px-6 py-5 text-right font-mono font-bold text-slate-900">{formatCurrency(arLine?.debit || 0)}</td>
-                    <td className="px-6 py-5 text-center"><span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase rounded-full border border-blue-100">Issued</span></td>
-                    <td className="px-6 py-5 text-right"><button className="p-2 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors"><MoreVertical size={16} /></button></td>
+                    <td className="px-6 py-5 text-center">
+                      <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border ${
+                        inv.status === 'POSTED' 
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                          : 'bg-amber-50 text-amber-600 border-amber-100'
+                      }`}>
+                        {inv.status || 'DRAFT'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {inv.status !== 'POSTED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
+                          <button 
+                            onClick={() => onApproveInvoice?.(inv.id)}
+                            className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm"
+                            title="Approve and Post to Ledger"
+                          >
+                            <CheckCircle2 size={12} /> Approve
+                          </button>
+                        )}
+                        <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-300 transition-colors">
+                          <MoreVertical size={16} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 )
               }) : (
@@ -340,7 +388,7 @@ const ARView: React.FC<ARViewProps> = ({
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest px-2">Recent Official Receipts</h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input placeholder="Find by OR# or Payer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-indigo-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input placeholder="Find by OR# or Payer..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none w-72 focus:ring-1 focus:ring-teal-600" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           <table className="min-w-full divide-y divide-slate-200">
@@ -364,7 +412,7 @@ const ARView: React.FC<ARViewProps> = ({
                       <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle size={14} /></div>
                       <div className="text-sm font-bold text-slate-800">{coll.description.split(': ')[1]}</div>
                     </td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-indigo-600">{coll.reference}</td>
+                    <td className="px-6 py-5 text-xs font-mono font-bold text-teal-600">{coll.reference}</td>
                     <td className="px-6 py-5 text-xs text-slate-600">{coll.date}</td>
                     <td className="px-6 py-5 text-right font-mono font-bold text-emerald-600">{formatCurrency(cashLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
@@ -387,7 +435,7 @@ const ARView: React.FC<ARViewProps> = ({
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Calendar size={20} /></div>
+                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl"><Calendar size={20} /></div>
                 <div>
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Effective Aging Date</p>
                    <input type="date" className="bg-transparent border-none outline-none font-bold text-slate-800 text-lg p-0 focus:ring-0" value={agingAsOf} onChange={e => setAgingAsOf(e.target.value)} />
@@ -432,7 +480,7 @@ const ARView: React.FC<ARViewProps> = ({
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-slate-50/50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl"><FileText size={24} /></div>
+                  <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-xl"><FileText size={24} /></div>
                   <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Generate Sales Invoice</h3>
                </div>
                <button onClick={() => setShowInvoiceModal(false)} className="text-slate-400 hover:text-slate-600"><X size={28} /></button>
@@ -446,7 +494,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Sequential #</label>
-                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-indigo-600 font-mono" value={invoiceRef} />
+                    <input readOnly className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-black text-teal-600 font-mono" value={invoiceRef} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Recipient Type</label>
@@ -457,7 +505,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Select Entity</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-indigo-100 rounded-2xl text-sm font-black text-indigo-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-teal-100 rounded-2xl text-sm font-black text-teal-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
                       <option value="">Choose...</option>
                       {recipientType === 'SPONSOR' 
                         ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
@@ -466,9 +514,9 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100/50">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-teal-50/30 rounded-3xl border border-teal-100/50">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 px-1">
+                    <label className="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-2 px-1">
                       <BookOpen size={12} /> Target G/L Receivable Account
                     </label>
                     <select 
@@ -489,7 +537,7 @@ const ARView: React.FC<ARViewProps> = ({
                     </p>
                   </div>
                   <div className="flex items-center gap-4 text-slate-400 italic text-xs pt-4">
-                    <AlertCircle size={14} className="text-indigo-400" />
+                    <AlertCircle size={14} className="text-teal-400" />
                     <span>Selected account is automatically synced with {recipientType === 'SPONSOR' ? 'Sponsor' : 'Individual'} defaults but can be overridden here.</span>
                   </div>
                </div>
@@ -502,7 +550,7 @@ const ARView: React.FC<ARViewProps> = ({
                     <div className="col-span-1"></div>
                   </div>
                   {invoiceLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-indigo-100 transition-all">
+                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded-2xl border border-slate-100 hover:border-teal-100 transition-all">
                       <div className="col-span-5">
                         <select required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
                           <option value="">Select Item...</option>
@@ -515,7 +563,7 @@ const ARView: React.FC<ARViewProps> = ({
                       <div className="col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
                     </div>
                   ))}
-                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border-2 border-dashed border-indigo-100"><Plus size={14}/> Add Invoice Line</button>
+                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase text-teal-600 hover:bg-teal-50 rounded-xl transition-colors border-2 border-dashed border-teal-100"><Plus size={14}/> Add Invoice Line</button>
                </div>
 
                <div className="p-10 bg-slate-900 rounded-[3rem] flex flex-col md:flex-row justify-between items-center gap-10 shadow-2xl">
@@ -536,7 +584,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="flex gap-4 w-full md:w-auto">
                     <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Discard</button>
-                    <button type="submit" className="flex-1 px-12 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-900/40 hover:bg-indigo-500 active:scale-95 transition-all">Authorize & Post SI</button>
+                    <button type="submit" className="flex-1 px-12 py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-teal-900/40 hover:bg-teal-500 active:scale-95 transition-all">Authorize & Post SI</button>
                   </div>
                </div>
             </form>
@@ -646,7 +694,7 @@ const ARView: React.FC<ARViewProps> = ({
 const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-     <p className={`text-2xl font-mono font-black text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'indigo' ? 'indigo-600' : 'amber-600'} tracking-tighter`}>{value}</p>
+     <p className={`text-2xl font-mono font-black text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'teal' ? 'teal-600' : 'amber-600'} tracking-tighter`}>{value}</p>
   </div>
 );
 

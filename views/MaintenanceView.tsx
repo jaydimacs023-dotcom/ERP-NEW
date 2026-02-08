@@ -44,19 +44,19 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
       </header>
 
       {/* Feature Flag / Data Strategy Controller */}
-      <div className="bg-white rounded-[2.5rem] border-2 border-indigo-600 shadow-2xl overflow-hidden animate-in slide-in-from-top-4 duration-700">
-         <div className="p-8 border-b bg-indigo-600 text-white flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="bg-white rounded-[2.5rem] border-2 border-teal-600 shadow-2xl overflow-hidden animate-in slide-in-from-top-4 duration-700">
+         <div className="p-8 border-b bg-teal-600 text-white flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-4">
                <div className="p-3 bg-white/20 rounded-2xl border border-white/20">
                   <Zap size={24} />
                </div>
                <div>
                   <h3 className="text-xl font-black uppercase tracking-tight leading-none">Data Strategy Controller</h3>
-                  <p className="text-xs font-bold text-indigo-100 uppercase tracking-widest mt-1">Instant Feature Flag Switching</p>
+                  <p className="text-xs font-bold text-teal-100 uppercase tracking-widest mt-1">Instant Feature Flag Switching</p>
                </div>
             </div>
             <div className="flex items-center gap-3">
-               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 ${config.useMockData ? 'bg-white text-indigo-600 border-white' : 'bg-emerald-500 text-white border-emerald-400'}`}>
+               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 ${config.useMockData ? 'bg-white text-teal-600 border-white' : 'bg-emerald-500 text-white border-emerald-400'}`}>
                   {config.useMockData ? 'Mock Local Active' : 'Cloud Supabase Active'}
                </span>
             </div>
@@ -65,12 +65,12 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
          <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
                <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                  Manually override the system data source. This utilizes <code className="bg-slate-100 px-1 rounded text-indigo-600">localStorage</code> to persist your choice across sessions.
+                  Manually override the system data source. This utilizes <code className="bg-slate-100 px-1 rounded text-teal-600">localStorage</code> to persist your choice across sessions.
                </p>
                <div className="flex flex-wrap gap-3">
                   <button 
                     onClick={() => config.switchDataSource('MOCK')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${config.useMockData ? 'bg-indigo-600 text-white shadow-xl' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${config.useMockData ? 'bg-teal-600 text-white shadow-xl' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                   >
                      <Monitor size={16} /> Force Mock
                   </button>
@@ -104,7 +104,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white rounded-[2.5rem] border border-slate-200 p-8 space-y-6 shadow-sm">
            <div className="flex items-center gap-4 mb-2">
-              <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Download size={24}/></div>
+              <div className="p-3 bg-teal-600 text-white rounded-2xl shadow-lg"><Download size={24}/></div>
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Export Full Snapshot</h3>
            </div>
            <p className="text-sm text-slate-500 leading-relaxed font-medium">
@@ -112,7 +112,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
            </p>
            <button 
              onClick={onExport}
-             className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
+             className="w-full py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 transition-all shadow-xl shadow-teal-100 flex items-center justify-center gap-2"
            >
              <FileJson size={18} /> Download Backup (.json)
            </button>
@@ -142,7 +142,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
          </div>
          <div className="relative z-10 space-y-8">
             <div className="flex justify-between items-center">
-               <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Security Protocol</h4>
+               <h4 className="text-[10px] font-black text-teal-400 uppercase tracking-[0.3em]">Security Protocol</h4>
                <div className="px-3 py-1 bg-white/10 rounded-full text-[8px] font-black uppercase tracking-widest border border-white/10 flex items-center gap-2">
                   <ShieldCheck size={12} className="text-emerald-400" /> AES-256 Readiness
                </div>
@@ -151,7 +151,7 @@ const MaintenanceView: React.FC<MaintenanceViewProps> = ({ logs, onExport, onImp
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
                   <div className="flex items-center gap-3 mb-4">
-                     <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center"><History size={16}/></div>
+                     <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center"><History size={16}/></div>
                      <span className="text-[10px] font-black uppercase tracking-widest">Soft Delete Registry</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed font-bold">

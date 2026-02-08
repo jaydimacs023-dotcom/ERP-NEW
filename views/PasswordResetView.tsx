@@ -47,7 +47,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
     weak: 'bg-red-500',
     fair: 'bg-amber-500',
     good: 'bg-emerald-500',
-    strong: 'bg-indigo-500',
+    strong: 'bg-teal-500',
   };
 
   const strengthLabels: Record<string, string> = {
@@ -152,7 +152,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             placeholder="you@example.com"
           />
         </div>
@@ -168,7 +168,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
       <button
         type="submit"
         disabled={loading || !email}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {loading ? (
           <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
           </p>
           <a
             href={resetLink}
-            className="text-indigo-400 hover:text-indigo-300 text-sm break-all underline"
+            className="text-teal-400 hover:text-teal-300 text-sm break-all underline"
             onClick={(e) => {
               e.preventDefault();
               // Extract token and reload with it
@@ -223,7 +223,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
           setEmail('');
           setResetLink(null);
         }}
-        className="text-indigo-400 hover:text-indigo-300 text-sm"
+        className="text-teal-400 hover:text-teal-300 text-sm"
       >
         Send another reset link
       </button>
@@ -248,7 +248,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
             required
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="block w-full pl-10 pr-12 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="block w-full pl-10 pr-12 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             placeholder="Enter new password"
           />
           <button
@@ -280,7 +280,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
                 passwordStrength.strength === 'weak' ? 'text-red-400' :
                 passwordStrength.strength === 'fair' ? 'text-amber-400' :
                 passwordStrength.strength === 'good' ? 'text-emerald-400' :
-                'text-indigo-400'
+                'text-teal-400'
               }`}>
                 {strengthLabels[passwordStrength.strength]} ({passwordStrength.score}/7)
               </span>
@@ -307,7 +307,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="block w-full pl-10 pr-3 py-3 border border-slate-700 rounded-xl bg-slate-800/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
             placeholder="Confirm new password"
           />
         </div>
@@ -329,7 +329,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
       <button
         type="submit"
         disabled={loading || !newPassword || !confirmPassword || newPassword !== confirmPassword || passwordStrength?.strength === 'weak'}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {loading ? (
           <div className="flex items-center gap-2">
@@ -355,7 +355,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
       </p>
       <button
         onClick={onBackToLogin}
-        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-purple-600 hover:from-teal-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all"
       >
         Back to Login
       </button>
@@ -378,7 +378,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
           window.history.replaceState({}, '', window.location.pathname);
           window.location.reload();
         }}
-        className="text-indigo-400 hover:text-indigo-300 text-sm"
+        className="text-teal-400 hover:text-teal-300 text-sm"
       >
         Request a new reset link
       </button>
@@ -386,11 +386,11 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 p-4">
       <div className="max-w-md w-full space-y-6">
         {/* Logo/Header */}
         <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-teal-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/30 mb-4">
             <KeyRound className="h-8 w-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white">
@@ -410,7 +410,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
             tokenValid === null ? (
               // Loading token validation
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-500 border-t-transparent" />
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-teal-500 border-t-transparent" />
               </div>
             ) : tokenValid ? (
               // Valid token - show reset form or completion

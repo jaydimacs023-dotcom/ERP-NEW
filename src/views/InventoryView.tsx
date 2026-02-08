@@ -106,7 +106,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       case 'YELLOW':
         return 'bg-yellow-50 border-yellow-200';
       case 'BLUE':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-teal-50 border-teal-200';
       default:
         return 'bg-green-50 border-green-200';
     }
@@ -119,7 +119,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       case 'YELLOW':
         return 'text-yellow-700 bg-yellow-100';
       case 'BLUE':
-        return 'text-blue-700 bg-blue-100';
+        return 'text-teal-700 bg-teal-100';
       default:
         return 'text-green-700 bg-green-100';
     }
@@ -147,9 +147,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <p className="text-sm text-yellow-700 mb-1 font-medium">Low Stock (YELLOW)</p>
           <p className="text-2xl font-bold text-yellow-600">{summaries.lowStockItems}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-blue-200 shadow-sm">
-          <p className="text-sm text-blue-700 mb-1 font-medium">Overstock (BLUE)</p>
-          <p className="text-2xl font-bold text-blue-600">{summaries.overstockedItems}</p>
+        <div className="bg-white p-4 rounded-lg border border-teal-200 shadow-sm">
+          <p className="text-sm text-teal-700 mb-1 font-medium">Overstock (BLUE)</p>
+          <p className="text-2xl font-bold text-teal-600">{summaries.overstockedItems}</p>
         </div>
         <div className="bg-white p-4 rounded-lg border border-green-200 shadow-sm">
           <p className="text-sm text-green-700 mb-1 font-medium">Total Qty</p>
@@ -180,9 +180,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+            <div className="w-3 h-3 rounded-full bg-teal-600"></div>
             <span className="text-sm text-gray-700">
-              <strong className="text-blue-700">BLUE:</strong> Overstock detected
+              <strong className="text-teal-700">BLUE:</strong> Overstock detected
             </span>
           </div>
         </div>
@@ -195,7 +195,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="ALL">All Status</option>
             <option value="RED">Critical (RED)</option>
@@ -209,7 +209,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           >
             <option value="ALL">All Types</option>
             <option value="STOCK_ITEM">Stock Items</option>
@@ -222,7 +222,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
           <div className="col-span-full p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading inventory...</p>
           </div>
         ) : filteredStatuses.length === 0 ? (
@@ -284,7 +284,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
 
               {status.isOverstocked && (
-                <div className="p-2 bg-blue-100 rounded text-xs text-blue-800 flex items-start gap-2">
+                <div className="p-2 bg-teal-100 rounded text-xs text-teal-800 flex items-start gap-2">
                   <TrendingUp className="w-3 h-3 mt-0.5 flex-shrink-0" />
                   <span>Overstock detected</span>
                 </div>
