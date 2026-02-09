@@ -57,7 +57,6 @@ export type EntityType =
   | 'BANK_ACCOUNT'
   | 'BANK_RECONCILIATION'
   | 'CHECK_VOUCHER'
-  | 'EFT_BATCH'
   | 'FIXED_ASSET'
   | 'ITEM'
   | 'GOODS_RECEIPT'

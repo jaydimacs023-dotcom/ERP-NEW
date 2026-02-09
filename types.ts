@@ -355,7 +355,6 @@ export interface Payable extends BaseEntity {
   checkNumber?: string;
   checkDate?: string;
   checkVoucherId?: string;
-  eftBatchId?: string;
   // Enhanced audit fields
   postedBy?: string;
   postedAt?: string;
@@ -580,6 +579,7 @@ export interface JournalEntry extends BaseEntity {
   date: string;
   description: string;
   reference: string;
+  glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL-2026-00001)
   status: 'DRAFT' | 'POSTED' | 'REVERSED';
   createdBy: string;
   createdAt: string;
@@ -895,45 +895,6 @@ export interface CheckVoucher extends BaseEntity {
   voidReason?: string;
   createdAt: string;
   updatedAt?: string;
-}
-
-export interface EFTBatch extends BaseEntity {
-  id: string;
-  orgId: string;
-  batchNumber: string;
-  bankAccountId: string;
-  fileFormat: 'ISO20022' | 'SEPA' | 'NACHA' | 'CUSTOM';
-  status: 'DRAFT' | 'GENERATED' | 'UPLOADED' | 'PROCESSED' | 'REJECTED';
-  totalAmount: number;
-  transactionCount: number;
-  // File info
-  fileName?: string;
-  fileContent?: string;
-  generatedAt?: string;
-  generatedBy?: string;
-  uploadedAt?: string;
-  uploadedBy?: string;
-  processedAt?: string;
-  // Audit
-  createdAt: string;
-  updatedAt?: string;
-}
-
-export interface EFTTransaction {
-  id: string;
-  batchId: string;
-  payableId?: string;
-  payeeId: string;
-  payeeType: 'VENDOR' | 'EMPLOYEE';
-  payeeName: string;
-  payeeBankName?: string;
-  payeeBankAccount?: string;
-  payeeBankRoutingCode?: string;
-  amount: number;
-  currency: string;
-  reference: string;
-  status: 'PENDING' | 'PROCESSED' | 'REJECTED';
-  rejectionReason?: string;
 }
 
 // ============================================================================

@@ -31,7 +31,8 @@ const Ledger: React.FC<LedgerProps> = ({
 
   const filteredEntries = entries.filter(e => 
     e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    e.reference.toLowerCase().includes(searchTerm.toLowerCase())
+    e.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (e.glEntryNumber && e.glEntryNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -66,7 +67,7 @@ const Ledger: React.FC<LedgerProps> = ({
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50/80">
               <tr>
-                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Transaction Anchor</th>
+                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GL Entry # / Date</th>
                 <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Memo / Source</th>
                 <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Account Detail</th>
                 <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Debit</th>
@@ -82,7 +83,12 @@ const Ledger: React.FC<LedgerProps> = ({
                   <tr key={entry.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-8 py-6 whitespace-nowrap align-top">
                       <div className="text-sm font-semibold text-gray-700">{entry.date}</div>
-                      <div className="text-xs text-[#F47721] font-mono font-semibold mt-1 uppercase tracking-tighter">{entry.reference}</div>
+                      <div className="text-xs text-[#F47721] font-mono font-semibold mt-1 uppercase tracking-tighter">
+                        {entry.glEntryNumber || entry.reference}
+                      </div>
+                      {entry.glEntryNumber && entry.reference && (
+                        <div className="text-[10px] text-gray-400 font-medium mt-0.5">Ref: {entry.reference}</div>
+                      )}
                     </td>
                     <td className="px-8 py-6 align-top">
                       <div className="text-sm font-bold text-gray-800 line-clamp-1">{entry.description}</div>

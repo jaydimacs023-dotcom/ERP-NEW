@@ -253,6 +253,159 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
             </div>
         </div>
       </div>
+
+      {/* Define Specification Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-[#F47721]/10 rounded-lg text-[#F47721]">
+                  <Box size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {editingItem ? 'Modify Specification' : 'Define New Specification'}
+                  </h3>
+                  <p className="text-xs text-gray-500 italic">Configure non-stock item parameters and G/L mappings</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowModal(false); resetForm(); }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Item Code <span className="text-gray-300">(SKU)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code || ''}
+                    onChange={e => setFormData({ ...formData, code: e.target.value })}
+                    placeholder="e.g., SVC-001"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Unit Price <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">PHP</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.unitPrice || ''}
+                      onChange={e => setFormData({ ...formData, unitPrice: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      className="w-full pl-14 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Item Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Training Fee, Assessment Fee, Registration Fee"
+                  required
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description || ''}
+                  onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                  placeholder="Optional description for this item..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all resize-none"
+                />
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <LinkIcon size={14} className="text-[#F47721]" />
+                  G/L Account Mapping
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Income Account <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formData.incomeAccountId || ''}
+                      onChange={e => setFormData({ ...formData, incomeAccountId: e.target.value })}
+                      required
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    >
+                      <option value="">Select income account...</option>
+                      {accounts
+                        .filter(a => a.class === 'REVENUE' && !a.isHeader)
+                        .map(acc => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.code} - {acc.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Expense Account
+                    </label>
+                    <select
+                      value={formData.expenseAccountId || ''}
+                      onChange={e => setFormData({ ...formData, expenseAccountId: e.target.value })}
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    >
+                      <option value="">Select expense account (optional)...</option>
+                      {accounts
+                        .filter(a => a.class === 'EXPENSE' && !a.isHeader)
+                        .map(acc => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.code} - {acc.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-4 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { setShowModal(false); resetForm(); }}
+                  className="px-6 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-8 py-3 bg-[#F47721] text-white rounded-lg font-semibold text-sm uppercase tracking-wide shadow-sm hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-2"
+                >
+                  <ShieldCheck size={16} />
+                  {editingItem ? 'Update Specification' : 'Register Specification'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

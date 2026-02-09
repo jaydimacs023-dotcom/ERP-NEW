@@ -43,7 +43,6 @@ export type ModuleTab =
   | 'reports'
   | 'banking'
   | 'checks'
-  | 'eft'
   // AR Modules
   | 'ar'
   | 'recurring-invoices'
@@ -99,7 +98,7 @@ export type ModuleTab =
 const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // SYSTEM_ADMIN: Full platform access
   SYSTEM_ADMIN: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'ledger', 'reports', 'banking', 'checks',
     'ar', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -112,7 +111,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // ADMIN: Full organization access (no system admin modules)
   ADMIN: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'ledger', 'reports', 'banking', 'checks',
     'ar', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -133,7 +132,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // FINANCE_MANAGER: All finance modules
   FINANCE_MANAGER: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'ledger', 'reports', 'banking', 'checks',
     'ar', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -163,7 +162,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AP_SPECIALIST: Accounts Payable focused
   AP_SPECIALIST: [
-    'dashboard', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'reports', 'banking', 'checks',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
@@ -178,7 +177,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AP_SUPERVISOR: AP with approvals
   AP_SUPERVISOR: [
-    'dashboard', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'reports', 'banking', 'checks',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
@@ -187,7 +186,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // TREASURY: Banking and cash management
   TREASURY: [
-    'dashboard', 'reports', 'banking', 'checks', 'eft',
+    'dashboard', 'reports', 'banking', 'checks',
     'ar', // View receivables for cash forecasting
     'payables', // View payables for cash forecasting
     'audit'
@@ -224,7 +223,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
 // ===== Module Groups for Sidebar Sections =====
 export const MODULE_GROUPS = {
-  FINANCIAL_CORE: ['dashboard', 'ledger', 'reports', 'banking', 'checks', 'eft'] as ModuleTab[],
+  FINANCIAL_CORE: ['dashboard', 'ledger', 'reports', 'banking', 'checks'] as ModuleTab[],
   AR_MODULES: ['ar', 'recurring-invoices', 'revenue-recognition'] as ModuleTab[],
   AP_MODULES: ['payables', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],

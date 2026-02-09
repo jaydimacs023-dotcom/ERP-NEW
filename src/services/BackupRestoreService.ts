@@ -8,7 +8,7 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch, Sponsor,
   Vendor, Employee, PayrollRun, JournalEntry, JournalLine, AuditLog,
   Budget, ChartOfAccount, PurchaseOrder, PaymentHistory, Payable,
-  AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation,
+  AccountingPeriod, CheckVoucher, GoodsReceipt, BankReconciliation,
   WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction,
   StockAdjustment, FixedAsset, BankAccount, Location, NonStockItem,
   Payroll, Subscriber, Department, Deduction, SalaryComponent
@@ -48,7 +48,6 @@ export interface BackupRecordCount {
   payables: number;
   accountingPeriods: number;
   checkVouchers: number;
-  eftBatches: number;
   goodsReceipts: number;
   bankReconciliations: number;
   warehouseLocations: number;
@@ -85,7 +84,6 @@ export interface BackupData {
     payables: Payable[];
     accountingPeriods: AccountingPeriod[];
     checkVouchers: CheckVoucher[];
-    eftBatches: EFTBatch[];
     goodsReceipts: GoodsReceipt[];
     bankReconciliations: BankReconciliation[];
     warehouseLocations: WarehouseLocation[];
@@ -144,7 +142,6 @@ export class BackupRestoreService {
       payables: (data.payables || []).length,
       accountingPeriods: (data.accountingPeriods || []).length,
       checkVouchers: (data.checkVouchers || []).length,
-      eftBatches: (data.eftBatches || []).length,
       goodsReceipts: (data.goodsReceipts || []).length,
       bankReconciliations: (data.bankReconciliations || []).length,
       warehouseLocations: (data.warehouseLocations || []).length,
@@ -220,7 +217,6 @@ export class BackupRestoreService {
       payables: (allData.payables || []).filter((p: any) => p.orgId === orgId && !p.isDeleted),
       accountingPeriods: (allData.accountingPeriods || []).filter((a: any) => a.orgId === orgId && !a.isDeleted),
       checkVouchers: (allData.checkVouchers || []).filter((c: any) => c.orgId === orgId && !c.isDeleted),
-      eftBatches: (allData.eftBatches || []).filter((e: any) => e.orgId === orgId && !e.isDeleted),
       goodsReceipts: (allData.goodsReceipts || []).filter((g: any) => g.orgId === orgId && !g.isDeleted),
       bankReconciliations: (allData.bankReconciliations || []).filter((b: any) => b.orgId === orgId && !b.isDeleted),
       warehouseLocations: (allData.warehouseLocations || []).filter((w: any) => w.orgId === orgId && !w.isDeleted),
@@ -330,7 +326,7 @@ export class BackupRestoreService {
       'organizations', 'users', 'students', 'qualifications', 'trainers', 'batches',
       'sponsors', 'vendors', 'employees', 'payrollRuns', 'journalEntries',
       'JournalLines', 'auditLogs', 'budgets', 'chartOfAccounts', 'purchaseOrders',
-      'paymentHistory', 'payables', 'accountingPeriods', 'checkVouchers', 'eftBatches',
+      'paymentHistory', 'payables', 'accountingPeriods', 'checkVouchers',
       'goodsReceipts', 'bankReconciliations', 'warehouseLocations', 'stockItems',
       'inventoryLevels', 'inventoryTransactions', 'stockAdjustments', 'fixedAssets',
       'bankAccounts', 'locations', 'nonStockItems'

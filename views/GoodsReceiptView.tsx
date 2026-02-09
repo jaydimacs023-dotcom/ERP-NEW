@@ -7,7 +7,7 @@ import EmptyState from '../components/EmptyState';
 import {
   Package, Plus, Search, Filter, ChevronDown, X, CheckCircle, 
   Clock, XCircle, Eye, Edit, Trash2, AlertCircle, FileText,
-  Truck, Calendar, Building, ArrowRight, Link, Unlink
+  Truck, Calendar, Building, ArrowRight, Link, Unlink, Layers, ShoppingCart
 } from 'lucide-react';
 
 interface GoodsReceiptViewProps {

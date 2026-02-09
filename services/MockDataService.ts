@@ -817,27 +817,6 @@ export class MockDataService implements IDataService {
     return null;
   }
 
-  // EFT Batch CRUD
-  async createEFTBatch(batch: any): Promise<any> {
-    console.warn('[MockDataService] createEFTBatch - data not persisted.');
-    return { ...batch, id: batch.id || `eft-${Date.now()}`, createdAt: new Date().toISOString() };
-  }
-  async updateEFTBatch(id: string, updates: any): Promise<any> {
-    console.warn('[MockDataService] updateEFTBatch - data not persisted.');
-    return { id, ...updates, updatedAt: new Date().toISOString() };
-  }
-  async deleteEFTBatch(id: string): Promise<void> {
-    console.warn('[MockDataService] deleteEFTBatch - data not persisted.');
-  }
-  async getEFTBatchesByOrg(orgId: string): Promise<any[]> {
-    console.warn('[MockDataService] getEFTBatchesByOrg returning empty array.');
-    return [];
-  }
-  async getEFTBatchById(id: string): Promise<any | null> {
-    console.warn('[MockDataService] getEFTBatchById returning null.');
-    return null;
-  }
-
   // Generic Entity CRUD
   async createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T> {
     console.warn(`[MockDataService] createEntity for ${table} is memory-only.`);

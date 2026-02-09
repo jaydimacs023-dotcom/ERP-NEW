@@ -60,6 +60,15 @@ export class SupabaseDataService implements IDataService {
           console.warn(`[Supabase] ⚠️ Table not found: '${table}' (404) - using empty array`);
           return [] as T[];
         }
+        // Handle RLS permission errors with clear guidance
+        if (response.status === 403 || response.status === 401) {
+          const errorBody = await response.text();
+          console.error(`[Supabase] 🔒 RLS Permission Error on '${table}': ${response.status}`);
+          console.error(`[Supabase] This usually means Row Level Security (RLS) is enabled but no policies are defined.`);
+          console.error(`[Supabase] Run FIX_JOURNAL_RLS.sql in Supabase SQL Editor to fix this.`);
+          console.error(`[Supabase] Response:`, errorBody);
+          return [] as T[];
+        }
         console.error(`[Supabase] ❌ Error fetching ${table}: ${response.status} ${response.statusText}`);
         const errorBody = await response.text();
         console.error(`[Supabase] Response body:`, errorBody);
@@ -225,6 +234,7 @@ export class SupabaseDataService implements IDataService {
    * Convert snake_case object keys to camelCase
    * Used because Supabase tables use snake_case but app uses camelCase
    * Deeply recursive to handle JSONB columns
+   * Also converts numeric string values from PostgreSQL NUMERIC types to JavaScript numbers
    */
   private snakeToCamel(obj: any): any {
     if (obj === null || obj === undefined) return obj;
@@ -232,13 +242,31 @@ export class SupabaseDataService implements IDataService {
     if (Array.isArray(obj)) return obj.map(item => this.snakeToCamel(item));
     if (obj instanceof Date) return obj;
 
+    // Fields that should be converted from string to number (PostgreSQL NUMERIC comes as strings)
+    const numericFields = new Set([
+      'debit', 'credit', 'amount', 'balance', 'quantity', 'qty', 'price', 'unit_price', 'unitPrice',
+      'rate', 'total', 'subtotal', 'tax', 'vat', 'discount', 'net', 'gross', 'fee', 'charge',
+      'cost', 'value', 'salary', 'hours', 'overtime', 'deductions', 'contributions', 'netPay', 'net_pay',
+      'withholding_amount', 'withholdingAmount', 'applied_rate_percent', 'appliedRatePercent',
+      'net_payable', 'netPayable', 'capacity', 'limit'
+    ]);
+
     const camelCaseObj: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         // Convert snake_case to camelCase: is_vat_registered → isVatRegistered
         const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        let value = obj[key];
+        
+        // Convert numeric string values to numbers for known numeric fields
+        if (numericFields.has(key) || numericFields.has(camelKey)) {
+          if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
+            value = Number(value);
+          }
+        }
+        
         // Recursively convert values for nested JSONB objects
-        camelCaseObj[camelKey] = this.snakeToCamel(obj[key]);
+        camelCaseObj[camelKey] = this.snakeToCamel(value);
       }
     }
     return camelCaseObj;
@@ -1141,7 +1169,7 @@ export class SupabaseDataService implements IDataService {
     const slotsBackup = schedule.slots;
     
     const snakeCaseSchedule = this.camelToSnake(schedule);
-    let filteredSchedule = this.filterToTableSchema('schedules', snakeCaseSchedule);
+    let filteredSchedule = this.filterToTableSchema('trainer_schedules', snakeCaseSchedule);
     
     // Restore the original slots array (JSONB content should not be snake_cased)
     if (slotsBackup) {
@@ -1164,7 +1192,7 @@ export class SupabaseDataService implements IDataService {
       delete filteredSchedule.id;
     }
 
-    return this.insertToSupabaseRaw('schedules', filteredSchedule);
+    return this.insertToSupabaseRaw('trainer_schedules', filteredSchedule);
   }
 
   async updateSchedule(id: string, updates: Partial<any>): Promise<any> {
@@ -1172,7 +1200,7 @@ export class SupabaseDataService implements IDataService {
     const slotsBackup = updates.slots;
     
     const snakeCaseUpdates = this.camelToSnake(updates);
-    const filteredUpdates = this.filterToTableSchema('schedules', snakeCaseUpdates);
+    const filteredUpdates = this.filterToTableSchema('trainer_schedules', snakeCaseUpdates);
     
     // Restore the original slots array (JSONB content should not be snake_cased)
     if (slotsBackup) {
@@ -1184,11 +1212,11 @@ export class SupabaseDataService implements IDataService {
       filteredUpdates.location_id = null;
     }
     
-    return this.updateInSupabaseRaw('schedules', id, filteredUpdates);
+    return this.updateInSupabaseRaw('trainer_schedules', id, filteredUpdates);
   }
 
   async deleteSchedule(id: string): Promise<void> {
-    return this.deleteFromSupabase('schedules', id);
+    return this.deleteFromSupabase('trainer_schedules', id);
   }
 
   async checkScheduleUsage(scheduleId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
@@ -3286,12 +3314,27 @@ export class SupabaseDataService implements IDataService {
 
   async createJournalLines(lines: any[]): Promise<any[]> {
     console.debug('[Supabase] createJournalLines called with:', lines.length, 'lines');
+    console.debug('[Supabase] Sample input line:', JSON.stringify(lines[0]));
     try {
+      // Define only the columns that exist in the actual database table
+      // Supabase bulk insert requires all objects to have the same keys (PGRST102 error)
+      const allKeys = [
+        'journal_entry_id', 'account_id', 'debit', 'credit', 'memo',
+        'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
+      ];
+      
       const payloads = lines.map(line => {
         const payload = this.camelToSnake(line);
-        delete payload.id;
-        return payload;
+        
+        // Only include columns that exist in the database
+        const normalizedPayload: any = {};
+        for (const key of allKeys) {
+          normalizedPayload[key] = payload[key] !== undefined ? payload[key] : null;
+        }
+        return normalizedPayload;
       });
+      console.debug('[Supabase] Sample payload to send:', JSON.stringify(payloads[0]));
+      
       const url = `${this.baseUrl}/journal_lines`;
       const response = await fetch(url, {
         method: 'POST',
@@ -3300,10 +3343,14 @@ export class SupabaseDataService implements IDataService {
       });
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[Supabase] createJournalLines failed:', response.status, errorText);
         throw new Error(`Failed to create journal lines: ${response.status} - ${errorText}`);
       }
       const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [this.snakeToCamel(data)];
+      console.debug('[Supabase] createJournalLines response:', JSON.stringify(data[0] || data));
+      const result = Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [this.snakeToCamel(data)];
+      console.debug('[Supabase] createJournalLines converted result sample:', JSON.stringify(result[0]));
+      return result;
     } catch (error) {
       console.error('[Supabase] Error creating journal lines:', error);
       throw error;
@@ -3679,97 +3726,4 @@ export class SupabaseDataService implements IDataService {
       return null;
     }
   }
-
-  // ============================================================================
-  // EFT BATCH CRUD
-  // ============================================================================
-
-  async createEFTBatch(batch: any): Promise<any> {
-    console.debug('[Supabase] createEFTBatch called with:', batch);
-    try {
-      const payload = this.camelToSnake(batch);
-      delete payload.id;
-      const url = `${this.baseUrl}/eft_batches`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create EFT batch: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error creating EFT batch:', error);
-      throw error;
-    }
-  }
-
-  async updateEFTBatch(id: string, updates: any): Promise<any> {
-    console.debug('[Supabase] updateEFTBatch called with id:', id, 'updates:', updates);
-    try {
-      const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update EFT batch: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error updating EFT batch:', error);
-      throw error;
-    }
-  }
-
-  async deleteEFTBatch(id: string): Promise<void> {
-    console.debug('[Supabase] deleteEFTBatch called with id:', id);
-    try {
-      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: this.getHeaders()
-      });
-      if (!response.ok) throw new Error('Failed to delete EFT batch');
-    } catch (error) {
-      console.error('[Supabase] Error deleting EFT batch:', error);
-      throw error;
-    }
-  }
-
-  async getEFTBatchesByOrg(orgId: string): Promise<any[]> {
-    console.debug('[Supabase] getEFTBatchesByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/eft_batches?org_id=eq.${orgId}&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching EFT batches:', error);
-      return [];
-    }
-  }
-
-  async getEFTBatchById(id: string): Promise<any | null> {
-    console.debug('[Supabase] getEFTBatchById called with id:', id);
-    try {
-      const url = `${this.baseUrl}/eft_batches?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
-    } catch (error) {
-      console.error('[Supabase] Error fetching EFT batch:', error);
-      return null;
-    }
-  }
 }
-

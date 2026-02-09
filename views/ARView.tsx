@@ -1,6 +1,6 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Batch, Qualification } from '../types';
 import { AccountingService } from '../accountingService';
 import { 
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock, 
@@ -18,6 +18,8 @@ interface ARViewProps {
   items: NonStockItem[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
+  batches: Batch[];
+  qualifications: Qualification[];
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onApproveInvoice?: (entryId: string) => void;
   currentUser?: any;
@@ -27,7 +29,7 @@ interface ARViewProps {
 type ARTab = 'invoices' | 'collections' | 'aging';
 
 const ARView: React.FC<ARViewProps> = ({ 
-  entries, lines, students, sponsors, items, accounts, bankAccounts, onPostInvoice, onApproveInvoice, currentUser, onNotify 
+  entries, lines, students, sponsors, items, accounts, bankAccounts, batches, qualifications, onPostInvoice, onApproveInvoice, currentUser, onNotify 
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -40,10 +42,41 @@ const ARView: React.FC<ARViewProps> = ({
   const [invoiceRef, setInvoiceRef] = useState('');
   const [recipientType, setRecipientType] = useState<'STUDENT' | 'SPONSOR'>('SPONSOR');
   const [recipientId, setRecipientId] = useState('');
+  const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedArAccountId, setSelectedArAccountId] = useState('');
   const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number }[]>([
     { itemId: '', qty: 1, price: 0 }
   ]);
+
+  // Get batches filtered by selected sponsor (only show batches with sponsorId matching recipientId)
+  const sponsoredBatches = useMemo(() => {
+    if (recipientType !== 'SPONSOR' || !recipientId) return [];
+    return batches.filter(b => b.sponsorId === recipientId && !b.isDeleted);
+  }, [batches, recipientId, recipientType]);
+
+  // Handle batch selection - auto-populate sponsor when batch is selected
+  const handleBatchChange = (batchId: string) => {
+    setSelectedBatchId(batchId);
+    if (batchId) {
+      const batch = batches.find(b => b.id === batchId);
+      if (batch?.sponsorId) {
+        setRecipientType('SPONSOR');
+        setRecipientId(batch.sponsorId);
+      }
+    }
+  };
+
+  // Handle sponsor change - reset batch selection if sponsor changes
+  const handleRecipientChange = (newRecipientId: string) => {
+    setRecipientId(newRecipientId);
+    // If the new sponsor doesn't match the selected batch's sponsor, reset batch
+    if (selectedBatchId) {
+      const batch = batches.find(b => b.id === selectedBatchId);
+      if (batch?.sponsorId !== newRecipientId) {
+        setSelectedBatchId('');
+      }
+    }
+  };
 
   // Collection Form State
   const [collDate, setCollDate] = useState(new Date().toISOString().split('T')[0]);
@@ -242,16 +275,27 @@ const ARView: React.FC<ARViewProps> = ({
       return onNotify('error', 'Accounting Error: VAT account (2200 or "Output VAT") not found in Chart of Accounts.');
     }
 
+    // Include batchId in all lines for tracking (if a batch is selected)
+    const batchId = selectedBatchId || undefined;
+    
     const finalizedLines: JournalLine[] = [];
-    finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType });
+    finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType, batchId });
     invoiceLines.forEach((il, idx) => {
       const item = items.find(i => i.id === il.itemId);
-      if (item) finalizedLines.push({ id: `l-rev-${idx}-${Date.now()}`, journalEntryId: entryId, accountId: item.incomeAccountId, debit: 0, credit: il.qty * il.price, contactId: recipientId, contactType: recipientType, itemId: il.itemId });
+      if (item) finalizedLines.push({ id: `l-rev-${idx}-${Date.now()}`, journalEntryId: entryId, accountId: item.incomeAccountId, debit: 0, credit: il.qty * il.price, contactId: recipientId, contactType: recipientType, itemId: il.itemId, batchId });
     });
-    if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType });
+    if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType, batchId });
 
-    onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description: `Sales Invoice: ${recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.name : students.find(s => s.id === recipientId)?.lastName}`, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
+    // Build description including batch info if selected
+    const recipientName = recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.name : students.find(s => s.id === recipientId)?.lastName;
+    const batch = selectedBatchId ? batches.find(b => b.id === selectedBatchId) : null;
+    const description = batch 
+      ? `Sales Invoice: ${recipientName} - Batch: ${batch.batchCode || batch.name}`
+      : `Sales Invoice: ${recipientName}`;
+
+    onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
     setShowInvoiceModal(false);
+    setSelectedBatchId(''); // Reset batch selection for next invoice
   };
 
   const handlePostCollection = (e: React.FormEvent) => {
@@ -332,6 +376,7 @@ const ARView: React.FC<ARViewProps> = ({
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer / Sponsor</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Invoice #</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">GL Entry #</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount Due</th>
                 <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
@@ -345,6 +390,9 @@ const ARView: React.FC<ARViewProps> = ({
                   <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-5"><div className="text-sm font-bold text-gray-800">{inv.description.split(': ')[1]}</div></td>
                     <td className="px-6 py-5 text-xs font-mono font-bold text-[#F47721]">{inv.reference}</td>
+                    <td className="px-6 py-5 text-xs font-mono font-bold text-emerald-600">
+                      {inv.glEntryNumber || <span className="text-gray-300 italic font-normal">—</span>}
+                    </td>
                     <td className="px-6 py-5 text-xs text-gray-600">{inv.date}</td>
                     <td className="px-6 py-5 text-right font-mono font-bold text-gray-900">{formatCurrency(arLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
@@ -375,7 +423,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </tr>
                 )
               }) : (
-                <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sales invoices recorded.</td></tr>
+                <tr><td colSpan={7} className="py-20 text-center text-gray-400 italic">No sales invoices recorded.</td></tr>
               )}
             </tbody>
           </table>
@@ -498,14 +546,14 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Recipient Type</label>
-                    <select className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); }}>
+                    <select className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded text-sm font-bold" value={recipientType} onChange={e => { setRecipientType(e.target.value as any); setRecipientId(''); setSelectedBatchId(''); }}>
                       <option value="SPONSOR">Corporate Sponsor</option>
                       <option value="STUDENT">Individual Learner</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Select Entity</label>
-                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-orange-100 rounded text-sm font-semibold text-orange-700" value={recipientId} onChange={e => setRecipientId(e.target.value)}>
+                    <select required className="w-full px-5 py-3.5 bg-white border-2 border-orange-100 rounded text-sm font-semibold text-orange-700" value={recipientId} onChange={e => handleRecipientChange(e.target.value)}>
                       <option value="">Choose...</option>
                       {recipientType === 'SPONSOR' 
                         ? sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
@@ -514,6 +562,53 @@ const ARView: React.FC<ARViewProps> = ({
                     </select>
                   </div>
                </div>
+
+               {/* Batch Selection - Only show for SPONSOR type */}
+               {recipientType === 'SPONSOR' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-blue-50/30 rounded-md border border-blue-100/50">
+                   <div className="space-y-1.5">
+                     <label className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-2 px-1">
+                       <Calendar size={12} /> Training Batch (Optional)
+                     </label>
+                     <select 
+                       className="w-full px-5 py-3.5 bg-white border border-gray-200 rounded text-sm font-bold shadow-sm"
+                       value={selectedBatchId}
+                       onChange={e => handleBatchChange(e.target.value)}
+                     >
+                       <option value="">No specific batch</option>
+                       {sponsoredBatches.map(batch => {
+                         const qual = qualifications.find(q => q.id === batch.qualificationId);
+                         return (
+                           <option key={batch.id} value={batch.id}>
+                             {batch.batchCode || batch.name} - {qual?.name || 'Unknown'} ({batch.startDate} to {batch.endDate})
+                           </option>
+                         );
+                       })}
+                     </select>
+                     <p className="text-xs text-gray-500 italic mt-1 px-1">
+                       Link this invoice to a specific training batch for tracking purposes.
+                     </p>
+                   </div>
+                   <div className="flex items-center gap-4">
+                     {selectedBatchId && (() => {
+                       const batch = batches.find(b => b.id === selectedBatchId);
+                       const qual = qualifications.find(q => q.id === batch?.qualificationId);
+                       return batch ? (
+                         <div className="bg-white p-4 rounded border border-blue-100 w-full">
+                           <p className="text-xs font-bold text-blue-600 uppercase mb-2">Selected Batch Details</p>
+                           <p className="text-sm font-semibold text-gray-800">{batch.batchCode || batch.name}</p>
+                           <p className="text-xs text-gray-500">{qual?.name}</p>
+                           <p className="text-xs text-gray-400 mt-1">{batch.studentIds?.length || 0} enrolled students</p>
+                           <p className="text-xs text-gray-400">{batch.startDate} → {batch.endDate}</p>
+                         </div>
+                       ) : null;
+                     })()}
+                     {!selectedBatchId && sponsoredBatches.length === 0 && recipientId && (
+                       <p className="text-xs text-gray-400 italic">No training batches found for this sponsor.</p>
+                     )}
+                   </div>
+                 </div>
+               )}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-orange-50/30 rounded-md border border-orange-100/50">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide flex items-center gap-2 px-1">

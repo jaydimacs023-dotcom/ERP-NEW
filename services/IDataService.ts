@@ -6,7 +6,7 @@ import {
   JournalEntry, JournalLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
-  RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, EFTBatch
+  RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -328,13 +328,6 @@ export interface IDataService {
   deleteRecurringBill(id: string): Promise<void>;
   getRecurringBillsByOrg(orgId: string): Promise<RecurringBill[]>;
   getRecurringBillById(id: string): Promise<RecurringBill | null>;
-
-  // EFT Batch CRUD
-  createEFTBatch(batch: EFTBatch): Promise<EFTBatch>;
-  updateEFTBatch(id: string, updates: Partial<EFTBatch>): Promise<EFTBatch>;
-  deleteEFTBatch(id: string): Promise<void>;
-  getEFTBatchesByOrg(orgId: string): Promise<EFTBatch[]>;
-  getEFTBatchById(id: string): Promise<EFTBatch | null>;
 
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;
