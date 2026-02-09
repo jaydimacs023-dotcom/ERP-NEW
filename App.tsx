@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, ItemGroup, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -389,6 +389,7 @@ export default function App() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [items, setItems] = useState<NonStockItem[]>([]);
+  const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorTaxSettings, setVendorTaxSettings] = useState<any[]>([]);
   const [atcCategories, setAtcCategories] = useState<any[]>([]);
@@ -724,7 +725,7 @@ export default function App() {
     }
   };
 
-  const handleApproveJournal = async (entryId: string) => {
+  const handleApproveJournal = async (entryId: string, comment?: string) => {
     try {
       const entry = journalEntries.find(e => e.id === entryId);
       if (!entry) return;
@@ -735,10 +736,24 @@ export default function App() {
       const nextNum = postedEntries.length + 1;
       const glEntryNumber = `GL-${year}-${String(nextNum).padStart(5, '0')}`;
 
+      // Add approval comment if provided
+      const reviewComments = entry.reviewComments || [];
+      if (comment) {
+        reviewComments.push({
+          id: `rc-${Date.now()}`,
+          userId: currentUser?.id || 'system',
+          userName: currentUser?.name || 'System',
+          comment,
+          action: 'APPROVED',
+          createdAt: new Date().toISOString()
+        });
+      }
+
       const updatedEntry = {
         ...entry,
         status: 'POSTED' as const,
         glEntryNumber,
+        reviewComments,
         approvedBy: currentUser?.id,
         approvedAt: new Date().toISOString()
       };
@@ -761,6 +776,101 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error approving journal entry:', error);
       handleNotify('error', 'Failed to approve journal entry');
+    }
+  };
+
+  const handleRequestRevision = async (entryId: string, comment: string) => {
+    try {
+      const entry = journalEntries.find(e => e.id === entryId);
+      if (!entry) return;
+
+      // Add revision request comment
+      const reviewComments = entry.reviewComments || [];
+      reviewComments.push({
+        id: `rc-${Date.now()}`,
+        userId: currentUser?.id || 'system',
+        userName: currentUser?.name || 'System',
+        comment,
+        action: 'REQUEST_REVISION',
+        createdAt: new Date().toISOString()
+      });
+
+      const updatedEntry = {
+        ...entry,
+        status: 'REVISION_REQUESTED' as const,
+        reviewComments
+      };
+
+      const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
+      
+      setJournalEntries(prev => prev.map(e => e.id === entryId ? savedEntry : e));
+      handleNotify('info', `Revision requested for ${entry.reference}. AR personnel has been notified.`);
+      
+      // Audit
+      AuditService.post(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        entryId,
+        entryId,
+        `Requested revision on journal: ${entry.reference} - ${comment}`
+      );
+    } catch (error) {
+      console.error('[App] Error requesting revision:', error);
+      handleNotify('error', 'Failed to request revision');
+    }
+  };
+
+  const handleUpdateInvoice = async (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
+    if (!entry.id) {
+      handleNotify('error', 'Cannot update: Invoice ID missing');
+      return;
+    }
+    
+    try {
+      // Reset status to DRAFT when invoice is edited after revision request
+      const updatedEntry = {
+        ...entry,
+        status: 'DRAFT' as const,
+        updatedBy: currentUser?.id || 'system',
+        updatedAt: new Date().toISOString()
+      };
+
+      const savedEntry = await dataService.updateJournalEntry(entry.id, updatedEntry);
+      
+      // Delete existing lines for this entry and create new ones
+      const existingLines = journalLines.filter(l => l.journalEntryId === entry.id);
+      for (const line of existingLines) {
+        await dataService.deleteJournalLine(line.id);
+      }
+      
+      // Create new lines
+      const linesWithEntryId = lines.map(line => ({
+        ...line,
+        journalEntryId: entry.id!
+      }));
+      const savedLines = await dataService.createJournalLines(linesWithEntryId);
+      
+      // Update state
+      setJournalEntries(prev => prev.map(e => e.id === entry.id ? savedEntry : e));
+      setJournalLines(prev => [...prev.filter(l => l.journalEntryId !== entry.id), ...savedLines]);
+      
+      handleNotify('success', `Invoice ${entry.reference} updated successfully`);
+      
+      // Audit
+      AuditService.post(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        entry.id,
+        entry.id,
+        `Updated invoice: ${entry.reference} (${savedLines.length} lines)`
+      );
+    } catch (error) {
+      console.error('[App] Error updating invoice:', error);
+      handleNotify('error', 'Failed to update invoice');
     }
   };
 
@@ -3002,11 +3112,31 @@ export default function App() {
     try {
       console.info('[App] Updating purchase order status:', id, status);
       const existing = purchaseOrders.find(p => p.id === id);
-      const updated = await dataService.updatePurchaseOrder(id, { status: status as any });
-      setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, status: updated.status } : p));
+      
+      // Generate GL Entry Number when approving
+      let updatePayload: any = { status: status as any };
+      if (status === 'APPROVED' && existing && !existing.glEntryNumber) {
+        const year = new Date().getFullYear();
+        // Count all entries with GL numbers (from both journal entries and POs)
+        const postedJournals = journalEntries.filter(e => e.status === 'POSTED' && e.glEntryNumber);
+        const approvedPOs = purchaseOrders.filter(p => p.glEntryNumber);
+        const nextNum = postedJournals.length + approvedPOs.length + 1;
+        const glEntryNumber = `GL-${year}-${String(nextNum).padStart(5, '0')}`;
+        updatePayload.glEntryNumber = glEntryNumber;
+        updatePayload.approvedBy = currentUser?.id;
+        updatePayload.approvedAt = new Date().toISOString();
+      }
+      
+      const updated = await dataService.updatePurchaseOrder(id, updatePayload);
+      setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
       
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PURCHASE_ORDER', id, existing?.reference, { status: existing?.status }, { status });
-      handleNotify('success', 'Purchase order status updated successfully');
+      
+      if (status === 'APPROVED' && updatePayload.glEntryNumber) {
+        handleNotify('success', `Purchase order approved. GL Entry #: ${updatePayload.glEntryNumber}`);
+      } else {
+        handleNotify('success', 'Purchase order status updated successfully');
+      }
     } catch (error) {
       console.error('[App] Error updating purchase order:', error);
       handleNotify('error', 'Failed to update purchase order. Falling back to memory storage.');
@@ -3385,10 +3515,10 @@ export default function App() {
           )}
 
           {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries.filter(e => e.status === 'POSTED')} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
-          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} batches={batches} qualifications={qualifications} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} />}
+          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} itemGroups={itemGroups.filter(g => g.orgId === currentOrgId && !g.isDeleted)} accounts={filteredAccounts} bankAccounts={bankAccounts} batches={batches} qualifications={qualifications} onPostInvoice={handlePostJournal} onUpdateInvoice={handleUpdateInvoice} onApproveInvoice={handleApproveJournal} onRequestRevision={handleRequestRevision} onAddItemGroup={(group) => setItemGroups(prev => [...prev, { ...group, orgId: currentOrgId }])} onUpdateItemGroup={(id, updates) => setItemGroups(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))} onDeleteItemGroup={(id) => setItemGroups(prev => prev.map(g => g.id === id ? { ...g, isDeleted: true } : g))} currentUser={currentUser} onNotify={handleNotify} />}
           {activeTab === 'recurring-invoices' && <RecurringInvoicesView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} recurringInvoices={recurringInvoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} recurringInvoiceHistory={recurringInvoiceHistory.filter(h => h.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} onCreateRecurringInvoice={handleAddRecurringInvoice} onUpdateRecurringInvoice={handleUpdateRecurringInvoice} onDeleteRecurringInvoice={handleDeleteRecurringInvoice} onRunRecurringInvoice={handleRunRecurringInvoice} onNotify={handleNotify} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} currency={currentOrg?.currency} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}

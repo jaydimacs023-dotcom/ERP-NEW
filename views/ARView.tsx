@@ -1,13 +1,13 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Batch, Qualification } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
 import { AccountingService } from '../accountingService';
 import { 
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock, 
   MoreVertical, CreditCard, ChevronRight, X, User, Handshake, 
   Trash2, AlertCircle, Save, CheckCircle2, Link as LinkIcon,
   BookOpen, Calculator, Percent, History, Calendar, BarChart3,
-  Download, Printer, Landmark, Wallet, Receipt
+  Download, Printer, Landmark, Wallet, Receipt, Package, MessageSquare, Send, RotateCcw, Edit3
 } from 'lucide-react';
 
 interface ARViewProps {
@@ -16,26 +16,49 @@ interface ARViewProps {
   students: Student[];
   sponsors: Sponsor[];
   items: NonStockItem[];
+  itemGroups: ItemGroup[];
   accounts: ChartOfAccount[];
   bankAccounts: BankAccount[];
   batches: Batch[];
   qualifications: Qualification[];
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
-  onApproveInvoice?: (entryId: string) => void;
+  onUpdateInvoice?: (entryId: string, entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onApproveInvoice?: (entryId: string, comment?: string) => void;
+  onRequestRevision?: (entryId: string, comment: string) => void;
+  onAddComment?: (entryId: string, comment: string) => void;
+  onAddItemGroup?: (group: Partial<ItemGroup>) => void;
+  onUpdateItemGroup?: (id: string, updates: Partial<ItemGroup>) => void;
+  onDeleteItemGroup?: (id: string) => void;
   currentUser?: any;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-type ARTab = 'invoices' | 'collections' | 'aging';
+type ARTab = 'invoices' | 'collections' | 'aging' | 'item-groups';
 
 const ARView: React.FC<ARViewProps> = ({ 
-  entries, lines, students, sponsors, items, accounts, bankAccounts, batches, qualifications, onPostInvoice, onApproveInvoice, currentUser, onNotify 
+  entries, lines, students, sponsors, items, itemGroups, accounts, bankAccounts, batches, qualifications, onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify 
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showItemGroupModal, setShowItemGroupModal] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [selectedInvoiceForApproval, setSelectedInvoiceForApproval] = useState<JournalEntry | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<JournalEntry | null>(null);
+  const [approvalComment, setApprovalComment] = useState('');
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'revision'>('approve');
+  const [editingItemGroup, setEditingItemGroup] = useState<ItemGroup | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
+
+  // Item Group Form State
+  const [itemGroupCode, setItemGroupCode] = useState('');
+  const [itemGroupName, setItemGroupName] = useState('');
+  const [itemGroupDescription, setItemGroupDescription] = useState('');
+  const [itemGroupItems, setItemGroupItems] = useState<{ itemId: string; qty: number; price: number }[]>([
+    { itemId: '', qty: 1, price: 0 }
+  ]);
 
   // Invoice Form State
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -89,10 +112,10 @@ const ARView: React.FC<ARViewProps> = ({
 
   // Load next sequential references
   useEffect(() => {
-    if (showInvoiceModal) {
+    if (showInvoiceModal && !editingInvoice) {
       setInvoiceRef(AccountingService.getNextReference(entries, 'SI'));
     }
-  }, [showInvoiceModal, entries]);
+  }, [showInvoiceModal, entries, editingInvoice]);
 
   useEffect(() => {
     if (showCollectionModal) {
@@ -243,6 +266,149 @@ const ARView: React.FC<ARViewProps> = ({
     setInvoiceLines(newLines);
   };
 
+  // Apply item group to invoice lines
+  const handleApplyItemGroup = (groupId: string) => {
+    const group = itemGroups.find(g => g.id === groupId);
+    if (!group) return;
+    
+    // Convert item group items to invoice lines
+    const newLines = group.items.map(gi => ({
+      itemId: gi.itemId,
+      qty: gi.qty,
+      price: gi.price
+    }));
+    
+    setInvoiceLines(prev => {
+      // Filter out empty lines and add new lines
+      const nonEmpty = prev.filter(l => l.itemId);
+      return [...nonEmpty, ...newLines];
+    });
+    
+    onNotify('success', `Applied item group: ${group.name}`);
+  };
+
+  // Edit invoice - populate form with existing invoice data
+  const handleEditInvoice = (invoice: JournalEntry) => {
+    setEditingInvoice(invoice);
+    setInvoiceDate(invoice.date);
+    setInvoiceRef(invoice.reference);
+    
+    // Get invoice lines to populate form
+    const invoiceJournalLines = lines.filter(l => l.journalEntryId === invoice.id);
+    
+    // Find the AR line (debit line) to get recipient info
+    const arLine = invoiceJournalLines.find(l => l.debit > 0);
+    if (arLine) {
+      setRecipientType(arLine.contactType as 'STUDENT' | 'SPONSOR');
+      setRecipientId(arLine.contactId || '');
+      setSelectedArAccountId(arLine.accountId);
+      if (arLine.batchId) setSelectedBatchId(arLine.batchId);
+    }
+    
+    // Get revenue lines (credit lines with items) to populate invoice lines
+    const revenueLines = invoiceJournalLines.filter(l => l.credit > 0 && l.itemId);
+    if (revenueLines.length > 0) {
+      setInvoiceLines(revenueLines.map(rl => ({
+        itemId: rl.itemId || '',
+        qty: 1, // We don't store qty separately, so we need to calculate
+        price: rl.credit
+      })));
+    } else {
+      setInvoiceLines([{ itemId: '', qty: 1, price: 0 }]);
+    }
+    
+    setShowInvoiceModal(true);
+  };
+
+  // Reset invoice form
+  const resetInvoiceForm = () => {
+    setEditingInvoice(null);
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setInvoiceRef('');
+    setRecipientType('SPONSOR');
+    setRecipientId('');
+    setSelectedBatchId('');
+    setSelectedArAccountId('');
+    setInvoiceLines([{ itemId: '', qty: 1, price: 0 }]);
+  };
+
+  // Item Group handlers
+  const handleAddItemGroupLine = () => setItemGroupItems([...itemGroupItems, { itemId: '', qty: 1, price: 0 }]);
+  const handleRemoveItemGroupLine = (i: number) => setItemGroupItems(itemGroupItems.filter((_, idx) => idx !== i));
+  const updateItemGroupLine = (index: number, updates: any) => {
+    const newLines = [...itemGroupItems];
+    newLines[index] = { ...newLines[index], ...updates };
+    if (updates.itemId) {
+      const item = items.find(i => i.id === updates.itemId);
+      if (item) newLines[index].price = item.unitPrice;
+    }
+    setItemGroupItems(newLines);
+  };
+
+  const itemGroupTotal = useMemo(() => itemGroupItems.reduce((sum, l) => sum + (l.qty * l.price), 0), [itemGroupItems]);
+
+  const resetItemGroupForm = () => {
+    setItemGroupCode('');
+    setItemGroupName('');
+    setItemGroupDescription('');
+    setItemGroupItems([{ itemId: '', qty: 1, price: 0 }]);
+    setEditingItemGroup(null);
+  };
+
+  const handleSaveItemGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemGroupCode || !itemGroupName) {
+      return onNotify('error', 'Code and Name are required');
+    }
+    if (itemGroupItems.filter(l => l.itemId).length === 0) {
+      return onNotify('error', 'At least one item is required');
+    }
+
+    const groupData = {
+      code: itemGroupCode,
+      name: itemGroupName,
+      description: itemGroupDescription,
+      items: itemGroupItems.filter(l => l.itemId).map(l => ({
+        itemId: l.itemId,
+        qty: l.qty,
+        price: l.price
+      })),
+      totalAmount: itemGroupTotal,
+      isActive: true
+    };
+
+    if (editingItemGroup && onUpdateItemGroup) {
+      onUpdateItemGroup(editingItemGroup.id, groupData);
+      onNotify('success', 'Item group updated successfully');
+    } else if (onAddItemGroup) {
+      onAddItemGroup({
+        id: `ig-${Date.now()}`,
+        ...groupData,
+        createdAt: new Date().toISOString()
+      });
+      onNotify('success', 'Item group created successfully');
+    }
+
+    setShowItemGroupModal(false);
+    resetItemGroupForm();
+  };
+
+  const handleEditItemGroup = (group: ItemGroup) => {
+    setEditingItemGroup(group);
+    setItemGroupCode(group.code);
+    setItemGroupName(group.name);
+    setItemGroupDescription(group.description || '');
+    setItemGroupItems(group.items.map(i => ({ itemId: i.itemId, qty: i.qty, price: i.price })));
+    setShowItemGroupModal(true);
+  };
+
+  const handleDeleteItemGroup = (id: string) => {
+    if (onDeleteItemGroup && confirm('Are you sure you want to delete this item group?')) {
+      onDeleteItemGroup(id);
+      onNotify('success', 'Item group deleted');
+    }
+  };
+
   const totalInvoiceNet = useMemo(() => invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0), [invoiceLines]);
 
   const vatableSales = useMemo(() => invoiceLines.reduce((sum, l) => {
@@ -258,7 +424,7 @@ const ARView: React.FC<ARViewProps> = ({
     if (!recipientId) return onNotify('error', 'Validation Error: Learner or Sponsor recipient must be defined.');
     if (grossInvoiceAmount <= 0) return onNotify('error', 'Validation Error: Invoice amount must be greater than zero.');
     
-    const entryId = `je-inv-${Date.now()}`;
+    const entryId = editingInvoice?.id || `je-inv-${Date.now()}`;
     // Use the explicitly selected G/L account from the form
     const arAccountId = selectedArAccountId;
       
@@ -293,9 +459,25 @@ const ARView: React.FC<ARViewProps> = ({
       ? `Sales Invoice: ${recipientName} - Batch: ${batch.batchCode || batch.name}`
       : `Sales Invoice: ${recipientName}`;
 
-    onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
+    if (editingInvoice && onUpdateInvoice) {
+      // Update existing invoice - restore to DRAFT status after revision
+      onUpdateInvoice({ 
+        id: entryId, 
+        date: invoiceDate, 
+        reference: invoiceRef, 
+        description, 
+        sourceType: 'INVOICE', 
+        status: 'DRAFT',
+        reviewComments: editingInvoice.reviewComments // Preserve review comments
+      }, finalizedLines);
+      onNotify('success', 'Invoice updated and resubmitted for approval');
+    } else {
+      // Create new invoice
+      onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
+    }
+    
     setShowInvoiceModal(false);
-    setSelectedBatchId(''); // Reset batch selection for next invoice
+    resetInvoiceForm();
   };
 
   const handlePostCollection = (e: React.FormEvent) => {
@@ -343,6 +525,9 @@ const ARView: React.FC<ARViewProps> = ({
              <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging Report
              </button>
+             <button onClick={() => setActiveTab('item-groups')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'item-groups' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+               <Package size={14} className="inline mr-1.5" /> Item Groups
+             </button>
            </div>
            <button onClick={() => { setShowCollectionModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"><Landmark size={18} /> Collect Payment</button>
            <button onClick={() => { setShowInvoiceModal(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"><Plus size={18} /> New Invoice</button>
@@ -386,9 +571,19 @@ const ARView: React.FC<ARViewProps> = ({
             <tbody className="divide-y divide-gray-100">
               {filteredInvoices.length > 0 ? filteredInvoices.reverse().map(inv => {
                 const arLine = lines.find(l => l.journalEntryId === inv.id && l.debit > 0);
+                const hasComments = inv.reviewComments && inv.reviewComments.length > 0;
+                const latestComment = hasComments ? inv.reviewComments![inv.reviewComments!.length - 1] : null;
                 return (
-                  <tr key={inv.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-5"><div className="text-sm font-bold text-gray-800">{inv.description.split(': ')[1]}</div></td>
+                  <tr key={inv.id} className={`hover:bg-gray-50 transition-colors group ${inv.status === 'REVISION_REQUESTED' ? 'bg-amber-50/50' : ''}`}>
+                    <td className="px-6 py-5">
+                      <div className="text-sm font-bold text-gray-800">{inv.description.split(': ')[1]}</div>
+                      {inv.status === 'REVISION_REQUESTED' && latestComment && (
+                        <div className="mt-1 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-100/50 px-2 py-1 rounded">
+                          <MessageSquare size={12} className="mt-0.5 shrink-0" />
+                          <span className="line-clamp-1">{latestComment.comment}</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-5 text-xs font-mono font-bold text-[#F47721]">{inv.reference}</td>
                     <td className="px-6 py-5 text-xs font-mono font-bold text-emerald-600">
                       {inv.glEntryNumber || <span className="text-gray-300 italic font-normal">—</span>}
@@ -398,21 +593,50 @@ const ARView: React.FC<ARViewProps> = ({
                     <td className="px-6 py-5 text-center">
                       <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full border ${
                         inv.status === 'POSTED' 
-                          ? 'bg-orange-50 text-[#F47721] border-orange-100' 
-                          : 'bg-amber-50 text-[#F47721] border-amber-100'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                          : inv.status === 'REVISION_REQUESTED'
+                          ? 'bg-amber-50 text-amber-600 border-amber-100'
+                          : 'bg-gray-50 text-gray-500 border-gray-100'
                       }`}>
-                        {inv.status || 'DRAFT'}
+                        {inv.status === 'REVISION_REQUESTED' ? 'REVISION' : inv.status || 'DRAFT'}
                       </span>
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {/* Show comments button if there are comments */}
+                        {hasComments && (
+                          <button 
+                            onClick={() => { setSelectedInvoiceForApproval(inv); setShowCommentsModal(true); }}
+                            className="flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-[#F47721] hover:bg-orange-50 rounded text-xs transition-all"
+                            title={`${inv.reviewComments?.length} comment(s)`}
+                          >
+                            <MessageSquare size={14} />
+                            <span className="font-bold">{inv.reviewComments?.length}</span>
+                          </button>
+                        )}
+                        {/* Edit button - for DRAFT or REVISION_REQUESTED invoices */}
+                        {(inv.status === 'DRAFT' || inv.status === 'REVISION_REQUESTED') && (
+                          <button 
+                            onClick={() => handleEditInvoice(inv)}
+                            className="flex items-center gap-1.5 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+                            title="Edit Invoice"
+                          >
+                            <Edit3 size={12} /> Edit
+                          </button>
+                        )}
+                        {/* Approve button - for approvers */}
                         {inv.status !== 'POSTED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
                           <button 
-                            onClick={() => onApproveInvoice?.(inv.id)}
+                            onClick={() => { 
+                              setSelectedInvoiceForApproval(inv); 
+                              setApprovalComment('');
+                              setApprovalAction('approve');
+                              setShowApprovalModal(true); 
+                            }}
                             className="flex items-center gap-1.5 px-3 py-1 bg-[#F47721] hover:bg-[#E06610] text-white rounded-lg text-xs font-bold transition-all shadow-sm"
-                            title="Approve and Post to Ledger"
+                            title="Review and Approve"
                           >
-                            <CheckCircle2 size={12} /> Approve
+                            <CheckCircle2 size={12} /> Review
                           </button>
                         )}
                         <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-300 transition-colors">
@@ -522,6 +746,72 @@ const ARView: React.FC<ARViewProps> = ({
         </div>
       )}
 
+      {/* Item Groups Tab */}
+      {activeTab === 'item-groups' && (
+        <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+          <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Package size={18} className="text-[#F47721]" />
+              <span className="font-bold text-gray-800">Item Groups</span>
+              <span className="text-xs text-gray-500">({itemGroups.length} groups)</span>
+            </div>
+            <button onClick={() => { resetItemGroupForm(); setShowItemGroupModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all font-bold text-sm">
+              <Plus size={16} /> New Item Group
+            </button>
+          </div>
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Code</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Name</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Description</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Items</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Total Amount</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {itemGroups.map(group => (
+                <tr key={group.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono font-bold text-[#F47721]">{group.code}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-gray-800">{group.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{group.description || '—'}</td>
+                  <td className="px-6 py-4 text-center text-sm">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold">
+                      {group.items.length} items
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right font-mono text-sm font-semibold text-gray-900">{formatCurrency(group.totalAmount)}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${group.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {group.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => handleEditItemGroup(group)} className="p-1.5 text-gray-400 hover:text-[#F47721] hover:bg-orange-50 rounded transition-colors" title="Edit">
+                        <FileText size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteItemGroup(group.id)} className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-colors" title="Delete">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {itemGroups.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-20 text-center text-gray-400 italic">
+                    No item groups defined. Create one to bundle items for quick invoicing.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Invoice Modal */}
       {showInvoiceModal && (
         <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
@@ -529,9 +819,9 @@ const ARView: React.FC<ARViewProps> = ({
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                <div className="flex items-center gap-4">
                   <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><FileText size={24} /></div>
-                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Generate Sales Invoice</h3>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">{editingInvoice ? 'Edit Invoice' : 'Generate Sales Invoice'}</h3>
                </div>
-               <button onClick={() => setShowInvoiceModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
+               <button onClick={() => { setShowInvoiceModal(false); resetInvoiceForm(); }} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
             </div>
 
             <form onSubmit={handlePostInvoice} className="p-5 space-y-10">
@@ -636,6 +926,34 @@ const ARView: React.FC<ARViewProps> = ({
                     <span>Selected account is automatically synced with {recipientType === 'SPONSOR' ? 'Sponsor' : 'Individual'} defaults but can be overridden here.</span>
                   </div>
                </div>
+
+               {/* Quick Apply Item Group */}
+               {itemGroups.length > 0 && (
+                 <div className="p-4 bg-purple-50/50 rounded-md border border-purple-100/50">
+                   <div className="flex items-center gap-4">
+                     <div className="flex items-center gap-2">
+                       <Package size={16} className="text-purple-600" />
+                       <span className="text-xs font-bold text-purple-700 uppercase">Quick Add Item Group</span>
+                     </div>
+                     <select 
+                       className="flex-1 px-4 py-2.5 bg-white border border-purple-200 rounded text-sm font-semibold shadow-sm"
+                       onChange={e => { if (e.target.value) { handleApplyItemGroup(e.target.value); e.target.value = ''; } }}
+                       value=""
+                     >
+                       <option value="">Select an item group to add...</option>
+                       {itemGroups.filter(g => g.isActive).map(group => (
+                         <option key={group.id} value={group.id}>
+                           {group.code} - {group.name} ({group.items.length} items, ₱{group.totalAmount.toLocaleString()})
+                         </option>
+                       ))}
+                     </select>
+                   </div>
+                   <p className="text-xs text-purple-500 italic mt-2 px-1">
+                     Select an item group to quickly add multiple pre-configured line items to this invoice.
+                   </p>
+                 </div>
+               )}
+
                <div className="space-y-4">
                   <div className="grid grid-cols-12 gap-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                     <div className="col-span-5">Item / Service</div>
@@ -679,7 +997,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </div>
                   <div className="flex gap-4 w-full md:w-auto">
                     <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-white transition-colors">Discard</button>
-                    <button type="submit" className="flex-1 px-12 py-4 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#F47721] active:scale-95 transition-all">Authorize & Post SI</button>
+                    <button type="submit" className="flex-1 px-12 py-4 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#F47721] active:scale-95 transition-all">Saved</button>
                   </div>
                </div>
             </form>
@@ -782,6 +1100,350 @@ const ARView: React.FC<ARViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Item Group Modal */}
+      {showItemGroupModal && (
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-purple-600 text-white rounded shadow-sm"><Package size={24} /></div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
+                    {editingItemGroup ? 'Edit Item Group' : 'Create Item Group'}
+                  </h3>
+               </div>
+               <button onClick={() => { setShowItemGroupModal(false); resetItemGroupForm(); }} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
+            </div>
+
+            <form onSubmit={handleSaveItemGroup} className="p-6 space-y-6">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Group Code *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-bold font-mono" 
+                      value={itemGroupCode} 
+                      onChange={e => setItemGroupCode(e.target.value.toUpperCase())}
+                      placeholder="e.g., PKG-TESDA-01"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Group Name *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-bold" 
+                      value={itemGroupName} 
+                      onChange={e => setItemGroupName(e.target.value)}
+                      placeholder="e.g., TESDA Certification Package"
+                    />
+                  </div>
+               </div>
+
+               <div className="space-y-1.5">
+                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Description</label>
+                 <textarea 
+                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm resize-none" 
+                   rows={2}
+                   value={itemGroupDescription} 
+                   onChange={e => setItemGroupDescription(e.target.value)}
+                   placeholder="Brief description of what this item group includes..."
+                 />
+               </div>
+
+               <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-purple-600 uppercase tracking-wide px-1">Group Items</label>
+                    <button type="button" onClick={handleAddItemGroupLine} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-purple-600 hover:bg-purple-50 rounded transition-colors border border-dashed border-purple-200">
+                      <Plus size={14}/> Add Item
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-12 gap-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                    <div className="col-span-6">Item / Service</div>
+                    <div className="col-span-2 text-center">Qty</div>
+                    <div className="col-span-2 text-right">Unit Price</div>
+                    <div className="col-span-1 text-right">Subtotal</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  {itemGroupItems.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-4 items-center p-3 bg-white rounded border border-gray-100 hover:border-purple-100 transition-all">
+                      <div className="col-span-6">
+                        <select 
+                          required 
+                          className="w-full px-3 py-2 bg-gray-50 border-none rounded text-xs font-bold" 
+                          value={line.itemId} 
+                          onChange={e => updateItemGroupLine(idx, { itemId: e.target.value })}
+                        >
+                          <option value="">Select Item...</option>
+                          {items.map(i => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <input 
+                          type="number" 
+                          min="1" 
+                          className="w-full px-3 py-2 bg-gray-50 border-none rounded text-center text-xs font-semibold" 
+                          value={line.qty} 
+                          onChange={e => updateItemGroupLine(idx, { qty: Number(e.target.value) })} 
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          className="w-full px-3 py-2 bg-gray-50 border-none rounded text-right text-xs font-mono font-bold" 
+                          value={line.price} 
+                          onChange={e => updateItemGroupLine(idx, { price: Number(e.target.value) })} 
+                        />
+                      </div>
+                      <div className="col-span-1 text-right font-mono text-xs font-semibold text-gray-700">
+                        {(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveItemGroupLine(idx)} 
+                          className="text-gray-300 hover:text-rose-500"
+                          disabled={itemGroupItems.length <= 1}
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+               </div>
+
+               <div className="p-4 bg-purple-50 rounded-md flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Total Group Amount</p>
+                    <p className="text-xl font-mono font-semibold text-purple-700">₱ {itemGroupTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => { setShowItemGroupModal(false); resetItemGroupForm(); }} className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800 transition-colors">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-8 py-3 bg-purple-600 text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm hover:bg-purple-700 active:scale-95 transition-all">
+                      {editingItemGroup ? 'Update Group' : 'Create Group'}
+                    </button>
+                  </div>
+               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Approval/Review Modal */}
+      {showApprovalModal && selectedInvoiceForApproval && (
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+          <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+               <div className="flex items-center gap-4">
+                  <div className={`p-3 ${approvalAction === 'approve' ? 'bg-emerald-500' : 'bg-amber-500'} text-white rounded shadow-sm`}>
+                    {approvalAction === 'approve' ? <CheckCircle2 size={24} /> : <RotateCcw size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Review Invoice</h3>
+                    <p className="text-xs text-gray-500">{selectedInvoiceForApproval.reference}</p>
+                  </div>
+               </div>
+               <button onClick={() => { setShowApprovalModal(false); setSelectedInvoiceForApproval(null); }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Invoice Summary */}
+              <div className="p-4 bg-gray-50 rounded-md space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Invoice:</span>
+                  <span className="font-bold text-gray-800">{selectedInvoiceForApproval.reference}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Description:</span>
+                  <span className="font-semibold text-gray-700">{selectedInvoiceForApproval.description.split(': ')[1] || selectedInvoiceForApproval.description}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Date:</span>
+                  <span className="font-semibold text-gray-700">{selectedInvoiceForApproval.date}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Amount:</span>
+                  <span className="font-bold text-[#F47721]">
+                    {formatCurrency(lines.find(l => l.journalEntryId === selectedInvoiceForApproval.id && l.debit > 0)?.debit || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Selection */}
+              <div className="flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setApprovalAction('approve')}
+                  className={`flex-1 p-4 rounded-md border-2 transition-all ${
+                    approvalAction === 'approve' 
+                      ? 'border-emerald-500 bg-emerald-50' 
+                      : 'border-gray-200 hover:border-emerald-200'
+                  }`}
+                >
+                  <CheckCircle2 size={24} className={`mx-auto mb-2 ${approvalAction === 'approve' ? 'text-emerald-500' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-bold ${approvalAction === 'approve' ? 'text-emerald-700' : 'text-gray-500'}`}>Approve & Post</p>
+                  <p className="text-xs text-gray-400 mt-1">Post to General Ledger</p>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setApprovalAction('revision')}
+                  className={`flex-1 p-4 rounded-md border-2 transition-all ${
+                    approvalAction === 'revision' 
+                      ? 'border-amber-500 bg-amber-50' 
+                      : 'border-gray-200 hover:border-amber-200'
+                  }`}
+                >
+                  <RotateCcw size={24} className={`mx-auto mb-2 ${approvalAction === 'revision' ? 'text-amber-500' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-bold ${approvalAction === 'revision' ? 'text-amber-700' : 'text-gray-500'}`}>Request Revision</p>
+                  <p className="text-xs text-gray-400 mt-1">Send back for changes</p>
+                </button>
+              </div>
+
+              {/* Comment Field */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                  <MessageSquare size={12} />
+                  {approvalAction === 'approve' ? 'Comment (Optional)' : 'Revision Instructions (Required)'}
+                </label>
+                <textarea
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm resize-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all"
+                  rows={3}
+                  placeholder={approvalAction === 'approve' 
+                    ? 'Add optional approval notes...' 
+                    : 'Describe what changes are needed...'}
+                  value={approvalComment}
+                  onChange={e => setApprovalComment(e.target.value)}
+                  required={approvalAction === 'revision'}
+                />
+              </div>
+
+              {/* Previous Comments */}
+              {selectedInvoiceForApproval.reviewComments && selectedInvoiceForApproval.reviewComments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Previous Comments</p>
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {selectedInvoiceForApproval.reviewComments.map(comment => (
+                      <div key={comment.id} className="p-3 bg-gray-50 rounded text-xs">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-gray-700">{comment.userName}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            comment.action === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+                            comment.action === 'REQUEST_REVISION' ? 'bg-amber-100 text-amber-600' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>{comment.action.replace('_', ' ')}</span>
+                        </div>
+                        <p className="text-gray-600">{comment.comment}</p>
+                        <p className="text-gray-400 mt-1">{new Date(comment.createdAt).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
+              <button 
+                type="button" 
+                onClick={() => { setShowApprovalModal(false); setSelectedInvoiceForApproval(null); }} 
+                className="flex-1 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (approvalAction === 'revision') {
+                    if (!approvalComment.trim()) {
+                      onNotify('error', 'Please provide revision instructions');
+                      return;
+                    }
+                    onRequestRevision?.(selectedInvoiceForApproval.id, approvalComment);
+                  } else {
+                    onApproveInvoice?.(selectedInvoiceForApproval.id, approvalComment || undefined);
+                  }
+                  setShowApprovalModal(false);
+                  setSelectedInvoiceForApproval(null);
+                  setApprovalComment('');
+                }}
+                className={`flex-1 py-3 rounded text-xs font-semibold uppercase tracking-wide shadow-sm transition-all ${
+                  approvalAction === 'approve'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+              >
+                {approvalAction === 'approve' ? 'Approve & Post' : 'Request Revision'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comments History Modal */}
+      {showCommentsModal && selectedInvoiceForApproval && (
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+          <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+               <div className="flex items-center gap-4">
+                  <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><MessageSquare size={24} /></div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Review History</h3>
+                    <p className="text-xs text-gray-500">{selectedInvoiceForApproval.reference}</p>
+                  </div>
+               </div>
+               <button onClick={() => { setShowCommentsModal(false); setSelectedInvoiceForApproval(null); }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
+              {selectedInvoiceForApproval.reviewComments && selectedInvoiceForApproval.reviewComments.length > 0 ? (
+                selectedInvoiceForApproval.reviewComments.map(comment => (
+                  <div key={comment.id} className={`p-4 rounded-md border ${
+                    comment.action === 'APPROVED' ? 'bg-emerald-50 border-emerald-100' :
+                    comment.action === 'REQUEST_REVISION' ? 'bg-amber-50 border-amber-100' :
+                    'bg-gray-50 border-gray-100'
+                  }`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-sm">
+                          {comment.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-gray-800">{comment.userName}</p>
+                          <p className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                        comment.action === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+                        comment.action === 'REQUEST_REVISION' ? 'bg-amber-100 text-amber-600' :
+                        comment.action === 'REJECTED' ? 'bg-rose-100 text-rose-600' :
+                        'bg-gray-100 text-gray-500'
+                      }`}>
+                        {comment.action.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 pl-10">{comment.comment}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-400 italic">No comments yet</div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50">
+              <button 
+                type="button" 
+                onClick={() => { setShowCommentsModal(false); setSelectedInvoiceForApproval(null); }} 
+                className="w-full py-3 bg-gray-200 hover:bg-gray-300 rounded text-xs font-semibold text-gray-700 uppercase tracking-wide transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -794,4 +1456,3 @@ const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({
 );
 
 export default ARView;
-

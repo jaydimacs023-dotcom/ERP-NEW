@@ -271,11 +271,14 @@ export interface PurchaseOrder extends BaseEntity {
   vendorId: string;
   date: string;
   reference: string;
+  glEntryNumber?: string; // Generated when APPROVED - GL transaction reference (e.g., GL-2026-00001)
   status: PurchaseOrderStatus;
   lines: PurchaseOrderLine[];
   totalAmount: number;
   memo?: string;
   createdAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 export type WithholdingType = 'EXPANDED' | 'FINAL';
@@ -431,6 +434,26 @@ export interface NonStockItem extends BaseEntity {
   createdAt: string;
 }
 
+// Item Group / Billing Package - a predefined set of items for quick invoice creation
+export interface ItemGroupItem {
+  itemId: string;
+  qty: number;
+  priceOverride?: number; // Optional override of item's default price
+}
+
+export interface ItemGroup extends BaseEntity {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;
+  description?: string;
+  items: ItemGroupItem[];
+  totalAmount?: number; // Cached total (computed from items)
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface WarehouseLocation extends BaseEntity {
   id: string;
   orgId: string;
@@ -580,7 +603,7 @@ export interface JournalEntry extends BaseEntity {
   description: string;
   reference: string;
   glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL-2026-00001)
-  status: 'DRAFT' | 'POSTED' | 'REVERSED';
+  status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;
   sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL';
@@ -593,11 +616,23 @@ export interface JournalEntry extends BaseEntity {
   reversedAt?: string;
   reversalReason?: string;
   originalEntryId?: string; // For reversal entries, link to original
+  // Review/approval comments
+  reviewComments?: ReviewComment[];
   // Integration
   payableId?: string;
   receivableId?: string;
   goodsReceiptId?: string;
   recurringEntryId?: string; // Links to recurring template
+}
+
+// Review comment for invoice approval workflow
+export interface ReviewComment {
+  id: string;
+  userId: string;
+  userName: string;
+  comment: string;
+  action: 'COMMENT' | 'REQUEST_REVISION' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
 }
 
 export type RecurrenceFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM';
