@@ -86,7 +86,6 @@ export type ModuleTab =
   | 'payment-history'
   | 'users'
   | 'audit'
-  | 'archive'
   // System Admin
   | 'maintenance'
   | 'backup-restore'
@@ -106,7 +105,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
-    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'archive',
+    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
     'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'
   ],
 
@@ -119,7 +118,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
-    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'archive'
+    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'
   ],
 
   // PRESIDENT: Executive view - dashboards, reports, approvals
