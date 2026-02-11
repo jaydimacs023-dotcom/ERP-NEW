@@ -16,7 +16,7 @@
  */
 
 // ===== Role Definitions =====
-export type UserRole = 
+export type UserRole =
   | 'SYSTEM_ADMIN'      // Platform administrator - full system access
   | 'ADMIN'             // Organization admin - full org access
   | 'PRESIDENT'         // Executive - dashboard, reports, approvals
@@ -33,7 +33,7 @@ export type UserRole =
   | 'STUDENT';          // Student portal only
 
 // ===== Module/Tab Definitions =====
-export type ModuleTab = 
+export type ModuleTab =
   // Portals
   | 'student-portal'
   | 'trainer-portal'
@@ -153,11 +153,11 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AR_SPECIALIST: Accounts Receivable focused
   AR_SPECIALIST: [
-    'dashboard', 'reports',
+    'dashboard',
     'ar', 'recurring-invoices', 'revenue-recognition',
-    'sponsors',
-    'students', // Need to see students for billing
-    'audit'
+    'batches',
+    'items',
+    'sponsors'
   ],
 
   // AP_SPECIALIST: Accounts Payable focused
@@ -324,7 +324,7 @@ export function hasOperationsAccess(role: UserRole | string | undefined): boolea
  */
 export function getDefaultTab(role: UserRole | string | undefined): ModuleTab {
   if (!role) return 'dashboard';
-  
+
   switch (role) {
     case 'STUDENT':
       return 'student-portal';
@@ -350,7 +350,7 @@ export function getDefaultTab(role: UserRole | string | undefined): ModuleTab {
  */
 export function getRoleDisplayName(role: UserRole | string | undefined): string {
   if (!role) return 'Unknown';
-  
+
   const names: Record<string, string> = {
     SYSTEM_ADMIN: 'System Administrator',
     ADMIN: 'Organization Admin',
@@ -367,14 +367,14 @@ export function getRoleDisplayName(role: UserRole | string | undefined): string 
     TRAINER: 'Trainer',
     STUDENT: 'Student'
   };
-  
+
   return names[role] || role.replace(/_/g, ' ');
 }
 
 // ===== Action Permissions (for future use with edit/delete/approve actions) =====
 export type ActionPermission = 'view' | 'create' | 'edit' | 'delete' | 'approve' | 'post' | 'void';
 
-const ROLE_ACTIONS: Partial<Record<UserRole, Record<ModuleTab, ActionPermission[]>>> = {
+const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPermission[]>>>> = {
   // AUDITOR can only view
   AUDITOR: {
     'dashboard': ['view'],
@@ -399,26 +399,26 @@ const ROLE_ACTIONS: Partial<Record<UserRole, Record<ModuleTab, ActionPermission[
  * Check if role can perform action on module
  */
 export function canPerformAction(
-  role: UserRole | string | undefined, 
-  tab: ModuleTab, 
+  role: UserRole | string | undefined,
+  tab: ModuleTab,
   action: ActionPermission
 ): boolean {
   if (!role) return false;
-  
+
   // System admin and admin can do everything
   if (role === 'SYSTEM_ADMIN' || role === 'ADMIN') return true;
-  
+
   const roleActions = ROLE_ACTIONS[role as UserRole];
   if (!roleActions) {
     // If no specific restrictions, allow all actions if they have access to the tab
     return canAccess(role, tab);
   }
-  
+
   const tabActions = roleActions[tab];
   if (!tabActions) {
     // No specific tab restrictions
     return canAccess(role, tab);
   }
-  
+
   return tabActions.includes(action);
 }

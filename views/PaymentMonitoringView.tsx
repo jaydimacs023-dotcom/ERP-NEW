@@ -14,7 +14,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
       const org = organizations.find(o => o.id === p.orgId);
-      const matchesSearch = 
+      const matchesSearch =
         (org?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
         p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -29,9 +29,9 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PAID': return 'bg-emerald-50 text-orange-700 border-orange-200';
+      case 'PAID': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'OVERDUE': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'PENDING': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'PENDING': return 'bg-[#025959]/5 text-[#025959] border-[#025959]/20';
       case 'CANCELLED': return 'bg-gray-50 text-gray-700 border-gray-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
@@ -70,9 +70,9 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Collected</p>
-              <p className="text-lg font-semibold text-[#F47721] mt-2">USD {stats.paid.toLocaleString()}</p>
+              <p className="text-lg font-mono font-bold text-[#025959] mt-2">USD {stats.paid.toLocaleString()}</p>
             </div>
-            <CheckCircle2 size={32} className="text-orange-200" />
+            <CheckCircle2 size={32} className="text-[#025959]/20" />
           </div>
         </div>
 
@@ -101,19 +101,19 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
       <div className="bg-white p-4 rounded border border-gray-200 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-4">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            placeholder="Search by tenant name, invoice, or description..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+          <input
+            placeholder="Search by tenant name, invoice, or description..."
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-[#025959] outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
           <Filter size={18} className="text-gray-400" />
-          <select 
+          <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
-            className="px-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-orange-500 outline-none"
+            className="px-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-[#025959] outline-none"
           >
             <option value="ALL">All Statuses</option>
             <option value="PAID">Paid</option>
@@ -151,7 +151,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                   <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-[#F47721]">
+                        <div className="w-8 h-8 rounded-lg bg-[#025959]/10 flex items-center justify-center text-[#025959]">
                           <Building2 size={16} />
                         </div>
                         <div className="min-w-0">

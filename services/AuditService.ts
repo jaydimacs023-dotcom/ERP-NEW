@@ -17,15 +17,15 @@
 import { AuditLog } from '../types';
 import { generateUUID } from '../utils/uuid';
 
-export type AuditAction = 
-  | 'CREATE' 
-  | 'UPDATE' 
-  | 'DELETE' 
+export type AuditAction =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
   | 'SOFT_DELETE'
   | 'RESTORE'
-  | 'POST' 
-  | 'REVERSE' 
-  | 'APPROVE' 
+  | 'POST'
+  | 'REVERSE'
+  | 'APPROVE'
   | 'REJECT'
   | 'VOID'
   | 'PRINT'
@@ -67,6 +67,9 @@ export type EntityType =
   | 'STOCK_ADJUSTMENT'
   | 'REORDER_POINT'
   | 'INVENTORY_TRANSACTION'
+  | 'RECURRING_INVOICE'
+  | 'REVENUE_SCHEDULE'
+  | 'INVOICE'
   | 'SYSTEM';
 
 export interface AuditLogInput {
@@ -101,10 +104,10 @@ class AuditServiceClass {
    */
   log(input: AuditLogInput): AuditLog {
     const timestamp = new Date().toISOString();
-    
+
     // Build details string
     let details = input.details || this.buildDefaultDetails(input);
-    
+
     // Add change tracking if previous/new values provided
     if (input.previousValue !== undefined && input.newValue !== undefined) {
       const changes = this.detectChanges(input.previousValue, input.newValue);
@@ -143,7 +146,7 @@ class AuditServiceClass {
   private buildDefaultDetails(input: AuditLogInput): string {
     const entityName = input.entityName ? ` "${input.entityName}"` : '';
     const entityRef = `${input.entityType}${entityName}`;
-    
+
     switch (input.action) {
       case 'CREATE':
         return `Created new ${entityRef}`;
@@ -187,19 +190,19 @@ class AuditServiceClass {
    */
   private detectChanges(prev: any, next: any): string[] {
     if (!prev || !next) return [];
-    
+
     const changes: string[] = [];
     const allKeys = new Set([...Object.keys(prev), ...Object.keys(next)]);
-    
+
     for (const key of allKeys) {
       // Skip internal/meta fields
       if (['id', 'orgId', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'deletedBy'].includes(key)) {
         continue;
       }
-      
+
       const prevVal = prev[key];
       const nextVal = next[key];
-      
+
       if (JSON.stringify(prevVal) !== JSON.stringify(nextVal)) {
         // Format the change nicely
         const fieldName = this.formatFieldName(key);
@@ -212,7 +215,7 @@ class AuditServiceClass {
         }
       }
     }
-    
+
     return changes.slice(0, 5); // Limit to 5 changes to avoid huge logs
   }
 
@@ -292,6 +295,14 @@ class AuditServiceClass {
 
   logout(orgId: string, userId: string, userName: string): AuditLog {
     return this.log({ orgId, userId, userName, action: 'LOGOUT', entityType: 'USER', entityId: userId });
+  }
+
+  logAction(orgId: string, userId: string, userName: string, action: AuditAction, entityType: EntityType, entityId: string, entityName?: string, details?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action, entityType, entityId, entityName, details });
+  }
+
+  archive(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'EXPORT', entityType, entityId, entityName, details: 'Archived record' });
   }
 }
 

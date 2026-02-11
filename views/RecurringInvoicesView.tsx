@@ -1,8 +1,8 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { RecurringInvoice, RecurringInvoiceHistory, RecurrenceFrequency, ChartOfAccount, NonStockItem, RecurringInvoiceLineItem } from '../types';
 import { RecurringInvoiceService } from '../services/RecurringInvoiceService';
-import { 
-  Plus, Edit2, Trash2, Play, Pause, X, Check, Calendar, 
+import {
+  Plus, Edit2, Trash2, Play, Pause, X, Check, Calendar,
   RefreshCw, Search, Filter, ChevronDown, ChevronUp, History,
   AlertCircle, Clock
 } from 'lucide-react';
@@ -83,7 +83,7 @@ export default function RecurringInvoicesView({
   // Filter invoices
   const filteredInvoices = useMemo(() => {
     return recurringInvoices.filter(inv => {
-      const matchesSearch = 
+      const matchesSearch =
         inv.invoiceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.description?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || inv.status === statusFilter;
@@ -92,13 +92,13 @@ export default function RecurringInvoicesView({
   }, [recurringInvoices, searchTerm, statusFilter]);
 
   // Get AR accounts
-  const arAccounts = useMemo(() => 
+  const arAccounts = useMemo(() =>
     accounts.filter(a => a.class === 'ASSET' && !a.isHeader && a.name.toLowerCase().includes('receivable')),
     [accounts]
   );
 
   // Get Revenue accounts
-  const revenueAccounts = useMemo(() => 
+  const revenueAccounts = useMemo(() =>
     accounts.filter(a => a.class === 'REVENUE' && !a.isHeader),
     [accounts]
   );
@@ -119,9 +119,9 @@ export default function RecurringInvoicesView({
   const formatCurrency = (amount: number) => {
     // Explicitly handle symbols to stay consistent with institutional layout
     const symbol = currency === 'PHP' ? '\u20B1' : currency === 'USD' ? '$' : '';
-    const formatted = Math.abs(amount).toLocaleString(undefined, { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    const formatted = Math.abs(amount).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     });
     return `${amount < 0 ? '-' : ''}${symbol}${formatted}`;
   };
@@ -171,7 +171,7 @@ export default function RecurringInvoicesView({
   // Handle form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.customerId) {
       onNotify('error', 'Please select a customer');
       return;
@@ -180,7 +180,7 @@ export default function RecurringInvoicesView({
       onNotify('error', 'Please enter an invoice name');
       return;
     }
-    
+
     // Validate line items
     const validLineItems = lineItems.filter(l => l.itemId && l.quantity > 0 && l.unitPrice > 0);
     if (validLineItems.length === 0) {
@@ -299,7 +299,7 @@ export default function RecurringInvoicesView({
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
         >
           <Plus size={18} />
           New Recurring Invoice
@@ -315,7 +315,7 @@ export default function RecurringInvoicesView({
             placeholder="Search invoices..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] focus:border-[#025959] outline-none text-sm"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -323,7 +323,7 @@ export default function RecurringInvoicesView({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+            className="px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] focus:border-[#025959] outline-none text-sm"
           >
             <option value="ALL">All Status</option>
             {STATUS_OPTIONS.map(opt => (
@@ -337,13 +337,13 @@ export default function RecurringInvoicesView({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Active Templates</div>
-          <div className="text-lg font-mono font-semibold text-[#F47721] tracking-tighter">
+          <div className="text-lg font-mono font-bold text-[#025959] tracking-tighter">
             {recurringInvoices.filter(i => i.status === 'ACTIVE').length}
           </div>
         </div>
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Monthly Recurring Revenue</div>
-          <div className="text-lg font-mono font-semibold text-[#F47721] tracking-tighter">
+          <div className="text-lg font-mono font-bold text-[#025959] tracking-tighter">
             {formatCurrency(
               recurringInvoices
                 .filter(i => i.status === 'ACTIVE' && i.frequency === 'MONTHLY')
@@ -353,7 +353,7 @@ export default function RecurringInvoicesView({
         </div>
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cycles Due Today</div>
-          <div className="text-lg font-mono font-semibold text-amber-600 tracking-tighter">
+          <div className="text-lg font-mono font-bold text-[#025959] tracking-tighter">
             {recurringInvoices.filter(i => RecurringInvoiceService.isDueToRun(i)).length}
           </div>
         </div>
@@ -427,7 +427,7 @@ export default function RecurringInvoicesView({
                           ) : (
                             <Calendar className="w-4 h-4 text-gray-400" />
                           )}
-                          <span className={scheduleInfo.isOverdue ? 'text-orange-600 font-medium' : 'text-gray-900'}>
+                          <span className={scheduleInfo.isOverdue ? 'text-[#025959] font-bold' : 'text-gray-900'}>
                             {invoice.nextInvoiceDate}
                           </span>
                           {scheduleInfo.daysUntilRun > 0 && !scheduleInfo.isOverdue && (
@@ -461,7 +461,7 @@ export default function RecurringInvoicesView({
                           </button>
                           <button
                             onClick={() => handleEdit(invoice)}
-                            className="p-1.5 text-[#F47721] hover:bg-orange-100 rounded-lg"
+                            className="p-1.5 text-[#025959] hover:bg-[#025959]/10 rounded"
                             title="Edit"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -527,11 +527,10 @@ export default function RecurringInvoicesView({
                                       <span className="text-gray-900">{h.invoiceDate}</span>
                                       <span className="text-gray-500">-</span>
                                       <span className="text-gray-900">{formatCurrency(h.amount)}</span>
-                                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                        h.status === 'CREATED' ? 'bg-green-100 text-green-700' :
+                                      <span className={`text-xs px-1.5 py-0.5 rounded ${h.status === 'CREATED' ? 'bg-green-100 text-green-700' :
                                         h.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-                                        'bg-gray-100 text-gray-700'
-                                      }`}>
+                                          'bg-gray-100 text-gray-700'
+                                        }`}>
                                         {h.status}
                                       </span>
                                     </li>
@@ -571,7 +570,7 @@ export default function RecurringInvoicesView({
                 <select
                   value={formData.customerId}
                   onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   required
                 >
                   <option value="">Select Customer</option>
@@ -588,7 +587,7 @@ export default function RecurringInvoicesView({
                   type="text"
                   value={formData.invoiceName}
                   onChange={(e) => setFormData({ ...formData, invoiceName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   placeholder="e.g., Monthly Subscription"
                   required
                 />
@@ -600,7 +599,7 @@ export default function RecurringInvoicesView({
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   rows={2}
                   placeholder="Invoice description..."
                 />
@@ -633,18 +632,17 @@ export default function RecurringInvoicesView({
                                 value={line.itemId}
                                 onChange={(e) => {
                                   const selectedItem = items.find(i => i.id === e.target.value);
-                                  handleUpdateLineItem(index, 'itemId', e.target.value);
+                                  handleUpdateLineItem(index, { itemId: e.target.value });
                                   if (selectedItem) {
-                                    handleUpdateLineItem(index, 'unitPrice', selectedItem.unitPrice || 0);
-                                    handleUpdateLineItem(index, 'description', selectedItem.name);
+                                    handleUpdateLineItem(index, { unitPrice: selectedItem.unitPrice || 0, description: selectedItem.name });
                                   }
                                 }}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-400"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none"
                               >
                                 <option value="">Select item...</option>
                                 {items.map(item => (
                                   <option key={item.id} value={item.id}>
-                                    {item.itemCode} - {item.name}
+                                    {item.code} - {item.name}
                                   </option>
                                 ))}
                               </select>
@@ -653,8 +651,8 @@ export default function RecurringInvoicesView({
                               <input
                                 type="number"
                                 value={line.quantity}
-                                onChange={(e) => handleUpdateLineItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-400"
+                                onChange={(e) => handleUpdateLineItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none"
                                 min="1"
                               />
                             </td>
@@ -662,8 +660,8 @@ export default function RecurringInvoicesView({
                               <input
                                 type="number"
                                 value={line.unitPrice}
-                                onChange={(e) => handleUpdateLineItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-400"
+                                onChange={(e) => handleUpdateLineItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none"
                                 min="0"
                                 step="0.01"
                               />
@@ -693,7 +691,7 @@ export default function RecurringInvoicesView({
                     <button
                       type="button"
                       onClick={handleAddLineItem}
-                      className="flex items-center gap-1 text-sm text-[#F47721] hover:text-orange-700"
+                      className="flex items-center gap-1 text-sm text-[#025959] font-bold hover:text-[#014242]"
                     >
                       <Plus className="w-4 h-4" />
                       Add Line Item
@@ -726,7 +724,7 @@ export default function RecurringInvoicesView({
                   type="text"
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   placeholder="PHP"
                 />
               </div>
@@ -738,7 +736,7 @@ export default function RecurringInvoicesView({
                   <select
                     value={formData.frequency}
                     onChange={(e) => setFormData({ ...formData, frequency: e.target.value as RecurrenceFrequency })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   >
                     {FREQUENCY_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -751,7 +749,7 @@ export default function RecurringInvoicesView({
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                     required
                   />
                 </div>
@@ -761,7 +759,7 @@ export default function RecurringInvoicesView({
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   />
                 </div>
               </div>
@@ -773,7 +771,7 @@ export default function RecurringInvoicesView({
                   type="number"
                   value={formData.paymentTermsDays}
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: parseInt(e.target.value) || 30 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   min="0"
                 />
               </div>
@@ -785,7 +783,7 @@ export default function RecurringInvoicesView({
                   <select
                     value={formData.arAccountId}
                     onChange={(e) => setFormData({ ...formData, arAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   >
                     <option value="">Select AR Account</option>
                     {arAccounts.map(a => (
@@ -798,7 +796,7 @@ export default function RecurringInvoicesView({
                   <select
                     value={formData.revenueAccountId}
                     onChange={(e) => setFormData({ ...formData, revenueAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] outline-none text-sm"
                   >
                     <option value="">Select Revenue Account</option>
                     {revenueAccounts.map(a => (

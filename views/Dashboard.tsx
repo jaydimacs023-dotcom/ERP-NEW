@@ -1,9 +1,10 @@
+
 import React, { useMemo } from 'react';
-import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, Activity, PieChart, BarChart3, LineChart as LucideLineChart, Printer } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Legend, Cell, AreaChart, Area
+import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus } from '../types';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, Cell, AreaChart, Area, PieChart, Pie
 } from 'recharts';
 
 interface DashboardProps {
@@ -11,14 +12,457 @@ interface DashboardProps {
   currency?: string;
   lines: JournalLine[];
   accounts: ChartOfAccount[];
+  currentUser?: User;
+  students?: Student[];
+  sponsors?: Sponsor[];
+  entries?: JournalEntry[];
+  batches?: Batch[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts }) => {
+const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [] }) => {
+  const formatCurrency = (val: number) => {
+    const symbol = currency === 'USD' ? '$' : '₱';
+    const formatted = Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${val < 0 ? '-' : ''}${symbol}${formatted} `;
+  };
+
+  // Enterprise-grade Professional Palette (Blues, Teals, Muted Grays)
+  const COLORS = [
+    '#0EA5E9', // Sky 500
+    '#2563EB', // Blue 600
+    '#0F766E', // Teal 700
+    '#F59E0B', // Amber 500
+    '#64748B', // Slate 500
+    '#6366F1', // Indigo 500
+    '#10B981', // Emerald 500
+    '#8B5CF6', // Violet 500
+    '#F43F5E', // Rose 500
+    '#94A3B8'  // Slate 400
+  ];
+
+  // 1. Total Collectibles (Outstanding AR)
+  const arAccounts = accounts.filter(a => a.class === AccountClass.ASSET && a.name.toLowerCase().includes('receivable'));
+  const totalCollectibles = summaries
+    .filter(s => arAccounts.some(a => a.id === s.accountId))
+    .reduce((sum, s) => sum + s.balance, 0);
+
+  // 2. Receivables by Donor/Sponsor
+  const receivablesByDonor = useMemo(() => {
+    const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
+    const arAccountIds = new Set(arAccounts.map(a => a.id));
+    const balances: Record<string, number> = {};
+
+    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId) && l.contactType === 'SPONSOR' && l.contactId).forEach(l => {
+      balances[l.contactId!] = (balances[l.contactId!] || 0) + (l.debit - l.credit);
+    });
+
+    return Object.entries(balances)
+      .map(([id, balance]) => ({
+        name: sponsors.find(s => s.id === id)?.name || 'Unknown Sponsor',
+        value: balance
+      }))
+      .filter(i => i.value > 1) // Filter out zero/negative balances or very small amounts
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Top 10
+  }, [lines, entries, sponsors, arAccounts]);
+
+  const topDonorTotal = receivablesByDonor.reduce((sum, item) => sum + item.value, 0);
+
+  // 3. AR Aging Summary
+  const agingSummary = useMemo(() => {
+    const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
+    const arAccountIds = new Set(arAccounts.map(a => a.id));
+    const today = new Date();
+
+    let current = 0;
+    let thirty = 0;
+    let sixty = 0;
+    let ninety = 0;
+    let overNinety = 0;
+
+    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
+      const entry = entries.find(e => e.id === l.journalEntryId);
+      if (!entry) return;
+
+      const entryDate = new Date(entry.date);
+      const diffTime = Math.abs(today.getTime() - entryDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const amount = l.debit - l.credit;
+
+      if (diffDays <= 30) current += amount;
+      else if (diffDays <= 60) thirty += amount;
+      else if (diffDays <= 90) sixty += amount;
+      else overNinety += amount; // Corrected logic: anything over 90 goes here
+    });
+
+    // 60-90 days bucket should be its own, currently > 90 is capturing everything else.
+    // Wait, typical aging is 0-30, 31-60, 61-90, 90+.
+    // My logic: <=30, <=60 (which includes <=30 if not checked first? No, if-else if handles it).
+    // Correct.
+
+    return [
+      { name: 'Current', value: current, color: '#10B981' }, // Emerald
+      { name: '1-30 Days', value: thirty, color: '#3B82F6' }, // Blue
+      { name: '31-60 Days', value: sixty, color: '#F59E0B' }, // Amber
+      { name: '> 60 Days', value: overNinety, color: '#EF4444' }, // Red
+    ];
+  }, [lines, entries, arAccounts]);
+
+  // 4. Unbilled Batches Logic
+  const unbilledBatches = useMemo(() => {
+    // Candidates: Ongoing or Completed batches
+    const candidates = batches.filter(b =>
+      !b.isDeleted && (b.status === BatchStatus.ONGOING || b.status === BatchStatus.COMPLETED)
+    );
+
+    // Identify Invoiced Batches by looking for Batch Code in Invoice References/Descriptions
+    // This is a heuristic since there isn't a direct hard-link yet.
+    // Ideally, we'd check a link table, but for now we search strings.
+    const invoicedBatchCodes = new Set<string>();
+
+    const invoices = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
+
+    invoices.forEach(inv => {
+      const text = `${inv.reference} ${inv.description} `.toLowerCase();
+      candidates.forEach(b => {
+        if (b.batchCode && text.includes(b.batchCode.toLowerCase())) {
+          invoicedBatchCodes.add(b.id);
+        }
+      });
+    });
+
+    return candidates.filter(b => !invoicedBatchCodes.has(b.id));
+  }, [batches, entries]);
+
+  // 5. Receivables by Income Source (using Revenue accounts from invoices)
+  // This is tricky because AR lines don't map 1:1 to Revenue lines purely by account.
+  // But we can approximate by looking at Revenue Account Balances.
+  const revenueBySource = summaries
+    .filter(s => s.accountClass === AccountClass.REVENUE)
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 5)
+    .map(s => ({
+      name: s.accountName,
+      value: Math.abs(s.balance) // Revenue is normally Credit balance (negative in some systems, postive in others depending on signage. stored as abs usually in charts)
+    }));
+
+  // 6. Collections per Month (Bar Chart)
+  const collectionsPerMonth = useMemo(() => {
+    const today = new Date();
+    const last12Months: { month: string; amount: number; order: number }[] = [];
+
+    // Initialize last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      last12Months.push({
+        month: d.toLocaleDateString('en-US', { month: 'short' }),
+        amount: 0,
+        order: d.getFullYear() * 100 + d.getMonth()
+      });
+    }
+
+    // Filter for Collections
+    // Logic: Look for Journal Entries with sourceType = 'COLLECTION' or 'PAYMENT'
+    // Then find the Credit to AR Accounts in those entries.
+    const collectionEntries = entries.filter(e =>
+      (e.sourceType === 'COLLECTION' || e.sourceType === 'PAYMENT') &&
+      e.status === 'POSTED'
+    );
+
+    const collectionEntryIds = new Set(collectionEntries.map(e => e.id));
+    const arAccountIds = new Set(arAccounts.map(a => a.id));
+
+    lines.filter(l => collectionEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
+      // In AR, a Credit reduces the balance (Payment).
+      // We only care about Credits to AR.
+      if (l.credit > 0) {
+        const entry = entries.find(e => e.id === l.journalEntryId);
+        if (entry) {
+          const d = new Date(entry.date);
+          const label = d.toLocaleDateString('en-US', { month: 'short' });
+          const item = last12Months.find(m => m.month === label); // Simple string match might be risky if crossing years with same month name? 
+          // Better to match by approximate time or just check the array index if we mapped strictly.
+          // Actually, simplest is to iterate the finding logic more robustly or just map to "Mon" keys.
+          // Given it's last 12 months, names are unique unless we wrap exactly 12 months today (e.g. Feb to Feb).
+          // Let's use the order key or simply find matching month/year.
+
+          const bucket = last12Months.find(m => {
+            // Re-construct date from bucket logic to compare?
+            // Easier:
+            return d.getMonth() === new Date(Date.parse(m.month + " 1, 2000")).getMonth();
+            // Wait, this is flawed for "Feb" vs "Feb" across years.
+          });
+
+          // Correct approach: generate key YYYY-MM
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          // ... actually, let's just loop.
+        }
+      }
+    });
+
+    // Re-implementation with robust Map
+    const monthlyMap = new Map<string, number>();
+    const months: any[] = [];
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const label = d.toLocaleDateString('en-US', { month: 'short' });
+      monthlyMap.set(key, 0);
+      months.push({ key, label, amount: 0 });
+    }
+
+    lines.filter(l => collectionEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
+      if (l.credit > 0) {
+        const entry = entries.find(e => e.id === l.journalEntryId);
+        if (entry) {
+          const d = new Date(entry.date);
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          if (monthlyMap.has(key)) {
+            monthlyMap.set(key, monthlyMap.get(key)! + l.credit);
+          }
+        }
+      }
+    });
+
+    return months.map(m => ({
+      month: m.label,
+      amount: monthlyMap.get(m.key) || 0
+    }));
+
+  }, [entries, lines, arAccounts]);
+
+
+  return (
+    <div className="space-y-6 pb-10 font-sans">
+      <header className="flex justify-between items-end border-b pb-4 border-gray-200">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Overview : Billing and Collection</h2>
+          <p className="text-sm text-gray-500 mt-1">Specialist View &bull; {new Date().toLocaleDateString()}</p>
+        </div>
+
+      </header>
+
+      <div className="space-y-6">
+        {/* Row 1: Receivables & Aging */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Receivables by Donor Chart */}
+          <div className="md:col-span-2">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  Outstanding Receivables by Donor
+                </h3>
+                <div className="text-right">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Total Outstanding</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalCollectibles)}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4 items-center h-full">
+                {/* Left: Donut Chart */}
+                <div className="w-full md:w-5/12 h-[260px] relative">
+                  <div className="absolute inset-y-0 left-[40%] -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none z-0">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Top 10 Total</span>
+                    <span className="text-xl font-bold text-gray-800 mt-0.5">{formatCurrency(topDonorTotal)}</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={receivablesByDonor}
+                        cx="40%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={110}
+                        paddingAngle={2}
+                        dataKey="value"
+                        nameKey="name"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        {receivablesByDonor.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="white" strokeWidth={2} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                        contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', padding: '8px 12px' }}
+                        itemStyle={{ color: '#1e293b', fontWeight: 600, fontSize: '13px' }}
+                        labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Right: Detailed Donor List */}
+                <div className="w-full md:w-7/12">
+                  <div className="flex justify-between px-2 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b pb-2">
+                    <span>Rank / Sponsor</span>
+                    <div className="text-right flex gap-8">
+                      <span className="w-20">Amount</span>
+                      <span className="w-10">% Total</span>
+                    </div>
+                  </div>
+                  <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
+                    {receivablesByDonor.map((item, index) => (
+                      <div key={index} className="group flex justify-between items-center py-2.5 px-3 rounded-md hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full ${index < 3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {index + 1}
+                          </span>
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="text-sm font-medium text-gray-700 truncate" title={item.name}>{item.name}</span>
+                        </div>
+
+                        <div className="flex gap-8 text-right flex-shrink-0">
+                          <span className="text-sm font-semibold font-mono text-gray-900 w-20 block">{formatCurrency(item.value)}</span>
+                          <span className="text-xs font-medium text-gray-500 w-10 block pt-0.5">{((item.value / totalCollectibles) * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-1">
+            {/* AR Aging Summary */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <FileClock size={18} className="text-amber-500" /> Aging Summary
+              </h3>
+              <div className="space-y-4">
+                {agingSummary.map((item, idx) => (
+                  <div key={idx} className="flex flex-col">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600 font-medium">{item.name}</span>
+                      <span className="font-bold text-gray-900">{formatCurrency(item.value)}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${totalCollectibles > 0 ? (item.value / totalCollectibles) * 100 : 0}%`, backgroundColor: item.color }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Collections & Unbilled Batches */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Collections per Month Chart */}
+          <div className="md:col-span-2">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <Banknote size={20} className="text-emerald-500" /> Collections per Month
+                </h3>
+                <div className="text-right">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Total Collections</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(collectionsPerMonth.reduce((sum, item) => sum + item.amount, 0))}</p>
+                </div>
+              </div>
+
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={collectionsPerMonth} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="month"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748B', fontSize: 12 }}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748B', fontSize: 12 }}
+                      tickFormatter={(val) => `${currency === 'USD' ? '$' : '₱'}${val / 1000}k`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [formatCurrency(value), 'Collected']}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
+                      cursor={{ fill: '#F1F5F9' }}
+                    />
+                    <Bar
+                      dataKey="amount"
+                      fill="#10B981"
+                      radius={[4, 4, 0, 0]}
+                      barSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-1">
+            {/* Unbilled Batches List */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full min-h-[300px]">
+              <div className="flex justify-between items-center mb-4 shrink-0">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <Layers size={18} className="text-[#F47721]" /> Unbilled Batches
+                </h3>
+                <span className="bg-orange-100 text-[#F47721] text-xs font-bold px-2 py-0.5 rounded-full">{unbilledBatches.length}</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200">
+                {unbilledBatches.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                    <CheckCircle size={32} className="mb-2 text-emerald-100" />
+                    <p className="text-xs font-medium uppercase tracking-wide">All batches billed</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {unbilledBatches.map(b => (
+                      <div key={b.id} className="p-3 bg-gray-50 rounded border border-gray-100 hover:border-orange-200 transition-colors group">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-xs font-bold text-gray-700 group-hover:text-[#F47721] transition-colors">{b.batchCode}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${b.status === BatchStatus.ONGOING ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {b.status}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 truncate mb-1" title={b.name}>{b.name}</p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-500 truncate max-w-[120px]">
+                            {sponsors.find(s => s.id === b.sponsorId)?.name || 'Private / Unknown'}
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-400 flex items-center gap-1">
+                            <Users size={10} /> {b.currentStudents}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+const Dashboard: React.FC<DashboardProps> = (props) => {
+  const { summaries, currency = 'USD', lines, accounts, currentUser } = props;
+
+  // Conditional Render for AR Specialist
+  if (currentUser?.role === 'AR_SPECIALIST') {
+    return <ARDashboard {...props} />;
+  }
+
   const assets = summaries.filter(s => s.accountClass === AccountClass.ASSET).reduce((sum, s) => sum + s.balance, 0);
   const liabilities = summaries.filter(s => s.accountClass === AccountClass.LIABILITY).reduce((sum, s) => sum + s.balance, 0);
   const revenue = summaries.filter(s => s.accountClass === AccountClass.REVENUE).reduce((sum, s) => sum + s.balance, 0);
   const expenses = summaries.filter(s => s.accountClass === AccountClass.EXPENSE).reduce((sum, s) => sum + s.balance, 0);
-  
+
   const netIncome = revenue - expenses;
   const currentRatio = liabilities > 0 ? (assets / liabilities).toFixed(2) : 'N/A';
 
@@ -40,11 +484,11 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
   const formatCurrency = (val: number) => {
     // Explicitly handle symbols to avoid "PHP" glitch
     const symbol = currency === 'PHP' ? '\u20B1' : currency === 'USD' ? '$' : '';
-    const formatted = Math.abs(val).toLocaleString(undefined, { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
+    const formatted = Math.abs(val).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     });
-    return `${val < 0 ? '-' : ''}${symbol}${formatted}`;
+    return `${val < 0 ? '-' : ''}${symbol}${formatted} `;
   };
 
   const handlePrint = () => {
@@ -58,7 +502,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
           <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
           <p className="text-sm text-gray-500">Financial overview and key performance indicators</p>
         </div>
-        <button 
+        <button
           onClick={handlePrint}
           className="no-print flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
         >
@@ -75,10 +519,10 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 
       {/* Print Only Header */}
       <div className="hidden print:block border-b-2 border-gray-800 pb-3">
-         <h1 className="text-xl font-bold">Financial Performance Report</h1>
-         <p className="text-xs text-gray-500 mt-1">
-            Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
-         </p>
+        <h1 className="text-xl font-bold">Financial Performance Report</h1>
+        <p className="text-xs text-gray-500 mt-1">
+          Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -93,24 +537,24 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
               <BarChart3 size={16} />
             </div>
           </div>
-          
+
           <div className="h-[300px] w-full min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#e11d48" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#e11d48" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#e11d48" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '4px', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '10px', fontFamily: "'Open Sans', sans-serif" }}
                   labelStyle={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}
                 />
@@ -124,44 +568,44 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 
         <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5 flex flex-col relative overflow-hidden">
           <div className="absolute top-0 right-0 p-6 opacity-5 text-gray-300 no-print">
-             <LucideLineChart size={80} />
+            <LucideLineChart size={80} />
           </div>
           <div className="relative z-10">
-             <h3 className="text-sm font-semibold text-gray-800 mb-4">Asset Distribution</h3>
-             <div className="h-[200px] min-h-[200px]">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
-                  <BarChart data={classDistributionData} layout="vertical">
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" hide />
-                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '4px', color: '#1F2937', fontFamily: "'Open Sans', sans-serif" }} />
-                    <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={30}>
-                       {classDistributionData.map((entry, index) => (
-                         <Cell key={`cell-${index}`} fill={entry.color} />
-                       ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-             </div>
-             
-             <div className="space-y-3 mt-4">
-                {classDistributionData.map((item, i) => (
-                   <div key={i} className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                         <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
-                         <span className="text-xs text-gray-500">{item.name}</span>
-                      </div>
-                      <span className="text-sm font-semibold text-gray-800 font-mono">{formatCurrency(item.value)}</span>
-                   </div>
-                ))}
-             </div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Asset Distribution</h3>
+            <div className="h-[200px] min-h-[200px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
+                <BarChart data={classDistributionData} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" hide />
+                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '4px', color: '#1F2937', fontFamily: "'Open Sans', sans-serif" }} />
+                  <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={30}>
+                    {classDistributionData.map((entry, index) => (
+                      <Cell key={`cell - ${index} `} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="space-y-3 mt-4">
+              {classDistributionData.map((item, i) => (
+                <div key={i} className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                    <span className="text-xs text-gray-500">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800 font-mono">{formatCurrency(item.value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-md shadow-sm border border-gray-200 p-5">
         <div className="flex justify-between items-center mb-4">
-           <h3 className="text-sm font-semibold text-gray-800">Balance Sheet Summary</h3>
-           <span className="text-xs text-gray-400 no-print">Aggregated GL Summary</span>
+          <h3 className="text-sm font-semibold text-gray-800">Balance Sheet Summary</h3>
+          <span className="text-xs text-gray-400 no-print">Aggregated GL Summary</span>
         </div>
         <div className="overflow-hidden rounded border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -198,7 +642,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', line
 
 const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
   <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-    <div className={`w-8 h-8 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center mb-2 no-print`}>
+    <div className={`w - 8 h - 8 rounded bg - ${color} -50 text - ${color} -600 flex items - center justify - center mb - 2 no - print`}>
       {icon}
     </div>
     <div className="text-xs text-gray-500 mb-1">{title}</div>
