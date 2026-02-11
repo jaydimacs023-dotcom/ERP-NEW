@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -83,6 +83,9 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Navigation section state
+  const [openSections, setOpenSections] = useState<{ financial: boolean; operations: boolean; registries: boolean; inventory: boolean; administration: boolean }>({ financial: true, operations: true, registries: true, inventory: true, administration: true });
   
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -283,7 +286,7 @@ export default function App() {
   // PAYROLL PERSISTENCE HANDLERS
   // ============================================================================
   
-  const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalEntryLine[]) => {
+  const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalLine[]) => {
     try {
       console.info('[App] Posting payroll run:', run.id);
       
@@ -364,9 +367,11 @@ export default function App() {
   const [recurringJournalEntries, setRecurringJournalEntries] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [purchaseOrderLines, setPurchaseOrderLines] = useState<PurchaseOrderLine[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
   const [recurringBillHistory, setRecurringBillHistory] = useState<RecurringBillHistory[]>([]);
 
@@ -390,10 +395,11 @@ export default function App() {
   const [checkVouchers, setCheckVouchers] = useState<CheckVoucher[]>([]);
   const [eftBatches, setEftBatches] = useState<EFTBatch[]>([]);
   const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceipt[]>([]);
+  const [goodsReceiptLines, setGoodsReceiptLines] = useState<GoodsReceiptLine[]>([]);
 
   // Financial Cycle State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [journalLines, setJournalLines] = useState<JournalEntryLine[]>([]);
+  const [journalLines, setJournalLines] = useState<JournalLine[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [payrollLines, setPayrollLines] = useState<PayrollLine[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -620,7 +626,7 @@ export default function App() {
     setActiveTab(getDefaultTab(user.role));
   };
 
-  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalEntryLine[]) => {
+  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
     const fullEntry = {
       ...entry,
       id: entry.id || `je-${Date.now()}`,
@@ -901,7 +907,7 @@ export default function App() {
       if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets);
       if (backupData.data.accounts?.length) setAccounts(backupData.data.accounts);
       if (backupData.data.purchaseOrders?.length) setPurchaseOrders(backupData.data.purchaseOrders);
-      if (backupData.data.paymentHistory?.length) setPaymentHistory(backupData.data.paymentHistory);
+      if (backupData.data.paymentHistory?.length) setPayments(backupData.data.paymentHistory);
       if (backupData.data.payables?.length) setPayables(backupData.data.payables);
       if (backupData.data.accountingPeriods?.length) setAccountingPeriods(backupData.data.accountingPeriods);
       if (backupData.data.checkVouchers?.length) setCheckVouchers(backupData.data.checkVouchers);
@@ -913,19 +919,20 @@ export default function App() {
       if (backupData.data.inventoryLevels?.length) setInventoryLevels(backupData.data.inventoryLevels);
       if (backupData.data.inventoryTransactions?.length) setInventoryTransactions(backupData.data.inventoryTransactions);
       if (backupData.data.stockAdjustments?.length) setStockAdjustments(backupData.data.stockAdjustments);
-      if (backupData.data.nonStockItems?.length) setNonStockItems(backupData.data.nonStockItems);
+      if (backupData.data.nonStockItems?.length) setItems(backupData.data.nonStockItems);
       if (backupData.data.fixedAssets?.length) setFixedAssets(backupData.data.fixedAssets);
       if (backupData.data.bankAccounts?.length) setBankAccounts(backupData.data.bankAccounts);
       if (backupData.data.locations?.length) setLocations(backupData.data.locations);
 
       // Audit: Backup restored
       AuditService.logAction(
+        currentOrgId,
         currentUser?.id || 'system',
         currentUser?.name || 'System',
         'BACKUP_RESTORED',
         'BACKUP',
         currentOrgId,
-        { backupTimestamp: backupData.metadata?.createdAt, recordCount: backupData.metadata?.recordCounts }
+        `Backup from ${backupData.metadata?.createdAt}, records: ${JSON.stringify(backupData.metadata?.recordCounts)}`
       );
 
       handleNotify('success', `Backup restored successfully. ${Object.values(backupData.metadata?.recordCounts || {}).reduce((a: number, b: number) => a + b, 0)} records restored.`);
@@ -2183,7 +2190,7 @@ export default function App() {
       updateState(type, id, { isDeleted: false });
       
       // Audit: Restored
-      AuditService.logAction(currentUser?.id || "system", currentUser?.name || "System", "RESTORED", type, id);
+      AuditService.logAction(currentOrgId, currentUser?.id || "system", currentUser?.name || "System", "RESTORED", type, id);
       
       handleNotify('success', `${type} restored successfully`);
     } catch (error) {
@@ -2205,7 +2212,7 @@ export default function App() {
       removeFromState(type, id);
       
       // Audit: Permanent Delete
-      AuditService.logAction(currentUser?.id || "system", currentUser?.name || "System", "PERMANENT_DELETE", type, id);
+      AuditService.logAction(currentOrgId, currentUser?.id || "system", currentUser?.name || "System", "PERMANENT_DELETE", type, id);
       
       handleNotify('success', `${type} deleted permanently`);
     } catch (error) {
@@ -2327,7 +2334,7 @@ export default function App() {
       const entryId = `depr-${Date.now()}`;
 
       // Create depreciation lines with proper journalEntryId reference
-      const deprLines: JournalEntryLine[] = [
+      const deprLines: JournalLine[] = [
         {
           id: `line-${Date.now()}-debit`,
           journalEntryId: entryId,
@@ -2364,7 +2371,7 @@ export default function App() {
       };
 
       // Add journal entry lines separately
-      const newLines: JournalEntryLine[] = deprLines.map(line => ({
+      const newLines: JournalLine[] = deprLines.map(line => ({
         ...line,
         journalEntryId: entryId
       }));
@@ -2609,13 +2616,13 @@ export default function App() {
   // ===== Goods Receipt CRUD Handlers =====
   const handleAddGoodsReceipt = async (gr: GoodsReceipt) => {
     try {
-      console.info('[App] Creating goods receipt:', gr.receiptNumber);
+      console.info('[App] Creating goods receipt:', gr.grNumber);
       const grWithOrg = { ...gr, orgId: currentOrgId };
       const savedGR = await dataService.createGoodsReceipt(grWithOrg);
       setGoodsReceipts(prev => [...prev, savedGR]);
       
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', savedGR.id, gr.receiptNumber);
-      handleNotify('success', `Goods Receipt "${gr.receiptNumber}" created successfully`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', savedGR.id, gr.grNumber);
+      handleNotify('success', `Goods Receipt "${gr.grNumber}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating goods receipt:', error);
       handleNotify('error', 'Failed to create goods receipt. Falling back to memory storage.');
@@ -2631,7 +2638,7 @@ export default function App() {
       const updated = await dataService.updateGoodsReceipt(id, updates);
       setGoodsReceipts(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
       
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.receiptNumber, existing, { ...existing, ...updates });
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.grNumber, existing, { ...existing, ...updates });
       handleNotify('success', 'Goods receipt updated successfully');
     } catch (error) {
       console.error('[App] Error updating goods receipt:', error);
@@ -2647,7 +2654,7 @@ export default function App() {
       await dataService.deleteGoodsReceipt(id);
       setGoodsReceipts(prev => prev.filter(g => g.id !== id));
       
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.receiptNumber);
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.grNumber);
       handleNotify('success', 'Goods receipt deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting goods receipt:', error);
@@ -2788,8 +2795,8 @@ export default function App() {
         ))}
       </div>
 
-      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-slate-950 flex flex-col transition-all duration-500 z-50 border-r border-white/5`}>
-        <div className="p-6 flex items-center justify-center border-b border-white/5 bg-slate-900/50">
+      <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white flex flex-col transition-all duration-500 z-50 border-r border-slate-200`}>
+        <div className="p-6 flex items-center justify-center border-b border-slate-200 bg-slate-50">
            {sidebarOpen ? (
              <div className="flex flex-col items-center gap-3 w-full">
                 <div 
@@ -2799,7 +2806,7 @@ export default function App() {
                    {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
                 </div>
                 <div className="w-full text-center">
-                   <h1 className="text-sm font-black text-white uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
+                   <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
                 </div>
              </div>
@@ -2813,7 +2820,7 @@ export default function App() {
            )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-8 px-4 space-y-1.5 scrollbar-hide">
+        <nav className="flex-1 overflow-y-auto py-8 px-4 scrollbar-hide">
            {/* Navigation Items (unchanged logic) */}
            {currentUser.role === 'STUDENT' && (
              <div className="mb-8">
@@ -2841,7 +2848,6 @@ export default function App() {
                <NavItem icon={<PieChart size={18}/>} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Landmark size={18}/>} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Printer size={18}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Zap size={18}/>} label="EFT Batches" active={activeTab === 'eft'} onClick={() => setActiveTab('eft')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={18}/>} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<RefreshCw size={18}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<TrendingUp size={18}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -2854,30 +2860,42 @@ export default function App() {
            )}
 
            {isRegistrar && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Operations</p>}
+             <NavSection 
+               label="Operations" 
+               isOpen={openSections.operations} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isFinance && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Registries</p>}
+             <NavSection 
+               label="Registries" 
+               isOpen={openSections.registries} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isFinance && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Inventory Management</p>}
+             <NavSection 
+               label="Inventory" 
+               isOpen={openSections.inventory} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Package size={20}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Box size={20}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -2886,12 +2904,16 @@ export default function App() {
                <NavItem icon={<Zap size={20}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<TrendingUp size={20}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isTenantAdmin && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Administration</p>}
+             <NavSection 
+               label="Administration" 
+               isOpen={openSections.administration} 
+               onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))}
+               compact={!sidebarOpen}
+             >
                <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarCheck size={20}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -2907,7 +2929,7 @@ export default function App() {
                </div>
                <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
+             </NavSection>
            )}
 
            {isSysAdmin && (
@@ -2935,8 +2957,8 @@ export default function App() {
           </div>
         )}
 
-        <div className="p-6 mt-auto border-t border-white/5">
-           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-500 hover:text-white transition-colors rounded-xl hover:bg-white/5">
+        <div className="p-6 mt-auto border-t border-slate-200">
+           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
               <LogOut size={20} />
               {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
            </button>
@@ -2956,15 +2978,6 @@ export default function App() {
               <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
            </div>
            <div className="flex items-center gap-6">
-              {isFinance && !['PRESIDENT', 'REGISTRAR', 'TRAINER', 'STUDENT'].includes(currentUser?.role || '') && (
-                <button 
-                  onClick={() => setShowJournalForm(true)} 
-                  className="flex items-center gap-2 px-5 py-2.5 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all active:scale-95"
-                  style={{ backgroundColor: brandColor }}
-                >
-                   <PlusCircle size={18} /> Manual Post
-                </button>
-              )}
               <div className="h-10 w-px bg-slate-100 mx-2" />
               <div className="flex items-center gap-3">
                  <div className="text-right">
@@ -3080,7 +3093,7 @@ export default function App() {
                 fixedAssets, bankAccounts, locations
               }}
               onRestore={handleRestoreBackup}
-              onNotify={notify}
+              onNotify={handleNotify}
               currency={currentOrg?.currency || 'USD'}
             />
           )}
@@ -3120,11 +3133,40 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
       style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
     >
       <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</div>
       {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
     </button>
+  );
+}
+
+interface NavSectionProps {
+  label: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  compact: boolean;
+  children: React.ReactNode;
+}
+
+function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
+  return (
+    <div className="mb-8">
+      <button 
+        onClick={onToggle}
+        className="w-full flex items-center justify-between mb-4 px-4 group"
+      >
+        {!compact && (
+          <p className="text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-slate-700 transition-colors">
+            {label}
+          </p>
+        )}
+        <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isOpen && <div className="space-y-1">{children}</div>}
+    </div>
   );
 }

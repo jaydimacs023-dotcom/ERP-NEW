@@ -51,12 +51,17 @@ export type EntityType =
   | 'JOURNAL_ENTRY'
   | 'RECURRING_JOURNAL_ENTRY'
   | 'CHART_OF_ACCOUNT'
+  | 'ACCOUNT'
   | 'PAYABLE'
   | 'RECEIVABLE'
+  | 'INVOICE'
+  | 'RECURRING_INVOICE'
+  | 'REVENUE_SCHEDULE'
   | 'PURCHASE_ORDER'
   | 'BANK_ACCOUNT'
   | 'BANK_RECONCILIATION'
   | 'CHECK_VOUCHER'
+  | 'EFT_BATCH'
   | 'FIXED_ASSET'
   | 'ITEM'
   | 'GOODS_RECEIPT'
@@ -67,6 +72,7 @@ export type EntityType =
   | 'STOCK_ADJUSTMENT'
   | 'REORDER_POINT'
   | 'INVENTORY_TRANSACTION'
+  | 'BACKUP'
   | 'SYSTEM';
 
 export interface AuditLogInput {
@@ -292,6 +298,47 @@ class AuditServiceClass {
 
   logout(orgId: string, userId: string, userName: string): AuditLog {
     return this.log({ orgId, userId, userName, action: 'LOGOUT', entityType: 'USER', entityId: userId });
+  }
+
+  archive(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'SOFT_DELETE', entityType, entityId, entityName, details: `Archived ${entityType}` });
+  }
+
+  restore(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'RESTORE', entityType, entityId, entityName });
+  }
+
+  /**
+   * Generic log action method for custom actions
+   */
+  logAction(orgId: string, userId: string, userName: string, action: string, entityType: string, entityId: string, details?: any): AuditLog {
+    // Map custom action strings to valid AuditAction types
+    let mappedAction: AuditAction;
+    switch (action) {
+      case 'BACKUP_RESTORED':
+      case 'RESTORED':
+        mappedAction = 'RESTORE';
+        break;
+      case 'PERMANENT_DELETE':
+        mappedAction = 'DELETE';
+        break;
+      case 'PAYABLE_EXCEPTION_APPROVED':
+        mappedAction = 'APPROVE';
+        break;
+      default:
+        mappedAction = 'UPDATE';
+    }
+    
+    const detailsStr = typeof details === 'object' ? JSON.stringify(details) : details;
+    return this.log({ 
+      orgId, 
+      userId, 
+      userName, 
+      action: mappedAction, 
+      entityType: entityType as EntityType, 
+      entityId, 
+      details: detailsStr 
+    });
   }
 }
 

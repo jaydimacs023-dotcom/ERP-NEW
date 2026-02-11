@@ -932,6 +932,31 @@ export interface CheckVoucher extends BaseEntity {
   updatedAt?: string;
 }
 
+export type EFTStatus = 'DRAFT' | 'GENERATED' | 'SUBMITTED' | 'PROCESSED' | 'PARTIALLY_PROCESSED' | 'FAILED';
+
+export interface EFTBatch extends BaseEntity {
+  id: string;
+  orgId: string;
+  batchNumber: string;
+  bankAccountId: string;
+  batchDate: string;
+  status: EFTStatus;
+  totalAmount: number;
+  paymentCount: number;
+  payableIds?: string[];
+  // File generation
+  fileFormat?: 'NACHA' | 'ISO20022' | 'CUSTOM';
+  generatedFileName?: string;
+  generatedAt?: string;
+  // Audit
+  createdBy?: string;
+  createdAt: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  processedAt?: string;
+  notes?: string;
+}
+
 // ============================================================================
 // ENHANCED PERMISSIONS
 // ============================================================================

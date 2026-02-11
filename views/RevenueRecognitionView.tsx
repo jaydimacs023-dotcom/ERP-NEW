@@ -42,7 +42,7 @@ interface RevenueRecognitionViewProps {
   onDeleteSchedule: (id: string) => void;
   onCreateEntry: (entry: Partial<RevenueRecognitionEntry>) => void;
   onUpdateEntry: (id: string, updates: Partial<RevenueRecognitionEntry>) => void;
-  onPostJournal: (entry: any) => void;
+  onPostJournal: (entry: any, lines: any[]) => void;
   onNotify: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
 }
 
@@ -333,7 +333,7 @@ export default function RevenueRecognitionView({
       );
       
       // Post the journal entry
-      onPostJournal({ ...journalEntry, lines });
+      onPostJournal(journalEntry, lines);
       
       totalRecognized += period.amount;
     }
@@ -373,7 +373,7 @@ export default function RevenueRecognitionView({
           schedule,
           entry as RevenueRecognitionEntry
         );
-        onPostJournal({ ...journalEntry, lines });
+        onPostJournal(journalEntry, lines);
         
         totalAmount += period.amount;
       }
