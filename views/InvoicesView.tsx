@@ -34,6 +34,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+
+  // Derived: Students in the batch for annex
+  const batchStudents = React.useMemo(() => {
+    if (!showViewModal || !viewingInvoice?.batchId) return [];
+    const batchEnrollments = enrollments.filter(e => e.batchId === viewingInvoice.batchId && !e.isDeleted);
+    return batchEnrollments.map(e => {
+      const student = students.find(s => s.id === e.studentId);
+      return student ? {
+        id: student.id,
+        name: `${student.firstName} ${student.lastName}`,
+        studentNo: student.studentNo || student.id,
+        courseName: qualifications.find(q => q.id === student.qualificationId)?.name || '',
+      } : null;
+    }).filter(Boolean);
+  }, [showViewModal, viewingInvoice, enrollments, students, qualifications]);
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false); // Generate from enrollments wizard
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -1124,7 +1139,29 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       {/* View Invoice Modal */}
       {showViewModal && viewingInvoice && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
+            {/* PAID Watermark Overlay */}
+            {viewingInvoice.balanceDue === 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%) rotate(-20deg)',
+                  pointerEvents: 'none',
+                  opacity: 0.18,
+                  fontSize: '5rem',
+                  fontWeight: 900,
+                  color: '#10B981',
+                  zIndex: 30,
+                  textShadow: '2px 2px 8px #fff',
+                  letterSpacing: '0.2em',
+                  userSelect: 'none',
+                }}
+              >
+                PAID
+              </div>
+            )}
             <div className="flex items-center justify-between p-4 border-b">
               <div>
                 <h3 className="text-lg font-bold text-gray-800">Invoice {viewingInvoice.invoiceNo}</h3>
@@ -1137,7 +1174,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </button>
               </div>
             </div>
-            
             <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
               {/* Bill To */}
               <div className="grid grid-cols-2 gap-6">
@@ -1225,6 +1261,33 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
                   <p className="text-sm text-gray-700">{viewingInvoice.notes}</p>
+                </div>
+              )}
+
+              {/* Annex: Student Breakdown for Sponsor/Batch Invoices */}
+              {viewingInvoice.sponsorId && viewingInvoice.batchId && batchStudents?.length > 0 && (
+                <div className="mt-10 print:break-before-page">
+                  <h4 className="text-lg font-bold text-gray-800 mb-2">Annex: Student Breakdown</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Student Name</th>
+                          <th className="px-4 py-2 text-left">Student ID</th>
+                          <th className="px-4 py-2 text-left">Course</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchStudents.map((student, idx) => (
+                          <tr key={student.id || idx} className="border-t">
+                            <td className="px-4 py-2">{student.name}</td>
+                            <td className="px-4 py-2">{student.studentNo}</td>
+                            <td className="px-4 py-2">{student.courseName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

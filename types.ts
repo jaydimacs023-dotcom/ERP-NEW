@@ -873,7 +873,7 @@ export interface ReviewComment {
   createdAt: string;
 }
 
-export type RecurrenceFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM';
+// RecurrenceFrequency removed
 
 export interface RecurringJournalEntry extends BaseEntity {
   id: string;
@@ -1350,62 +1350,13 @@ export interface RecurringBillHistory extends BaseEntity {
   createdAt: string;
 }
 
-export type RecurringInvoiceStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+// RecurringInvoiceStatus removed
 
-export interface RecurringInvoiceLineItem {
-  itemId: string;
-  description?: string;
-  quantity: number;
-  unitPrice: number;
-  taxAmount?: number;
-}
+// RecurringInvoiceLineItem removed
 
-export interface RecurringInvoice extends BaseEntity {
-  id: string;
-  orgId: string;
-  customerId: string;
-  invoiceName: string;
-  description: string;
-  amount: number;
-  currency?: string;
-  frequency: RecurrenceFrequency;
-  startDate: string;
-  endDate?: string;
-  nextInvoiceDate: string;
-  lastInvoiceDate?: string;
-  invoiceDaysAfterMonth?: number; // Day of month to generate invoice (1-31)
-  status: RecurringInvoiceStatus;
-  // Line items (charge items)
-  lineItems?: RecurringInvoiceLineItem[];
-  // Account mapping
-  arAccountId?: string;
-  revenueAccountId?: string;
-  departmentId?: string;
-  costCenterId?: string;
-  // Invoice configuration
-  category?: string;
-  paymentTermsDays?: number;
-  // Tracking
-  totalInvoicesGenerated: number;
-  autoCreateReceivable: boolean;
-  createdBy?: string;
-  createdAt: string;
-  updatedAt?: string;
-  lastModifiedBy?: string;
-  notes?: string;
-}
+// RecurringInvoice removed
 
-export interface RecurringInvoiceHistory extends BaseEntity {
-  id: string;
-  orgId: string;
-  recurringInvoiceId: string;
-  receivableId?: string;
-  invoiceDate: string;
-  amount: number;
-  status: 'GENERATED' | 'CREATED' | 'SKIPPED' | 'FAILED';
-  notes?: string;
-  createdAt: string;
-}
+// RecurringInvoiceHistory removed
 
 // ============================================
 // Revenue Recognition & Deferred Revenue Types

@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit
-} from './types';
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit
+} from './types'; // RecurringInvoice, RecurringInvoiceHistory removed
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
@@ -59,7 +59,7 @@ import ReorderView from './views/ReorderView';
 import InventoryTransactionsView from './views/InventoryTransactionsView';
 import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import BackupRestoreView from './views/BackupRestoreView';
-import RecurringInvoicesView from './views/RecurringInvoicesView';
+// import RecurringInvoicesView from './views/RecurringInvoicesView';
 import RevenueRecognitionView from './views/RevenueRecognitionView';
 import CourseFeesView from './views/CourseFeesView';
 import EnrollmentsView from './views/EnrollmentsView';
@@ -132,95 +132,7 @@ export default function App() {
     }
   };
 
-    // Recurring Invoice CRUD Handlers
-    const handleAddRecurringInvoice = async (invoice: any) => {
-      try {
-        console.info('[App] Creating recurring invoice:', invoice.invoiceName);
-        const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
-        const created = await dataService.createRecurringInvoice(invoiceWithOrg);
-        setRecurringInvoices(prev => [...prev, created]);
-        // Audit: Recurring invoice created
-        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', created.id, `Recurring invoice: ${created.invoiceName}`);
-        handleNotify('success', 'Recurring invoice created successfully');
-      } catch (error) {
-        console.error('[App] Error creating recurring invoice:', error);
-        handleNotify('error', `Failed to create recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
-
-    const handleUpdateRecurringInvoice = async (id: string, updates: any) => {
-      try {
-        console.info('[App] Updating recurring invoice:', id);
-        const existing = recurringInvoices.find(e => e.id === id);
-        const updated = await dataService.updateRecurringInvoice(id, updates);
-        setRecurringInvoices(prev => prev.map(e => e.id === id ? updated : e));
-        // Audit: Recurring invoice updated
-        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', id, existing?.invoiceName, existing, { ...existing, ...updates });
-        handleNotify('success', 'Recurring invoice updated successfully');
-      } catch (error) {
-        console.error('[App] Error updating recurring invoice:', error);
-        handleNotify('error', `Failed to update recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
-
-    const handleDeleteRecurringInvoice = async (id: string) => {
-      try {
-        console.info('[App] Deleting recurring invoice:', id);
-        const existing = recurringInvoices.find(e => e.id === id);
-        await dataService.deleteRecurringInvoice(id);
-        setRecurringInvoices(prev => prev.filter(e => e.id !== id));
-        // Audit: Recurring invoice deleted
-        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_INVOICE', id, existing?.invoiceName);
-        handleNotify('success', 'Recurring invoice deleted successfully');
-      } catch (error) {
-        console.error('[App] Error deleting recurring invoice:', error);
-        handleNotify('error', `Failed to delete recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
-
-    const handleRunRecurringInvoice = async (id: string) => {
-      try {
-        console.info('[App] Running recurring invoice:', id);
-        const invoice = recurringInvoices.find(e => e.id === id);
-        if (!invoice) {
-          handleNotify('error', 'Recurring invoice not found');
-          return;
-        }
-        // Import RecurringInvoiceService to use its logic
-        const { RecurringInvoiceService } = await import('./services/RecurringInvoiceService');
-        // Check if invoice is due
-        if (!RecurringInvoiceService.isDueToRun(invoice)) {
-          handleNotify('warning', 'This recurring invoice is not due to run yet');
-          return;
-        }
-        // Generate invoice from template
-        const invoiceDate = new Date().toISOString().split('T')[0];
-        const generatedId = crypto.randomUUID();
-        const { invoice: invoiceData, lines: invoiceLineData } = RecurringInvoiceService.generateInvoiceFromTemplate(
-          invoice,
-          invoiceDate,
-          generatedId
-        );
-        // Create invoice with lines
-        const newInvoice: Partial<any> = {
-          ...invoiceData,
-          orgId: currentOrgId,
-          createdBy: currentUser?.id || 'system',
-          createdAt: new Date().toISOString()
-        };
-        const created = await dataService.createInvoice(newInvoice);
-        // Update the recurring invoice with execution info
-        const updatedInvoice = RecurringInvoiceService.updateAfterExecution(invoice, created.id);
-        const updated = await dataService.updateRecurringInvoice(id, updatedInvoice);
-        setRecurringInvoices(prev => prev.map(e => e.id === id ? updated : e));
-        // Audit
-        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', created.id, `Auto-generated from recurring invoice: ${invoice.invoiceName}`);
-        handleNotify('success', 'Recurring invoice executed and posted successfully');
-      } catch (error) {
-        console.error('[App] Error running recurring invoice:', error);
-        handleNotify('error', `Failed to execute recurring invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+    // Recurring invoice handlers removed
 
     // Revenue Schedule (Deferred Revenue) CRUD Handlers
     const handleAddRevenueSchedule = async (schedule: any) => {
@@ -387,9 +299,7 @@ export default function App() {
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
   const [recurringBillHistory, setRecurringBillHistory] = useState<RecurringBillHistory[]>([]);
 
-  // Recurring Invoices (AR)
-  const [recurringInvoices, setRecurringInvoices] = useState<RecurringInvoice[]>([]);
-  const [recurringInvoiceHistory, setRecurringInvoiceHistory] = useState<RecurringInvoiceHistory[]>([]);
+  // Recurring Invoices (AR) removed
 
   // Revenue Recognition & Deferred Revenue
   const [revenueSchedules, setRevenueSchedules] = useState<RevenueSchedule[]>([]);
@@ -3449,7 +3359,85 @@ export default function App() {
             onDeletePayment={handleDeletePayment} 
             onVoidPayment={handleVoidPayment}
             onApplyToInvoice={handleApplyToInvoice}
+            onReverseApplication={handleReverseApplication}
           />}
+                      // ===== Payment Application Reversal Handler (RVRS) =====
+                      const handleReverseApplication = async (paymentId, applicationId, reason) => {
+                        // 1. Update Payment Application State
+                        const payment = payments.find(p => p.id === paymentId);
+                        if (!payment) return;
+                        const application = (payment.applications || []).find(app => app.id === applicationId);
+                        if (!application) return;
+                        const invoice = invoices.find(i => i.id === application.invoiceId);
+                        if (!invoice) return;
+
+                        // Mark application as reversed
+                        const updatedApplications = (payment.applications || []).map(app =>
+                          app.id === applicationId
+                            ? { ...app, isReversed: true, reversalReason: reason, reversedAt: new Date().toISOString() }
+                            : app
+                        );
+                        const reversedAmount = application.amountApplied;
+                        const updatedPayment = {
+                          ...payment,
+                          applications: updatedApplications,
+                          totalApplied: (payment.totalApplied || 0) - reversedAmount,
+                          customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount
+                        };
+                        setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
+
+                        // 2. Update Invoice Balance and Status
+                        const newAmountPaid = (invoice.amountPaid || 0) - reversedAmount;
+                        const newBalanceDue = (invoice.balanceDue || 0) + reversedAmount;
+                        const newStatus = invoice.status === 'CLOSED' ? 'OPEN' : invoice.status;
+                        const updatedInvoice = {
+                          ...invoice,
+                          amountPaid: newAmountPaid,
+                          balanceDue: newBalanceDue,
+                          status: newStatus
+                        };
+                        setInvoices(prev => prev.map(i => i.id === invoice.id ? updatedInvoice : i));
+
+                        // 3. Create GL Journal Entry for RVRS
+                        const coa = accounts.filter(a => a.orgId === currentOrgId);
+                        const arAcct = coa.find(a => a.code === '1200');
+                        const depositsAcct = coa.find(a => a.code === '2000');
+                        if (arAcct && depositsAcct) {
+                          const rvrsEntry = {
+                            orgId: currentOrgId,
+                            periodId: invoice.periodId,
+                            date: new Date().toISOString().split('T')[0],
+                            description: `Reversal of Payment Application for Invoice ${invoice.invoiceNo}`,
+                            reference: `RVRS-${invoice.invoiceNo}-${Date.now()}`,
+                            status: 'POSTED',
+                            sourceType: 'RVRS',
+                            sourceRef: invoice.id,
+                            createdBy: currentUser?.id,
+                            createdAt: new Date().toISOString()
+                          };
+                          const rvrsLines = [
+                            {
+                              id: `jl-${Date.now()}-1`,
+                              entryId: '',
+                              accountId: arAcct.id,
+                              debit: reversedAmount,
+                              credit: 0,
+                              description: 'Restore Accounts Receivable',
+                              createdAt: new Date().toISOString()
+                            },
+                            {
+                              id: `jl-${Date.now()}-2`,
+                              entryId: '',
+                              accountId: depositsAcct.id,
+                              debit: 0,
+                              credit: reversedAmount,
+                              description: 'Restore Customer Deposits',
+                              createdAt: new Date().toISOString()
+                            }
+                          ];
+                          await handlePostJournal(rvrsEntry, rvrsLines);
+                        }
+                      };
             // ===== Payment Application Handler (APPL) =====
             const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
               // 1. Update Payment Application State

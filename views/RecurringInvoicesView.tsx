@@ -1,23 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
-import { RecurringInvoice, RecurringInvoiceHistory, RecurrenceFrequency, ChartOfAccount, NonStockItem, RecurringInvoiceLineItem } from '../types';
-import { RecurringInvoiceService } from '../services/RecurringInvoiceService';
-import { 
-  Plus, Edit2, Trash2, Play, Pause, X, Check, Calendar, 
-  RefreshCw, Search, Filter, ChevronDown, ChevronUp, History,
-  AlertCircle, Clock
-} from 'lucide-react';
-
-interface RecurringInvoicesViewProps {
-  orgId: string;
-  currency: string;
-  recurringInvoices: RecurringInvoice[];
-  recurringInvoiceHistory: RecurringInvoiceHistory[];
-  customers: { id: string; name: string }[];
-  accounts: ChartOfAccount[];
-  items: NonStockItem[];
-  onCreateRecurringInvoice: (invoice: Partial<RecurringInvoice>) => void;
-  onUpdateRecurringInvoice: (id: string, updates: Partial<RecurringInvoice>) => void;
-  onDeleteRecurringInvoice: (id: string) => void;
+﻿// File intentionally left blank (RecurringInvoicesView removed)
   onRunRecurringInvoice: (id: string) => void;
   onNotify: (type: 'success' | 'error' | 'warning', message: string) => void;
 }

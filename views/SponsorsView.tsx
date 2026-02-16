@@ -1,5 +1,6 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Sponsor, ChartOfAccount, TaxType } from '../types';
+import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine, Student, Batch } from '../types';
+import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
@@ -15,15 +16,21 @@ interface Toast {
 
 interface SponsorsViewProps {
   sponsors: Sponsor[];
-  accounts?: any[];
+  accounts?: ChartOfAccount[];
+  entries?: JournalEntry[];
+  lines?: JournalLine[];
+  students?: Student[];
+  batches?: Batch[];
+  currency?: string;
   onAddSponsor: (sponsor: Sponsor) => void | Promise<void>;
   onUpdateSponsor: (sponsor: Sponsor) => void | Promise<void>;
   onDeleteSponsor: (id: string) => void | Promise<boolean>;
 }
 
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
-  sponsors, accounts = [], onAddSponsor, onUpdateSponsor, onDeleteSponsor 
+  sponsors, accounts = [], entries = [], lines = [], students = [], batches = [], currency = '₱', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
+    const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
@@ -308,8 +315,27 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     >
                       {deletingId === sponsor.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>
+                    <button
+                      onClick={() => setShowSOAFor(sponsor)}
+                      className="p-2 hover:bg-blue-50 text-blue-500 hover:text-blue-700 rounded-lg transition-colors border border-blue-100"
+                      title="View Statement of Account"
+                    >
+                      <FileText size={16} />
+                    </button>
                   </div>
                 </td>
+                    {showSOAFor && (
+                      <SponsorSOAView
+                        sponsor={showSOAFor}
+                        entries={entries}
+                        lines={lines}
+                        students={students}
+                        batches={batches}
+                        accounts={accounts}
+                        currency={currency}
+                        onClose={() => setShowSOAFor(null)}
+                      />
+                    )}
               </tr>
             )) : (
               <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sponsors registered in the system.</td></tr>
