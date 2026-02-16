@@ -52,6 +52,9 @@ const ARView: React.FC<ARViewProps> = ({
   const [approvalAction, setApprovalAction] = useState<'approve' | 'revision'>('approve');
   const [editingItemGroup, setEditingItemGroup] = useState<ItemGroup | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'ALL'|'INVOICE'|'CREDIT'|'OTHER'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL'|'On Hold'|'Open'|'Closed'|'Voided'>('ALL');
+  const [filterDateRange, setFilterDateRange] = useState<'ALL'|'30D'|'MTD'|'YTD'>('ALL');
   const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
 
   // Item Group Form State
@@ -208,10 +211,84 @@ const ARView: React.FC<ARViewProps> = ({
     return lines.filter(l => postedEntryIds.has(l.journalEntryId) && vatAccountIds.has(l.accountId)).reduce((sum, l) => sum + (l.credit - l.debit), 0);
   }, [lines, entries, accounts]);
 
-  const filteredInvoices = arInvoices.filter(inv =>
-    inv.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getDisplayStatus = (status?: string, entry?: any) => {
+    // Normalize stored statuses into the UI statuses requested by the product owner
+    // UI statuses: On Hold, Open, Closed, Voided
+    if (!status) return 'On Hold';
+    const s = status.toUpperCase();
+    if (s === 'REVERSED' || s === 'VOIDED') return 'Voided';
+    if (s === 'DRAFT' || s === 'REVISION_REQUESTED' || s === 'PENDING') return 'On Hold';
+    if (s === 'POSTED') {
+      // posted entries are assumed "Open" (outstanding) unless explicitly closed
+      return 'Open';
+    }
+    if (s === 'CLOSED') return 'Closed';
+    // fallback
+    return 'Open';
+  };
+
+  const filteredInvoices = arInvoices.filter(inv => {
+    const textMatch = inv.reference.toLowerCase().includes(searchTerm.toLowerCase()) || inv.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const displayStatus = getDisplayStatus(inv.status, inv);
+
+    const statusMatch = filterStatus === 'ALL' || filterStatus === displayStatus;
+    const typeMatch = filterType === 'ALL' || (inv.sourceType === filterType);
+
+    // date range filter (simple implementations)
+    let dateMatch = true;
+    if (filterDateRange !== 'ALL') {
+      const entryDate = new Date(inv.date);
+      const now = new Date();
+      if (filterDateRange === '30D') {
+        const days = (now.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24);
+        dateMatch = days <= 30;
+      } else if (filterDateRange === 'MTD') {
+        dateMatch = entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear();
+      } else if (filterDateRange === 'YTD') {
+        dateMatch = entryDate.getFullYear() === now.getFullYear();
+      }
+    }
+
+    return textMatch && statusMatch && typeMatch && dateMatch;
+  });
+
+  const handleExportInvoices = () => {
+    if (!filteredInvoices || filteredInvoices.length === 0) return onNotify('info', 'No records to export.');
+
+    const headers = ['Type','GL Nbr','Reference Nbr','Status','Date','Post Period','Customer ID','Customer Name','Description','Currency','Amount'];
+    const rows: string[] = [];
+
+    filteredInvoices.forEach(inv => {
+      const arLine = lines.find(l => l.journalEntryId === inv.id && l.debit > 0);
+      const batchLine = lines.find(l => l.journalEntryId === inv.id && l.batchId);
+      const batch = batchLine ? batches.find(b => b.id === batchLine.batchId) : undefined;
+      const contactId = arLine?.contactId || '';
+      const contactType = arLine?.contactType || '';
+      const customerName = contactType === 'STUDENT'
+        ? (students.find(s => s.id === contactId)?.lastName ? `${students.find(s => s.id === contactId)?.lastName}, ${students.find(s => s.id === contactId)?.firstName}` : contactId)
+        : (sponsors.find(s => s.id === contactId)?.name || contactId);
+
+      const postPeriod = inv.date ? formatDateMMYYYY(inv.date) : '';
+      const dateFmt = formatDateMMDDYYYY(inv.date);
+      const glNbr = inv.glEntryNumber || batch?.batchCode || '';
+      const status = getDisplayStatus(inv.status, inv);
+      const amountVal = arLine?.debit || 0;
+      const currency = inv.currency || 'PHP';
+
+      const safe = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      rows.push([inv.sourceType || 'INVOICE', glNbr, inv.reference, status, dateFmt, postPeriod, getCustomerDisplayId(contactType, contactId), customerName, inv.description || '', currency, amountVal.toFixed(2)].map(safe).join(','));
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `AR_Invoices_${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const filteredCollections = arCollections.filter(c =>
     c.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -509,6 +586,54 @@ const ARView: React.FC<ARViewProps> = ({
 
   const formatCurrency = (val: number) => `\u20B1 ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const formatDateMMDDYYYY = (d?: string | null) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return d as string;
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  };
+
+  const formatDateMMYYYY = (d?: string | null) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return d as string;
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return `${mm}-${yyyy}`;
+  };
+
+  // Returns a display-friendly Customer ID. For STUDENT contactType prefer the stored ULI (e.g. "STU-2024-00001");
+  // when ULI is missing we generate a fallback in the required format: STU-<4digit-year>-<5digit-number>
+  const getCustomerDisplayId = (contactType?: string, contactId?: string) => {
+    if (!contactId) return '—';
+
+    // STUDENT => prefer stored ULI; otherwise generate STU-<year>-<5digit>
+    if (contactType === 'STUDENT') {
+      const s = students.find(x => x.id === contactId);
+      if (s?.uli) return s.uli; // existing ULI is authoritative
+
+      const year = s?.createdAt ? new Date(s.createdAt).getFullYear() : new Date().getFullYear();
+      const numericFromId = (s?.id || '').replace(/\D/g, '').slice(-5);
+      const suffix = (numericFromId && numericFromId.length === 5) ? numericFromId : String(Date.now()).slice(-5);
+      return `STU-${year}-${String(suffix).padStart(5, '0')}`;
+    }
+
+    // SPONSOR => generate SPO-<year>-<5digit> (use createdAt if available)
+    if (contactType === 'SPONSOR') {
+      const sp = sponsors.find(x => x.id === contactId);
+      const year = sp?.createdAt ? new Date(sp.createdAt).getFullYear() : new Date().getFullYear();
+      const numericFromId = (sp?.id || contactId || '').replace(/\D/g, '').slice(-5);
+      const suffix = (numericFromId && numericFromId.length === 5) ? numericFromId : String(Date.now()).slice(-5);
+      return `SPO-${year}-${String(suffix).padStart(5, '0')}`;
+    }
+
+    // Fallback: return raw id
+    return contactId;
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -517,155 +642,231 @@ const ARView: React.FC<ARViewProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-6 w-full justify-start">
         <button
           onClick={() => { resetInvoiceForm(); setShowInvoiceModal(true); }}
-          className="flex items-center gap-3 px-4 w-40 h-16 bg-[#025959] hover:bg-[#014242] text-white rounded-md shadow-sm transition-all group active:scale-95 shrink-0"
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title="Create a new sales invoice"
         >
-          <div className="shrink-0 p-1.5 bg-white/10 rounded group-hover:scale-110 transition-transform">
-            <FilePlus size={20} />
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><FilePlus size={44} /></div>
           </div>
-          <div className="text-left min-w-0">
-            <p className="text-[11px] font-bold leading-tight uppercase tracking-tight">New<br />Invoice</p>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800">New Invoice</div>
+            <div className="text-xs text-gray-400 mt-1">Create sales invoice</div>
           </div>
         </button>
 
         <button
           onClick={() => { setShowCollectionModal(true); }}
-          className="flex items-center gap-3 px-4 w-40 h-16 bg-[#025959] hover:bg-[#014242] text-white rounded-md shadow-sm transition-all group active:scale-95 shrink-0"
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title="Record a payment / official receipt"
         >
-          <div className="shrink-0 p-1.5 bg-white/10 rounded group-hover:scale-110 transition-transform">
-            <CreditCard size={20} />
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><CreditCard size={44} /></div>
           </div>
-          <div className="text-left min-w-0">
-            <p className="text-[11px] font-bold leading-tight uppercase tracking-tight">New<br />Payment</p>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800">New Payment</div>
+            <div className="text-xs text-gray-400 mt-1">Record cash or bank payments</div>
           </div>
         </button>
 
         <button
           onClick={() => setActiveTab('aging')}
-          className="flex items-center gap-3 px-4 w-40 h-16 bg-[#025959] hover:bg-[#014242] text-white rounded-md shadow-sm transition-all group active:scale-95 shrink-0"
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title="View customer ledger and aging"
         >
-          <div className="shrink-0 p-1.5 bg-white/10 rounded group-hover:scale-110 transition-transform">
-            <UserSearch size={20} />
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><UserSearch size={44} /></div>
           </div>
-          <div className="text-left min-w-0">
-            <p className="text-[11px] font-bold leading-tight uppercase tracking-tight">Customer<br />Ledger</p>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800">New Customer</div>
+            <div className="text-xs text-gray-400 mt-1">Aging & balances by customer</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate ? onNavigate('credits') : onNotify('info', 'Credits & Discounts — not implemented')}
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title="Manage credit memos and discounts"
+        >
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><Percent size={44} /></div>
+          </div>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800">Credits & Discounts</div>
+            <div className="text-xs text-gray-400 mt-1">Apply credit memos or discounts</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate ? onNavigate('customer-details') : onNotify('info', 'Customer Details — not implemented')}
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title=" Customer Details"
+        >
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><User size={44} /></div>
+          </div>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800"> Customer Details</div>
+            <div className="text-xs text-gray-400 mt-1">View or edit customer profile</div>
           </div>
         </button>
 
         <button
           onClick={() => onNavigate ? onNavigate('reports') : setActiveTab('aging')}
-          className="flex items-center gap-3 px-4 w-40 h-16 bg-[#025959] hover:bg-[#014242] text-white rounded-md shadow-sm transition-all group active:scale-95 shrink-0"
+          className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
+          title="Open AR reports and forms"
         >
-          <div className="shrink-0 p-1.5 bg-white/10 rounded group-hover:scale-110 transition-transform">
-            <FileBarChart size={20} />
+          <div className="w-full flex justify-center">
+            <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-[#025959]/5 text-[#025959] shadow-sm"><FileBarChart size={44} /></div>
           </div>
-          <div className="text-left min-w-0">
-            <p className="text-[11px] font-bold leading-tight uppercase tracking-tight">Reports<br />and Forms</p>
+
+          <div className="w-full my-3">
+            <div className="mx-auto h-[2px] bg-gray-100 w-24"></div>
+          </div>
+
+          <div className="mt-1">
+            <div className="text-[16px] font-semibold text-gray-800">Reports & Forms</div>
+            <div className="text-xs text-gray-400 mt-1">Print AR reports and export data</div>
           </div>
         </button>
       </div>
 
       {activeTab === 'invoices' && (
-        <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
-          <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-            <div className="relative">
+        <div className="bg-white rounded-b-md border border-gray-200 border-t-0 overflow-hidden shadow-sm -mt-2">
+          <div className="p-4 border-b bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <select className="px-3 py-2 bg-white border border-gray-200 rounded text-xs" value={filterType} onChange={e => setFilterType(e.target.value as any)}>
+                <option value="ALL">Type: All</option>
+                <option value="INVOICE">Invoice</option>
+                <option value="CREDIT">Credit Memo</option>
+                <option value="OTHER">Other</option>
+              </select>
+
+              <select className="px-3 py-2 bg-white border border-gray-200 rounded text-xs" value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}>
+                <option value="ALL">Status: All</option>
+                <option value="On Hold">On Hold</option>
+                <option value="Open">Open</option>
+                <option value="Closed">Closed</option>
+                <option value="Voided">Voided</option>
+              </select>
+
+              <select className="px-3 py-2 bg-white border border-gray-200 rounded text-xs" value={filterDateRange} onChange={e => setFilterDateRange(e.target.value as any)}>
+                <option value="ALL">Date: All</option>
+                <option value="30D">Last 30 days</option>
+                <option value="MTD">This month</option>
+                <option value="YTD">This year</option>
+              </select>
+
+              <button onClick={() => handleExportInvoices()} className="flex items-center gap-2 px-3 py-2 bg-[#025959] text-white rounded text-xs font-bold hover:bg-[#014242] transition-all">
+                <Download size={14} /> Export
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded text-xs outline-none w-72 focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input placeholder="Find invoice by ref or customer..." className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded text-xs outline-none w-full focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer / Sponsor</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Invoice #</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">GL Entry #</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount Due</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Action</th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-400 uppercase"> </th>
+                <th className="px-3 py-3 text-left text-xs font-bold text-gray-400 uppercase"> </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">GL Nbr</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Reference Nbr.</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Post Period</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer ID</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer Name</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Currency</th>
+                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredInvoices.length > 0 ? filteredInvoices.reverse().map(inv => {
                 const arLine = lines.find(l => l.journalEntryId === inv.id && l.debit > 0);
+                const batchLine = lines.find(l => l.journalEntryId === inv.id && l.batchId);
+                const batch = batchLine ? batches.find(b => b.id === batchLine.batchId) : undefined;
+                const contactId = arLine?.contactId || '';
+                const contactType = arLine?.contactType || '';
+                const customerName = contactType === 'STUDENT'
+                  ? (students.find(s => s.id === contactId)?.lastName ? `${students.find(s => s.id === contactId)?.lastName}, ${students.find(s => s.id === contactId)?.firstName}` : contactId)
+                  : (sponsors.find(s => s.id === contactId)?.name || contactId);
+
+                const postPeriod = inv.date ? formatDateMMYYYY(inv.date) : '';
+
                 const hasComments = inv.reviewComments && inv.reviewComments.length > 0;
                 const latestComment = hasComments ? inv.reviewComments![inv.reviewComments!.length - 1] : null;
+
                 return (
                   <tr key={inv.id} className={`hover:bg-gray-50 transition-colors group ${inv.status === 'REVISION_REQUESTED' ? 'bg-amber-50/50' : ''}`}>
-                    <td className="px-6 py-5">
-                      <div className="text-sm font-bold text-gray-800">{inv.description.split(': ')[1]}</div>
-                      {inv.status === 'REVISION_REQUESTED' && latestComment && (
-                        <div className="mt-1 flex items-start gap-1.5 text-xs text-amber-700 bg-amber-100/50 px-2 py-1 rounded">
-                          <MessageSquare size={12} className="mt-0.5 shrink-0" />
-                          <span className="line-clamp-1">{latestComment.comment}</span>
-                        </div>
-                      )}
+                    <td className="px-3 py-4 text-xs text-gray-400">{/* placeholder for attach icon */}</td>
+                    <td className="px-3 py-4 text-xs text-gray-400">{/* placeholder for doc icon */}</td>
+
+                    <td className="px-6 py-4 text-xs font-medium text-gray-700">{inv.sourceType || 'INVOICE'}</td>
+                    <td className="px-6 py-4 text-xs font-mono text-gray-600">{inv.glEntryNumber || batch?.batchCode || (batch?.name || '—')}</td>
+                    <td className="px-6 py-4 text-xs font-mono font-semibold text-[#025959]">{inv.reference}</td>
+
+                    <td className="px-6 py-4 text-xs">
+                      {(() => {
+                        const displayStatus = getDisplayStatus(inv.status, inv);
+                        const cls = displayStatus === 'Open'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                          : displayStatus === 'On Hold'
+                            ? 'bg-amber-50 text-amber-600 border-amber-100'
+                            : displayStatus === 'Voided'
+                              ? 'bg-rose-50 text-rose-600 border-rose-100'
+                              : 'bg-gray-50 text-gray-500 border-gray-100';
+                        return <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full border ${cls}`}>{displayStatus}</span>;
+                      })()}
                     </td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-[#025959]">{inv.reference}</td>
-                    <td className="px-6 py-5 text-xs font-mono font-bold text-emerald-600">
-                      {inv.glEntryNumber || <span className="text-gray-300 italic font-normal">—</span>}
-                    </td>
-                    <td className="px-6 py-5 text-xs text-gray-600">{inv.date}</td>
-                    <td className="px-6 py-5 text-right font-mono font-bold text-gray-900">{formatCurrency(arLine?.debit || 0)}</td>
-                    <td className="px-6 py-5 text-center">
-                      <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full border ${inv.status === 'POSTED'
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                        : inv.status === 'REVISION_REQUESTED'
-                          ? 'bg-amber-50 text-amber-600 border-amber-100'
-                          : 'bg-gray-50 text-gray-500 border-gray-100'
-                        }`}>
-                        {inv.status === 'REVISION_REQUESTED' ? 'REVISION' : inv.status || 'DRAFT'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* Show comments button if there are comments */}
-                        {hasComments && (
-                          <button
-                            onClick={() => { setSelectedInvoiceForApproval(inv); setShowCommentsModal(true); }}
-                            className="flex items-center gap-1 px-2 py-1 text-gray-500 hover:text-[#025959] hover:bg-[#025959]/10 rounded text-xs transition-all"
-                            title={`${inv.reviewComments?.length} comment(s)`}
-                          >
-                            <MessageSquare size={14} />
-                            <span className="font-bold">{inv.reviewComments?.length}</span>
-                          </button>
-                        )}
-                        {/* Edit button - for DRAFT or REVISION_REQUESTED invoices */}
-                        {(inv.status === 'DRAFT' || inv.status === 'REVISION_REQUESTED') && (
-                          <button
-                            onClick={() => handleEditInvoice(inv)}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
-                            title="Edit Invoice"
-                          >
-                            <Edit3 size={12} /> Edit
-                          </button>
-                        )}
-                        {/* Approve button - for approvers */}
-                        {inv.status !== 'POSTED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
-                          <button
-                            onClick={() => {
-                              setSelectedInvoiceForApproval(inv);
-                              setApprovalComment('');
-                              setApprovalAction('approve');
-                              setShowApprovalModal(true);
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-[#025959] hover:bg-[#014242] text-white rounded-lg text-xs font-bold transition-all shadow-sm"
-                            title="Review and Approve"
-                          >
-                            <CheckCircle2 size={12} /> Review
-                          </button>
-                        )}
-                        <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-300 transition-colors">
-                          <MoreVertical size={16} />
-                        </button>
-                      </div>
-                    </td>
+
+                    <td className="px-6 py-4 text-xs text-gray-600">{formatDateMMDDYYYY(inv.date)}</td>
+                    <td className="px-6 py-4 text-xs text-gray-600">{postPeriod}</td>
+
+                    <td className="px-6 py-4 text-xs text-gray-700">{getCustomerDisplayId(contactType, contactId)}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-800">{customerName}</td>
+
+                    <td className="px-6 py-4 text-xs text-gray-500 line-clamp-1">{inv.description || '—'}</td>
+
+                    <td className="px-4 py-4 text-xs text-gray-500">{inv.currency || 'PHP'}</td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">{formatCurrency(arLine?.debit || 0)}</td>
+
+
                   </tr>
-                )
+                );
               }) : (
-                <tr><td colSpan={7} className="py-20 text-center text-gray-400 italic">No sales invoices recorded.</td></tr>
+                <tr><td colSpan={13} className="py-20 text-center text-gray-400 italic">No sales invoices recorded.</td></tr>
               )}
             </tbody>
           </table>
@@ -703,7 +904,7 @@ const ARView: React.FC<ARViewProps> = ({
                       <div className="text-sm font-bold text-gray-800">{coll.description.split(': ')[1]}</div>
                     </td>
                     <td className="px-6 py-5 text-xs font-mono font-bold text-[#025959]">{coll.reference}</td>
-                    <td className="px-6 py-5 text-xs text-gray-600">{coll.date}</td>
+                    <td className="px-6 py-5 text-xs text-gray-600">{formatDateMMDDYYYY(coll.date)}</td>
                     <td className="px-6 py-5 text-right font-mono font-bold text-[#025959]">{formatCurrency(cashLine?.debit || 0)}</td>
                     <td className="px-6 py-5 text-center">
                       <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded text-xs font-bold text-gray-500 uppercase">
@@ -714,7 +915,7 @@ const ARView: React.FC<ARViewProps> = ({
                   </tr>
                 )
               }) : (
-                <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No collections recorded yet.</td></tr>
+                <tr><td colSpan={5} className="py-20 text-center text-gray-400 italic">No collections recorded yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -833,11 +1034,11 @@ const ARView: React.FC<ARViewProps> = ({
       {/* Invoice Modal */}
       {showInvoiceModal && (
         <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+          <div className="bg-white rounded-md shadow-md w-full max-w-[95%] lg:max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-[#025959] text-white rounded shadow-sm"><FileText size={24} /></div>
-                <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">{editingInvoice ? 'Edit Invoice' : 'Generate Sales Invoice'}</h3>
+                <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">{editingInvoice ? 'Edit Invoice' : 'Create Sales Invoice'}</h3>
               </div>
               <button onClick={() => { setShowInvoiceModal(false); resetInvoiceForm(); }} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
             </div>
@@ -888,7 +1089,7 @@ const ARView: React.FC<ARViewProps> = ({
                         const qual = qualifications.find(q => q.id === batch.qualificationId);
                         return (
                           <option key={batch.id} value={batch.id}>
-                            {batch.batchCode || batch.name} - {qual?.name || 'Unknown'} ({batch.startDate} to {batch.endDate})
+                            {batch.batchCode || batch.name} - {qual?.name || 'Unknown'} ({formatDateMMDDYYYY(batch.startDate)} to {formatDateMMDDYYYY(batch.endDate)})
                           </option>
                         );
                       })}
@@ -907,7 +1108,7 @@ const ARView: React.FC<ARViewProps> = ({
                           <p className="text-sm font-semibold text-gray-800">{batch.batchCode || batch.name}</p>
                           <p className="text-xs text-gray-500">{qual?.name}</p>
                           <p className="text-xs text-gray-400 mt-1">{batch.studentIds?.length || 0} enrolled students</p>
-                          <p className="text-xs text-gray-400">{batch.startDate} → {batch.endDate}</p>
+                          <p className="text-xs text-gray-400">{formatDateMMDDYYYY(batch.startDate)} → {formatDateMMDDYYYY(batch.endDate)}</p>
                         </div>
                       ) : null;
                     })()}
@@ -974,47 +1175,52 @@ const ARView: React.FC<ARViewProps> = ({
 
               <div className="space-y-4">
                 <div className="grid grid-cols-12 gap-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                  <div className="col-span-5">Item / Service</div>
-                  <div className="col-span-2 text-center">Qty</div>
-                  <div className="col-span-2 text-right">Rate</div>
-                  <div className="col-span-2 text-right">Subtotal</div>
-                  <div className="col-span-1"></div>
+                  <div className="col-span-12 sm:col-span-5">Item / Service</div>
+                  <div className="col-span-4 sm:col-span-2 text-center">Qty</div>
+                  <div className="col-span-4 sm:col-span-2 text-right">Rate</div>
+                  <div className="col-span-4 sm:col-span-2 text-right">Subtotal</div>
+                  <div className="col-span-12 sm:col-span-1"></div>
                 </div>
+
                 {invoiceLines.map((line, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded border border-gray-100 hover:border-[#025959]/20 transition-all">
-                    <div className="col-span-5">
+                    <div className="col-span-12 sm:col-span-5">
                       <select required className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
                         <option value="">Select Item...</option>
                         {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                       </select>
                     </div>
-                    <div className="col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-center text-xs font-semibold" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
-                    <div className="col-span-2"><input type="number" step="0.01" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-right text-xs font-mono font-bold" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
-                    <div className="col-span-2 text-right font-mono font-semibold text-sm">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    <div className="col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-gray-300 hover:text-rose-500"><Trash2 size={16} /></button></div>
+                    <div className="col-span-4 sm:col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-center text-xs font-semibold" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>
+                    <div className="col-span-4 sm:col-span-2"><input type="number" step="0.01" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-right text-xs font-mono font-bold" value={line.price} onChange={e => updateInvoiceLine(idx, { price: Number(e.target.value) })} /></div>
+                    <div className="col-span-4 sm:col-span-2 text-right font-mono font-semibold text-sm">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="col-span-12 sm:col-span-1 flex justify-center"><button type="button" onClick={() => handleRemoveInvoiceLine(idx)} className="text-gray-300 hover:text-rose-500"><Trash2 size={16} /></button></div>
                   </div>
                 ))}
-                <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase text-[#025959] hover:bg-[#025959]/10 rounded transition-colors border-2 border-dashed border-[#025959]/10"><Plus size={14} /> Add Invoice Line</button>
+
+                <div className="flex items-center justify-between gap-4">
+                  <button type="button" onClick={handleAddInvoiceLine} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase text-[#025959] hover:bg-[#025959]/10 rounded transition-colors border-2 border-dashed border-[#025959]/10"><Plus size={14} /> Add Invoice Line</button>
+                  <div className="text-xs text-gray-400 italic">Tip: use Quick Add Item Group (above) to add multiple lines at once.</div>
+                </div>
               </div>
 
-              <div className="p-5 bg-gray-800 rounded-md flex flex-col md:flex-row justify-between items-center gap-5 shadow-md">
+              <div className="p-5 bg-[#014242] rounded-md flex flex-col md:flex-row justify-between items-center gap-5 shadow-md">
                 <div className="flex gap-5">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Subtotal (Net)</p>
+                    <p className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Subtotal (Net)</p>
                     <p className="text-xl font-mono font-semibold text-white">{"\u20B1"} {totalInvoiceNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Output VAT (12%)</p>
+                    <p className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Output VAT (12%)</p>
                     <p className="text-xl font-mono font-semibold text-white">{"\u20B1"} {totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="w-px h-12 bg-white/10"></div>
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-brand uppercase tracking-wide">Gross Invoice Value</p>
+                    <p className="text-xs font-semibold text-white uppercase tracking-wide">Gross Invoice Value</p>
                     <p className="text-xl font-mono font-semibold text-white tracking-tighter">{"\u20B1"} {grossInvoiceAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
                 <div className="flex gap-4 w-full md:w-auto">
-                  <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-white transition-colors">Discard</button>
+                  <button type="button" onClick={() => setShowInvoiceModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-200 uppercase tracking-wide hover:text-white transition-colors">Discard</button>
                   <button type="submit" className="flex-1 px-12 py-4 bg-[#025959] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#014242] active:scale-95 transition-all">Submit Invoice</button>
                 </div>
               </div>
@@ -1281,7 +1487,7 @@ const ARView: React.FC<ARViewProps> = ({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Date:</span>
-                  <span className="font-semibold text-gray-700">{selectedInvoiceForApproval.date}</span>
+                  <span className="font-semibold text-gray-700">{formatDateMMDDYYYY(selectedInvoiceForApproval.date)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Amount:</span>
