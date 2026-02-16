@@ -78,7 +78,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine
+  ArrowDownToLine, UserCheck
 } from 'lucide-react';
 
 export default function App() {
@@ -2657,6 +2657,161 @@ export default function App() {
     }
   };
 
+  // ===== Payment Application Handler (APPL) =====
+  const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
+    // 1. Update Payment Application State
+    const payment = payments.find(p => p.id === paymentId);
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (!payment || !invoice) return;
+
+    const newApplication = {
+      id: `appl-${Date.now()}`,
+      paymentId,
+      invoiceId,
+      amountApplied: amount,
+      isReversed: false,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedPayment = {
+      ...payment,
+      applications: [...(payment.applications || []), newApplication],
+      totalApplied: (payment.totalApplied || 0) + amount,
+      customerDepositBalance: (payment.customerDepositBalance || 0) - amount
+    };
+    setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
+
+    // 2. Update Invoice Balance and Status
+    const newAmountPaid = (invoice.amountPaid || 0) + amount;
+    const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
+    const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
+    const updatedInvoice = {
+      ...invoice,
+      amountPaid: newAmountPaid,
+      balanceDue: newBalanceDue,
+      status: newStatus
+    };
+    setInvoices(prev => prev.map(i => i.id === invoiceId ? updatedInvoice : i));
+
+    // 3. Create GL Journal Entry for APPL
+    const coa = accounts.filter(a => a.orgId === currentOrgId);
+    const depositsAcct = coa.find(a => a.code === '2000');
+    const arAcct = coa.find(a => a.code === '1200');
+    if (depositsAcct && arAcct) {
+      const applEntry: Partial<JournalEntry> = {
+        orgId: currentOrgId,
+        periodId: invoice.periodId,
+        date: new Date().toISOString().split('T')[0],
+        description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+        reference: `APPL-${invoice.invoiceNo}-${Date.now()}`,
+        status: 'POSTED',
+        sourceType: 'APPL',
+        sourceRef: invoiceId,
+        createdBy: currentUser?.id,
+        createdAt: new Date().toISOString()
+      };
+      const applLines: JournalLine[] = [
+        {
+          id: `jl-${Date.now()}-1`,
+          entryId: '', // will be set by handlePostJournal
+          accountId: depositsAcct.id,
+          debit: amount,
+          credit: 0,
+          description: 'Apply from Customer Deposits',
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: `jl-${Date.now()}-2`,
+          entryId: '',
+          accountId: arAcct.id,
+          debit: 0,
+          credit: amount,
+          description: 'Reduce Accounts Receivable',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      await handlePostJournal(applEntry, applLines);
+    }
+  };
+
+  // ===== Payment Application Reversal Handler (RVRS) =====
+  const handleReverseApplication = async (paymentId: string, applicationId: string, reason: string) => {
+    // 1. Update Payment Application State
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) return;
+    const application = (payment.applications || []).find(app => app.id === applicationId);
+    if (!application) return;
+    const invoice = invoices.find(i => i.id === application.invoiceId);
+    if (!invoice) return;
+
+    // Mark application as reversed
+    const updatedApplications = (payment.applications || []).map(app =>
+      app.id === applicationId
+        ? { ...app, isReversed: true, reversalReason: reason, reversedAt: new Date().toISOString() }
+        : app
+    );
+    const reversedAmount = application.amountApplied;
+    const updatedPayment = {
+      ...payment,
+      applications: updatedApplications,
+      totalApplied: (payment.totalApplied || 0) - reversedAmount,
+      customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount
+    };
+    setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
+
+    // 2. Update Invoice Balance and Status
+    const newAmountPaid = (invoice.amountPaid || 0) - reversedAmount;
+    const newBalanceDue = (invoice.balanceDue || 0) + reversedAmount;
+    const newStatus = invoice.status === 'CLOSED' ? 'OPEN' : invoice.status;
+    const updatedInvoice = {
+      ...invoice,
+      amountPaid: newAmountPaid,
+      balanceDue: newBalanceDue,
+      status: newStatus
+    };
+    setInvoices(prev => prev.map(i => i.id === invoice.id ? updatedInvoice : i));
+
+    // 3. Create GL Journal Entry for RVRS
+    const coa = accounts.filter(a => a.orgId === currentOrgId);
+    const arAcct = coa.find(a => a.code === '1200');
+    const depositsAcct = coa.find(a => a.code === '2000');
+    if (arAcct && depositsAcct) {
+      const rvrsEntry = {
+        orgId: currentOrgId,
+        periodId: invoice.periodId,
+        date: new Date().toISOString().split('T')[0],
+        description: `Reversal of Payment Application for Invoice ${invoice.invoiceNo}`,
+        reference: `RVRS-${invoice.invoiceNo}-${Date.now()}`,
+        status: 'POSTED',
+        sourceType: 'RVRS',
+        sourceRef: invoice.id,
+        createdBy: currentUser?.id,
+        createdAt: new Date().toISOString()
+      };
+      const rvrsLines = [
+        {
+          id: `jl-${Date.now()}-1`,
+          entryId: '',
+          accountId: arAcct.id,
+          debit: reversedAmount,
+          credit: 0,
+          description: 'Restore Accounts Receivable',
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: `jl-${Date.now()}-2`,
+          entryId: '',
+          accountId: depositsAcct.id,
+          debit: 0,
+          credit: reversedAmount,
+          description: 'Restore Customer Deposits',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      await handlePostJournal(rvrsEntry, rvrsLines);
+    }
+  };
+
   // ===== Bank Deposit CRUD Handlers =====
   const handleAddBankDeposit = async (deposit: BankDeposit) => {
     try {
@@ -3113,7 +3268,6 @@ export default function App() {
                <NavItem icon={<Landmark size={18}/>} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Printer size={18}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
                {isAR && <NavItem icon={<Receipt size={18}/>} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<RefreshCw size={18}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<TrendingUp size={18}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<FileText size={18}/>} label="Invoices" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<Wallet size={18}/>} label="Payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -3293,7 +3447,6 @@ export default function App() {
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} />}
-          {activeTab === 'recurring-invoices' && <RecurringInvoicesView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} recurringInvoices={recurringInvoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} recurringInvoiceHistory={recurringInvoiceHistory.filter(h => h.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} onCreateRecurringInvoice={handleAddRecurringInvoice} onUpdateRecurringInvoice={handleUpdateRecurringInvoice} onDeleteRecurringInvoice={handleDeleteRecurringInvoice} onRunRecurringInvoice={handleRunRecurringInvoice} onNotify={handleNotify} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
@@ -3360,162 +3513,83 @@ export default function App() {
             onVoidPayment={handleVoidPayment}
             onApplyToInvoice={handleApplyToInvoice}
             onReverseApplication={handleReverseApplication}
-          />}
-                      // ===== Payment Application Reversal Handler (RVRS) =====
-                      const handleReverseApplication = async (paymentId, applicationId, reason) => {
-                        // 1. Update Payment Application State
-                        const payment = payments.find(p => p.id === paymentId);
-                        if (!payment) return;
-                        const application = (payment.applications || []).find(app => app.id === applicationId);
-                        if (!application) return;
-                        const invoice = invoices.find(i => i.id === application.invoiceId);
-                        if (!invoice) return;
+          /> }
+          {activeTab === 'bank-deposits' && <BankDepositsView 
+            deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)} 
+            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} 
+            currency={currentOrg?.currency || 'PHP'} 
+            onAddDeposit={handleAddBankDeposit} 
+            onUpdateDeposit={handleUpdateBankDeposit} 
+            onDeleteDeposit={handleDeleteBankDeposit} 
+            onVoidDeposit={handleVoidBankDeposit} 
+            onPostDeposit={async (deposit) => {
+              // 1. Update deposit status in state
+              setBankDeposits(prev => prev.map(d => d.id === deposit.id ? { ...deposit, status: 'POSTED', postedAt: new Date().toISOString() } : d));
 
-                        // Mark application as reversed
-                        const updatedApplications = (payment.applications || []).map(app =>
-                          app.id === applicationId
-                            ? { ...app, isReversed: true, reversalReason: reason, reversedAt: new Date().toISOString() }
-                            : app
-                        );
-                        const reversedAmount = application.amountApplied;
-                        const updatedPayment = {
-                          ...payment,
-                          applications: updatedApplications,
-                          totalApplied: (payment.totalApplied || 0) - reversedAmount,
-                          customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount
-                        };
-                        setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
-
-                        // 2. Update Invoice Balance and Status
-                        const newAmountPaid = (invoice.amountPaid || 0) - reversedAmount;
-                        const newBalanceDue = (invoice.balanceDue || 0) + reversedAmount;
-                        const newStatus = invoice.status === 'CLOSED' ? 'OPEN' : invoice.status;
-                        const updatedInvoice = {
-                          ...invoice,
-                          amountPaid: newAmountPaid,
-                          balanceDue: newBalanceDue,
-                          status: newStatus
-                        };
-                        setInvoices(prev => prev.map(i => i.id === invoice.id ? updatedInvoice : i));
-
-                        // 3. Create GL Journal Entry for RVRS
-                        const coa = accounts.filter(a => a.orgId === currentOrgId);
-                        const arAcct = coa.find(a => a.code === '1200');
-                        const depositsAcct = coa.find(a => a.code === '2000');
-                        if (arAcct && depositsAcct) {
-                          const rvrsEntry = {
-                            orgId: currentOrgId,
-                            periodId: invoice.periodId,
-                            date: new Date().toISOString().split('T')[0],
-                            description: `Reversal of Payment Application for Invoice ${invoice.invoiceNo}`,
-                            reference: `RVRS-${invoice.invoiceNo}-${Date.now()}`,
-                            status: 'POSTED',
-                            sourceType: 'RVRS',
-                            sourceRef: invoice.id,
-                            createdBy: currentUser?.id,
-                            createdAt: new Date().toISOString()
-                          };
-                          const rvrsLines = [
-                            {
-                              id: `jl-${Date.now()}-1`,
-                              entryId: '',
-                              accountId: arAcct.id,
-                              debit: reversedAmount,
-                              credit: 0,
-                              description: 'Restore Accounts Receivable',
-                              createdAt: new Date().toISOString()
-                            },
-                            {
-                              id: `jl-${Date.now()}-2`,
-                              entryId: '',
-                              accountId: depositsAcct.id,
-                              debit: 0,
-                              credit: reversedAmount,
-                              description: 'Restore Customer Deposits',
-                              createdAt: new Date().toISOString()
-                            }
-                          ];
-                          await handlePostJournal(rvrsEntry, rvrsLines);
-                        }
-                      };
-            // ===== Payment Application Handler (APPL) =====
-            const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
-              // 1. Update Payment Application State
-              const payment = payments.find(p => p.id === paymentId);
-              const invoice = invoices.find(i => i.id === invoiceId);
-              if (!payment || !invoice) return;
-
-              // Add application to payment
-              const newApplication = {
-                id: `appl-${Date.now()}`,
-                paymentId,
-                invoiceId,
-                amountApplied: amount,
-                isReversed: false,
-                createdAt: new Date().toISOString()
-              };
-              const updatedPayment = {
-                ...payment,
-                applications: [...(payment.applications || []), newApplication],
-                totalApplied: (payment.totalApplied || 0) + amount,
-                customerDepositBalance: (payment.customerDepositBalance || 0) - amount
-              };
-              setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
-
-              // 2. Update Invoice Balance and Status
-              const newAmountPaid = (invoice.amountPaid || 0) + amount;
-              const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
-              const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
-              const updatedInvoice = {
-                ...invoice,
-                amountPaid: newAmountPaid,
-                balanceDue: newBalanceDue,
-                status: newStatus
-              };
-              setInvoices(prev => prev.map(i => i.id === invoiceId ? updatedInvoice : i));
-
-              // 3. Create GL Journal Entry for APPL
-              // Find account IDs
+              // 2. Find COA accounts for Undeposited Funds (1000) and Bank Account (1010)
               const coa = accounts.filter(a => a.orgId === currentOrgId);
-              const depositsAcct = coa.find(a => a.code === '2000');
-              const arAcct = coa.find(a => a.code === '1200');
-              if (depositsAcct && arAcct) {
-                const applEntry: Partial<JournalEntry> = {
+              const undepositedAcct = coa.find(a => a.code === '1000');
+              const bankAcct = coa.find(a => a.code === '1010' && a.id === deposit.bankAccountId);
+              // Fallback: if not found by id, just use code 1010
+              const bankAccount = bankAccounts.find(b => b.id === deposit.bankAccountId);
+              const bankAcctById = coa.find(a => a.id === bankAccount?.accountId);
+              const finalBankAcct = bankAcctById || bankAcct;
+
+              if (undepositedAcct && finalBankAcct) {
+                // 3. Create Journal Entry for DEPOSIT
+                const entry = {
                   orgId: currentOrgId,
-                  periodId: invoice.periodId,
-                  date: new Date().toISOString().split('T')[0],
-                  description: `Payment Application to Invoice ${invoice.invoiceNo}`,
-                  reference: `APPL-${invoice.invoiceNo}-${Date.now()}`,
+                  periodId: deposit.periodId || '',
+                  date: deposit.depositDate,
+                  description: `Bank Deposit #${deposit.depositNo}`,
+                  reference: `DEPOSIT-${deposit.depositNo}`,
                   status: 'POSTED',
-                  sourceType: 'APPL',
-                  sourceRef: invoiceId,
+                  sourceType: 'DEPOSIT',
+                  sourceRef: deposit.id,
                   createdBy: currentUser?.id,
-                  createdAt: new Date().toISOString()
+                  createdAt: new Date().toISOString(),
+                  postedBy: currentUser?.id,
+                  postedAt: new Date().toISOString()
                 };
-                const applLines: JournalLine[] = [
+                const lines = [
                   {
                     id: `jl-${Date.now()}-1`,
-                    entryId: '', // will be set by handlePostJournal
-                    accountId: depositsAcct.id,
-                    debit: amount,
+                    entryId: '',
+                    accountId: finalBankAcct.id,
+                    debit: deposit.totalAmount,
                     credit: 0,
-                    description: 'Apply from Customer Deposits',
+                    description: 'Deposit to Bank',
                     createdAt: new Date().toISOString()
                   },
                   {
                     id: `jl-${Date.now()}-2`,
                     entryId: '',
-                    accountId: arAcct.id,
+                    accountId: undepositedAcct.id,
                     debit: 0,
-                    credit: amount,
-                    description: 'Reduce Accounts Receivable',
+                    credit: deposit.totalAmount,
+                    description: 'Clear Undeposited Funds',
                     createdAt: new Date().toISOString()
                   }
                 ];
-                await handlePostJournal(applEntry, applLines);
+                await handlePostJournal(entry, lines);
               }
-            };
-          {activeTab === 'bank-deposits' && <BankDepositsView deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)} bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddDeposit={handleAddBankDeposit} onUpdateDeposit={handleUpdateBankDeposit} onDeleteDeposit={handleDeleteBankDeposit} onVoidDeposit={handleVoidBankDeposit} />}
+
+              // 4. Mark included payments as deposited
+              if (deposit.lines && deposit.lines.length > 0) {
+                setPayments(prev => prev.map(p => {
+                  const included = deposit.lines?.some(l => l.paymentId === p.id);
+                  if (included) {
+                    return { ...p, status: 'DEPOSITED', bankAccountId: deposit.bankAccountId, postedAt: new Date().toISOString() };
+                  }
+                  return p;
+                }));
+              }
+
+              // 5. Notify
+              handleNotify('success', `Deposit #${deposit.depositNo} posted and journal entry created.`);
+            }}
+          />}
           {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
           {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
           {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}

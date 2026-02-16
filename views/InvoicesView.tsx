@@ -34,6 +34,15 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false); // Generate from enrollments wizard
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Derived: Students in the batch for annex
   const batchStudents = React.useMemo(() => {
@@ -49,15 +58,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       } : null;
     }).filter(Boolean);
   }, [showViewModal, viewingInvoice, enrollments, students, qualifications]);
-  const [showVoidModal, setShowVoidModal] = useState(false);
-  const [showGenerateModal, setShowGenerateModal] = useState(false); // Generate from enrollments wizard
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
-  const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
-  const [voidReason, setVoidReason] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   // Generate from Enrollments state
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>('');

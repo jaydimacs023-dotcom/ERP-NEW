@@ -161,69 +161,98 @@ const LocationsView: React.FC<LocationsViewProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredLocations.length > 0 ? filteredLocations.map(loc => (
-          <div key={loc.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded bg-orange-50 text-[#F47721] flex items-center justify-center transition-colors group-hover:bg-[#F47721] group-hover:text-white">
-                  <Building size={24} />
-                </div>
-                <div className="flex gap-1">
-                   <button 
-                     onClick={() => openEditModal(loc)}
-                     className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
-                     title="Edit"
-                   >
-                     <Edit2 size={16} />
-                   </button>
-                   <button 
-                     onClick={() => handleDelete(loc.id)}
-                     disabled={deletingId === loc.id}
-                     className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                     title="Delete"
-                   >
-                     {deletingId === loc.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                   </button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                 <div>
-                    <h3 className="text-lg font-semibold text-gray-800 leading-tight truncate">{loc.name}</h3>
-                    {loc.capacity && loc.capacity > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                        <Users size={12} />
-                        <span>Capacity: {loc.capacity}</span>
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Facility</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Address</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Capacity</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredLocations.length > 0 ? filteredLocations.map(loc => (
+                <tr key={loc.id} className="hover:bg-gray-50 transition-colors group">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded bg-orange-50 text-[#F47721] flex items-center justify-center group-hover:bg-[#F47721] group-hover:text-white transition-colors">
+                        <Building size={20} />
                       </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{loc.name}</p>
+                        {loc.code && (
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">{loc.code}</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-start gap-2">
+                      <Map size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                      <p className="text-sm text-gray-600 leading-relaxed">{loc.address}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    {loc.capacity && loc.capacity > 0 ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <Users size={14} className="text-gray-500" />
+                        <span className="text-sm font-medium text-gray-700">{loc.capacity}</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
                     )}
-                 </div>
-
-                 <div className="flex gap-3">
-                    <Map size={18} className="text-gray-400 shrink-0 mt-1" />
-                    <p className="text-xs font-medium text-gray-500 leading-relaxed italic">{loc.address}</p>
-                 </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-               <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F47721] uppercase tracking-wide">
-                  <ShieldCheck size={14} /> Operational
-               </div>
-               <button className="text-[#F47721] text-xs font-semibold uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
-                  Facility Info <ChevronRight size={14} strokeWidth={2} />
-               </button>
-            </div>
-          </div>
-        )) : (
-          <EmptyState 
-            title="No training facilities"
-            description="Register your first training location to manage classrooms and satellite centers."
-            actionLabel="Add Facility"
-            onAction={() => { resetForm(); setShowModal(true); }}
-            icon={<MapPin size={48} className="text-gray-300" />}
-          />
-        )}
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold uppercase tracking-wide rounded">
+                      <ShieldCheck size={12} />
+                      Operational
+                    </div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => openEditModal(loc)}
+                        className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
+                        title="Edit Facility"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(loc.id)}
+                        disabled={deletingId === loc.id}
+                        className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                        title="Delete Facility"
+                      >
+                        {deletingId === loc.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      </button>
+                      <button
+                        className="p-2 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Facility Info"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <EmptyState
+                      title="No training facilities"
+                      description="Register your first training location to manage classrooms and satellite centers."
+                      actionLabel="Add Facility"
+                      onAction={() => { resetForm(); setShowModal(true); }}
+                      icon={<MapPin size={48} className="text-gray-300" />}
+                    />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (

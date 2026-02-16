@@ -194,92 +194,103 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {filteredSchedules.length > 0 ? filteredSchedules.map(sch => {
-          const trainer = trainers.find(t => t.id === sch.trainerId);
-          const location = locations.find(l => l.id === sch.locationId);
-          const weeklyHours = sch.slots.reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0);
-          
-          return (
-            <div key={sch.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm transition-all group overflow-hidden flex flex-col md:flex-row">
-               <div className="p-8 md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50 flex flex-col justify-between">
-                  <div className="space-y-6">
-                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded bg-gray-800 text-white flex items-center justify-center font-semibold text-lg shadow-sm shadow-gray-200 border-2 border-white">
-                           {trainer?.lastName[0]}{trainer?.firstName[0]}
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Trainer</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Location</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Weekly Hours</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Schedule</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredSchedules.length > 0 ? filteredSchedules.map(sch => {
+                const trainer = trainers.find(t => t.id === sch.trainerId);
+                const location = locations.find(l => l.id === sch.locationId);
+                const weeklyHours = sch.slots.reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0);
+
+                return (
+                  <tr key={sch.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-gray-800 text-white flex items-center justify-center font-semibold text-sm shadow-sm">
+                          {trainer?.lastName[0]}{trainer?.firstName[0]}
                         </div>
                         <div>
-                           <p className="text-sm font-semibold text-gray-800 uppercase leading-none">{trainer?.lastName}, {trainer?.firstName}</p>
-                           <p className="text-xs text-gray-400 font-bold uppercase mt-1 tracking-wide">Trainer Schedule</p>
+                          <p className="text-sm font-semibold text-gray-800">{trainer?.lastName}, {trainer?.firstName}</p>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide">Trainer</p>
                         </div>
-                     </div>
-
-                     <div className="space-y-4">
-                        <div className="p-4 bg-white rounded border border-gray-100 shadow-sm">
-                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Primary Station</p>
-                           <div className="flex items-center gap-2">
-                              <MapPin size={16} className="text-[#F47721]" />
-                              <span className="text-xs font-bold text-gray-700">{location?.name || 'Mobile/Remote'}</span>
-                           </div>
-                        </div>
-
-                        <div className="p-4 bg-gray-800 rounded border border-white/5 shadow-sm">
-                           <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">Resource Load</p>
-                           <div className="flex items-baseline gap-2">
-                              <span className="text-lg font-mono font-semibold text-white">{weeklyHours.toFixed(1)}</span>
-                              <span className="text-xs font-semibold text-gray-500 uppercase">Hrs / Week</span>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="mt-8 pt-6 border-t border-gray-100 flex gap-2">
-                     <button 
-                       onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
-                       className="flex-1 py-3 bg-white border border-gray-200 rounded text-xs font-semibold uppercase tracking-wide text-gray-600 hover:border-orange-500 hover:text-[#F47721] transition-all flex items-center justify-center gap-2"
-                       disabled={deletingId === sch.id}
-                     >
-                        <Edit2Icon size={14} /> Adjust Profile
-                     </button>
-                     <button 
-                       onClick={() => handleDelete(sch.id)}
-                       disabled={deletingId === sch.id}
-                       className="p-3 bg-rose-50 text-rose-400 rounded hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                        {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                     </button>
-                  </div>
-               </div>
-
-               <div className="flex-1 p-8 bg-white grid grid-cols-1 sm:grid-cols-7 gap-3">
-                  {DAYS.map((day, idx) => {
-                    const slot = sch.slots.find(s => s.dayIndex === idx);
-                    return (
-                      <div key={day} className={`p-4 rounded-md border-2 flex flex-col items-center justify-center transition-all ${slot ? 'bg-[#F47721] border-orange-600 text-white shadow-lg shadow-gray-100' : 'bg-gray-50 border-gray-50 text-gray-300 opacity-40'}`}>
-                         <p className="text-xs font-semibold uppercase tracking-wide mb-3">{day.slice(0, 3)}</p>
-                         {slot ? (
-                           <>
-                              <div className="p-2 bg-white/10 rounded mb-3"><Clock size={16} /></div>
-                              <p className="text-xs font-mono font-semibold">{slot.startTime}</p>
-                              <div className="h-2 w-px bg-white/20 my-1"></div>
-                              <p className="text-xs font-mono font-semibold">{slot.endTime}</p>
-                           </>
-                         ) : (
-                            <div className="text-xs font-semibold uppercase italic">Off</div>
-                         )}
                       </div>
-                    )
-                  })}
-               </div>
-            </div>
-          );
-        }) : (
-          <div className="py-16 text-center bg-white rounded-md border border-dashed border-gray-200">
-             <CalendarDays size={64} strokeWidth={1} className="mx-auto mb-6 text-gray-200" />
-             <h3 className="text-xl font-semibold text-gray-400 uppercase tracking-tight">No trainer profiles established</h3>
-             <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">Schedules are mandatory for computing program terminal dates and institutional instructional hours.</p>
-          </div>
-        )}
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={16} className="text-[#F47721]" />
+                        <span className="text-sm text-gray-700">{location?.name || 'Mobile/Remote'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-800 text-white rounded text-sm font-mono font-semibold">
+                        <Timer size={14} />
+                        {weeklyHours.toFixed(1)} hrs
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex flex-wrap gap-1">
+                        {DAYS.map((day, idx) => {
+                          const slot = sch.slots.find(s => s.dayIndex === idx);
+                          return (
+                            <div key={day} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${slot ? 'bg-[#F47721] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                              <span>{day.slice(0, 3)}</span>
+                              {slot && <Clock size={10} />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {sch.slots.map((slot, idx) => (
+                          <div key={idx} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block mr-1">
+                            {DAYS[slot.dayIndex]}: {slot.startTime} - {slot.endTime}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
+                          className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
+                          title="Edit Schedule"
+                          disabled={deletingId === sch.id}
+                        >
+                          <Edit2Icon size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(sch.id)}
+                          disabled={deletingId === sch.id}
+                          className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                          title="Delete Schedule"
+                        >
+                          {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center">
+                    <CalendarDays size={64} strokeWidth={1} className="mx-auto mb-6 text-gray-200" />
+                    <h3 className="text-xl font-semibold text-gray-400 uppercase tracking-tight">No trainer profiles established</h3>
+                    <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">Schedules are mandatory for computing program terminal dates and institutional instructional hours.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (
