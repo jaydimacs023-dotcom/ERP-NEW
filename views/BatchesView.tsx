@@ -316,124 +316,135 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredBatches.map(batch => {
-          const qual = qualifications.find(q => q.id === batch.qualificationId);
-          const trainer = trainers.find(t => t.id === batch.trainerId);
-          const sponsor = sponsors.find(s => s.id === batch.sponsorId);
-          const location = locations.find(l => l.id === batch.locationId);
-          
-          return (
-            <div key={batch.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm transition-all group overflow-hidden flex flex-col">
-              <div className="p-8 flex-1">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-semibold text-[#F47721] bg-orange-50 px-2 py-0.5 rounded border border-orange-100 uppercase tracking-wide">FY {batch.year}</span>
-                      {getStatusBadge(batch.status)}
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800 leading-tight group-hover:text-[#F47721] transition-colors">{batch.name}</h3>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button 
-                      onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
-                      className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
-                      title="Edit Batch"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(batch.id)}
-                      disabled={isDeleting === batch.id}
-                      className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                      title="Delete Batch"
-                    >
-                      {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                   <div className="grid grid-cols-3 gap-3">
-                     <div className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-semibold uppercase tracking-wide ${sponsor ? 'bg-orange-50 border-orange-100 text-[#F47721]' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
-                        {sponsor ? <Handshake size={14} /> : <Users size={14} />}
+      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Batch</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Qualification</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Trainer</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Type</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Location</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Students</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">End Date</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredBatches.map(batch => {
+                const qual = qualifications.find(q => q.id === batch.qualificationId);
+                const trainer = trainers.find(t => t.id === batch.trainerId);
+                const sponsor = sponsors.find(s => s.id === batch.sponsorId);
+                const location = locations.find(l => l.id === batch.locationId);
+                
+                return (
+                  <tr key={batch.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-5">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-[#F47721] bg-orange-50 px-2 py-0.5 rounded border border-orange-100 uppercase tracking-wide">FY {batch.year}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 group-hover:text-[#F47721] transition-colors">{batch.name}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <Award className="text-amber-500 shrink-0" size={16} />
+                        <span className="text-sm text-gray-700">{qual?.name || 'Unknown'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="text-orange-500 shrink-0" size={16} />
+                        <span className="text-sm text-gray-700">{trainer ? `${trainer.lastName}, ${trainer.firstName}` : 'Not Assigned'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${sponsor ? 'bg-orange-50 border border-orange-100 text-[#F47721]' : 'bg-amber-50 border border-amber-100 text-amber-600'}`}>
+                        {sponsor ? <Handshake size={12} /> : <Users size={12} />}
                         {sponsor ? 'Sponsored' : 'Private'}
-                     </div>
-                     <div className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-semibold uppercase tracking-wide bg-gray-50 border-gray-100 text-gray-500`}>
-                        <MapPin size={14} className="text-orange-500" />
-                        {location?.code || 'TBD'}
-                     </div>
-                     <div className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-semibold uppercase tracking-wide ${batch.currentStudents >= 5 ? 'bg-emerald-50 border-emerald-100 text-[#F47721]' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
-                        <Users size={14} />
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="text-orange-500 shrink-0" size={16} />
+                        <span className="text-sm text-gray-700">{location?.code || 'TBD'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${batch.currentStudents >= 5 ? 'bg-emerald-50 border border-emerald-100 text-[#F47721]' : 'bg-rose-50 border border-rose-100 text-rose-600'}`}>
+                        <Users size={12} />
                         {batch.currentStudents}/{batch.maxStudents}
-                     </div>
-                   </div>
-
-                   <div className="space-y-2">
-                     <div className="flex items-center gap-3 p-4 bg-gray-50 rounded border border-gray-100">
-                        <Award className="text-amber-500 shrink-0" size={20} />
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Qualification</p>
-                          <p className="text-sm font-bold text-gray-700 truncate">{qual?.name || 'Unknown'}</p>
-                        </div>
-                     </div>
-
-                     <div className="flex items-center gap-3 p-4 bg-gray-50 rounded border border-gray-100">
-                        <GraduationCap className="text-orange-500 shrink-0" size={20} />
-                        <div className="flex-1 overflow-hidden">
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Lead Instructor</p>
-                          <p className="text-sm font-bold text-gray-700 truncate">{trainer ? `${trainer.lastName}, ${trainer.firstName}` : 'Not Assigned'}</p>
-                        </div>
-                     </div>
-                   </div>
-                </div>
-              </div>
-
-              <div className="px-8 py-5 bg-gray-800 border-t border-gray-700 flex justify-between items-center text-white">
-                 <div className="flex items-center gap-3">
-                    <CalendarRange size={18} className="text-orange-400" />
-                    <div>
-                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-none mb-1">Projected End</p>
-                       <p className="text-sm font-semibold tracking-tight">{batch.endDate}</p>
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-3">
-                   {batch.status === 'PLANNED' && (
-                     <button 
-                       onClick={() => handleCommenceTraining(batch)}
-                       disabled={isCommencing === batch.id}
-                       className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold uppercase tracking-wide rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                       title={batch.currentStudents >= 5 ? "Start Training" : "Requires at least 5 enrolled students"}
-                     >
-                       {isCommencing === batch.id ? (
-                         <Loader2 size={14} className="animate-spin" />
-                       ) : (
-                         <Play size={14} />
-                       )}
-                       Commence
-                     </button>
-                   )}
-                   {batch.status === 'ONGOING' && (
-                     <span className="flex items-center gap-2 px-4 py-2 bg-[#F47721]/20 text-orange-400 text-xs font-semibold uppercase tracking-wide rounded">
-                       <Play size={14} /> In Progress
-                     </span>
-                   )}
-                   {batch.status === 'COMPLETED' && (
-                     <span className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wide rounded">
-                       ✓ Completed
-                     </span>
-                   )}
-                   <button 
-                     onClick={() => setViewingBatch(batch)}
-                     className="text-orange-400 text-xs font-semibold uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all group-hover:text-white"
-                   >
-                      View <ChevronRight size={16} strokeWidth={3} />
-                   </button>
-                 </div>
-              </div>
-            </div>
-          );
-        })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-2">
+                        <CalendarRange className="text-orange-400 shrink-0" size={16} />
+                        <span className="text-sm text-gray-700">{batch.endDate}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      {getStatusBadge(batch.status)}
+                      {batch.status === 'PLANNED' && batch.currentStudents >= 5 && (
+                        <button 
+                          onClick={() => handleCommenceTraining(batch)}
+                          disabled={isCommencing === batch.id}
+                          className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-all disabled:opacity-50"
+                          title="Start Training"
+                        >
+                          {isCommencing === batch.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Play size={12} />
+                          )}
+                          Commence
+                        </button>
+                      )}
+                      {batch.status === 'ONGOING' && (
+                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-[#F47721]/20 text-orange-400 text-xs font-semibold rounded">
+                          <Play size={12} /> In Progress
+                        </span>
+                      )}
+                      {batch.status === 'COMPLETED' && (
+                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded">
+                          ✓ Completed
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button 
+                          onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
+                          className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
+                          title="Edit Batch"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(batch.id)}
+                          disabled={isDeleting === batch.id}
+                          className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
+                          title="Delete Batch"
+                        >
+                          {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                        <button 
+                          onClick={() => setViewingBatch(batch)}
+                          className="p-2 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600 transition-colors"
+                          title="View Details"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (

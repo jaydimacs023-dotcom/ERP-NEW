@@ -343,10 +343,10 @@ const APView: React.FC<APViewProps> = ({
       {activeTab === 'bills' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <SummaryBox label="Total Payables" value={formatCurrency(totalPayables)} color="orange" />
-            <SummaryBox label="Pending Approval" value="0.00" color="gray" />
-            <SummaryBox label="Due within 7 Days" value="0.00" color="rose" />
-            <SummaryBox label="Active Vendors" value={vendors.length.toString()} color="amber" />
+            <StatCard title="Total Payables" value={formatCurrency(totalPayables)} icon={<Receipt size={16} />} color="orange" />
+            <StatCard title="Pending Approval" value="0.00" icon={<Clock size={16} />} color="gray" />
+            <StatCard title="Due within 7 Days" value="0.00" icon={<AlertCircle size={16} />} color="red" />
+            <StatCard title="Active Vendors" value={vendors.length.toString()} icon={<Truck size={16} />} color="amber" />
           </div>
 
           <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
@@ -751,10 +751,13 @@ const SummaryRow: React.FC<{ label: string, value: number, isHighlighted?: boole
   </div>
 );
 
-const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => (
-  <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm">
-     <p className={`text-xs font-bold text-gray-400 uppercase tracking-wide mb-1`}>{label}</p>
-     <p className={`text-xl font-mono font-bold text-${color === 'emerald' ? 'emerald-600' : color === 'rose' ? 'rose-600' : color === 'orange' ? 'orange-600' : 'amber-600'}`}>{value}</p>
+const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
+  <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+    <div className={`w-8 h-8 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center mb-2 no-print`}>
+      {icon}
+    </div>
+    <div className="text-xs text-gray-500 mb-1">{title}</div>
+    <div className="text-lg font-semibold text-gray-900">{value}</div>
   </div>
 );
 

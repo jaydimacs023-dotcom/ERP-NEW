@@ -42,7 +42,7 @@ interface RevenueRecognitionViewProps {
   onDeleteSchedule: (id: string) => void;
   onCreateEntry: (entry: Partial<RevenueRecognitionEntry>) => void;
   onUpdateEntry: (id: string, updates: Partial<RevenueRecognitionEntry>) => void;
-  onPostJournal: (entry: any) => void;
+  onPostJournal: (entry: any, lines: any[]) => void;
   onNotify: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
 }
 
@@ -107,11 +107,11 @@ export default function RevenueRecognitionView({
   });
 
   // Filters
-  const liabilityAccounts = useMemo(() =>
+  const liabilityAccounts = useMemo(() => 
     accounts.filter(a => a.class === 'LIABILITY' && !a.isHeader && !a.isDeleted),
     [accounts]
   );
-  const revenueAccounts = useMemo(() =>
+  const revenueAccounts = useMemo(() => 
     accounts.filter(a => a.class === 'REVENUE' && !a.isHeader && !a.isDeleted),
     [accounts]
   );
@@ -142,14 +142,14 @@ export default function RevenueRecognitionView({
       totalRecognized: schedules.filter(s => !s.isDeleted).reduce((sum, s) => sum + s.recognizedAmount, 0),
       activeCount: activeSchedules.length,
       dueForRecognition: RevenueRecognitionService.getSchedulesDueForRecognition(
-        activeSchedules,
+        activeSchedules, 
         entries
       ).length
     };
   }, [schedules, entries]);
 
   // Customer summaries
-  const customerSummaries = useMemo(() =>
+  const customerSummaries = useMemo(() => 
     RevenueRecognitionService.calculateSummaryByCustomer(schedules.filter(s => !s.isDeleted)),
     [schedules]
   );
@@ -176,7 +176,7 @@ export default function RevenueRecognitionView({
 
   // Get schedule entries
   const getScheduleEntries = (scheduleId: string): RevenueRecognitionEntry[] => {
-    return entries.filter(e => e.scheduleId === scheduleId).sort((a, b) =>
+    return entries.filter(e => e.scheduleId === scheduleId).sort((a, b) => 
       b.recognitionDate.localeCompare(a.recognitionDate)
     );
   };
@@ -311,7 +311,7 @@ export default function RevenueRecognitionView({
   const handleRunRecognition = (schedule: RevenueSchedule) => {
     const scheduleEntries = getScheduleEntries(schedule.id);
     const periodsDue = RevenueRecognitionService.getPeriodsDueForRecognition(
-      schedule,
+      schedule, 
       scheduleEntries
     );
 
@@ -328,13 +328,13 @@ export default function RevenueRecognitionView({
 
       // Generate and post journal entry
       const { entry: journalEntry, lines } = RevenueRecognitionService.generateJournalEntry(
-        schedule,
+        schedule, 
         entry as RevenueRecognitionEntry
       );
-
+      
       // Post the journal entry
-      onPostJournal({ ...journalEntry, lines });
-
+      onPostJournal(journalEntry, lines);
+      
       totalRecognized += period.amount;
     }
 
@@ -373,8 +373,8 @@ export default function RevenueRecognitionView({
           schedule,
           entry as RevenueRecognitionEntry
         );
-        onPostJournal({ ...journalEntry, lines });
-
+        onPostJournal(journalEntry, lines);
+        
         totalAmount += period.amount;
       }
 
@@ -410,9 +410,9 @@ export default function RevenueRecognitionView({
           )}
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] transition-colors"
           >
-            <Plus size={18} />
+            <Plus className="w-4 h-4" />
             New Schedule
           </button>
         </div>
@@ -425,7 +425,7 @@ export default function RevenueRecognitionView({
             <DollarSign className="w-4 h-4" />
             Deferred Balance
           </div>
-          <div className="text-lg font-mono font-bold text-[#025959]">
+          <div className="text-lg font-bold text-[#F47721]">
             {formatCurrency(summary.totalDeferred)}
           </div>
         </div>
@@ -443,7 +443,7 @@ export default function RevenueRecognitionView({
             <Calendar className="w-4 h-4" />
             Active Schedules
           </div>
-          <div className="text-lg font-mono font-bold text-[#025959]">
+          <div className="text-lg font-bold text-[#F47721]">
             {summary.activeCount}
           </div>
         </div>
@@ -469,10 +469,11 @@ export default function RevenueRecognitionView({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors font-medium text-sm ${activeTab === tab.id
-                ? 'border-[#025959] text-[#025959]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200'
-                }`}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-orange-500 text-[#F47721]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -491,7 +492,7 @@ export default function RevenueRecognitionView({
               placeholder="Search schedules..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] focus:border-[#025959] outline-none text-sm"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -499,7 +500,7 @@ export default function RevenueRecognitionView({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-[#025959] focus:border-[#025959] outline-none text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
             >
               <option value="ALL">All Status</option>
               {STATUS_OPTIONS.map(opt => (
@@ -538,17 +539,17 @@ export default function RevenueRecognitionView({
                   const isExpanded = expandedRow === schedule.id;
                   const scheduleEntries = getScheduleEntries(schedule.id);
                   const periodsDue = RevenueRecognitionService.getPeriodsDueForRecognition(
-                    schedule,
+                    schedule, 
                     scheduleEntries
                   );
                   const statusInfo = RevenueRecognitionService.getStatusInfo(schedule.status);
-                  const progressPercent = schedule.totalAmount > 0
+                  const progressPercent = schedule.totalAmount > 0 
                     ? Math.round((schedule.recognizedAmount / schedule.totalAmount) * 100)
                     : 0;
 
                   return (
                     <React.Fragment key={schedule.id}>
-                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-[#025959]/5' : ''}`}>
+                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-orange-50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -575,7 +576,7 @@ export default function RevenueRecognitionView({
                           {formatCurrency(schedule.recognizedAmount)}
                           <div className="text-xs text-gray-400">{progressPercent}%</div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-bold text-[#025959]">
+                        <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
                           {formatCurrency(schedule.deferredBalance)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
@@ -608,10 +609,11 @@ export default function RevenueRecognitionView({
                             )}
                             <button
                               onClick={() => handleToggleStatus(schedule)}
-                              className={`p-1.5 rounded-lg ${schedule.status === 'ACTIVE'
-                                ? 'text-yellow-600 hover:bg-yellow-100'
-                                : 'text-green-600 hover:bg-green-100'
-                                }`}
+                              className={`p-1.5 rounded-lg ${
+                                schedule.status === 'ACTIVE' 
+                                  ? 'text-yellow-600 hover:bg-yellow-100' 
+                                  : 'text-green-600 hover:bg-green-100'
+                              }`}
                               title={schedule.status === 'ACTIVE' ? 'Pause' : 'Resume'}
                               disabled={schedule.status === 'COMPLETED' || schedule.status === 'CANCELLED'}
                             >
@@ -619,7 +621,7 @@ export default function RevenueRecognitionView({
                             </button>
                             <button
                               onClick={() => handleEdit(schedule)}
-                              className="p-1.5 text-[#025959] hover:bg-[#025959]/10 rounded"
+                              className="p-1.5 text-[#F47721] hover:bg-orange-100 rounded-lg"
                               title="Edit"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -671,7 +673,7 @@ export default function RevenueRecognitionView({
                                     <span>{progressPercent}%</span>
                                   </div>
                                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
+                                    <div 
                                       className="h-full bg-green-500 transition-all"
                                       style={{ width: `${progressPercent}%` }}
                                     />
@@ -692,10 +694,11 @@ export default function RevenueRecognitionView({
                                         <span>{entry.recognitionDate}</span>
                                         <span className="text-gray-400">•</span>
                                         <span className="font-medium">{formatCurrency(entry.amount)}</span>
-                                        <span className={`text-xs px-1.5 py-0.5 rounded ${entry.status === 'POSTED' ? 'bg-green-100 text-green-700' :
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                          entry.status === 'POSTED' ? 'bg-green-100 text-green-700' :
                                           entry.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                                            'bg-gray-100 text-gray-700'
-                                          }`}>
+                                          'bg-gray-100 text-gray-700'
+                                        }`}>
                                           {entry.status}
                                         </span>
                                       </li>
@@ -755,10 +758,11 @@ export default function RevenueRecognitionView({
                           {formatCurrency(entry.amount)}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${entry.status === 'POSTED' ? 'bg-green-100 text-green-800' :
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            entry.status === 'POSTED' ? 'bg-green-100 text-green-800' :
                             entry.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                            'bg-red-100 text-red-800'
+                          }`}>
                             {entry.status}
                           </span>
                         </td>
@@ -820,7 +824,7 @@ export default function RevenueRecognitionView({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden max-w-[100px]">
-                            <div
+                            <div 
                               className="h-full bg-green-500"
                               style={{ width: `${progressPercent}%` }}
                             />

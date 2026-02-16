@@ -17,15 +17,15 @@
 import { AuditLog } from '../types';
 import { generateUUID } from '../utils/uuid';
 
-export type AuditAction =
-  | 'CREATE'
-  | 'UPDATE'
-  | 'DELETE'
+export type AuditAction = 
+  | 'CREATE' 
+  | 'UPDATE' 
+  | 'DELETE' 
   | 'SOFT_DELETE'
   | 'RESTORE'
-  | 'POST'
-  | 'REVERSE'
-  | 'APPROVE'
+  | 'POST' 
+  | 'REVERSE' 
+  | 'APPROVE' 
   | 'REJECT'
   | 'VOID'
   | 'PRINT'
@@ -51,12 +51,17 @@ export type EntityType =
   | 'JOURNAL_ENTRY'
   | 'RECURRING_JOURNAL_ENTRY'
   | 'CHART_OF_ACCOUNT'
+  | 'ACCOUNT'
   | 'PAYABLE'
   | 'RECEIVABLE'
+  | 'INVOICE'
+  | 'RECURRING_INVOICE'
+  | 'REVENUE_SCHEDULE'
   | 'PURCHASE_ORDER'
   | 'BANK_ACCOUNT'
   | 'BANK_RECONCILIATION'
   | 'CHECK_VOUCHER'
+  | 'EFT_BATCH'
   | 'FIXED_ASSET'
   | 'ITEM'
   | 'GOODS_RECEIPT'
@@ -67,9 +72,7 @@ export type EntityType =
   | 'STOCK_ADJUSTMENT'
   | 'REORDER_POINT'
   | 'INVENTORY_TRANSACTION'
-  | 'RECURRING_INVOICE'
-  | 'REVENUE_SCHEDULE'
-  | 'INVOICE'
+  | 'BACKUP'
   | 'SYSTEM';
 
 export interface AuditLogInput {
@@ -104,10 +107,10 @@ class AuditServiceClass {
    */
   log(input: AuditLogInput): AuditLog {
     const timestamp = new Date().toISOString();
-
+    
     // Build details string
     let details = input.details || this.buildDefaultDetails(input);
-
+    
     // Add change tracking if previous/new values provided
     if (input.previousValue !== undefined && input.newValue !== undefined) {
       const changes = this.detectChanges(input.previousValue, input.newValue);
@@ -146,7 +149,7 @@ class AuditServiceClass {
   private buildDefaultDetails(input: AuditLogInput): string {
     const entityName = input.entityName ? ` "${input.entityName}"` : '';
     const entityRef = `${input.entityType}${entityName}`;
-
+    
     switch (input.action) {
       case 'CREATE':
         return `Created new ${entityRef}`;
@@ -190,19 +193,19 @@ class AuditServiceClass {
    */
   private detectChanges(prev: any, next: any): string[] {
     if (!prev || !next) return [];
-
+    
     const changes: string[] = [];
     const allKeys = new Set([...Object.keys(prev), ...Object.keys(next)]);
-
+    
     for (const key of allKeys) {
       // Skip internal/meta fields
       if (['id', 'orgId', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'deletedBy'].includes(key)) {
         continue;
       }
-
+      
       const prevVal = prev[key];
       const nextVal = next[key];
-
+      
       if (JSON.stringify(prevVal) !== JSON.stringify(nextVal)) {
         // Format the change nicely
         const fieldName = this.formatFieldName(key);
@@ -215,7 +218,7 @@ class AuditServiceClass {
         }
       }
     }
-
+    
     return changes.slice(0, 5); // Limit to 5 changes to avoid huge logs
   }
 
@@ -297,12 +300,45 @@ class AuditServiceClass {
     return this.log({ orgId, userId, userName, action: 'LOGOUT', entityType: 'USER', entityId: userId });
   }
 
-  logAction(orgId: string, userId: string, userName: string, action: AuditAction, entityType: EntityType, entityId: string, entityName?: string, details?: string): AuditLog {
-    return this.log({ orgId, userId, userName, action, entityType, entityId, entityName, details });
+  archive(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'SOFT_DELETE', entityType, entityId, entityName, details: `Archived ${entityType}` });
   }
 
-  archive(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
-    return this.log({ orgId, userId, userName, action: 'EXPORT', entityType, entityId, entityName, details: 'Archived record' });
+  restore(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'RESTORE', entityType, entityId, entityName });
+  }
+
+  /**
+   * Generic log action method for custom actions
+   */
+  logAction(orgId: string, userId: string, userName: string, action: string, entityType: string, entityId: string, details?: any): AuditLog {
+    // Map custom action strings to valid AuditAction types
+    let mappedAction: AuditAction;
+    switch (action) {
+      case 'BACKUP_RESTORED':
+      case 'RESTORED':
+        mappedAction = 'RESTORE';
+        break;
+      case 'PERMANENT_DELETE':
+        mappedAction = 'DELETE';
+        break;
+      case 'PAYABLE_EXCEPTION_APPROVED':
+        mappedAction = 'APPROVE';
+        break;
+      default:
+        mappedAction = 'UPDATE';
+    }
+    
+    const detailsStr = typeof details === 'object' ? JSON.stringify(details) : details;
+    return this.log({ 
+      orgId, 
+      userId, 
+      userName, 
+      action: mappedAction, 
+      entityType: entityType as EntityType, 
+      entityId, 
+      details: detailsStr 
+    });
   }
 }
 

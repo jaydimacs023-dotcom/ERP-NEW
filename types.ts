@@ -79,6 +79,22 @@ export interface BaseEntity {
   deletedBy?: string;
 }
 
+// Subsidiary Ledger for Students (AR)
+export interface StudentLedger extends BaseEntity {
+  id: string;
+  orgId: string;
+  studentId: string; // FK to Student
+  invoiceId?: string; // FK to Invoice (if AR)
+  date: string;
+  description: string;
+  debit: number; // Amount owed by student
+  credit: number; // Amount paid/covered
+  balance: number; // Running balance after this entry
+  sponsorId?: string; // If covered by sponsor
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Organization extends BaseEntity {
   id: string;
   name: string;
@@ -191,14 +207,20 @@ export interface TrainerSchedule extends BaseEntity {
   updatedAt?: string;
 }
 
+export type TaxType = 'VAT' | 'NON_VAT' | 'ZERO_RATED';
+
 export interface Sponsor extends BaseEntity {
   id: string;
   orgId: string;
+  sponsorCode?: string; // Unique sponsor identifier
   name: string;
   contactPerson?: string;
   email?: string;
   phone?: string;
   address?: string;
+  tin?: string; // Tax Identification Number
+  taxType?: TaxType; // VAT, Non-VAT, Zero-Rated
+  ewtRate?: number; // Expanded Withholding Tax Rate (e.g., 0.02 for 2%)
   arAccountId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -434,6 +456,27 @@ export interface NonStockItem extends BaseEntity {
   createdAt: string;
 }
 
+// Course Fee - links fees to qualifications/courses with tax tracking
+export type CourseFeeCategory = 'TUITION' | 'REGISTRATION' | 'CERTIFICATION' | 'ASSESSMENT' | 'MATERIALS' | 'MISCELLANEOUS';
+
+export interface CourseFee extends BaseEntity {
+  id: string;
+  orgId: string;
+  feeCode: string;               // Unique fee identifier (Fee_ID)
+  qualificationId: string;       // Links to Qualification (Course_ID)
+  feeName: string;               // Fee_Name
+  amount: number;                // Amount
+  glAccountId: string;           // GL_Account_Code - links to ChartOfAccount
+  taxCategoryId?: string;        // Tax_Category - links to ATC categories
+  isSubjectToEwt: boolean;       // Is_Subject_to_EWT (Boolean)
+  ewtRate?: number;              // EWT rate if applicable (e.g., 0.02 for 2%)
+  category?: CourseFeeCategory;  // Optional categorization
+  description?: string;          // Optional description
+  isActive: boolean;             // Whether fee is currently active
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Item Group / Billing Package - a predefined set of items for quick invoice creation
 export interface ItemGroupItem {
   itemId: string;
@@ -572,6 +615,199 @@ export interface Batch extends BaseEntity {
   updatedAt?: string;
 }
 
+// Enrollment - links students to batches with billing tracking
+export type BillingStatus = 'UNBILLED' | 'BILLED' | 'PARTIALLY_BILLED';
+export type EnrollmentStatus = 'ACTIVE' | 'DROPPED' | 'COMPLETED' | 'ON_HOLD';
+
+export interface Enrollment extends BaseEntity {
+  id: string;
+  orgId: string;
+  enrollmentCode?: string;      // Human-readable enrollment ID
+  studentId: string;            // FK to Student
+  batchId: string;              // FK to Batch
+  sponsorId?: string;           // FK to Sponsor (can override batch/student sponsor)
+  billingStatus: BillingStatus; // Unbilled, Billed, Partially Billed
+  enrollmentStatus: EnrollmentStatus; // ACTIVE, DROPPED, COMPLETED, ON_HOLD
+  enrollmentDate: string;       // When student enrolled
+  completionDate?: string;      // When student completed/dropped
+  totalFees?: number;           // Total fees for this enrollment
+  billedAmount?: number;        // Amount already billed
+  notes?: string;               // Optional notes
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Invoice - AR Invoice for sponsors/students with EWT tracking
+export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'VOIDED';
+
+export interface InvoiceLine extends BaseEntity {
+  id: string;
+  invoiceId: string;
+  lineNumber: number;
+  description: string;
+  courseFeeId?: string;        // FK to CourseFee (optional)
+  enrollmentId?: string;       // FK to Enrollment (optional)
+  quantity: number;
+  unitPrice: number;
+  amount: number;              // quantity * unitPrice
+  taxCategoryId?: string;      // FK to TaxCategory
+  vatAmount?: number;          // VAT amount for this line
+  glAccountId?: string;        // Revenue G/L account
+}
+
+export interface Invoice extends BaseEntity {
+  id: string;
+  orgId: string;
+  invoiceNo: string;           // Human-readable invoice number (e.g., INV-2025-00001)
+  sponsorId?: string;          // FK to Sponsor (primary billing party)
+  studentId?: string;          // FK to Student (if individual billing)
+  enrollmentId?: string;       // FK to Enrollment (optional link)
+  batchId?: string;            // FK to Batch (optional link)
+  invoiceDate: string;         // Invoice date
+  dueDate: string;             // Payment due date
+  status: InvoiceStatus;       // DRAFT, OPEN, CLOSED, VOIDED
+  
+  // Amounts
+  subtotal: number;            // Sum of line amounts before tax
+  vatAmount: number;           // Total VAT amount
+  grandTotal: number;          // Subtotal + VAT
+  totalEwtAmount: number;      // Total EWT withheld by sponsor
+  netAmountDue: number;        // Grand Total - EWT
+  amountPaid: number;          // Payments received
+  balanceDue: number;          // Net Amount Due - Amount Paid
+  
+  // EWT Configuration
+  ewtRate?: number;            // EWT rate applied (e.g., 0.02 for 2%)
+  isSubjectToEwt: boolean;     // Whether invoice is subject to EWT
+  
+  // Reference fields
+  reference?: string;          // External reference number
+  terms?: string;              // Payment terms
+  notes?: string;              // Invoice notes/memo
+  journalEntryId?: string;     // FK to JournalEntry when posted
+  
+  // Audit
+  postedBy?: string;
+  postedAt?: string;
+  voidedBy?: string;
+  voidedAt?: string;
+  voidReason?: string;
+  
+  // Lines
+  lines?: InvoiceLine[];
+  
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+}
+
+// Payment - AR Payment/Collection from sponsors/students
+export type PaymentStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
+export type PaymentMethod = 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'EWALLET' | 'OFFSET';
+
+export interface PaymentApplication extends BaseEntity {
+  id: string;
+  paymentId: string;            // FK to Payment
+  invoiceId: string;            // FK to Invoice
+  amountApplied: number;        // Amount applied to this invoice
+  isReversed: boolean;          // Whether application was reversed
+  reversalReason?: string;      // Reason for reversal
+  reversedAt?: string;          // When reversed
+  reversedBy?: string;          // Who reversed
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Payment extends BaseEntity {
+  id: string;
+  orgId: string;
+  paymentNo: string;            // Human-readable payment number (e.g., PAY-2025-00001)
+  sponsorId?: string;           // FK to Sponsor (primary payer)
+  studentId?: string;           // FK to Student (if individual payment)
+  paymentDate: string;          // Date payment received
+  status: PaymentStatus;        // DRAFT, POSTED, VOIDED
+  paymentMethod: PaymentMethod; // CASH, CHECK, BANK_TRANSFER, etc.
+  
+  // Reference fields
+  refNo?: string;               // External reference (check #, transfer ref, etc.)
+  bankAccountId?: string;       // FK to BankAccount (where deposited)
+  checkNumber?: string;         // Check number if payment by check
+  checkDate?: string;           // Check date
+  
+  // Amounts
+  amountReceived: number;       // Total amount received from payer
+  ewtAmountCertified: number;   // EWT amount certified by sponsor (reduces receivable)
+  totalApplied: number;         // Amount applied to invoices
+  customerDepositBalance: number; // Remaining unapplied balance (prepayment pool)
+  
+  // Applications
+  applications?: PaymentApplication[];
+  
+  // Audit
+  notes?: string;
+  journalEntryId?: string;      // FK to JournalEntry when posted
+  postedBy?: string;
+  postedAt?: string;
+  voidedBy?: string;
+  voidedAt?: string;
+  voidReason?: string;
+  
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+}
+
+// ===== Bank Deposits =====
+export type BankDepositStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
+
+export interface BankDepositLine {
+  id: string;
+  depositId: string;
+  paymentId?: string;        // FK to Payment if from AR collection
+  description: string;       // Description of deposit item
+  amount: number;            // Amount for this line
+  checkNumber?: string;      // Check number if applicable
+  checkDate?: string;        // Check date
+  payerName?: string;        // Name of payer
+  createdAt?: string;
+}
+
+export interface BankDeposit extends BaseEntity {
+  id: string;
+  orgId: string;
+  depositNo: string;         // Human-readable deposit number (e.g., DEP-2025-00001)
+  bankAccountId: string;     // FK to BankAccount where deposited
+  referenceNo?: string;      // Bank reference / deposit slip number
+  depositDate: string;       // Date of deposit
+  status: BankDepositStatus; // DRAFT, POSTED, VOIDED
+  
+  // Amounts
+  totalAmount: number;       // Total deposit amount (sum of lines)
+  cashAmount: number;        // Cash portion
+  checkAmount: number;       // Check portion
+  
+  // Lines
+  lines?: BankDepositLine[];
+  
+  // Journal entry linkage
+  journalEntryId?: string;   // FK to JournalEntry when posted
+  
+  // Posting info
+  postedBy?: string;
+  postedAt?: string;
+  
+  // Void info
+  voidedBy?: string;
+  voidedAt?: string;
+  voidReason?: string;
+  
+  // Audit
+  notes?: string;
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+}
+
 export interface ChartOfAccount extends BaseEntity {
   id: string;
   orgId: string;
@@ -606,7 +842,8 @@ export interface JournalEntry extends BaseEntity {
   status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;
-  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL';
+  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT';
+  sourceRef?: string; // Unified reference to source document ID (Invoice ID, Payment ID, Deposit ID, etc.)
   // Enhanced audit fields
   postedBy?: string;
   postedAt?: string;
@@ -622,6 +859,7 @@ export interface JournalEntry extends BaseEntity {
   payableId?: string;
   receivableId?: string;
   goodsReceiptId?: string;
+  depositId?: string;       // FK to BankDeposit
   recurringEntryId?: string; // Links to recurring template
 }
 
@@ -635,7 +873,7 @@ export interface ReviewComment {
   createdAt: string;
 }
 
-export type RecurrenceFrequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM';
+// RecurrenceFrequency removed
 
 export interface RecurringJournalEntry extends BaseEntity {
   id: string;
@@ -932,6 +1170,31 @@ export interface CheckVoucher extends BaseEntity {
   updatedAt?: string;
 }
 
+export type EFTStatus = 'DRAFT' | 'GENERATED' | 'SUBMITTED' | 'PROCESSED' | 'PARTIALLY_PROCESSED' | 'FAILED';
+
+export interface EFTBatch extends BaseEntity {
+  id: string;
+  orgId: string;
+  batchNumber: string;
+  bankAccountId: string;
+  batchDate: string;
+  status: EFTStatus;
+  totalAmount: number;
+  paymentCount: number;
+  payableIds?: string[];
+  // File generation
+  fileFormat?: 'NACHA' | 'ISO20022' | 'CUSTOM';
+  generatedFileName?: string;
+  generatedAt?: string;
+  // Audit
+  createdBy?: string;
+  createdAt: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  processedAt?: string;
+  notes?: string;
+}
+
 // ============================================================================
 // ENHANCED PERMISSIONS
 // ============================================================================
@@ -1087,62 +1350,13 @@ export interface RecurringBillHistory extends BaseEntity {
   createdAt: string;
 }
 
-export type RecurringInvoiceStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+// RecurringInvoiceStatus removed
 
-export interface RecurringInvoiceLineItem {
-  itemId: string;
-  description?: string;
-  quantity: number;
-  unitPrice: number;
-  taxAmount?: number;
-}
+// RecurringInvoiceLineItem removed
 
-export interface RecurringInvoice extends BaseEntity {
-  id: string;
-  orgId: string;
-  customerId: string;
-  invoiceName: string;
-  description: string;
-  amount: number;
-  currency?: string;
-  frequency: RecurrenceFrequency;
-  startDate: string;
-  endDate?: string;
-  nextInvoiceDate: string;
-  lastInvoiceDate?: string;
-  invoiceDaysAfterMonth?: number; // Day of month to generate invoice (1-31)
-  status: RecurringInvoiceStatus;
-  // Line items (charge items)
-  lineItems?: RecurringInvoiceLineItem[];
-  // Account mapping
-  arAccountId?: string;
-  revenueAccountId?: string;
-  departmentId?: string;
-  costCenterId?: string;
-  // Invoice configuration
-  category?: string;
-  paymentTermsDays?: number;
-  // Tracking
-  totalInvoicesGenerated: number;
-  autoCreateReceivable: boolean;
-  createdBy?: string;
-  createdAt: string;
-  updatedAt?: string;
-  lastModifiedBy?: string;
-  notes?: string;
-}
+// RecurringInvoice removed
 
-export interface RecurringInvoiceHistory extends BaseEntity {
-  id: string;
-  orgId: string;
-  recurringInvoiceId: string;
-  receivableId?: string;
-  invoiceDate: string;
-  amount: number;
-  status: 'GENERATED' | 'CREATED' | 'SKIPPED' | 'FAILED';
-  notes?: string;
-  createdAt: string;
-}
+// RecurringInvoiceHistory removed
 
 // ============================================
 // Revenue Recognition & Deferred Revenue Types
