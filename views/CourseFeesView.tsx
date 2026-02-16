@@ -1,0 +1,670 @@
+import React, { useState, useMemo } from 'react';
+import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount, TaxType } from '../types';
+import { generateUUID } from '../utils/uuid';
+import { 
+  Search, Plus, DollarSign, Trash2, X, BookOpen, GraduationCap,
+  Filter, Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
+  Percent, Hash, Tag, ToggleLeft, ToggleRight, FileText, Layers
+} from 'lucide-react';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+interface CourseFeesViewProps {
+  courseFees: CourseFee[];
+  qualifications: Qualification[];
+  accounts: ChartOfAccount[];
+  currency?: string;
+  onAddCourseFee: (fee: CourseFee) => void | Promise<void>;
+  onUpdateCourseFee: (fee: CourseFee) => void | Promise<void>;
+  onDeleteCourseFee: (id: string) => void | Promise<boolean>;
+}
+
+const CATEGORY_OPTIONS: { value: CourseFeeCategory; label: string; color: string }[] = [
+  { value: 'TUITION', label: 'Tuition', color: 'bg-blue-100 text-blue-700' },
+  { value: 'REGISTRATION', label: 'Registration', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'CERTIFICATION', label: 'Certification', color: 'bg-purple-100 text-purple-700' },
+  { value: 'ASSESSMENT', label: 'Assessment', color: 'bg-amber-100 text-amber-700' },
+  { value: 'MATERIALS', label: 'Materials', color: 'bg-rose-100 text-rose-700' },
+  { value: 'MISCELLANEOUS', label: 'Miscellaneous', color: 'bg-gray-100 text-gray-700' },
+];
+
+const CourseFeesView: React.FC<CourseFeesViewProps> = ({ 
+  courseFees, qualifications, accounts, currency = 'PHP', onAddCourseFee, onUpdateCourseFee, onDeleteCourseFee 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterQualification, setFilterQualification] = useState<string>('');
+  const [filterCategory, setFilterCategory] = useState<CourseFeeCategory | ''>('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingFee, setEditingFee] = useState<CourseFee | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const [formData, setFormData] = useState<Partial<CourseFee>>({
+    feeCode: '',
+    qualificationId: '',
+    feeName: '',
+    amount: 0,
+    glAccountId: '',
+    taxCategoryId: '',
+    isSubjectToEwt: false,
+    ewtRate: undefined,
+    category: undefined,
+    description: '',
+    isActive: true
+  });
+
+  const filteredFees = useMemo(() => {
+    return courseFees.filter(f => {
+      if (f.isDeleted) return false;
+      
+      const matchesSearch = 
+        f.feeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.feeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (f.description?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesQualification = !filterQualification || f.qualificationId === filterQualification;
+      const matchesCategory = !filterCategory || f.category === filterCategory;
+      
+      return matchesSearch && matchesQualification && matchesCategory;
+    });
+  }, [courseFees, searchTerm, filterQualification, filterCategory]);
+
+  const revenueAccounts = useMemo(() => 
+    accounts.filter(a => a.class === 'REVENUE' && !a.isHeader && a.isActive !== false),
+    [accounts]
+  );
+
+  const resetForm = () => {
+    setFormData({ 
+      feeCode: '', 
+      qualificationId: '', 
+      feeName: '', 
+      amount: 0, 
+      glAccountId: '', 
+      taxCategoryId: '',
+      isSubjectToEwt: false,
+      ewtRate: undefined,
+      category: undefined,
+      description: '',
+      isActive: true
+    });
+    setEditingFee(null);
+  };
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}`;
+    const toast: Toast = { id, message, type };
+    setToasts(prev => [...prev, toast]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  const generateFeeCode = (qualificationId: string) => {
+    const qual = qualifications.find(q => q.id === qualificationId);
+    const prefix = qual?.code?.substring(0, 3).toUpperCase() || 'FEE';
+    const count = courseFees.filter(f => f.qualificationId === qualificationId).length + 1;
+    return `${prefix}-FEE-${String(count).padStart(3, '0')}`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.feeName || !formData.qualificationId || !formData.glAccountId) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      if (editingFee) {
+        const updatedFee: CourseFee = {
+          ...editingFee,
+          feeCode: formData.feeCode || editingFee.feeCode,
+          qualificationId: formData.qualificationId!,
+          feeName: formData.feeName!,
+          amount: Number(formData.amount) || 0,
+          glAccountId: formData.glAccountId!,
+          taxCategoryId: formData.taxCategoryId,
+          isSubjectToEwt: formData.isSubjectToEwt || false,
+          ewtRate: formData.isSubjectToEwt ? formData.ewtRate : undefined,
+          category: formData.category,
+          description: formData.description,
+          isActive: formData.isActive ?? true,
+          updatedAt: new Date().toISOString()
+        };
+        await onUpdateCourseFee(updatedFee);
+        showToast(`Course fee "${updatedFee.feeName}" updated successfully!`, 'success');
+      } else {
+        const newFee: CourseFee = {
+          id: generateUUID(),
+          orgId: '', // Will be set by App.tsx handler
+          feeCode: formData.feeCode || generateFeeCode(formData.qualificationId!),
+          qualificationId: formData.qualificationId!,
+          feeName: formData.feeName!,
+          amount: Number(formData.amount) || 0,
+          glAccountId: formData.glAccountId!,
+          taxCategoryId: formData.taxCategoryId,
+          isSubjectToEwt: formData.isSubjectToEwt || false,
+          ewtRate: formData.isSubjectToEwt ? formData.ewtRate : undefined,
+          category: formData.category,
+          description: formData.description,
+          isActive: formData.isActive ?? true,
+          createdAt: new Date().toISOString()
+        };
+        await onAddCourseFee(newFee);
+        showToast(`Course fee "${newFee.feeName}" created successfully!`, 'success');
+      }
+      
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving course fee:', error);
+      showToast(`Failed to save course fee: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this course fee?')) return;
+    
+    const feeToDelete = courseFees.find(f => f.id === id);
+    const feeName = feeToDelete?.feeName || 'Unknown';
+    
+    setDeletingId(id);
+    try {
+      const result = await onDeleteCourseFee(id);
+      if (result === false) {
+        showToast('Cannot delete course fee: It may be in use.', 'error');
+      } else {
+        showToast(`Course fee "${feeName}" deleted successfully!`, 'success');
+      }
+    } catch (error) {
+      showToast(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const openEditModal = (fee: CourseFee) => {
+    setEditingFee(fee);
+    setFormData({
+      feeCode: fee.feeCode,
+      qualificationId: fee.qualificationId,
+      feeName: fee.feeName,
+      amount: fee.amount,
+      glAccountId: fee.glAccountId,
+      taxCategoryId: fee.taxCategoryId || '',
+      isSubjectToEwt: fee.isSubjectToEwt,
+      ewtRate: fee.ewtRate,
+      category: fee.category,
+      description: fee.description || '',
+      isActive: fee.isActive
+    });
+    setShowModal(true);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', { 
+      style: 'currency', 
+      currency: currency,
+      minimumFractionDigits: 2 
+    }).format(amount);
+  };
+
+  const getCategoryBadge = (category?: CourseFeeCategory) => {
+    if (!category) return null;
+    const cat = CATEGORY_OPTIONS.find(c => c.value === category);
+    if (!cat) return null;
+    return (
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${cat.color}`}>
+        {cat.label}
+      </span>
+    );
+  };
+
+  const getQualificationName = (qualId: string) => {
+    const qual = qualifications.find(q => q.id === qualId);
+    return qual ? `${qual.code} - ${qual.name}` : 'Unknown';
+  };
+
+  const getAccountName = (accId: string) => {
+    const acc = accounts.find(a => a.id === accId);
+    return acc ? `${acc.code} - ${acc.name}` : 'Not mapped';
+  };
+
+  // Summary stats
+  const totalFees = filteredFees.length;
+  const activeFees = filteredFees.filter(f => f.isActive).length;
+  const totalAmount = filteredFees.reduce((sum, f) => sum + f.amount, 0);
+  const ewtFees = filteredFees.filter(f => f.isSubjectToEwt).length;
+
+  return (
+    <div className="space-y-8 pb-20 relative animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Course Fees Catalog</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Manage fee structures linked to qualifications and courses.</p>
+        </div>
+        <button 
+          onClick={() => { resetForm(); setShowModal(true); }}
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+        >
+          <Plus size={18} /> New Course Fee
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Fees</p>
+          <p className="text-2xl font-bold text-gray-800">{totalFees}</p>
+        </div>
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Active</p>
+          <p className="text-2xl font-bold text-gray-800">{activeFees}</p>
+        </div>
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Total Value</p>
+          <p className="text-2xl font-bold text-gray-800">{formatCurrency(totalAmount)}</p>
+        </div>
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">EWT Subject</p>
+          <p className="text-2xl font-bold text-gray-800">{ewtFees}</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search by name, code, description..." 
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={filterQualification}
+            onChange={(e) => setFilterQualification(e.target.value)}
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+          >
+            <option value="">All Courses</option>
+            {qualifications.filter(q => !q.isDeleted).map(q => (
+              <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value as CourseFeeCategory | '')}
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+          >
+            <option value="">All Categories</option>
+            {CATEGORY_OPTIONS.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Fee Details</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Course</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GL Account</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Tax/EWT</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {filteredFees.length > 0 ? filteredFees.map(fee => (
+              <tr key={fee.id} className="hover:bg-gray-50 transition-colors group">
+                <td className="px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded bg-orange-50 flex items-center justify-center text-[#F47721] border border-orange-100 shadow-sm shrink-0">
+                      <DollarSign size={20} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-800 leading-tight">{fee.feeName}</div>
+                      <div className="text-xs text-[#F47721] font-mono mt-0.5">{fee.feeCode}</div>
+                      {fee.category && <div className="mt-1">{getCategoryBadge(fee.category)}</div>}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <GraduationCap size={14} className="text-gray-400" />
+                    <span className="truncate max-w-[200px]">{getQualificationName(fee.qualificationId)}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="text-sm font-semibold text-gray-800 font-mono">
+                    {formatCurrency(fee.amount)}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="text-xs text-gray-600 truncate max-w-[180px]">
+                    {getAccountName(fee.glAccountId)}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="space-y-1">
+                    {fee.isSubjectToEwt ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">EWT</span>
+                        {fee.ewtRate && (
+                          <span className="text-xs text-gray-500">{(fee.ewtRate * 100).toFixed(1)}%</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No EWT</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  {fee.isActive ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                      <CheckCircle size={12} /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      Inactive
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-5 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => openEditModal(fee)}
+                      disabled={deletingId === fee.id}
+                      className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(fee.id)}
+                      disabled={deletingId === fee.id}
+                      className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingId === fee.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan={7} className="py-20 text-center text-gray-400 italic">No course fees defined. Create a fee structure to get started.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><DollarSign size={20} /></div>
+                <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
+                  {editingFee ? 'Edit Course Fee' : 'New Course Fee'}
+                </h3>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-4">
+                {/* Course Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Course / Qualification *</label>
+                  <select 
+                    required
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    value={formData.qualificationId || ''}
+                    onChange={e => {
+                      const qualId = e.target.value;
+                      setFormData({
+                        ...formData, 
+                        qualificationId: qualId,
+                        feeCode: formData.feeCode || (qualId ? generateFeeCode(qualId) : '')
+                      });
+                    }}
+                  >
+                    <option value="">Select a course...</option>
+                    {qualifications.filter(q => !q.isDeleted).map(q => (
+                      <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fee Code and Name */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fee Code</label>
+                    <div className="relative">
+                      <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        placeholder="Auto-generated if blank" 
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                        value={formData.feeCode || ''} 
+                        onChange={e => setFormData({...formData, feeCode: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fee Name *</label>
+                    <input 
+                      required 
+                      placeholder="e.g. Tuition Fee - First Semester" 
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      value={formData.feeName || ''} 
+                      onChange={e => setFormData({...formData, feeName: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                {/* Amount and Category */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">{currency}</span>
+                      <input 
+                        required
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00" 
+                        className="w-full pl-14 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                        value={formData.amount || ''} 
+                        onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</label>
+                    <select 
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      value={formData.category || ''}
+                      onChange={e => setFormData({...formData, category: e.target.value as CourseFeeCategory || undefined})}
+                    >
+                      <option value="">Select category...</option>
+                      {CATEGORY_OPTIONS.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* GL Account */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">G/L Revenue Account *</label>
+                  <select 
+                    required
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    value={formData.glAccountId || ''}
+                    onChange={e => setFormData({...formData, glAccountId: e.target.value})}
+                  >
+                    <option value="">Select revenue account...</option>
+                    {revenueAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 italic mt-1">Income will be posted to this G/L account when the fee is invoiced.</p>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</label>
+                  <textarea 
+                    placeholder="Optional description of this fee..." 
+                    rows={2}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium resize-none"
+                    value={formData.description || ''} 
+                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                  />
+                </div>
+
+                {/* Tax / EWT Section */}
+                <div className="p-4 bg-amber-50/50 rounded border border-amber-100 space-y-4">
+                  <label className="text-xs font-semibold text-amber-700 uppercase tracking-wide flex items-center gap-2">
+                    <Receipt size={12} /> Tax & Withholding
+                  </label>
+                  
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, isSubjectToEwt: !formData.isSubjectToEwt})}
+                      className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                        formData.isSubjectToEwt 
+                          ? 'bg-amber-100 border-amber-300 text-amber-800' 
+                          : 'bg-white border-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {formData.isSubjectToEwt ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                      <span className="text-sm font-medium">Subject to EWT</span>
+                    </button>
+                    
+                    {formData.isSubjectToEwt && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-500">EWT Rate:</label>
+                        <div className="relative w-24">
+                          <input 
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            placeholder="2" 
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-amber-500 text-sm font-medium pr-8"
+                            value={formData.ewtRate !== undefined ? (formData.ewtRate * 100) : ''} 
+                            onChange={e => {
+                              const val = e.target.value;
+                              setFormData({...formData, ewtRate: val ? parseFloat(val) / 100 : undefined});
+                            }} 
+                          />
+                          <Percent size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 italic">
+                    Enable this if Expanded Withholding Tax should be applied when billing this fee.
+                  </p>
+                </div>
+
+                {/* Active Status */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({...formData, isActive: !formData.isActive})}
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      formData.isActive 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                        : 'bg-gray-100 border-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {formData.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                    <span className="text-sm font-medium">{formData.isActive ? 'Active' : 'Inactive'}</span>
+                  </button>
+                  <span className="text-xs text-gray-500">Inactive fees won't appear in billing options.</span>
+                </div>
+              </div>
+
+              <div className="pt-6 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowModal(false)} 
+                  className="flex-1 py-3 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.glAccountId}
+                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      {editingFee ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    editingFee ? 'Update Fee' : 'Create Fee'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`px-4 py-3 rounded shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : toast.type === 'error'
+                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                  : 'bg-orange-50 text-orange-800 border-orange-200'
+              }`}
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle size={18} className="text-emerald-600" />
+              ) : toast.type === 'error' ? (
+                <AlertCircle size={18} className="text-rose-600" />
+              ) : (
+                <AlertCircle size={18} className="text-[#F47721]" />
+              )}
+              <span className="text-sm font-semibold">{toast.message}</span>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CourseFeesView;

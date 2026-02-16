@@ -1,10 +1,10 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Sponsor, ChartOfAccount } from '../types';
+import { Sponsor, ChartOfAccount, TaxType } from '../types';
 import { generateUUID } from '../utils/uuid';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
   Building, Filter, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
-  BookOpen
+  BookOpen, FileText, Receipt, Percent, Hash
 } from 'lucide-react';
 
 interface Toast {
@@ -32,11 +32,15 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const [formData, setFormData] = useState<Partial<Sponsor>>({
+    sponsorCode: '',
     name: '',
     contactPerson: '',
     email: '',
     phone: '',
     address: '',
+    tin: '',
+    taxType: undefined,
+    ewtRate: undefined,
     arAccountId: ''
   });
 
@@ -49,7 +53,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   ), [sponsors, searchTerm]);
 
   const resetForm = () => {
-    setFormData({ name: '', contactPerson: '', email: '', phone: '', address: '', arAccountId: '' });
+    setFormData({ sponsorCode: '', name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
     setEditingSponsor(null);
   };
 
@@ -75,11 +79,15 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         // Update existing sponsor
         const updatedSponsor: Sponsor = {
           ...editingSponsor,
+          sponsorCode: formData.sponsorCode,
           name: formData.name!,
           contactPerson: formData.contactPerson,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
+          tin: formData.tin,
+          taxType: formData.taxType,
+          ewtRate: formData.ewtRate,
           arAccountId: formData.arAccountId,
           updatedAt: new Date().toISOString()
         };
@@ -90,11 +98,15 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         const newSponsor: Sponsor = {
           id: generateUUID(),
           orgId: '', // Will be set by App.tsx handler
+          sponsorCode: formData.sponsorCode,
           name: formData.name!,
           contactPerson: formData.contactPerson,
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
+          tin: formData.tin,
+          taxType: formData.taxType,
+          ewtRate: formData.ewtRate,
           arAccountId: formData.arAccountId,
           createdAt: new Date().toISOString()
         };
@@ -136,14 +148,29 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   const openEditModal = (sponsor: Sponsor) => {
     setEditingSponsor(sponsor);
     setFormData({
+      sponsorCode: sponsor.sponsorCode || '',
       name: sponsor.name,
       contactPerson: sponsor.contactPerson,
       email: sponsor.email,
       phone: sponsor.phone,
       address: sponsor.address,
+      tin: sponsor.tin || '',
+      taxType: sponsor.taxType,
+      ewtRate: sponsor.ewtRate,
       arAccountId: sponsor.arAccountId || ''
     });
     setShowModal(true);
+  };
+
+  const taxTypeLabels: Record<TaxType, string> = {
+    'VAT': 'VAT Registered',
+    'NON_VAT': 'Non-VAT',
+    'ZERO_RATED': 'Zero-Rated'
+  };
+
+  const formatEwtRate = (rate?: number) => {
+    if (rate === undefined || rate === null) return null;
+    return `${(rate * 100).toFixed(1)}%`;
   };
 
   return (
@@ -184,6 +211,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Sponsor</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Person</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Info</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Tax Info</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</th>
               <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
             </tr>
@@ -198,7 +226,10 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     </div>
                     <div>
                       <div className="text-sm font-bold text-gray-800 leading-tight">{sponsor.name}</div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      {sponsor.sponsorCode && (
+                        <div className="text-xs text-[#F47721] font-mono mt-0.5">{sponsor.sponsorCode}</div>
+                      )}
+                      <div className="text-xs text-gray-400 mt-0.5">
                         Added {sponsor.createdAt ? new Date(sponsor.createdAt).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
@@ -224,6 +255,28 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     )}
                     {!sponsor.email && !sponsor.phone && (
                       <span className="text-xs text-gray-400 italic">No contact info</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="space-y-1">
+                    {sponsor.tin && (
+                      <div className="text-xs text-gray-600 flex items-center gap-1.5">
+                        <FileText size={12} className="text-gray-400" /> TIN: {sponsor.tin}
+                      </div>
+                    )}
+                    {sponsor.taxType && (
+                      <div className="text-xs text-gray-600 flex items-center gap-1.5">
+                        <Receipt size={12} className="text-gray-400" /> {taxTypeLabels[sponsor.taxType]}
+                      </div>
+                    )}
+                    {sponsor.ewtRate !== undefined && sponsor.ewtRate !== null && (
+                      <div className="text-xs text-gray-600 flex items-center gap-1.5">
+                        <Percent size={12} className="text-gray-400" /> EWT: {formatEwtRate(sponsor.ewtRate)}
+                      </div>
+                    )}
+                    {!sponsor.tin && !sponsor.taxType && (sponsor.ewtRate === undefined || sponsor.ewtRate === null) && (
+                      <span className="text-xs text-gray-400 italic">No tax info</span>
                     )}
                   </div>
                 </td>
@@ -259,7 +312,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={5} className="py-20 text-center text-gray-400 italic">No sponsors registered in the system.</td></tr>
+              <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sponsors registered in the system.</td></tr>
             )}
           </tbody>
         </table>
@@ -278,17 +331,31 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
               <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sponsor Name / Organization *</label>
-                  <input 
-                    required 
-                    placeholder="e.g. Phoenix Foundation" 
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
-                    value={formData.name} 
-                    onChange={e => setFormData({...formData, name: e.target.value})} 
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sponsor Code</label>
+                    <div className="relative">
+                      <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        placeholder="e.g. SP-001" 
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                        value={formData.sponsorCode || ''} 
+                        onChange={e => setFormData({...formData, sponsorCode: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sponsor Name / Organization *</label>
+                    <input 
+                      required 
+                      placeholder="e.g. Phoenix Foundation" 
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      value={formData.name} 
+                      onChange={e => setFormData({...formData, name: e.target.value})} 
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -332,6 +399,60 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     value={formData.address || ''} 
                     onChange={e => setFormData({...formData, address: e.target.value})} 
                   />
+                </div>
+
+                {/* Tax Information Section */}
+                <div className="p-4 bg-blue-50/50 rounded border border-blue-100 space-y-4">
+                  <label className="text-xs font-semibold text-blue-700 uppercase tracking-wide flex items-center gap-2">
+                    <Receipt size={12} /> Tax Information
+                  </label>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-500">TIN (Tax ID Number)</label>
+                      <input 
+                        placeholder="000-000-000-000" 
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm font-medium"
+                        value={formData.tin || ''} 
+                        onChange={e => setFormData({...formData, tin: e.target.value})} 
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-500">Tax Type</label>
+                      <select 
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm font-medium"
+                        value={formData.taxType || ''}
+                        onChange={e => setFormData({...formData, taxType: e.target.value as TaxType || undefined})}
+                      >
+                        <option value="">Select Tax Type</option>
+                        <option value="VAT">VAT Registered</option>
+                        <option value="NON_VAT">Non-VAT</option>
+                        <option value="ZERO_RATED">Zero-Rated</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-500">EWT Rate (%)</label>
+                      <div className="relative">
+                        <input 
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="e.g. 2" 
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm font-medium pr-8"
+                          value={formData.ewtRate !== undefined && formData.ewtRate !== null ? (formData.ewtRate * 100) : ''} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setFormData({...formData, ewtRate: val ? parseFloat(val) / 100 : undefined});
+                          }} 
+                        />
+                        <Percent size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 italic">
+                    EWT Rate is used for computing Expanded Withholding Tax on income payments to this sponsor.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5 p-4 bg-orange-50/50 rounded border border-orange-100">

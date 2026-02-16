@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RecurringInvoice, RecurringInvoiceHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -61,6 +61,11 @@ import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import BackupRestoreView from './views/BackupRestoreView';
 import RecurringInvoicesView from './views/RecurringInvoicesView';
 import RevenueRecognitionView from './views/RevenueRecognitionView';
+import CourseFeesView from './views/CourseFeesView';
+import EnrollmentsView from './views/EnrollmentsView';
+import InvoicesView from './views/InvoicesView';
+import PaymentsView from './views/PaymentsView';
+import BankDepositsView from './views/BankDepositsView';
 
 // Lucide Icons
 import { 
@@ -72,7 +77,8 @@ import {
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
-  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp
+  CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
+  ArrowDownToLine
 } from 'lucide-react';
 
 export default function App() {
@@ -351,6 +357,12 @@ export default function App() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [items, setItems] = useState<NonStockItem[]>([]);
+  const [courseFees, setCourseFees] = useState<CourseFee[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [studentLedger, setStudentLedger] = useState<StudentLedger[]>([]); // Subsidiary ledger for students
+  const [bankDeposits, setBankDeposits] = useState<BankDeposit[]>([]);
   const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorTaxSettings, setVendorTaxSettings] = useState<any[]>([]);
@@ -368,7 +380,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [purchaseOrderLines, setPurchaseOrderLines] = useState<PurchaseOrderLine[]>([]);
-  const [payments, setPayments] = useState<PaymentHistory[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
   const [fixedAssets, setFixedAssets] = useState<FixedAsset[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -907,7 +919,7 @@ export default function App() {
       if (backupData.data.budgets?.length) setBudgets(backupData.data.budgets);
       if (backupData.data.accounts?.length) setAccounts(backupData.data.accounts);
       if (backupData.data.purchaseOrders?.length) setPurchaseOrders(backupData.data.purchaseOrders);
-      if (backupData.data.paymentHistory?.length) setPayments(backupData.data.paymentHistory);
+      if (backupData.data.paymentHistory?.length) setPaymentHistory(backupData.data.paymentHistory);
       if (backupData.data.payables?.length) setPayables(backupData.data.payables);
       if (backupData.data.accountingPeriods?.length) setAccountingPeriods(backupData.data.accountingPeriods);
       if (backupData.data.checkVouchers?.length) setCheckVouchers(backupData.data.checkVouchers);
@@ -2459,6 +2471,348 @@ export default function App() {
     }
   };
 
+  // ===== Course Fee CRUD Handlers =====
+  const handleAddCourseFee = async (fee: CourseFee) => {
+    try {
+      console.info('[App] Creating course fee:', fee.feeName);
+      const feeWithOrg = { ...fee, orgId: currentOrgId };
+      // For now, store in memory (can be wired to dataService later)
+      setCourseFees(prev => [...prev, feeWithOrg]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', feeWithOrg.id, `${fee.feeCode} - ${fee.feeName}`);
+      handleNotify('success', `Course fee "${fee.feeName}" created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating course fee:', error);
+      handleNotify('error', 'Failed to create course fee.');
+    }
+  };
+
+  const handleUpdateCourseFee = async (fee: CourseFee) => {
+    try {
+      console.info('[App] Updating course fee:', fee.id);
+      const existing = courseFees.find(f => f.id === fee.id);
+      setCourseFees(prev => prev.map(f => f.id === fee.id ? { ...f, ...fee, updatedAt: new Date().toISOString() } : f));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', fee.id, fee.feeName, existing, fee);
+      handleNotify('success', `Course fee "${fee.feeName}" updated successfully`);
+    } catch (error) {
+      console.error('[App] Error updating course fee:', error);
+      handleNotify('error', 'Failed to update course fee.');
+    }
+  };
+
+  const handleDeleteCourseFee = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting course fee:', id);
+      const existing = courseFees.find(f => f.id === id);
+      setCourseFees(prev => prev.map(f => f.id === id ? { ...f, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : f));
+      
+      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', id, existing?.feeName);
+      handleNotify('success', 'Course fee deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting course fee:', error);
+      handleNotify('error', 'Failed to delete course fee.');
+      return false;
+    }
+  };
+
+  // ===== Enrollment CRUD Handlers =====
+  const handleAddEnrollment = async (enrollment: Enrollment) => {
+    try {
+      console.info('[App] Creating enrollment for student:', enrollment.studentId);
+      const enrollmentWithOrg = { ...enrollment, orgId: currentOrgId };
+      setEnrollments(prev => [...prev, enrollmentWithOrg]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollmentWithOrg.id, enrollment.enrollmentCode || enrollment.id);
+      handleNotify('success', 'Student enrolled successfully');
+    } catch (error) {
+      console.error('[App] Error creating enrollment:', error);
+      handleNotify('error', 'Failed to create enrollment.');
+    }
+  };
+
+  const handleUpdateEnrollment = async (enrollment: Enrollment) => {
+    try {
+      console.info('[App] Updating enrollment:', enrollment.id);
+      const existing = enrollments.find(e => e.id === enrollment.id);
+      setEnrollments(prev => prev.map(e => e.id === enrollment.id ? { ...e, ...enrollment, updatedAt: new Date().toISOString() } : e));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollment.id, enrollment.enrollmentCode, existing, enrollment);
+      handleNotify('success', 'Enrollment updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating enrollment:', error);
+      handleNotify('error', 'Failed to update enrollment.');
+    }
+  };
+
+  const handleDeleteEnrollment = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting enrollment:', id);
+      const existing = enrollments.find(e => e.id === id);
+      setEnrollments(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : e));
+      
+      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', id, existing?.enrollmentCode);
+      handleNotify('success', 'Enrollment removed successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting enrollment:', error);
+      handleNotify('error', 'Failed to delete enrollment.');
+      return false;
+    }
+  };
+
+  // ===== Invoice CRUD Handlers =====
+  const handleAddInvoice = async (invoice: Invoice) => {
+    try {
+      console.info('[App] Creating invoice:', invoice.invoiceNo);
+      const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
+      setInvoices(prev => [...prev, invoiceWithOrg]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoiceWithOrg.id, invoice.invoiceNo);
+      handleNotify('success', `Invoice ${invoice.invoiceNo} created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating invoice:', error);
+      handleNotify('error', 'Failed to create invoice.');
+    }
+  };
+
+  const handleUpdateInvoice = async (invoice: Invoice) => {
+    try {
+      console.info('[App] Updating invoice:', invoice.id);
+      const existing = invoices.find(i => i.id === invoice.id);
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...invoice, updatedAt: new Date().toISOString() } : i));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoice.id, invoice.invoiceNo, existing, invoice);
+      handleNotify('success', `Invoice ${invoice.invoiceNo} updated successfully`);
+    } catch (error) {
+      console.error('[App] Error updating invoice:', error);
+      handleNotify('error', 'Failed to update invoice.');
+    }
+  };
+
+  const handleDeleteInvoice = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting invoice:', id);
+      const existing = invoices.find(i => i.id === id);
+      setInvoices(prev => prev.map(i => i.id === id ? { ...i, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : i));
+      
+      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', id, existing?.invoiceNo);
+      handleNotify('success', 'Invoice deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting invoice:', error);
+      handleNotify('error', 'Failed to delete invoice.');
+      return false;
+    }
+  };
+
+
+  const handleVoidInvoice = async (id: string, reason: string) => {
+    try {
+      const invoice = invoices.find(i => i.id === id);
+      if (!invoice) return;
+
+      // 1. Block void if active payment applications
+      const activeApplications = payments
+        .flatMap(p => p.applications || [])
+        .filter(app => app.invoiceId === id && !app.isReversed);
+      if (activeApplications.length > 0) {
+        handleNotify('error', 'Cannot void invoice: active payment applications exist. Reverse all applications first.');
+        return;
+      }
+
+      // 2. Create GL_Journal reversal entry (VOID)
+      // Find original journal entry for this invoice
+      const origJournal = journalEntries.find(j => j.sourceType === 'INVOICE' && j.sourceRef === id && j.status === 'POSTED');
+      if (origJournal) {
+        // Reverse all lines: swap debit/credit
+        const origLines = journalLines.filter(l => l.entryId === origJournal.id);
+        const reversedLines = origLines.map(l => ({
+          ...l,
+          id: `${l.id}-VOID`,
+          entryId: `${origJournal.id}-VOID`,
+          debit: l.credit,
+          credit: l.debit,
+          createdAt: new Date().toISOString(),
+          updatedAt: undefined
+        }));
+        const voidJournal = {
+          ...origJournal,
+          id: `${origJournal.id}-VOID`,
+          status: 'POSTED',
+          sourceType: 'VOID',
+          reference: `${origJournal.reference}-VOID`,
+          description: `[VOID] ${origJournal.description}`,
+          createdAt: new Date().toISOString(),
+          postedAt: new Date().toISOString(),
+          postedBy: currentUser?.id,
+          sourceRef: id
+        };
+        setJournalEntries(prev => [...prev, voidJournal]);
+        setJournalLines(prev => [...prev, ...reversedLines]);
+        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'JOURNAL_ENTRY', voidJournal.id, voidJournal.reference);
+      }
+
+      // 3. Reset enrollment.billingStatus to 'UNBILLED' if linked
+      if (invoice.enrollmentId) {
+        const enrollment = enrollments.find(e => e.id === invoice.enrollmentId);
+        if (enrollment && enrollment.billingStatus !== 'UNBILLED') {
+          const updatedEnrollment = { ...enrollment, billingStatus: 'UNBILLED', updatedAt: new Date().toISOString() };
+          setEnrollments(prev => prev.map(e => e.id === enrollment.id ? updatedEnrollment : e));
+          AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollment.id, enrollment.enrollmentCode, enrollment, updatedEnrollment);
+        }
+      }
+
+      // 4. Mark invoice as voided
+      const voidedInvoice = {
+        ...invoice,
+        status: 'VOIDED' as const,
+        voidedAt: new Date().toISOString(),
+        voidedBy: currentUser?.id,
+        voidReason: reason
+      };
+      setInvoices(prev => prev.map(i => i.id === id ? voidedInvoice : i));
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', id, invoice.invoiceNo, invoice, voidedInvoice);
+      handleNotify('success', `Invoice ${invoice.invoiceNo} voided`);
+    } catch (error) {
+      console.error('[App] Error voiding invoice:', error);
+      handleNotify('error', 'Failed to void invoice.');
+    }
+  };
+
+  // ===== Payment CRUD Handlers =====
+  const handleAddPayment = async (payment: Payment) => {
+    try {
+      console.info('[App] Creating payment:', payment.paymentNo);
+      const paymentWithOrg = { ...payment, orgId: currentOrgId };
+      setPayments(prev => [...prev, paymentWithOrg]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentWithOrg.id, payment.paymentNo);
+      handleNotify('success', `Payment ${payment.paymentNo} created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating payment:', error);
+      handleNotify('error', 'Failed to create payment.');
+    }
+  };
+
+  const handleUpdatePayment = async (payment: Payment) => {
+    try {
+      console.info('[App] Updating payment:', payment.id);
+      const existing = payments.find(p => p.id === payment.id);
+      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...payment, updatedAt: new Date().toISOString() } : p));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', payment.id, payment.paymentNo, existing, payment);
+      handleNotify('success', `Payment ${payment.paymentNo} updated successfully`);
+    } catch (error) {
+      console.error('[App] Error updating payment:', error);
+      handleNotify('error', 'Failed to update payment.');
+    }
+  };
+
+  const handleDeletePayment = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting payment:', id);
+      const existing = payments.find(p => p.id === id);
+      setPayments(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
+      
+      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, existing?.paymentNo);
+      handleNotify('success', 'Payment deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting payment:', error);
+      handleNotify('error', 'Failed to delete payment.');
+      return false;
+    }
+  };
+
+  const handleVoidPayment = async (id: string, reason: string) => {
+    try {
+      const payment = payments.find(p => p.id === id);
+      if (payment) {
+        const voidedPayment = { 
+          ...payment, 
+          status: 'VOIDED' as const, 
+          voidedAt: new Date().toISOString(), 
+          voidedBy: currentUser?.id,
+          voidReason: reason 
+        };
+        setPayments(prev => prev.map(p => p.id === id ? voidedPayment : p));
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, payment.paymentNo, payment, voidedPayment);
+        handleNotify('success', `Payment ${payment.paymentNo} voided`);
+      }
+    } catch (error) {
+      console.error('[App] Error voiding payment:', error);
+      handleNotify('error', 'Failed to void payment.');
+    }
+  };
+
+  // ===== Bank Deposit CRUD Handlers =====
+  const handleAddBankDeposit = async (deposit: BankDeposit) => {
+    try {
+      console.info('[App] Creating bank deposit:', deposit.depositNo);
+      const depositWithOrg = { ...deposit, orgId: currentOrgId };
+      setBankDeposits(prev => [...prev, depositWithOrg]);
+      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', depositWithOrg.id, deposit.depositNo);
+      handleNotify('success', `Deposit ${deposit.depositNo} created successfully`);
+    } catch (error) {
+      console.error('[App] Error creating bank deposit:', error);
+      handleNotify('error', 'Failed to create bank deposit.');
+    }
+  };
+
+  const handleUpdateBankDeposit = async (deposit: BankDeposit) => {
+    try {
+      console.info('[App] Updating bank deposit:', deposit.id);
+      const existing = bankDeposits.find(d => d.id === deposit.id);
+      setBankDeposits(prev => prev.map(d => d.id === deposit.id ? { ...d, ...deposit, updatedAt: new Date().toISOString() } : d));
+      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', deposit.id, deposit.depositNo, existing, deposit);
+      handleNotify('success', `Deposit ${deposit.depositNo} updated successfully`);
+    } catch (error) {
+      console.error('[App] Error updating bank deposit:', error);
+      handleNotify('error', 'Failed to update bank deposit.');
+    }
+  };
+
+  const handleDeleteBankDeposit = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting bank deposit:', id);
+      const existing = bankDeposits.find(d => d.id === id);
+      setBankDeposits(prev => prev.map(d => d.id === id ? { ...d, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : d));
+      
+      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', id, existing?.depositNo);
+      handleNotify('success', 'Bank deposit deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting bank deposit:', error);
+      handleNotify('error', 'Failed to delete bank deposit.');
+      return false;
+    }
+  };
+
+  const handleVoidBankDeposit = async (id: string, reason: string) => {
+    try {
+      const deposit = bankDeposits.find(d => d.id === id);
+      if (deposit) {
+        const voidedDeposit = { 
+          ...deposit, 
+          status: 'VOIDED' as const, 
+          voidedAt: new Date().toISOString(), 
+          voidedBy: currentUser?.id,
+          voidReason: reason 
+        };
+        setBankDeposits(prev => prev.map(d => d.id === id ? voidedDeposit : d));
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', id, deposit.depositNo, deposit, voidedDeposit);
+        handleNotify('success', `Deposit ${deposit.depositNo} voided`);
+      }
+    } catch (error) {
+      console.error('[App] Error voiding bank deposit:', error);
+      handleNotify('error', 'Failed to void bank deposit.');
+    }
+  };
+
   // ===== Employee CRUD Handlers =====
   const handleAddEmployee = async (employee: Employee) => {
     try {
@@ -2851,6 +3205,9 @@ export default function App() {
                {isAR && <NavItem icon={<Receipt size={18}/>} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<RefreshCw size={18}/>} label="Recurring Invoices" active={activeTab === 'recurring-invoices'} onClick={() => setActiveTab('recurring-invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAR && <NavItem icon={<TrendingUp size={18}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<FileText size={18}/>} label="Invoices" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<Wallet size={18}/>} label="Payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
+               {isAR && <NavItem icon={<ArrowDownToLine size={18}/>} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => setActiveTab('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<CreditCard size={18}/>} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<ShoppingCart size={18}/>} label="Purchase Orders" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
                {isAP && <NavItem icon={<Package size={18}/>} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -2869,7 +3226,9 @@ export default function App() {
                <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<Receipt size={20}/>} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => setActiveTab('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+               <NavItem icon={<UserCheck size={20}/>} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => setActiveTab('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
                <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
              </NavSection>
@@ -3052,13 +3411,123 @@ export default function App() {
           
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
-          {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={payments.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} />}
+          {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} />}
           
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
           {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
+          {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
           {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
+          {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
+          {activeTab === 'invoices' && <InvoicesView 
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} 
+            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
+            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
+            enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} 
+            batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
+            qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} 
+            courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} 
+            accounts={filteredAccounts} 
+            currency={currentOrg?.currency || 'PHP'} 
+            onAddInvoice={handleAddInvoice} 
+            onUpdateInvoice={handleUpdateInvoice} 
+            onDeleteInvoice={handleDeleteInvoice} 
+            onVoidInvoice={handleVoidInvoice} 
+            onUpdateEnrollment={handleUpdateEnrollment}
+            onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
+          />}
+          {activeTab === 'payments' && <PaymentsView 
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} 
+            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
+            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} 
+            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
+            currency={currentOrg?.currency || 'PHP'} 
+            onAddPayment={handleAddPayment} 
+            onUpdatePayment={handleUpdatePayment} 
+            onDeletePayment={handleDeletePayment} 
+            onVoidPayment={handleVoidPayment}
+            onApplyToInvoice={handleApplyToInvoice}
+          />}
+            // ===== Payment Application Handler (APPL) =====
+            const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
+              // 1. Update Payment Application State
+              const payment = payments.find(p => p.id === paymentId);
+              const invoice = invoices.find(i => i.id === invoiceId);
+              if (!payment || !invoice) return;
+
+              // Add application to payment
+              const newApplication = {
+                id: `appl-${Date.now()}`,
+                paymentId,
+                invoiceId,
+                amountApplied: amount,
+                isReversed: false,
+                createdAt: new Date().toISOString()
+              };
+              const updatedPayment = {
+                ...payment,
+                applications: [...(payment.applications || []), newApplication],
+                totalApplied: (payment.totalApplied || 0) + amount,
+                customerDepositBalance: (payment.customerDepositBalance || 0) - amount
+              };
+              setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
+
+              // 2. Update Invoice Balance and Status
+              const newAmountPaid = (invoice.amountPaid || 0) + amount;
+              const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
+              const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
+              const updatedInvoice = {
+                ...invoice,
+                amountPaid: newAmountPaid,
+                balanceDue: newBalanceDue,
+                status: newStatus
+              };
+              setInvoices(prev => prev.map(i => i.id === invoiceId ? updatedInvoice : i));
+
+              // 3. Create GL Journal Entry for APPL
+              // Find account IDs
+              const coa = accounts.filter(a => a.orgId === currentOrgId);
+              const depositsAcct = coa.find(a => a.code === '2000');
+              const arAcct = coa.find(a => a.code === '1200');
+              if (depositsAcct && arAcct) {
+                const applEntry: Partial<JournalEntry> = {
+                  orgId: currentOrgId,
+                  periodId: invoice.periodId,
+                  date: new Date().toISOString().split('T')[0],
+                  description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+                  reference: `APPL-${invoice.invoiceNo}-${Date.now()}`,
+                  status: 'POSTED',
+                  sourceType: 'APPL',
+                  sourceRef: invoiceId,
+                  createdBy: currentUser?.id,
+                  createdAt: new Date().toISOString()
+                };
+                const applLines: JournalLine[] = [
+                  {
+                    id: `jl-${Date.now()}-1`,
+                    entryId: '', // will be set by handlePostJournal
+                    accountId: depositsAcct.id,
+                    debit: amount,
+                    credit: 0,
+                    description: 'Apply from Customer Deposits',
+                    createdAt: new Date().toISOString()
+                  },
+                  {
+                    id: `jl-${Date.now()}-2`,
+                    entryId: '',
+                    accountId: arAcct.id,
+                    debit: 0,
+                    credit: amount,
+                    description: 'Reduce Accounts Receivable',
+                    createdAt: new Date().toISOString()
+                  }
+                ];
+                await handlePostJournal(applEntry, applLines);
+              }
+            };
+          {activeTab === 'bank-deposits' && <BankDepositsView deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)} bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddDeposit={handleAddBankDeposit} onUpdateDeposit={handleUpdateBankDeposit} onDeleteDeposit={handleDeleteBankDeposit} onVoidDeposit={handleVoidBankDeposit} />}
           {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
           {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
           {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}
@@ -3087,7 +3556,7 @@ export default function App() {
               allData={{
                 organizations, users, students, qualifications, trainers, batches, sponsors,
                 vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
-                budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory: payments, payables, accountingPeriods,
+                budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
                 checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
                 stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
                 fixedAssets, bankAccounts, locations
