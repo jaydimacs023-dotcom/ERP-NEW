@@ -25,6 +25,45 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const exportToCSV = () => {
+    const headers = [
+      'Invoice Number',
+      'Description',
+      'Plan Type',
+      'Amount',
+      'Due Date',
+      'Paid Date',
+      'Status',
+      'Currency'
+    ];
+
+    const csvData = filteredPayments.map(payment => [
+      payment.invoiceNumber || 'N/A',
+      payment.description,
+      payment.planType,
+      payment.amount.toString(),
+      formatDate(payment.dueDate),
+      payment.paidDate ? formatDate(payment.paidDate) : 'Not Paid',
+      payment.status,
+      currency
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payment_history_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PAID': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -60,7 +99,10 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           </h2>
           <p className="text-sm text-gray-500 font-normal italic">Track subscription payments and manage billing.</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-md font-bold text-sm active:scale-95">
+        <button 
+          onClick={exportToCSV}
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-md font-bold text-sm active:scale-95"
+        >
           <Download size={18} /> Export Report
         </button>
       </div>
