@@ -751,14 +751,27 @@ const SummaryRow: React.FC<{ label: string, value: number, isHighlighted?: boole
   </div>
 );
 
-const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => (
-  <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-    <div className={`w-8 h-8 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center mb-2 no-print`}>
-      {icon}
+const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, color: string }> = ({ title, value, icon, color }) => {
+  const colorClasses: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-emerald-50 text-emerald-600',
+    red: 'bg-rose-50 text-rose-600',
+    orange: 'bg-orange-50 text-orange-600',
+    amber: 'bg-amber-50 text-amber-600',
+    gray: 'bg-gray-100 text-gray-600',
+    rose: 'bg-rose-50 text-rose-600',
+    emerald: 'bg-emerald-50 text-emerald-600'
+  };
+  const cls = colorClasses[color] || 'bg-gray-100 text-gray-600';
+  return (
+    <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+      <div className={`w-8 h-8 rounded ${cls} flex items-center justify-center mb-2 no-print`}>
+        {icon}
+      </div>
+      <div className="text-xs text-gray-500 mb-1">{title}</div>
+      <div className="text-lg font-semibold text-gray-900">{value}</div>
     </div>
-    <div className="text-xs text-gray-500 mb-1">{title}</div>
-    <div className="text-lg font-semibold text-gray-900">{value}</div>
-  </div>
-);
+  );
+};
 
 export default APView;
