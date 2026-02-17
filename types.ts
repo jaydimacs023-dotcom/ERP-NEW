@@ -130,8 +130,8 @@ export interface User extends BaseEntity {
   password?: string;
   role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'STUDENT' | 'TRAINER' | 'AP_SPECIALIST' | 'AR_SPECIALIST' | 'FINANCE_MANAGER' | 'PRESIDENT' | 'TREASURY' | 'AUDITOR' | 'AP_CLERK' | 'AP_SUPERVISOR';
   orgId: string;
-  studentId?: string; 
-  trainerId?: string; 
+  studentId?: string;
+  trainerId?: string;
   isEmailVerified?: boolean; // Added for email verification
 }
 
@@ -332,7 +332,7 @@ export type PayableStatus = 'for_approval' | 'approved' | 'paid' | 'partially_pa
 
 export type InvoiceType = 'standard' | 'prepayment' | 'credit_memo' | 'debit_memo';
 
-export type PaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_debit' | 'ewallet';
+export type PayablePaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_debit' | 'ewallet';
 
 export interface Payable extends BaseEntity {
   id: string;
@@ -375,7 +375,7 @@ export interface Payable extends BaseEntity {
   costCenterId?: string;
   paidAmount?: number;
   // Payment tracking
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: PayablePaymentMethod;
   paymentBankAccountId?: string;
   checkNumber?: string;
   checkDate?: string;
@@ -415,7 +415,7 @@ export interface BankAccount extends BaseEntity {
   bankName: string;
   accountNumber: string;
   type: 'SAVINGS' | 'CHECKING' | 'CREDIT' | 'CASH';
-  glAccountId: string; 
+  glAccountId: string;
   currency: string;
   balance: number;
   createdAt?: string;
@@ -666,7 +666,7 @@ export interface Invoice extends BaseEntity {
   invoiceDate: string;         // Invoice date
   dueDate: string;             // Payment due date
   status: InvoiceStatus;       // DRAFT, OPEN, CLOSED, VOIDED
-  
+
   // Amounts
   subtotal: number;            // Sum of line amounts before tax
   vatAmount: number;           // Total VAT amount
@@ -675,27 +675,27 @@ export interface Invoice extends BaseEntity {
   netAmountDue: number;        // Grand Total - EWT
   amountPaid: number;          // Payments received
   balanceDue: number;          // Net Amount Due - Amount Paid
-  
+
   // EWT Configuration
   ewtRate?: number;            // EWT rate applied (e.g., 0.02 for 2%)
   isSubjectToEwt: boolean;     // Whether invoice is subject to EWT
-  
+
   // Reference fields
   reference?: string;          // External reference number
   terms?: string;              // Payment terms
   notes?: string;              // Invoice notes/memo
   journalEntryId?: string;     // FK to JournalEntry when posted
-  
+
   // Audit
   postedBy?: string;
   postedAt?: string;
   voidedBy?: string;
   voidedAt?: string;
   voidReason?: string;
-  
+
   // Lines
   lines?: InvoiceLine[];
-  
+
   createdAt: string;
   createdBy?: string;
   updatedAt?: string;
@@ -727,22 +727,22 @@ export interface Payment extends BaseEntity {
   paymentDate: string;          // Date payment received
   status: PaymentStatus;        // DRAFT, POSTED, VOIDED
   paymentMethod: PaymentMethod; // CASH, CHECK, BANK_TRANSFER, etc.
-  
+
   // Reference fields
   refNo?: string;               // External reference (check #, transfer ref, etc.)
   bankAccountId?: string;       // FK to BankAccount (where deposited)
   checkNumber?: string;         // Check number if payment by check
   checkDate?: string;           // Check date
-  
+
   // Amounts
   amountReceived: number;       // Total amount received from payer
   ewtAmountCertified: number;   // EWT amount certified by sponsor (reduces receivable)
   totalApplied: number;         // Amount applied to invoices
   customerDepositBalance: number; // Remaining unapplied balance (prepayment pool)
-  
+
   // Applications
   applications?: PaymentApplication[];
-  
+
   // Audit
   notes?: string;
   journalEntryId?: string;      // FK to JournalEntry when posted
@@ -751,7 +751,7 @@ export interface Payment extends BaseEntity {
   voidedBy?: string;
   voidedAt?: string;
   voidReason?: string;
-  
+
   createdAt: string;
   createdBy?: string;
   updatedAt?: string;
@@ -780,27 +780,27 @@ export interface BankDeposit extends BaseEntity {
   referenceNo?: string;      // Bank reference / deposit slip number
   depositDate: string;       // Date of deposit
   status: BankDepositStatus; // DRAFT, POSTED, VOIDED
-  
+
   // Amounts
   totalAmount: number;       // Total deposit amount (sum of lines)
   cashAmount: number;        // Cash portion
   checkAmount: number;       // Check portion
-  
+
   // Lines
   lines?: BankDepositLine[];
-  
+
   // Journal entry linkage
   journalEntryId?: string;   // FK to JournalEntry when posted
-  
+
   // Posting info
   postedBy?: string;
   postedAt?: string;
-  
+
   // Void info
   voidedBy?: string;
   voidedAt?: string;
   voidReason?: string;
-  
+
   // Audit
   notes?: string;
   createdAt: string;
@@ -815,7 +815,7 @@ export interface ChartOfAccount extends BaseEntity {
   name: string;
   class: AccountClass;
   parentId?: string;
-  qualificationId?: string; 
+  qualificationId?: string;
   isActive: boolean;
   isHeader: boolean;
 }
@@ -890,19 +890,19 @@ export interface RecurringJournalEntry extends BaseEntity {
   templateEntry: Omit<JournalEntry, 'id' | 'orgId' | 'createdAt' | 'createdBy' | 'date' | 'reference'> & {
     lineTemplate: Omit<JournalLine, 'id' | 'journalEntryId'>[]
   };
-  
+
   // Execution tracking
   timesRun: number;
   maxRuns?: number; // Maximum number of executions
   runCount?: number; // Alias for timesRun
-  
+
   // Configuration
   autoPost: boolean; // Auto-post generated entries
   description_?: string; // Duplicate for description
   createdBy: string;
   createdAt: string;
   updatedAt?: string;
-  
+
   // Audit
   lastGeneratedEntryId?: string;
   nextScheduledRun?: string;
@@ -916,9 +916,9 @@ export interface JournalLine {
   credit: number;
   memo?: string;
   description?: string; // Alias for memo
-  contactId?: string; 
+  contactId?: string;
   contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
-  batchId?: string; 
+  batchId?: string;
   itemId?: string;
   assetId?: string;
   isCleared?: boolean;
@@ -1023,32 +1023,7 @@ export interface VendorTaxSetting extends BaseEntity {
   updatedAt?: string;
 }
 
-export interface ATCCategory extends BaseEntity {
-  id: string;
-  code: string; // 'A', 'B', 'C'
-  name: string; // Category name
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ATCItem extends BaseEntity {
-  id: string;
-  categoryId: string | number; // References atc_categories.id
-  atcCode: string; // e.g., 'WI010'
-  description: string;
-  taxpayerType?: 'Individual' | 'Corporation' | 'Both';
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface ATCRate extends BaseEntity {
-  id: string;
-  atcItemId: string | number; // References atc_items.id
-  rate: number; // e.g., 5.00 for 5%
-  rateLabel?: string; // e.g., '5%'
-  createdAt?: string;
-  updatedAt?: string;
-}
+// Duplicate ATC items removed - using definitions from lines 254-279
 
 // ============================================================================
 // ACCOUNTING PERIOD & CLOSING
@@ -1199,7 +1174,7 @@ export interface EFTBatch extends BaseEntity {
 // ENHANCED PERMISSIONS
 // ============================================================================
 
-export type Permission = 
+export type Permission =
   | 'ap:view' | 'ap:create' | 'ap:edit' | 'ap:delete' | 'ap:approve' | 'ap:pay' | 'ap:post'
   | 'ar:view' | 'ar:create' | 'ar:edit' | 'ar:delete' | 'ar:approve' | 'ar:receive'
   | 'gl:view' | 'gl:create' | 'gl:edit' | 'gl:post' | 'gl:reverse'
@@ -1350,13 +1325,57 @@ export interface RecurringBillHistory extends BaseEntity {
   createdAt: string;
 }
 
-// RecurringInvoiceStatus removed
+export type RecurringInvoiceStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 
-// RecurringInvoiceLineItem removed
+export interface RecurringInvoiceLineItem {
+  id?: string;
+  itemId: string;
+  description?: string;
+  quantity: number;
+  unitPrice: number;
+  discountAmount?: number;
+  taxAmount?: number;
+}
 
-// RecurringInvoice removed
+export interface RecurringInvoice extends BaseEntity {
+  id: string;
+  orgId: string;
+  customerId: string;
+  invoiceName: string;
+  description?: string;
+  amount: number;
+  currency?: string;
+  frequency: RecurrenceFrequency;
+  startDate: string;
+  endDate?: string;
+  nextInvoiceDate: string;
+  lastInvoiceDate?: string;
+  paymentTermsDays: number;
+  status: RecurringInvoiceStatus;
+  // Account mapping
+  arAccountId?: string;
+  revenueAccountId?: string;
+  // Configuration
+  autoCreateReceivable: boolean;
+  notes?: string;
+  // Tracking
+  totalInvoicesGenerated?: number;
+  lineItems?: RecurringInvoiceLineItem[];
+  createdAt: string;
+  updatedAt?: string;
+}
 
-// RecurringInvoiceHistory removed
+export interface RecurringInvoiceHistory extends BaseEntity {
+  id: string;
+  orgId: string;
+  recurringInvoiceId: string;
+  invoiceId?: string;
+  invoiceDate: string;
+  amount: number;
+  status: 'PENDING' | 'CREATED' | 'FAILED' | 'SKIPPED';
+  notes?: string;
+  createdAt: string;
+}
 
 // ============================================
 // Revenue Recognition & Deferred Revenue Types
@@ -1388,42 +1407,42 @@ export type RevenueScheduleStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELL
 export interface RevenueSchedule extends BaseEntity {
   id: string;
   orgId: string;
-  
+
   // Source reference (what generated this deferred revenue)
   sourceType: 'INVOICE' | 'RECEIVABLE' | 'MANUAL';
   sourceId?: string; // Link to AR invoice/receivable
   sourceReference?: string; // Invoice number or manual reference
-  
+
   // Customer/Student
   customerId: string;
   customerName?: string;
-  
+
   // Revenue details
   description: string;
   totalAmount: number; // Total amount to be recognized
   currency?: string;
-  
+
   // Recognition settings
   recognitionMethod: RecognitionMethod;
   recognitionPeriod?: RecognitionPeriod; // For straight-line
-  
+
   // Schedule dates
   startDate: string; // When recognition begins
   endDate: string; // When recognition ends
-  
+
   // Tracking
   recognizedAmount: number; // Amount recognized so far
   deferredBalance: number; // Remaining unrecognized amount
-  
+
   // GL Account mapping
   deferredRevenueAccountId: string; // Liability account (Deferred Revenue)
   revenueAccountId: string; // Revenue account (Earned Revenue)
-  
+
   // Status
   status: RevenueScheduleStatus;
   lastRecognitionDate?: string;
   nextRecognitionDate?: string;
-  
+
   // Audit
   createdBy?: string;
   createdAt: string;
@@ -1439,25 +1458,25 @@ export interface RevenueRecognitionEntry extends BaseEntity {
   id: string;
   orgId: string;
   scheduleId: string;
-  
+
   // Recognition details
   recognitionDate: string;
   periodStart: string;
   periodEnd: string;
   amount: number;
-  
+
   // GL posting
   journalEntryId?: string; // Link to posted journal entry
-  
+
   // Status
   status: 'PENDING' | 'POSTED' | 'REVERSED';
   postedDate?: string;
   postedBy?: string;
-  
+
   // For percentage-of-completion method
   percentageComplete?: number;
   milestone?: string;
-  
+
   // Audit
   createdAt: string;
   notes?: string;
@@ -1616,23 +1635,23 @@ export interface PagIBIGTable extends BaseEntity {
  */
 export interface ContributionCalculationResult {
   grossCompensation: number;
-  
+
   // SSS
   sssEmployeeShare: number;
   sssEmployerShare: number;
   sssMonthlySalaryCredit: number;
   sssBracketNumber?: number;
-  
+
   // PhilHealth
   philHealthEmployeeShare: number;
   philHealthEmployerShare: number;
   philHealthBasis: number; // Actual salary used for computation
-  
+
   // Pag-IBIG
   pagIBIGEmployeeShare: number;
   pagIBIGEmployerShare: number;
   pagIBIGTier: 1 | 2;
-  
+
   // Totals
   totalEmployeeContributions: number;
   totalEmployerContributions: number;
@@ -1646,7 +1665,7 @@ export interface ContributionCalculationResult {
 /**
  * Philippine DOLE Overtime Types with multipliers
  */
-export type OvertimeType = 
+export type OvertimeType =
   | 'REGULAR_OT'           // Regular day overtime (after 8 hrs)
   | 'REST_DAY'             // Rest day work
   | 'REST_DAY_OT'          // Rest day overtime
@@ -1699,7 +1718,7 @@ export interface OvertimeEntry extends BaseEntity {
 // LEAVE MANAGEMENT TYPES
 // ============================================================================
 
-export type LeaveType = 
+export type LeaveType =
   | 'VACATION'
   | 'SICK'
   | 'MATERNITY'
@@ -1803,23 +1822,23 @@ export interface ThirteenthMonthPay extends BaseEntity {
   orgId: string;
   employeeId: string;
   year: number;
-  
+
   // Calculation details
   totalBasicSalaryEarned: number; // Total basic pay for the year
   monthsWorked: number;
   averageMonthlyBasic: number;
   thirteenthMonthAmount: number;
-  
+
   // Payment details
   paymentDate?: string;
   payrollRunId?: string;
   status: 'CALCULATED' | 'APPROVED' | 'PAID';
-  
+
   // For separated employees
   isSeparated: boolean;
   separationDate?: string;
   proRatedDays?: number;
-  
+
   // Tax treatment
   taxExemptPortion: number; // First ₱90,000 is tax-exempt
   taxablePortion: number;
@@ -1831,7 +1850,7 @@ export interface ThirteenthMonthPay extends BaseEntity {
 // SEPARATION PAY TYPES
 // ============================================================================
 
-export type SeparationType = 
+export type SeparationType =
   | 'RESIGNATION'          // Voluntary resignation
   | 'RETIREMENT'           // Retirement (age or years of service)
   | 'REDUNDANCY'           // Position abolished
@@ -1851,45 +1870,45 @@ export interface SeparationPay extends BaseEntity {
   id: string;
   orgId: string;
   employeeId: string;
-  
+
   // Separation details
   separationType: SeparationType;
   separationDate: string;
   lastWorkingDay: string;
-  
+
   // Service computation
   hireDate: string;
   yearsOfService: number;
   monthsOfService: number;
-  
+
   // Pay components
   lastMonthlyBasic: number;
   lastDailyRate: number;
-  
+
   // Separation pay calculation
   separationPayRate: number; // e.g., 0.5 for half month per year
   separationPayBase: 'MONTHLY' | 'DAILY';
   separationPayAmount: number;
-  
+
   // Other final pay components
   finalBasicPay: number; // Pro-rated pay for last period
   leaveConversion: number; // Unused leave converted to cash
   thirteenthMonthProRated: number;
   otherBenefits: number;
-  
+
   // Deductions
   outstandingLoans: number;
   otherDeductions: number;
-  
+
   // Totals
   grossFinalPay: number;
   totalDeductions: number;
   netFinalPay: number;
-  
+
   // Tax
   taxableAmount: number;
   withholdingTax: number;
-  
+
   // Processing
   status: 'DRAFT' | 'CALCULATED' | 'APPROVED' | 'PAID';
   processedBy?: string;
@@ -1913,7 +1932,7 @@ export interface WorkSchedule extends BaseEntity {
   orgId: string;
   name: string; // e.g., "Regular 8-5", "Night Shift"
   description?: string;
-  
+
   // Daily schedule
   workDays: number[]; // 0=Sunday, 1=Monday, etc.
   startTime: string; // HH:mm format
@@ -1921,18 +1940,18 @@ export interface WorkSchedule extends BaseEntity {
   breakStartTime?: string;
   breakEndTime?: string;
   breakDurationMinutes: number;
-  
+
   // Calculations
   regularHoursPerDay: number;
   regularHoursPerWeek: number;
-  
+
   // Grace period
   gracePeriodMinutes: number;
-  
+
   // Night differential window
   nightDiffStart: string; // Default: "22:00"
   nightDiffEnd: string;   // Default: "06:00"
-  
+
   isDefault: boolean;
   isActive: boolean;
 }
@@ -1946,30 +1965,30 @@ export interface TimeEntry extends BaseEntity {
   employeeId: string;
   scheduleId?: string;
   date: string;
-  
+
   // Clock times
   clockIn?: string;
   clockOut?: string;
   breakStart?: string;
   breakEnd?: string;
-  
+
   // Computed hours
   regularHours: number;
   overtimeHours: number;
   nightDiffHours: number;
   undertimeMinutes: number;
   tardyMinutes: number;
-  
+
   // Status
   status: AttendanceStatus;
   isManualEntry: boolean;
   adjustedBy?: string;
   adjustmentReason?: string;
-  
+
   // Location (for field employees)
   clockInLocation?: { lat: number; lng: number; address?: string };
   clockOutLocation?: { lat: number; lng: number; address?: string };
-  
+
   // Approval
   approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
   approvedBy?: string;
@@ -1983,21 +2002,21 @@ export interface AttendanceSummary {
   employeeId: string;
   periodStart: string;
   periodEnd: string;
-  
+
   // Days
   workDays: number;
   daysPresent: number;
   daysAbsent: number;
   daysOnLeave: number;
   daysHoliday: number;
-  
+
   // Hours
   totalRegularHours: number;
   totalOvertimeHours: number;
   totalNightDiffHours: number;
   totalUndertimeMinutes: number;
   totalTardyMinutes: number;
-  
+
   // Deductions
   undertimeDeduction: number;
   tardinessDeduction: number;
@@ -2022,7 +2041,7 @@ export interface HolidayCalendar extends BaseEntity {
 // BIR REPORT TYPES
 // ============================================================================
 
-export type BIRFormType = 
+export type BIRFormType =
   | 'ALPHALIST'        // Annual list of employees and compensation
   | 'BIR_2316'         // Certificate of Compensation Payment/Tax Withheld
   | 'BIR_1601_C'       // Monthly Remittance Return of Income Taxes Withheld
@@ -2040,43 +2059,43 @@ export interface AlphalistEntry extends BaseEntity {
   year: number;
   quarter?: 1 | 2 | 3 | 4;
   employeeId: string;
-  
+
   // Employee info
   tin: string;
   lastName: string;
   firstName: string;
   middleName?: string;
-  
+
   // Employment info
   employmentStatus: 'R' | 'C' | 'S'; // Regular, Contractual, Seasonal
   startDate: string;
   terminationDate?: string;
   reasonForTermination?: string;
-  
+
   // Compensation
   grossCompensation: number;
-  
+
   // Non-taxable income
   thirteenthMonthPay: number;
   deMinimis: number;
   otherNonTaxable: number;
   totalNonTaxable: number;
-  
+
   // Taxable income
   taxableCompensation: number;
-  
+
   // Statutory contributions (employee share)
   sssContributions: number;
   philHealthContributions: number;
   pagIBIGContributions: number;
   unionDues: number;
   totalContributions: number;
-  
+
   // Tax withheld
   taxWithheld: number;
   taxDue: number;
   adjustment: number; // Over/under withholding adjustment
-  
+
   // Substituted filing
   qualifiesForSubstitutedFiling: boolean;
 }
@@ -2089,28 +2108,28 @@ export interface BIR2316Data extends BaseEntity {
   orgId: string;
   year: number;
   employeeId: string;
-  
+
   // Employer info
   employerTIN: string;
   employerName: string;
   employerAddress: string;
-  
+
   // Employee info
   employeeTIN: string;
   employeeName: string;
   employeeAddress: string;
   birthDate: string;
   zipCode: string;
-  
+
   // Employment period
   periodFrom: string;
   periodTo: string;
-  
+
   // Gross compensation
   grossCompensationPresent: number;
   grossCompensationPrevious: number;
   grossCompensationTotal: number;
-  
+
   // Non-taxable compensation
   basicSMW: number; // Statutory Minimum Wage
   holidayOT: number;
@@ -2121,21 +2140,21 @@ export interface BIR2316Data extends BaseEntity {
   sssPhilPag: number;
   otherNonTaxable: number;
   totalNonTaxable: number;
-  
+
   // Taxable compensation
   taxableCompensationPresent: number;
   taxableCompensationPrevious: number;
   taxableCompensationTotal: number;
-  
+
   // Tax withheld
   taxWithheldPresent: number;
   taxWithheldPrevious: number;
   taxWithheldTotal: number;
-  
+
   // Tax computation
   taxDue: number;
   taxWithheldAdjusted: number;
-  
+
   status: 'DRAFT' | 'GENERATED' | 'SIGNED' | 'SUBMITTED';
   generatedAt?: string;
   signedAt?: string;
@@ -2149,34 +2168,34 @@ export interface BIR1601CData extends BaseEntity {
   orgId: string;
   year: number;
   month: number; // 1-12
-  
+
   // Employer info
   tin: string;
   rdoCode: string;
   employerName: string;
   registeredAddress: string;
-  
+
   // Compensation summary
   totalEmployees: number;
   totalCompensation: number;
-  
+
   // Statutory contributions
   sssTotal: number;
   philHealthTotal: number;
   pagIBIGTotal: number;
-  
+
   // Tax computation
   taxableCompensation: number;
   taxWithheld: number;
   adjustments: number;
   taxRemittable: number;
-  
+
   // Payment
   surcharge?: number;
   interest?: number;
   compromise?: number;
   totalAmountDue: number;
-  
+
   status: 'DRAFT' | 'GENERATED' | 'FILED' | 'PAID';
   filedAt?: string;
   paidAt?: string;

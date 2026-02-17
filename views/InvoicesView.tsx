@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger } from '../types';
 import { generateUUID } from '../utils/uuid';
-import { 
-  FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye, 
-  Building2, User, Calendar, DollarSign, Percent, CheckCircle, 
+import {
+  FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
+  Building2, User, Calendar, DollarSign, Percent, CheckCircle,
   Clock, XCircle, AlertTriangle, Receipt, Download, Printer,
-  ChevronDown, ChevronUp, MoreVertical, Send, Ban, Wand2, Users, 
+  ChevronDown, ChevronUp, MoreVertical, Send, Ban, Wand2, Users,
   GraduationCap, CheckSquare, Square
 } from 'lucide-react';
 
@@ -30,7 +30,7 @@ interface InvoicesViewProps {
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
   invoices, sponsors, students, enrollments, batches, qualifications, courseFees, accounts, currency,
-  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment
+  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -58,7 +58,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       } : null;
     }).filter(Boolean);
   }, [showViewModal, viewingInvoice, enrollments, students, qualifications]);
-  
+
   // Generate from Enrollments state
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>('');
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<Set<string>>(new Set());
@@ -189,6 +189,46 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     });
   };
 
+  // Handle batch change - auto-fill sponsor, quantity, and line items
+  const handleBatchChange = (batchId: string) => {
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) {
+      setFormData(prev => ({ ...prev, batchId: '', lines: [] }));
+      return;
+    }
+
+    const sponsorId = batch.sponsorId || '';
+    const qualificationFees = courseFees.filter(f => f.qualificationId === batch.qualificationId && f.isActive && !f.isDeleted);
+
+    // Count students from enrollments
+    const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
+    const studentCount = batchEnrollments.length || batch.studentIds?.length || 0;
+
+    const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => ({
+      id: generateUUID(),
+      invoiceId: editingInvoice?.id || '',
+      lineNumber: idx + 1,
+      description: fee.feeName,
+      courseFeeId: fee.id,
+      quantity: studentCount,
+      unitPrice: fee.amount || 0,
+      amount: studentCount * (fee.amount || 0),
+      glAccountId: fee.glAccountId
+    }));
+
+    setFormData(prev => {
+      const sponsor = sponsors.find(s => s.id === sponsorId);
+      return {
+        ...prev,
+        batchId,
+        sponsorId: sponsorId || prev.sponsorId,
+        isSubjectToEwt: sponsor?.ewtRate ? true : prev.isSubjectToEwt,
+        ewtRate: sponsor?.ewtRate || prev.ewtRate,
+        lines: newLines
+      };
+    });
+  };
+
   // Add line
   const handleAddLine = () => {
     const newLine: InvoiceLine = {
@@ -250,7 +290,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
 
     const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate);
-    
+
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
       orgId: editingInvoice?.orgId || '',
@@ -352,7 +392,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // Filter invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
-      const matchesSearch = 
+      const matchesSearch =
         inv.invoiceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -395,12 +435,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
 
   // Revenue accounts for line items
-  const revenueAccounts = useMemo(() => 
+  const revenueAccounts = useMemo(() =>
     accounts.filter(a => a.class === AccountClass.REVENUE && !a.isHeader && a.isActive),
     [accounts]
   );
 
-  const formTotals = useMemo(() => 
+  const formTotals = useMemo(() =>
     calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate),
     [formData.lines, formData.isSubjectToEwt, formData.ewtRate]
   );
@@ -408,11 +448,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // ============================================
   // GENERATE FROM ENROLLMENTS LOGIC
   // ============================================
-  
+
   // Get unbilled enrollments grouped by sponsor
   const unbilledEnrollmentsBySponsor = useMemo(() => {
     const grouped = new Map<string, Enrollment[]>();
-    
+
     enrollments
       .filter(e => !e.isDeleted && e.billingStatus === 'UNBILLED' && e.sponsorId)
       .forEach(e => {
@@ -422,7 +462,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         }
         grouped.get(sponsorId)!.push(e);
       });
-    
+
     return grouped;
   }, [enrollments]);
 
@@ -468,10 +508,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     enrollmentsByBatch.forEach((batchEnrollments, batchId) => {
       const batch = batches.find(b => b.id === batchId);
       const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
-      
+
       // Find primary course fee for this qualification
       const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive && !cf.isDeleted);
-      
+
       // If no specific course fee, use enrollment totalFees
       const unitPrice = courseFee?.amount || (batchEnrollments[0]?.totalFees || 0);
       const quantity = batchEnrollments.length;
@@ -479,7 +519,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const vatAmount = isVat ? amount * 0.12 : 0;
       const isEwtSubject = courseFee?.isSubjectToEwt || false;
 
-      const description = qualification 
+      const description = qualification
         ? `${qualification.name} - ${batch?.batchCode || 'Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`
         : `Training Fee - ${batch?.batchCode || 'Unknown Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`;
 
@@ -630,7 +670,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               <Wand2 size={18} />
               Generate from Enrollments
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 rounded-full">
-                {Array.from(unbilledEnrollmentsBySponsor.values()).reduce((sum, arr) => sum + arr.length, 0)}
+                {Array.from(unbilledEnrollmentsBySponsor.values()).reduce((sum: number, arr) => sum + (arr as any[]).length, 0)}
               </span>
             </button>
           )}
@@ -763,7 +803,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             ) : (
               filteredInvoices.map(inv => (
                 <React.Fragment key={inv.id}>
-                  <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleRow(inv.id)}>
+                  <tr
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => toggleRow(inv.id)}
+                    onDoubleClick={() => handleEdit(inv)}
+                    title="Double-click to edit"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {expandedRows.has(inv.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -791,11 +836,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         </button>
                         {inv.status === 'DRAFT' && (
                           <>
-                            <button onClick={() => handleEdit(inv)} className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded" title="Edit">
-                              <Edit3 size={16} />
-                            </button>
-                            <button onClick={() => handlePost(inv)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Post">
-                              <Send size={16} />
+                            <button onClick={() => handlePost(inv)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Approve">
+                              <CheckCircle size={16} />
                             </button>
                             <button onClick={() => onDeleteInvoice(inv.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Delete">
                               <Trash2 size={16} />
@@ -803,9 +845,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           </>
                         )}
                         {inv.status === 'OPEN' && (
-                          <button 
-                            onClick={() => { setVoidingInvoice(inv); setShowVoidModal(true); }} 
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" 
+                          <button
+                            onClick={() => { setVoidingInvoice(inv); setShowVoidModal(true); }}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
                             title="Void"
                           >
                             <Ban size={16} />
@@ -862,52 +904,63 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Header fields */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Invoice No</label>
-                  <input
-                    type="text"
-                    value={formData.invoiceNo}
-                    onChange={e => setFormData({ ...formData, invoiceNo: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
-                  <input
-                    type="date"
-                    value={formData.invoiceDate}
-                    onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Due Date *</label>
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Reference</label>
-                  <input
-                    type="text"
-                    value={formData.reference}
-                    onChange={e => setFormData({ ...formData, reference: e.target.value })}
-                    placeholder="External ref"
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  />
+              {/* Prerequisite: Batch Selection */}
+              <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-bold text-orange-800 flex items-center gap-2">
+                      <Plus size={16} /> Step 1: Select Batch (Prerequisite)
+                    </label>
+                    <select
+                      value={formData.batchId}
+                      onChange={e => handleBatchChange(e.target.value)}
+                      className="w-full mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200"
+                    >
+                      <option value="">-- Select Batch --</option>
+                      {batches.map(b => (
+                        <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items.</p>
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
+                        <input
+                          type="date"
+                          value={formData.invoiceDate}
+                          onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
+                          className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500">Due Date *</label>
+                        <input
+                          type="date"
+                          value={formData.dueDate}
+                          onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                          className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Bill To */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Invoice No</label>
+                  <input
+                    type="text"
+                    value={formData.invoiceNo}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 font-medium"
+                    readOnly
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Sponsor</label>
                   <select
@@ -922,7 +975,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500">Or Student</label>
+                  <label className="text-xs font-medium text-gray-500">Reference</label>
+                  <input
+                    type="text"
+                    value={formData.reference}
+                    onChange={e => setFormData({ ...formData, reference: e.target.value })}
+                    placeholder="External ref"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
+              </div>
+
+              {/* Individual Student Option */}
+              {!formData.batchId && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Or Select Student (Individual Billing)</label>
                   <select
                     value={formData.studentId}
                     onChange={e => setFormData({ ...formData, studentId: e.target.value })}
@@ -935,20 +1002,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Batch (optional)</label>
-                  <select
-                    value={formData.batchId}
-                    onChange={e => setFormData({ ...formData, batchId: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  >
-                    <option value="">-- Select Batch --</option>
-                    {batches.map(b => (
-                      <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              )}
 
               {/* EWT Configuration */}
               <div className="bg-purple-50 rounded-lg p-4">
@@ -991,7 +1045,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <Plus size={16} /> Add Line
                   </button>
                 </div>
-                
+
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
@@ -1352,8 +1406,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <p className="text-sm text-gray-500">Select unbilled enrollments to create a draft invoice</p>
                 </div>
               </div>
-              <button 
-                onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }} 
+              <button
+                onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }}
                 className="p-1 hover:bg-gray-200 rounded"
               >
                 <X size={20} />
@@ -1370,9 +1424,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </label>
                 <select
                   value={selectedSponsorId}
-                  onChange={e => { 
-                    setSelectedSponsorId(e.target.value); 
-                    setSelectedEnrollmentIds(new Set()); 
+                  onChange={e => {
+                    setSelectedSponsorId(e.target.value);
+                    setSelectedEnrollmentIds(new Set());
                   }}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
                 >
@@ -1380,7 +1434,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   {sponsorsWithUnbilledEnrollments.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({unbilledEnrollmentsBySponsor.get(s.id)?.length || 0} unbilled)
-                      {s.taxType === 'VAT' ? ' - VAT' : ''} 
+                      {s.taxType === 'VAT' ? ' - VAT' : ''}
                       {s.ewtRate ? ` - EWT ${(s.ewtRate * 100).toFixed(0)}%` : ''}
                     </option>
                   ))}
@@ -1419,8 +1473,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <Calendar size={16} className="text-gray-400" />
                       Invoice Date
                     </label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={generateInvoiceDate}
                       onChange={e => setGenerateInvoiceDate(e.target.value)}
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
@@ -1431,8 +1485,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <Calendar size={16} className="text-gray-400" />
                       Due Date
                     </label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={generateDueDate}
                       onChange={e => setGenerateDueDate(e.target.value)}
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
@@ -1464,14 +1518,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       )}
                     </button>
                   </div>
-                  
+
                   <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left w-10">
                             <button onClick={toggleAllEnrollments}>
-                              {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length 
+                              {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length
                                 ? <CheckSquare size={18} className="text-purple-600" />
                                 : <Square size={18} className="text-gray-400" />
                               }
@@ -1491,15 +1545,15 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive);
                           const feeAmount = courseFee?.amount || enrollment.totalFees || 0;
                           const isSelected = selectedEnrollmentIds.has(enrollment.id);
-                          
+
                           return (
-                            <tr 
+                            <tr
                               key={enrollment.id}
                               className={`cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-purple-50' : ''}`}
                               onClick={() => toggleEnrollmentSelection(enrollment.id)}
                             >
                               <td className="px-3 py-2">
-                                {isSelected 
+                                {isSelected
                                   ? <CheckSquare size={18} className="text-purple-600" />
                                   : <Square size={18} className="text-gray-400" />
                                 }
@@ -1530,7 +1584,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <Receipt size={16} />
                     Invoice Preview
                   </h4>
-                  
+
                   {/* Preview Line Items */}
                   <div className="mb-4 space-y-2">
                     {generatePreviewTotals.lineItems.map((item, idx) => (

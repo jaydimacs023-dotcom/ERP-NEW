@@ -1,12 +1,13 @@
 
-import { 
-  Organization, User, Student, Qualification, Trainer, Batch, 
-  Sponsor, NonStockItem, Vendor, BankAccount, Location, 
+import {
+  Organization, User, Student, Qualification, Trainer, Batch,
+  Sponsor, NonStockItem, Vendor, BankAccount, Location,
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
   JournalEntry, JournalLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
-  RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill
+  RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
+  CourseFee
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -72,56 +73,57 @@ export interface InitialData {
   inventoryTransactions: InventoryTransaction[];
   stockAdjustments: StockAdjustment[];
   reorderPoints: ReorderPoint[];
+  courseFees: CourseFee[];
 }
 
 export interface IDataService {
   getInitialData(): Promise<InitialData>;
-  
+
   // Organization CRUD
   createOrganization(org: Organization): Promise<Organization>;
   updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization>;
   deleteOrganization(id: string): Promise<void>;
-  
+
   // User CRUD
   createUser(user: User): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   deleteUser(id: string): Promise<void>;
-  
+
   // Student CRUD
   createStudent(student: Student): Promise<Student>;
   updateStudent(id: string, updates: Partial<Student>): Promise<Student>;
   deleteStudent(id: string): Promise<void>;
   checkStudentUsage(studentId: string): Promise<{ isUsed: boolean; usedIn: string[] }>;
-  
+
   // Trainer CRUD
   createTrainer(trainer: Trainer): Promise<Trainer>;
   updateTrainer(id: string, updates: Partial<Trainer>): Promise<Trainer>;
   deleteTrainer(id: string): Promise<void>;
   checkTrainerUsage(trainerId: string): Promise<TrainerUsageCheck>;
-  
+
   // Qualification CRUD
   createQualification(qualification: Qualification): Promise<Qualification>;
   updateQualification(id: string, updates: Partial<Qualification>): Promise<Qualification>;
   deleteQualification(id: string): Promise<void>;
   checkQualificationUsage(qualificationId: string): Promise<QualificationUsageCheck>;
-  
+
   // Batch CRUD
   createBatch(batch: Batch): Promise<Batch>;
   updateBatch(id: string, updates: Partial<Batch>): Promise<Batch>;
   deleteBatch(id: string): Promise<void>;
-  
+
   // Location CRUD
   createLocation(location: Location): Promise<Location>;
   updateLocation(id: string, updates: Partial<Location>): Promise<Location>;
   deleteLocation(id: string): Promise<void>;
   checkLocationUsage(locationId: string): Promise<LocationUsageCheck>;
-  
+
   // Schedule CRUD
   createSchedule(schedule: TrainerSchedule): Promise<TrainerSchedule>;
   updateSchedule(id: string, updates: Partial<TrainerSchedule>): Promise<TrainerSchedule>;
   deleteSchedule(id: string): Promise<void>;
   checkScheduleUsage(scheduleId: string): Promise<ScheduleUsageCheck>;
-  
+
   // Sponsor CRUD
   createSponsor(sponsor: Sponsor): Promise<Sponsor>;
   updateSponsor(id: string, updates: Partial<Sponsor>): Promise<Sponsor>;
@@ -153,7 +155,7 @@ export interface IDataService {
   deleteRecurringInvoice(id: string): Promise<void>;
   getRecurringInvoicesByOrg(orgId: string): Promise<RecurringInvoice[]>;
   getRecurringInvoiceById(id: string): Promise<RecurringInvoice | null>;
-  
+
   // Fixed Asset CRUD
   createFixedAsset(asset: FixedAsset): Promise<FixedAsset>;
   updateFixedAsset(id: string, updates: Partial<FixedAsset>): Promise<FixedAsset>;
@@ -163,6 +165,12 @@ export interface IDataService {
   createItem(item: NonStockItem): Promise<NonStockItem>;
   updateItem(id: string, updates: Partial<NonStockItem>): Promise<NonStockItem>;
   deleteItem(id: string): Promise<void>;
+
+  // Course Fee CRUD
+  createCourseFee(fee: CourseFee): Promise<CourseFee>;
+  updateCourseFee(id: string, updates: Partial<CourseFee>): Promise<CourseFee>;
+  deleteCourseFee(id: string): Promise<void>;
+  getCourseFeesByOrg(orgId: string): Promise<CourseFee[]>;
 
   // Vendor CRUD
   createVendor(vendor: Vendor): Promise<Vendor>;
@@ -184,7 +192,7 @@ export interface IDataService {
   updateCheckVoucher(id: string, updates: Partial<CheckVoucher>): Promise<CheckVoucher>;
   deleteCheckVoucher(id: string): Promise<void>;
   getNextCheckNumber(orgId: string, bankAccountId: string): Promise<string>;
-  
+
   // Exchange Rate CRUD
   createExchangeRate(rate: ExchangeRate): Promise<ExchangeRate>;
   updateExchangeRate(id: string, updates: Partial<ExchangeRate>): Promise<ExchangeRate>;
@@ -333,7 +341,7 @@ export interface IDataService {
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;
   updateEntity<T>(table: string, id: string, updates: Partial<T>): Promise<T>;
   deleteEntity(table: string, id: string): Promise<void>;
-  
+
   // Archive / Restore / Permanent Delete
   archiveEntity(table: string, id: string, userId: string): Promise<void>;
   restoreEntity(table: string, id: string): Promise<void>;

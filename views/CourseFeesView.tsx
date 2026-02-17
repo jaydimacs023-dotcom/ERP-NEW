@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount, TaxType } from '../types';
 import { generateUUID } from '../utils/uuid';
-import { 
+import {
   Search, Plus, DollarSign, Trash2, X, BookOpen, GraduationCap,
   Filter, Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
-  Percent, Hash, Tag, ToggleLeft, ToggleRight, FileText, Layers
+  Percent, Hash, Tag, ToggleLeft, ToggleRight, FileText, Layers, Copy
 } from 'lucide-react';
 
 interface Toast {
@@ -32,8 +32,8 @@ const CATEGORY_OPTIONS: { value: CourseFeeCategory; label: string; color: string
   { value: 'MISCELLANEOUS', label: 'Miscellaneous', color: 'bg-gray-100 text-gray-700' },
 ];
 
-const CourseFeesView: React.FC<CourseFeesViewProps> = ({ 
-  courseFees, qualifications, accounts, currency = 'PHP', onAddCourseFee, onUpdateCourseFee, onDeleteCourseFee 
+const CourseFeesView: React.FC<CourseFeesViewProps> = ({
+  courseFees, qualifications, accounts, currency = 'PHP', onAddCourseFee, onUpdateCourseFee, onDeleteCourseFee
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterQualification, setFilterQualification] = useState<string>('');
@@ -43,6 +43,29 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Bulk creation state
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const emptyBulkRow = (): Partial<CourseFee> & { _key: string } => ({
+    _key: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    feeCode: '',
+    qualificationId: '',
+    feeName: '',
+    amount: 0,
+    glAccountId: '',
+    category: undefined,
+    description: '',
+    isSubjectToEwt: false,
+    ewtRate: undefined,
+    isActive: true,
+  });
+  const [bulkRows, setBulkRows] = useState<(Partial<CourseFee> & { _key: string })[]>([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
+  const [bulkDefaults, setBulkDefaults] = useState<{ qualificationId: string; glAccountId: string; category: CourseFeeCategory | '' }>({
+    qualificationId: '',
+    glAccountId: '',
+    category: '',
+  });
 
   const [formData, setFormData] = useState<Partial<CourseFee>>({
     feeCode: '',
@@ -61,31 +84,31 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const filteredFees = useMemo(() => {
     return courseFees.filter(f => {
       if (f.isDeleted) return false;
-      
-      const matchesSearch = 
+
+      const matchesSearch =
         f.feeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         f.feeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (f.description?.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+
       const matchesQualification = !filterQualification || f.qualificationId === filterQualification;
       const matchesCategory = !filterCategory || f.category === filterCategory;
-      
+
       return matchesSearch && matchesQualification && matchesCategory;
     });
   }, [courseFees, searchTerm, filterQualification, filterCategory]);
 
-  const revenueAccounts = useMemo(() => 
+  const revenueAccounts = useMemo(() =>
     accounts.filter(a => a.class === 'REVENUE' && !a.isHeader && a.isActive !== false),
     [accounts]
   );
 
   const resetForm = () => {
-    setFormData({ 
-      feeCode: '', 
-      qualificationId: '', 
-      feeName: '', 
-      amount: 0, 
-      glAccountId: '', 
+    setFormData({
+      feeCode: '',
+      qualificationId: '',
+      feeName: '',
+      amount: 0,
+      glAccountId: '',
       taxCategoryId: '',
       isSubjectToEwt: false,
       ewtRate: undefined,
@@ -94,6 +117,93 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       isActive: true
     });
     setEditingFee(null);
+  };
+
+  // Bulk creation helpers
+  const addBulkRow = () => setBulkRows(prev => [...prev, emptyBulkRow()]);
+  const removeBulkRow = (key: string) => setBulkRows(prev => prev.length > 1 ? prev.filter(r => r._key !== key) : prev);
+  const updateBulkRow = (key: string, field: string, value: any) => {
+    setBulkRows(prev => prev.map(r => r._key === key ? { ...r, [field]: value } : r));
+  };
+  const applyDefaultsToAll = () => {
+    setBulkRows(prev => prev.map(r => ({
+      ...r,
+      qualificationId: bulkDefaults.qualificationId || r.qualificationId,
+      glAccountId: bulkDefaults.glAccountId || r.glAccountId,
+      category: (bulkDefaults.category || r.category) as CourseFeeCategory | undefined,
+    })));
+    showToast('Defaults applied to all rows', 'info');
+  };
+
+  const openBulkModal = () => {
+    setBulkRows([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
+    setBulkDefaults({ qualificationId: '', glAccountId: '', category: '' });
+    setShowBulkModal(true);
+  };
+
+  const handleBulkSubmit = async () => {
+    const validRows = bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId);
+    if (validRows.length === 0) {
+      showToast('Please fill in at least one complete row (Name, Course, GL Account required).', 'error');
+      return;
+    }
+
+    setIsBulkSubmitting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Track fee code counters per qualification to avoid duplicates
+    const qualCounters: Record<string, number> = {};
+    const getNextFeeCode = (qualificationId: string): string => {
+      const qual = qualifications.find(q => q.id === qualificationId);
+      const prefix = qual?.code?.substring(0, 3).toUpperCase() || 'FEE';
+      const existingCount = courseFees.filter(f => f.qualificationId === qualificationId).length;
+      if (!qualCounters[qualificationId]) {
+        qualCounters[qualificationId] = existingCount;
+      }
+      qualCounters[qualificationId]++;
+      return `${prefix}-FEE-${String(qualCounters[qualificationId]).padStart(3, '0')}`;
+    };
+
+    try {
+      for (const row of validRows) {
+        try {
+          const newFee: CourseFee = {
+            id: generateUUID(),
+            orgId: '',
+            feeCode: row.feeCode || getNextFeeCode(row.qualificationId!),
+            qualificationId: row.qualificationId!,
+            feeName: row.feeName!,
+            amount: Number(row.amount) || 0,
+            glAccountId: row.glAccountId!,
+            taxCategoryId: row.taxCategoryId,
+            isSubjectToEwt: row.isSubjectToEwt || false,
+            ewtRate: row.isSubjectToEwt ? row.ewtRate : undefined,
+            category: row.category as CourseFeeCategory | undefined,
+            description: row.description,
+            isActive: row.isActive ?? true,
+            createdAt: new Date().toISOString(),
+          };
+          await onAddCourseFee(newFee);
+          successCount++;
+        } catch {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        showToast(`Successfully created ${successCount} course fee${successCount > 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}.`, errorCount > 0 ? 'info' : 'success');
+      }
+      if (errorCount > 0 && successCount === 0) {
+        showToast(`Failed to create any course fees. Please check your data.`, 'error');
+      }
+
+      setShowBulkModal(false);
+    } catch (error) {
+      showToast(`Bulk creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setIsBulkSubmitting(false);
+    }
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -117,7 +227,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     if (!formData.feeName || !formData.qualificationId || !formData.glAccountId) return;
 
     setIsSubmitting(true);
-    
+
     try {
       if (editingFee) {
         const updatedFee: CourseFee = {
@@ -157,7 +267,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
         await onAddCourseFee(newFee);
         showToast(`Course fee "${newFee.feeName}" created successfully!`, 'success');
       }
-      
+
       setShowModal(false);
       resetForm();
     } catch (error) {
@@ -170,10 +280,10 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this course fee?')) return;
-    
+
     const feeToDelete = courseFees.find(f => f.id === id);
     const feeName = feeToDelete?.feeName || 'Unknown';
-    
+
     setDeletingId(id);
     try {
       const result = await onDeleteCourseFee(id);
@@ -208,10 +318,10 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', { 
-      style: 'currency', 
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
       currency: currency,
-      minimumFractionDigits: 2 
+      minimumFractionDigits: 2
     }).format(amount);
   };
 
@@ -250,12 +360,20 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Course Fees Catalog</h2>
           <p className="text-sm text-gray-500 font-normal italic">Manage fee structures linked to qualifications and courses.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
-        >
-          <Plus size={18} /> New Course Fee
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openBulkModal}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-[#F47721] border border-[#F47721] rounded hover:bg-orange-50 transition-all font-medium text-sm active:scale-95"
+          >
+            <Copy size={16} /> Bulk Create
+          </button>
+          <button
+            onClick={() => { resetForm(); setShowModal(true); }}
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+          >
+            <Plus size={18} /> New Course Fee
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -282,9 +400,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name, code, description..." 
+          <input
+            type="text"
+            placeholder="Search by name, code, description..."
             className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -386,14 +504,14 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </td>
                 <td className="px-6 py-5 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <button 
+                    <button
                       onClick={() => openEditModal(fee)}
                       disabled={deletingId === fee.id}
                       className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
                     >
                       <Edit2 size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDelete(fee.id)}
                       disabled={deletingId === fee.id}
                       className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -429,14 +547,14 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 {/* Course Selection */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Course / Qualification *</label>
-                  <select 
+                  <select
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
                     value={formData.qualificationId || ''}
                     onChange={e => {
                       const qualId = e.target.value;
                       setFormData({
-                        ...formData, 
+                        ...formData,
                         qualificationId: qualId,
                         feeCode: formData.feeCode || (qualId ? generateFeeCode(qualId) : '')
                       });
@@ -455,22 +573,22 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fee Code</label>
                     <div className="relative">
                       <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input 
-                        placeholder="Auto-generated if blank" 
+                      <input
+                        placeholder="Auto-generated if blank"
                         className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
-                        value={formData.feeCode || ''} 
-                        onChange={e => setFormData({...formData, feeCode: e.target.value})} 
+                        value={formData.feeCode || ''}
+                        onChange={e => setFormData({ ...formData, feeCode: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fee Name *</label>
-                    <input 
-                      required 
-                      placeholder="e.g. Tuition Fee - First Semester" 
+                    <input
+                      required
+                      placeholder="e.g. Tuition Fee - First Semester"
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
-                      value={formData.feeName || ''} 
-                      onChange={e => setFormData({...formData, feeName: e.target.value})} 
+                      value={formData.feeName || ''}
+                      onChange={e => setFormData({ ...formData, feeName: e.target.value })}
                     />
                   </div>
                 </div>
@@ -481,24 +599,24 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount *</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">{currency}</span>
-                      <input 
+                      <input
                         required
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="0.00" 
+                        placeholder="0.00"
                         className="w-full pl-14 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
-                        value={formData.amount || ''} 
-                        onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} 
+                        value={formData.amount || ''}
+                        onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</label>
-                    <select 
+                    <select
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
                       value={formData.category || ''}
-                      onChange={e => setFormData({...formData, category: e.target.value as CourseFeeCategory || undefined})}
+                      onChange={e => setFormData({ ...formData, category: e.target.value as CourseFeeCategory || undefined })}
                     >
                       <option value="">Select category...</option>
                       {CATEGORY_OPTIONS.map(cat => (
@@ -511,11 +629,11 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 {/* GL Account */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">G/L Revenue Account *</label>
-                  <select 
+                  <select
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
                     value={formData.glAccountId || ''}
-                    onChange={e => setFormData({...formData, glAccountId: e.target.value})}
+                    onChange={e => setFormData({ ...formData, glAccountId: e.target.value })}
                   >
                     <option value="">Select revenue account...</option>
                     {revenueAccounts.map(acc => (
@@ -528,12 +646,12 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 {/* Description */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</label>
-                  <textarea 
-                    placeholder="Optional description of this fee..." 
+                  <textarea
+                    placeholder="Optional description of this fee..."
                     rows={2}
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium resize-none"
-                    value={formData.description || ''} 
-                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                    value={formData.description || ''}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
 
@@ -542,44 +660,43 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <label className="text-xs font-semibold text-amber-700 uppercase tracking-wide flex items-center gap-2">
                     <Receipt size={12} /> Tax & Withholding
                   </label>
-                  
+
                   <div className="flex items-center gap-4">
                     <button
                       type="button"
-                      onClick={() => setFormData({...formData, isSubjectToEwt: !formData.isSubjectToEwt})}
-                      className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
-                        formData.isSubjectToEwt 
-                          ? 'bg-amber-100 border-amber-300 text-amber-800' 
-                          : 'bg-white border-gray-200 text-gray-500'
-                      }`}
+                      onClick={() => setFormData({ ...formData, isSubjectToEwt: !formData.isSubjectToEwt })}
+                      className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${formData.isSubjectToEwt
+                        ? 'bg-amber-100 border-amber-300 text-amber-800'
+                        : 'bg-white border-gray-200 text-gray-500'
+                        }`}
                     >
                       {formData.isSubjectToEwt ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                       <span className="text-sm font-medium">Subject to EWT</span>
                     </button>
-                    
+
                     {formData.isSubjectToEwt && (
                       <div className="flex items-center gap-2">
                         <label className="text-xs font-medium text-gray-500">EWT Rate:</label>
                         <div className="relative w-24">
-                          <input 
+                          <input
                             type="number"
                             step="0.1"
                             min="0"
                             max="100"
-                            placeholder="2" 
+                            placeholder="2"
                             className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-amber-500 text-sm font-medium pr-8"
-                            value={formData.ewtRate !== undefined ? (formData.ewtRate * 100) : ''} 
+                            value={formData.ewtRate !== undefined ? (formData.ewtRate * 100) : ''}
                             onChange={e => {
                               const val = e.target.value;
-                              setFormData({...formData, ewtRate: val ? parseFloat(val) / 100 : undefined});
-                            }} 
+                              setFormData({ ...formData, ewtRate: val ? parseFloat(val) / 100 : undefined });
+                            }}
                           />
                           <Percent size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         </div>
                       </div>
                     )}
                   </div>
-                  
+
                   <p className="text-xs text-gray-500 italic">
                     Enable this if Expanded Withholding Tax should be applied when billing this fee.
                   </p>
@@ -589,12 +706,11 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, isActive: !formData.isActive})}
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
-                      formData.isActive 
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                        : 'bg-gray-100 border-gray-200 text-gray-500'
-                    }`}
+                    onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${formData.isActive
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : 'bg-gray-100 border-gray-200 text-gray-500'
+                      }`}
                   >
                     {formData.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                     <span className="text-sm font-medium">{formData.isActive ? 'Active' : 'Inactive'}</span>
@@ -604,15 +720,15 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               </div>
 
               <div className="pt-6 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)} 
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
                   className="flex-1 py-3 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.glAccountId}
                   className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -631,19 +747,212 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
         </div>
       )}
 
+      {/* Bulk Creation Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+          <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+            <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><Copy size={20} /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Bulk Create Course Fees</h3>
+                  <p className="text-xs text-gray-500">Add multiple fee entries at once. Only rows with Name, Course, and GL Account will be saved.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowBulkModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+            </div>
+
+            {/* Shared Defaults */}
+            <div className="px-6 pt-5 pb-3">
+              <div className="p-4 bg-orange-50/60 border border-orange-100 rounded space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">Shared Defaults (apply to all rows)</label>
+                  <button
+                    type="button"
+                    onClick={applyDefaultsToAll}
+                    className="text-xs font-semibold text-[#F47721] hover:text-[#E06610] px-3 py-1 border border-[#F47721] rounded hover:bg-orange-100 transition-colors"
+                  >
+                    Apply to All ↓
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <select
+                    value={bulkDefaults.qualificationId}
+                    onChange={e => setBulkDefaults({ ...bulkDefaults, qualificationId: e.target.value })}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                  >
+                    <option value="">Default Course...</option>
+                    {qualifications.filter(q => !q.isDeleted).map(q => (
+                      <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={bulkDefaults.glAccountId}
+                    onChange={e => setBulkDefaults({ ...bulkDefaults, glAccountId: e.target.value })}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                  >
+                    <option value="">Default GL Account...</option>
+                    {revenueAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={bulkDefaults.category}
+                    onChange={e => setBulkDefaults({ ...bulkDefaults, category: e.target.value as CourseFeeCategory | '' })}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                  >
+                    <option value="">Default Category...</option>
+                    {CATEGORY_OPTIONS.map(cat => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Rows Table */}
+            <div className="px-6 pb-4 max-h-[50vh] overflow-y-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="py-2 pr-2 text-left text-xs font-semibold text-gray-400 uppercase w-8">#</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Fee Name *</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Course *</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase w-28">Amount</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Category</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">GL Account *</th>
+                    <th className="py-2 pl-2 text-center text-xs font-semibold text-gray-400 uppercase w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkRows.map((row, idx) => {
+                    const isValid = !!(row.feeName && row.qualificationId && row.glAccountId);
+                    return (
+                      <tr key={row._key} className={`border-b border-gray-100 ${isValid ? 'bg-emerald-50/30' : ''}`}>
+                        <td className="py-2 pr-2 text-xs text-gray-400 font-mono">{idx + 1}</td>
+                        <td className="py-2 px-2">
+                          <input
+                            placeholder="e.g. Tuition Fee"
+                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            value={row.feeName || ''}
+                            onChange={e => updateBulkRow(row._key, 'feeName', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            value={row.qualificationId || ''}
+                            onChange={e => updateBulkRow(row._key, 'qualificationId', e.target.value)}
+                          >
+                            <option value="">Select...</option>
+                            {qualifications.filter(q => !q.isDeleted).map(q => (
+                              <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm font-mono focus:ring-1 focus:ring-orange-400 outline-none"
+                            value={row.amount || ''}
+                            onChange={e => updateBulkRow(row._key, 'amount', parseFloat(e.target.value) || 0)}
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            value={row.category || ''}
+                            onChange={e => updateBulkRow(row._key, 'category', e.target.value || undefined)}
+                          >
+                            <option value="">None</option>
+                            {CATEGORY_OPTIONS.map(cat => (
+                              <option key={cat.value} value={cat.value}>{cat.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            value={row.glAccountId || ''}
+                            onChange={e => updateBulkRow(row._key, 'glAccountId', e.target.value)}
+                          >
+                            <option value="">Select...</option>
+                            {revenueAccounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 pl-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeBulkRow(row._key)}
+                            disabled={bulkRows.length <= 1}
+                            className="p-1 text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <button
+                type="button"
+                onClick={addBulkRow}
+                className="mt-3 flex items-center gap-1.5 text-sm text-[#F47721] hover:text-[#E06610] font-medium transition-colors"
+              >
+                <Plus size={16} /> Add Row
+              </button>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                {bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length} of {bulkRows.length} rows ready to save
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
+                  className="px-6 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkSubmit}
+                  disabled={isBulkSubmitting || bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length === 0}
+                  className="px-8 py-2.5 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isBulkSubmitting ? (
+                    <><Loader2 size={16} className="animate-spin" /> Creating...</>
+                  ) : (
+                    <>Create {bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length} Fee{bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length !== 1 ? 's' : ''}</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notifications */}
       {toasts.length > 0 && (
         <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`px-4 py-3 rounded shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
-                toast.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : toast.type === 'error'
+              className={`px-4 py-3 rounded shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${toast.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
                   : 'bg-orange-50 text-orange-800 border-orange-200'
-              }`}
+                }`}
             >
               {toast.type === 'success' ? (
                 <CheckCircle size={18} className="text-emerald-600" />

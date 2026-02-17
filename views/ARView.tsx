@@ -38,7 +38,7 @@ interface ARViewProps {
 type ARTab = 'invoices' | 'collections' | 'aging' | 'item-groups';
 
 const ARView: React.FC<ARViewProps> = ({
-  entries, lines, students, sponsors, items, itemGroups, accounts, bankAccounts, batches, qualifications, onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate
+  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -142,8 +142,8 @@ const ARView: React.FC<ARViewProps> = ({
       // Default fallback: Try code 1200, then name, then ANY Asset account if still empty
       // CRITICAL: Must be an ASSET and not a header account
       const defaultAr = accounts.find(a => a.code === '1200' && a.class === AccountClass.ASSET && !a.isHeader)?.id ||
-        accounts.find(a => a.name.toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id ||
-        accounts.find(a => a.name.toLowerCase().includes('receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
+        accounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id ||
+        accounts.find(a => (a.name || '').toLowerCase().includes('receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
 
       if (defaultAr) {
         setSelectedArAccountId(defaultAr);
@@ -166,7 +166,7 @@ const ARView: React.FC<ARViewProps> = ({
         }
       }
       const defaultAr = accounts.find(a => a.code === '1200' && a.class === AccountClass.ASSET && !a.isHeader)?.id ||
-        accounts.find(a => a.name.toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
+        accounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader)?.id;
 
       if (defaultAr) {
         setSelectedCollArAccountId(defaultAr);
@@ -182,7 +182,7 @@ const ARView: React.FC<ARViewProps> = ({
 
   const subsidiaryBalances = useMemo(() => {
     const balances: Record<string, number> = {};
-    const arAccounts = new Set(accounts.filter(a => a.class === AccountClass.ASSET && a.name.toLowerCase().includes('receivable')).map(a => a.id));
+    const arAccounts = new Set(accounts.filter(a => a.class === AccountClass.ASSET && (a.name || '').toLowerCase().includes('receivable')).map(a => a.id));
 
     // Only use POSTED entries for confirmed subsidiary balances
     const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
@@ -201,8 +201,8 @@ const ARView: React.FC<ARViewProps> = ({
   const totalOutputVat = useMemo(() => {
     // Find VAT Payable account(s)
     const vatAccountIds = new Set(accounts.filter(a =>
-      a.name.toLowerCase().includes('vat payable') ||
-      a.name.toLowerCase().includes('output vat') ||
+      (a.name || '').toLowerCase().includes('vat payable') ||
+      (a.name || '').toLowerCase().includes('output vat') ||
       (a.code && a.code.startsWith('2400'))
     ).map(a => a.id));
 
@@ -228,7 +228,7 @@ const ARView: React.FC<ARViewProps> = ({
   };
 
   const filteredInvoices = arInvoices.filter(inv => {
-    const textMatch = inv.reference.toLowerCase().includes(searchTerm.toLowerCase()) || inv.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const textMatch = (inv.reference || '').toLowerCase().includes(searchTerm.toLowerCase()) || (inv.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const displayStatus = getDisplayStatus(inv.status, inv);
 
     const statusMatch = filterStatus === 'ALL' || filterStatus === displayStatus;
@@ -291,12 +291,12 @@ const ARView: React.FC<ARViewProps> = ({
   };
 
   const filteredCollections = arCollections.filter(c =>
-    c.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.reference || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.description || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const agingReport = useMemo(() => {
-    const targetAccounts = accounts.filter(a => a.class === AccountClass.ASSET && a.name.toLowerCase().includes('receivable'));
+    const targetAccounts = accounts.filter(a => a.class === AccountClass.ASSET && (a.name || '').toLowerCase().includes('receivable'));
     const targetIds = new Set(targetAccounts.map(a => a.id));
     // ONLY POSTED entries for aging
     const targetEntries = entries.filter(e => e.date <= agingAsOf && e.status === 'POSTED');
@@ -508,9 +508,9 @@ const ARView: React.FC<ARViewProps> = ({
     const arAccountId = selectedArAccountId;
 
     const vatPayableId = accounts.find(a => a.code === '2200')?.id ||
-      accounts.find(a => a.name.toLowerCase().includes('vat payable'))?.id ||
-      accounts.find(a => a.name.toLowerCase().includes('output vat'))?.id ||
-      accounts.find(a => a.name.toLowerCase().includes('vat'))?.id;
+      accounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('vat'))?.id;
 
     if (!arAccountId) {
       return onNotify('error', 'Accounting Error: Please select a Target G/L Receivable Account.');
@@ -1130,7 +1130,7 @@ const ARView: React.FC<ARViewProps> = ({
                     onChange={e => setSelectedArAccountId(e.target.value)}
                   >
                     <option value="">Select account...</option>
-                    {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && a.name.toLowerCase().includes('receivable')).map(acc => (
+                    {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && (a.name || '').toLowerCase().includes('receivable')).map(acc => (
                       <option key={acc.id} value={acc.id}>
                         {acc.code} - {acc.name}
                       </option>
@@ -1285,7 +1285,7 @@ const ARView: React.FC<ARViewProps> = ({
                     onChange={e => setSelectedCollArAccountId(e.target.value)}
                   >
                     <option value="">Select account...</option>
-                    {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && a.name.toLowerCase().includes('receivable')).map(acc => (
+                    {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader && (a.name || '').toLowerCase().includes('receivable')).map(acc => (
                       <option key={acc.id} value={acc.id}>
                         {acc.code} - {acc.name}
                       </option>

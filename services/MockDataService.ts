@@ -46,7 +46,8 @@ export class MockDataService implements IDataService {
       inventoryLevels: [],
       inventoryTransactions: [],
       stockAdjustments: [],
-      reorderPoints: []
+      reorderPoints: [],
+      courseFees: []
     };
   }
 
@@ -66,7 +67,7 @@ export class MockDataService implements IDataService {
 
   async createUser(user: User): Promise<User> {
     console.warn('[MockDataService] Users persist to memory only; changes lost on refresh');
-    
+
     // Hash password if provided (for consistency with SupabaseDataService)
     if ((user as any).password) {
       try {
@@ -79,7 +80,7 @@ export class MockDataService implements IDataService {
         console.warn('[MockDataService] Password hashing skipped in mock mode');
       }
     }
-    
+
     return user;
   }
 
@@ -279,6 +280,23 @@ export class MockDataService implements IDataService {
     console.warn('[MockDataService] Items persist to memory only; changes lost on refresh');
   }
 
+  // Course Fee CRUD
+  async createCourseFee(fee: any): Promise<any> {
+    console.warn('[MockDataService] createCourseFee is memory-only.');
+    return { ...fee, id: `fee-${Date.now()}` };
+  }
+  async updateCourseFee(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateCourseFee is memory-only.');
+    return { id, ...updates };
+  }
+  async deleteCourseFee(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteCourseFee is memory-only.');
+  }
+  async getCourseFeesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getCourseFeesByOrg returning empty array.');
+    return [];
+  }
+
   // Payables CRUD (mock)
   async createPayable(payable: any): Promise<any> {
     console.warn('[MockDataService] createPayable is memory-only.');
@@ -347,26 +365,26 @@ export class MockDataService implements IDataService {
     return null;
   }
 
-    // Recurring Invoice CRUD (mock)
-    async createRecurringInvoice(invoice: any): Promise<any> {
-      console.warn('[MockDataService] createRecurringInvoice is memory-only; changes lost on refresh.');
-      return { ...invoice };
-    }
-    async updateRecurringInvoice(id: string, updates: Partial<any>): Promise<any> {
-      console.warn('[MockDataService] updateRecurringInvoice is memory-only; changes lost on refresh.');
-      return { id, ...updates };
-    }
-    async deleteRecurringInvoice(id: string): Promise<void> {
-      console.warn('[MockDataService] deleteRecurringInvoice is memory-only; changes lost on refresh.');
-    }
-    async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
-      console.warn('[MockDataService] getRecurringInvoicesByOrg returning empty array.');
-      return [];
-    }
-    async getRecurringInvoiceById(id: string): Promise<any | null> {
-      console.warn('[MockDataService] getRecurringInvoiceById returning null.');
-      return null;
-    }
+  // Recurring Invoice CRUD (mock)
+  async createRecurringInvoice(invoice: any): Promise<any> {
+    console.warn('[MockDataService] createRecurringInvoice is memory-only; changes lost on refresh.');
+    return { ...invoice };
+  }
+  async updateRecurringInvoice(id: string, updates: Partial<any>): Promise<any> {
+    console.warn('[MockDataService] updateRecurringInvoice is memory-only; changes lost on refresh.');
+    return { id, ...updates };
+  }
+  async deleteRecurringInvoice(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteRecurringInvoice is memory-only; changes lost on refresh.');
+  }
+  async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
+    console.warn('[MockDataService] getRecurringInvoicesByOrg returning empty array.');
+    return [];
+  }
+  async getRecurringInvoiceById(id: string): Promise<any | null> {
+    console.warn('[MockDataService] getRecurringInvoiceById returning null.');
+    return null;
+  }
 
   // Check Voucher CRUD (mock)
   async createCheckVoucher(check: any): Promise<any> {
@@ -431,7 +449,7 @@ export class MockDataService implements IDataService {
   }
 
   // ==================== INVENTORY MANAGEMENT ====================
-  
+
   async createWarehouseLocation(location: any): Promise<any> {
     console.warn('[MockDataService] createWarehouseLocation - data not persisted.');
     return { ...location, id: `loc-${Date.now()}`, createdAt: new Date().toISOString() };

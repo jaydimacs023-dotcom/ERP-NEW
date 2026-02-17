@@ -1,8 +1,7 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit
-} from './types'; // RecurringInvoice, RecurringInvoiceHistory removed
+import {
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory
+} from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
@@ -68,12 +67,12 @@ import PaymentsView from './views/PaymentsView';
 import BankDepositsView from './views/BankDepositsView';
 
 // Lucide Icons
-import { 
-  LayoutDashboard, BookText, PieChart, Landmark, Users, 
-  Award, GraduationCap, Layers, MapPin, Handshake, 
-  Truck, Box, CalendarClock, ShoppingCart, ShieldCheck, 
-  History, UserCog, Settings, Palette, CreditCard, 
-  Binary, Terminal, Receipt, Calculator, Briefcase, 
+import {
+  LayoutDashboard, BookText, PieChart, Landmark, Users,
+  Award, GraduationCap, Layers, MapPin, Handshake,
+  Truck, Box, CalendarClock, ShoppingCart, ShieldCheck,
+  History, UserCog, Settings, Palette, CreditCard,
+  Binary, Terminal, Receipt, Calculator, Briefcase,
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
@@ -89,14 +88,14 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  
+
   // Navigation section state
   const [openSections, setOpenSections] = useState<{ financial: boolean; operations: boolean; registries: boolean; inventory: boolean; administration: boolean }>({ financial: true, operations: true, registries: true, inventory: true, administration: true });
-  
+
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
-  
+
   // Data service reference for CRUD operations
   const [dataService] = useState(() => DataServiceFactory.getService());
 
@@ -132,86 +131,86 @@ export default function App() {
     }
   };
 
-    // Recurring invoice handlers removed
+  // Recurring invoice handlers removed
 
-    // Revenue Schedule (Deferred Revenue) CRUD Handlers
-    const handleAddRevenueSchedule = async (schedule: any) => {
-      try {
-        console.info('[App] Creating revenue schedule:', schedule.description);
-        const scheduleWithOrg = { ...schedule, orgId: currentOrgId };
-        const created = await dataService.createRevenueSchedule(scheduleWithOrg);
-        setRevenueSchedules(prev => [...prev, created]);
-        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', created.id, `Revenue schedule: ${created.description}`);
-        handleNotify('success', 'Revenue schedule created successfully');
-      } catch (error) {
-        console.error('[App] Error creating revenue schedule:', error);
-        handleNotify('error', `Failed to create revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+  // Revenue Schedule (Deferred Revenue) CRUD Handlers
+  const handleAddRevenueSchedule = async (schedule: any) => {
+    try {
+      console.info('[App] Creating revenue schedule:', schedule.description);
+      const scheduleWithOrg = { ...schedule, orgId: currentOrgId };
+      const created = await dataService.createRevenueSchedule(scheduleWithOrg);
+      setRevenueSchedules(prev => [...prev, created]);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', created.id, `Revenue schedule: ${created.description} `);
+      handleNotify('success', 'Revenue schedule created successfully');
+    } catch (error) {
+      console.error('[App] Error creating revenue schedule:', error);
+      handleNotify('error', `Failed to create revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'} `);
+    }
+  };
 
-    const handleUpdateRevenueSchedule = async (id: string, updates: any) => {
-      try {
-        console.info('[App] Updating revenue schedule:', id);
-        const existing = revenueSchedules.find(e => e.id === id);
-        const updated = await dataService.updateRevenueSchedule(id, updates);
-        setRevenueSchedules(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description, existing, { ...existing, ...updates });
-        handleNotify('success', 'Revenue schedule updated successfully');
-      } catch (error) {
-        console.error('[App] Error updating revenue schedule:', error);
-        handleNotify('error', `Failed to update revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+  const handleUpdateRevenueSchedule = async (id: string, updates: any) => {
+    try {
+      console.info('[App] Updating revenue schedule:', id);
+      const existing = revenueSchedules.find(e => e.id === id);
+      const updated = await dataService.updateRevenueSchedule(id, updates);
+      setRevenueSchedules(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description, existing, { ...existing, ...updates });
+      handleNotify('success', 'Revenue schedule updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating revenue schedule:', error);
+      handleNotify('error', `Failed to update revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'} `);
+    }
+  };
 
-    const handleDeleteRevenueSchedule = async (id: string) => {
-      try {
-        console.info('[App] Deleting revenue schedule:', id);
-        const existing = revenueSchedules.find(e => e.id === id);
-        await dataService.deleteRevenueSchedule(id);
-        setRevenueSchedules(prev => prev.filter(e => e.id !== id));
-        AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description);
-        handleNotify('success', 'Revenue schedule deleted successfully');
-      } catch (error) {
-        console.error('[App] Error deleting revenue schedule:', error);
-        handleNotify('error', `Failed to delete revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+  const handleDeleteRevenueSchedule = async (id: string) => {
+    try {
+      console.info('[App] Deleting revenue schedule:', id);
+      const existing = revenueSchedules.find(e => e.id === id);
+      await dataService.deleteRevenueSchedule(id);
+      setRevenueSchedules(prev => prev.filter(e => e.id !== id));
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'REVENUE_SCHEDULE', id, existing?.description);
+      handleNotify('success', 'Revenue schedule deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting revenue schedule:', error);
+      handleNotify('error', `Failed to delete revenue schedule: ${error instanceof Error ? error.message : 'Unknown error'} `);
+    }
+  };
 
-    // Revenue Recognition Entry Handlers
-    const handleAddRevenueRecognitionEntry = async (entry: any) => {
-      try {
-        console.info('[App] Creating revenue recognition entry');
-        const entryWithOrg = { ...entry, orgId: currentOrgId };
-        const created = await dataService.createRevenueRecognitionEntry(entryWithOrg);
-        setRevenueRecognitionEntries(prev => [...prev, created]);
-      } catch (error) {
-        console.error('[App] Error creating revenue recognition entry:', error);
-        handleNotify('error', `Failed to create recognition entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
+  // Revenue Recognition Entry Handlers
+  const handleAddRevenueRecognitionEntry = async (entry: any) => {
+    try {
+      console.info('[App] Creating revenue recognition entry');
+      const entryWithOrg = { ...entry, orgId: currentOrgId };
+      const created = await dataService.createRevenueRecognitionEntry(entryWithOrg);
+      setRevenueRecognitionEntries(prev => [...prev, created]);
+    } catch (error) {
+      console.error('[App] Error creating revenue recognition entry:', error);
+      handleNotify('error', `Failed to create recognition entry: ${error instanceof Error ? error.message : 'Unknown error'} `);
+    }
+  };
 
-    const handleUpdateRevenueRecognitionEntry = async (id: string, updates: any) => {
-      try {
-        console.info('[App] Updating revenue recognition entry:', id);
-        const updated = await dataService.updateRevenueRecognitionEntry(id, updates);
-        setRevenueRecognitionEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-      } catch (error) {
-        console.error('[App] Error updating revenue recognition entry:', error);
-      }
-    };
+  const handleUpdateRevenueRecognitionEntry = async (id: string, updates: any) => {
+    try {
+      console.info('[App] Updating revenue recognition entry:', id);
+      const updated = await dataService.updateRevenueRecognitionEntry(id, updates);
+      setRevenueRecognitionEntries(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+    } catch (error) {
+      console.error('[App] Error updating revenue recognition entry:', error);
+    }
+  };
 
   // ============================================================================
   // PAYROLL PERSISTENCE HANDLERS
   // ============================================================================
-  
+
   const handlePostPayroll = async (run: PayrollRun, lines: PayrollLine[], entry: JournalEntry, entryLines: JournalLine[]) => {
     try {
       console.info('[App] Posting payroll run:', run.id);
-      
+
       // 1. Persist payroll run to Supabase
       const savedRun = await dataService.createPayrollRun(run);
       console.info('[App] Saved payroll run:', savedRun.id);
-      
+
       // 2. Persist all payroll lines
       const savedLines: PayrollLine[] = [];
       for (const line of lines) {
@@ -219,19 +218,19 @@ export default function App() {
         savedLines.push(savedLine);
       }
       console.info('[App] Saved', savedLines.length, 'payroll lines');
-      
+
       // 3. Update local state
       setPayrollRuns(prev => [...prev, savedRun as PayrollRun]);
       setPayrollLines(prev => [...prev, ...savedLines as PayrollLine[]]);
-      
+
       // 4. Post journal entry for GL integration
       handlePostJournal(entry, entryLines);
-      
+
       handleNotify('success', `Payroll run ${run.id} posted successfully with ${savedLines.length} employee lines`);
     } catch (error) {
       console.error('[App] Error posting payroll:', error);
-      handleNotify('error', `Failed to post payroll: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
+      handleNotify('error', `Failed to post payroll: ${error instanceof Error ? error.message : 'Unknown error'} `);
+
       // Fallback: At least update local state even if Supabase fails
       setPayrollRuns(prev => [...prev, run as PayrollRun]);
       setPayrollLines(prev => [...prev, ...lines as PayrollLine[]]);
@@ -255,7 +254,7 @@ export default function App() {
     if (currentUser) {
       AuditService.logout(currentOrgId, currentUser.id, currentUser.name);
     }
-    
+
     await authService.logout();
     setCurrentUser(null);
     setCurrentOrgId('');
@@ -299,7 +298,9 @@ export default function App() {
   const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
   const [recurringBillHistory, setRecurringBillHistory] = useState<RecurringBillHistory[]>([]);
 
-  // Recurring Invoices (AR) removed
+  // Recurring Invoices (AR)
+  const [recurringInvoices, setRecurringInvoices] = useState<RecurringInvoice[]>([]);
+  const [recurringInvoiceHistory, setRecurringInvoiceHistory] = useState<RecurringInvoiceHistory[]>([]);
 
   // Revenue Recognition & Deferred Revenue
   const [revenueSchedules, setRevenueSchedules] = useState<RevenueSchedule[]>([]);
@@ -337,25 +338,25 @@ export default function App() {
   const [showJournalForm, setShowJournalForm] = useState(false);
 
   // Toast Notification State
-  const [toasts, setToasts] = useState<Array<{id: number; type: 'success' | 'error' | 'info'; message: string}>>([]);
+  const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; message: string }>>([]);
   // Data Loading Logic
   useEffect(() => {
     async function loadData() {
       try {
         console.log("📊 App: Starting data load...");
         console.log("🔧 Config:", { useMockData: config.useMockData, supabaseConfigured: !!(config.supabase?.url && config.supabase?.anonKey) });
-        
+
         const service = DataServiceFactory.getService();
-        console.log(`📦 Using service: ${config.useMockData ? 'MOCK' : 'SUPABASE'}`);
-        
+        console.log(`📦 Using service: ${config.useMockData ? 'MOCK' : 'SUPABASE'} `);
+
         const data = await service.getInitialData();
-        console.log("✅ Data loaded:", { 
+        console.log("✅ Data loaded:", {
           organizations: data.organizations.length,
           users: data.users.length,
           students: data.students.length,
           accounts: data.accounts.length
         });
-        
+
         setOrganizations(data.organizations);
         setUsers(data.users);
         setStudents(data.students);
@@ -374,7 +375,7 @@ export default function App() {
         setAccounts(data.accounts);
         setJournalEntries(data.journalEntries);
         setJournalLines(data.journalLines);
-        
+
         // Debug: Log journal data to help diagnose AR invoice issue
         console.info('[App] Loaded journal data:', {
           entriesCount: data.journalEntries?.length || 0,
@@ -387,7 +388,7 @@ export default function App() {
             return entry?.sourceType === 'INVOICE';
           })?.length || 0
         });
-        
+
         setPayrollRuns(data.payrollRuns);
         setPayrollLines(data.payrollLines);
         setAuditLogs(data.auditLogs);
@@ -399,7 +400,7 @@ export default function App() {
         setAtcCategories(data.atcCategories || []);
         setAtcItems(data.atcItems || []);
         setAtcRates(data.atcRates || []);
-        
+
         // Load Inventory Data
         setWarehouseLocations(data.warehouseLocations || []);
         setStockItems(data.stockItems || []);
@@ -407,7 +408,9 @@ export default function App() {
         setInventoryTransactions(data.inventoryTransactions || []);
         setStockAdjustments(data.stockAdjustments || []);
         setReorderPoints(data.reorderPoints || []);
-        
+
+        // Load Course Fees
+        setCourseFees(data.courseFees || []);
         if (data.organizations.length > 0) {
           // Get the restored session to check user's orgId
           const restoredSession = authService.getSession();
@@ -415,9 +418,9 @@ export default function App() {
           const userOrgId = restoredUser?.orgId;
           const userOrgExists = data.organizations.some(o => o.id === userOrgId && !o.isDeleted);
           const isSystemAdmin = restoredUser?.role === 'SYSTEM_ADMIN';
-          
+
           console.log('[App] Organization selection:', { userOrgId, userOrgExists, isSystemAdmin, user: restoredUser?.email });
-          
+
           // Validate: User must have an organization OR be a SYSTEM_ADMIN
           if (restoredUser && !userOrgExists && !isSystemAdmin) {
             console.error('[App] ❌ Validation failed: User has no valid organization and is not SYSTEM_ADMIN');
@@ -428,7 +431,7 @@ export default function App() {
             setIsLoading(false);
             return;
           }
-          
+
           if (userOrgId && userOrgExists) {
             // User belongs to this org - use it
             setCurrentOrgId(userOrgId);
@@ -495,7 +498,7 @@ export default function App() {
   const isRegistrar = hasOperationsAccess(currentUser?.role);
   const isAR = hasARAccess(currentUser?.role);
   const isAP = hasAPAccess(currentUser?.role);
-  
+
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
 
@@ -504,16 +507,16 @@ export default function App() {
   // ============================================================================
   const paymentsDueSoon = useMemo(() => {
     if (!isTenantAdmin) return [];
-    
+
     const today = new Date();
     const fiveDaysFromNow = new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000);
-    
+
     return payments.filter(p => {
       const dueDate = new Date(p.dueDate);
-      return p.orgId === currentOrgId && 
-             p.status === 'PENDING' && 
-             dueDate >= today && 
-             dueDate <= fiveDaysFromNow;
+      return p.orgId === currentOrgId &&
+        p.status === 'PENDING' &&
+        dueDate >= today &&
+        dueDate <= fiveDaysFromNow;
     });
   }, [payments, currentOrgId, isTenantAdmin]);
 
@@ -527,7 +530,7 @@ export default function App() {
     // Validate that user has an organization, OR is a SYSTEM_ADMIN
     const userHasOrg = user.orgId && organizations.some(o => o.id === user.orgId && !o.isDeleted);
     const isSystemAdmin = user.role === 'SYSTEM_ADMIN';
-    
+
     if (!userHasOrg && !isSystemAdmin) {
       handleNotify('error', 'Access Denied: User must belong to an organization to login. Contact your system administrator.');
       console.warn('[App] Login denied: User has no valid organization and is not SYSTEM_ADMIN', user.email);
@@ -540,10 +543,10 @@ export default function App() {
     const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
     localStorage.setItem('at_erp_session', JSON.stringify(session));
     console.info('[App] User session stored:', user.email);
-    
+
     // Audit: User login
     AuditService.login(user.orgId || '', user.id, user.name);
-    
+
     // Set default tab based on role
     setActiveTab(getDefaultTab(user.role));
   };
@@ -561,20 +564,20 @@ export default function App() {
     try {
       console.info('[App] Posting journal entry:', fullEntry.id, fullEntry.sourceType);
       console.info('[App] Lines to save:', lines.length, 'Sample line:', lines[0]);
-      
+
       const savedEntry = await dataService.createJournalEntry(fullEntry);
-      
+
       // Update lines with the actual saved entry ID (UUID generated by Supabase)
       const linesWithActualId = lines.map(line => ({
         ...line,
         journalEntryId: savedEntry.id
       }));
-      
+
       const savedLines = await dataService.createJournalLines(linesWithActualId);
-      
+
       setJournalEntries(prev => [...prev, savedEntry]);
       setJournalLines(prev => [...prev, ...savedLines]);
-      
+
       // Audit: Journal entry posted
       AuditService.post(
         currentOrgId,
@@ -590,7 +593,7 @@ export default function App() {
       // Fallback to memory storage
       setJournalEntries(prev => [...prev, fullEntry]);
       setJournalLines(prev => [...prev, ...lines]);
-      
+
       AuditService.post(
         currentOrgId,
         currentUser?.id || 'system',
@@ -616,10 +619,10 @@ export default function App() {
       };
 
       const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
-      
+
       setJournalEntries(prev => prev.map(e => e.id === entryId ? savedEntry : e));
       handleNotify('success', 'Journal entry approved and posted');
-      
+
       // Audit
       AuditService.post(
         currentOrgId,
@@ -628,7 +631,7 @@ export default function App() {
         'JOURNAL_ENTRY',
         entryId,
         entryId,
-        `Approved and posted draft journal: ${entry.reference}`
+        `Approved and posted draft journal: ${entry.reference} `
       );
     } catch (error) {
       console.error('[App] Error approving journal entry:', error);
@@ -650,10 +653,10 @@ export default function App() {
       } as Payable;
       const savedPayable = await dataService.createPayable(fullPayable);
       setPayables(prev => [...prev, savedPayable]);
-      
+
       // Audit: Payable created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', savedPayable.id, payable.payableNumber);
-      
+
       handleNotify('success', `Payable ${payable.payableNumber} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payable:', error);
@@ -675,10 +678,10 @@ export default function App() {
       const existing = payables.find(p => p.id === id);
       const updated = await dataService.updatePayable(id, updates);
       setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
-      
+
       // Audit: Payable updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', id, existing?.payableNumber, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Payable updated successfully');
     } catch (error) {
       console.error('[App] Error updating payable:', error);
@@ -694,10 +697,10 @@ export default function App() {
       const existing = payables.find(p => p.id === id);
       await dataService.deletePayable(id);
       setPayables(prev => prev.filter(p => p.id !== id));
-      
+
       // Audit: Payable deleted
       AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', id, existing?.payableNumber);
-      
+
       handleNotify('success', 'Payable deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting payable:', error);
@@ -715,7 +718,7 @@ export default function App() {
         handleNotify('error', 'Payable not found');
         return;
       }
-      
+
       // Update payable status to approved with exception notes
       const exceptionNotes = `3-Way Match Exception Approved: ${notes}`;
       const updates: Partial<Payable> = {
@@ -724,9 +727,9 @@ export default function App() {
         approvedBy: currentUser?.id || 'system',
         approvedAt: new Date().toISOString()
       };
-      
+
       await handleUpdatePayable(payableId, updates);
-      
+
       // Log audit action for exception approval
       AuditService.logAction(
         currentOrgId,
@@ -734,9 +737,9 @@ export default function App() {
         currentUser?.name || 'System',
         'PAYABLE_EXCEPTION_APPROVED',
         payableId,
-        `3-Way Match Exception: ${notes}`
+        `3 - Way Match Exception: ${notes} `
       );
-      
+
       handleNotify('success', '3-Way Match exception approved successfully');
     } catch (error) {
       console.error('[App] Error approving exception:', error);
@@ -753,10 +756,10 @@ export default function App() {
       console.info('[App] Creating organization:', org.name);
       const savedOrg = await dataService.createOrganization(org);
       setOrganizations(prev => [...prev, savedOrg]);
-      
+
       // Audit: Organization created
       AuditService.create(savedOrg.id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', savedOrg.id, org.name);
-      
+
       handleNotify('success', `Organization "${org.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating organization:', error);
@@ -772,10 +775,10 @@ export default function App() {
       const existing = organizations.find(o => o.id === id);
       const updated = await dataService.updateOrganization(id, updates);
       setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updated } : o));
-      
+
       // Audit: Organization updated
       AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Organization updated successfully');
     } catch (error) {
       console.error('[App] Error updating organization:', error);
@@ -791,10 +794,10 @@ export default function App() {
       const existing = organizations.find(o => o.id === id);
       await dataService.deleteOrganization(id);
       setOrganizations(prev => prev.filter(o => o.id !== id));
-      
+
       // Audit: Organization deleted
       AuditService.hardDelete(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name);
-      
+
       handleNotify('success', 'Organization deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting organization:', error);
@@ -811,7 +814,7 @@ export default function App() {
   const handleRestoreBackup = async (backupData: any) => {
     try {
       console.info('[App] Restoring backup for organization:', backupData.metadata?.orgId);
-      
+
       // Update all state with restored data
       if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations);
       if (backupData.data.users?.length) setUsers(backupData.data.users);
@@ -854,13 +857,13 @@ export default function App() {
         'BACKUP_RESTORED',
         'BACKUP',
         currentOrgId,
-        `Backup from ${backupData.metadata?.createdAt}, records: ${JSON.stringify(backupData.metadata?.recordCounts)}`
+        `Backup from ${backupData.metadata?.createdAt}, records: ${JSON.stringify(backupData.metadata?.recordCounts)} `
       );
 
-      handleNotify('success', `Backup restored successfully. ${Object.values(backupData.metadata?.recordCounts || {}).reduce((a: number, b: number) => a + b, 0)} records restored.`);
+      handleNotify('success', `Backup restored successfully.${Object.values(backupData.metadata?.recordCounts || {}).reduce((a: number, b: number) => a + b, 0)} records restored.`);
     } catch (error) {
       console.error('[App] Error restoring backup:', error);
-      handleNotify('error', `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -900,7 +903,7 @@ export default function App() {
         const { emailSenderService } = await import('./services/EmailSenderService');
         const tokenEntry = emailVerificationService.generateToken(savedUser.id, savedUser.email);
         await emailSenderService.sendVerificationEmail(savedUser.email, tokenEntry.token);
-        handleNotify('info', `Verification email sent to ${savedUser.email}`);
+        handleNotify('info', `Verification email sent to ${savedUser.email} `);
       }
       handleNotify('success', `User "${user.name}" created successfully`);
     } catch (error) {
@@ -918,15 +921,14 @@ export default function App() {
       const existing = users.find(u => u.id === id);
       await dataService.deleteUser(id);
       setUsers(prev => prev.filter(u => u.id !== id));
-      
+
       // Audit: User deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'USER', id, existing?.name);
-      
+
       handleNotify('success', 'User deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting user:', error);
       handleNotify('error', 'Failed to delete user. Falling back to memory storage.');
-      // Fallback to memory storage
       setUsers(prev => prev.filter(u => u.id !== id));
     }
   };
@@ -934,19 +936,19 @@ export default function App() {
   const handleRegisterWithPersistence = async (org: Organization, admin: User) => {
     try {
       console.info('[App] Registering new organization and admin user');
-      
+
       // Create organization
       const savedOrg = await dataService.createOrganization(org);
       setOrganizations(p => [...p, savedOrg]);
-      
+
       // Create admin user
       const savedAdmin = await dataService.createUser(admin);
       setUsers(p => [...p, savedAdmin]);
-      
+
       setCurrentUser(savedAdmin);
       setCurrentOrgId(savedOrg.id);
       setActiveTab('dashboard');
-      
+
       // Audit: New organization registered
       AuditService.log({
         orgId: savedOrg.id,
@@ -956,9 +958,9 @@ export default function App() {
         entityType: 'ORGANIZATION',
         entityId: savedOrg.id,
         entityName: savedOrg.name,
-        details: `New organization registered with admin user: ${savedAdmin.name}`
+        details: `New organization registered with admin user: ${savedAdmin.name} `
       });
-      
+
       handleNotify('success', `Welcome! Organization "${org.name}" registered successfully`);
       console.info('[App] Registration complete');
     } catch (error) {
@@ -983,17 +985,17 @@ export default function App() {
       const studentWithOrg = { ...student, orgId: currentOrgId };
       const savedStudent = await dataService.createStudent(studentWithOrg);
       setStudents(prev => [...prev, savedStudent]);
-      
+
       // Audit: Student created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', savedStudent.id, `${student.firstName} ${student.lastName}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', savedStudent.id, `${student.firstName} ${student.lastName} `);
+
       handleNotify('success', `Student "${student.firstName} ${student.lastName}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating student:', error);
       handleNotify('error', 'Failed to create student. Falling back to memory storage.');
       const studentWithOrg = { ...student, orgId: currentOrgId };
       setStudents(prev => [...prev, studentWithOrg]);
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName}`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName} `);
     }
   };
 
@@ -1003,10 +1005,10 @@ export default function App() {
       const existing = students.find(s => s.id === student.id);
       const updated = await dataService.updateStudent(student.id, student);
       setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
-      
+
       // Audit: Student updated
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName}`, existing, student);
-      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName} `, existing, student);
+
       handleNotify('success', 'Student record updated successfully');
     } catch (error) {
       console.error('[App] Error updating student:', error);
@@ -1019,11 +1021,11 @@ export default function App() {
     try {
       console.info('[App] Checking student usage before deletion:', id);
       const existing = students.find(s => s.id === id);
-      
+
       // Check if student is used in other modules
       const usage = await dataService.checkStudentUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete student. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete student.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false; // Return false to indicate deletion failed
       }
@@ -1032,10 +1034,10 @@ export default function App() {
       console.info('[App] Deleting student:', id);
       await dataService.deleteStudent(id);
       setStudents(prev => prev.filter(s => s.id !== id));
-      
+
       // Audit: Student deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
-      
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', id, existing ? `${existing.firstName} ${existing.lastName} ` : undefined);
+
       handleNotify('success', 'Student record deleted successfully');
       return true; // Return true to indicate successful deletion
     } catch (error) {
@@ -1051,12 +1053,12 @@ export default function App() {
     try {
       console.info('[App] Batch adding students:', newStudents.length);
       const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
-      
+
       // Create each student
       const savedStudents = await Promise.all(
         studentsWithOrg.map(s => dataService.createStudent(s))
       );
-      
+
       setStudents(prev => [...prev, ...savedStudents]);
       handleNotify('success', `${newStudents.length} students imported successfully`);
     } catch (error) {
@@ -1074,14 +1076,14 @@ export default function App() {
 
   const handleAddTrainer = async (trainer: Trainer) => {
     try {
-      console.info('[App] Creating trainer:', `${trainer.firstName} ${trainer.lastName}`);
+      console.info('[App] Creating trainer:', `${trainer.firstName} ${trainer.lastName} `);
       const trainerWithOrg = { ...trainer, orgId: currentOrgId };
       const savedTrainer = await dataService.createTrainer(trainerWithOrg);
       setTrainers(prev => [...prev, savedTrainer]);
-      
+
       // Audit: Trainer created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', savedTrainer.id, `${trainer.firstName} ${trainer.lastName}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', savedTrainer.id, `${trainer.firstName} ${trainer.lastName} `);
+
       handleNotify('success', `Trainer "${trainer.firstName} ${trainer.lastName}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating trainer:', error);
@@ -1097,10 +1099,10 @@ export default function App() {
       const existing = trainers.find(t => t.id === trainer.id);
       const updated = await dataService.updateTrainer(trainer.id, trainer);
       setTrainers(prev => prev.map(t => t.id === trainer.id ? updated : t));
-      
+
       // Audit: Trainer updated
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', trainer.id, `${trainer.firstName} ${trainer.lastName}`, existing, trainer);
-      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', trainer.id, `${trainer.firstName} ${trainer.lastName} `, existing, trainer);
+
       handleNotify('success', 'Trainer record updated successfully');
     } catch (error) {
       console.error('[App] Error updating trainer:', error);
@@ -1113,11 +1115,11 @@ export default function App() {
     try {
       console.info('[App] Checking trainer usage before deletion:', id);
       const existing = trainers.find(t => t.id === id);
-      
+
       // Check if trainer is used in other modules
       const usage = await dataService.checkTrainerUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete trainer. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete trainer.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false; // Return false to indicate deletion failed
       }
@@ -1126,10 +1128,10 @@ export default function App() {
       console.info('[App] Deleting trainer:', id);
       await dataService.deleteTrainer(id);
       setTrainers(prev => prev.filter(t => t.id !== id));
-      
+
       // Audit: Trainer deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', id, existing ? `${existing.firstName} ${existing.lastName}` : undefined);
-      
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'TRAINER', id, existing ? `${existing.firstName} ${existing.lastName} ` : undefined);
+
       handleNotify('success', 'Trainer record deleted successfully');
       return true; // Return true to indicate successful deletion
     } catch (error) {
@@ -1151,10 +1153,10 @@ export default function App() {
       const qualWithOrg = { ...qualification, orgId: currentOrgId };
       const savedQual = await dataService.createQualification(qualWithOrg);
       setQualifications(prev => [...prev, savedQual]);
-      
+
       // Audit: Qualification created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', savedQual.id, qualification.name);
-      
+
       handleNotify('success', `Qualification "${qualification.name}" registered successfully`);
     } catch (error) {
       console.error('[App] Error creating qualification:', error);
@@ -1170,10 +1172,10 @@ export default function App() {
       const existing = qualifications.find(q => q.id === qualification.id);
       const updated = await dataService.updateQualification(qualification.id, qualification);
       setQualifications(prev => prev.map(q => q.id === qualification.id ? updated : q));
-      
+
       // Audit: Qualification updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', qualification.id, qualification.name, existing, qualification);
-      
+
       handleNotify('success', 'Qualification record updated successfully');
     } catch (error) {
       console.error('[App] Error updating qualification:', error);
@@ -1186,11 +1188,11 @@ export default function App() {
     try {
       console.info('[App] Checking qualification usage before deletion:', id);
       const existing = qualifications.find(q => q.id === id);
-      
+
       // Check if qualification is used in other modules
       const usage = await dataService.checkQualificationUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete qualification. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete qualification.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false;
       }
@@ -1199,10 +1201,10 @@ export default function App() {
       console.info('[App] Deleting qualification:', id);
       await dataService.deleteQualification(id);
       setQualifications(prev => prev.filter(q => q.id !== id));
-      
+
       // Audit: Qualification deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'QUALIFICATION', id, existing?.name);
-      
+
       handleNotify('success', 'Qualification record deleted successfully');
       return true;
     } catch (error) {
@@ -1220,14 +1222,14 @@ export default function App() {
       console.info('[App] Creating new location:', location);
       // Ensure orgId is set
       location.orgId = currentOrgId;
-      
+
       const created = await dataService.createLocation(location);
       console.info('[App] Location created successfully:', created);
       setLocations(prev => [...prev, created]);
-      
+
       // Audit: Location created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', created.id, location.name);
-      
+
       handleNotify('success', 'Location registered successfully');
     } catch (error) {
       console.error('[App] Error creating location:', error);
@@ -1245,10 +1247,10 @@ export default function App() {
       const updated = await dataService.updateLocation(location.id, location);
       console.info('[App] Location updated successfully:', updated);
       setLocations(prev => prev.map(l => l.id === location.id ? location : l));
-      
+
       // Audit: Location updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', location.id, location.name, existing, location);
-      
+
       handleNotify('success', 'Location updated successfully');
     } catch (error) {
       console.error('[App] Error updating location:', error);
@@ -1261,11 +1263,11 @@ export default function App() {
     try {
       console.info('[App] Checking location usage before deletion:', id);
       const existing = locations.find(l => l.id === id);
-      
+
       // Check if location is used in other modules
       const usage = await dataService.checkLocationUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete location. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete location.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false;
       }
@@ -1274,10 +1276,10 @@ export default function App() {
       console.info('[App] Deleting location:', id);
       await dataService.deleteLocation(id);
       setLocations(prev => prev.filter(l => l.id !== id));
-      
+
       // Audit: Location deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'LOCATION', id, existing?.name);
-      
+
       handleNotify('success', 'Location deleted successfully');
       return true;
     } catch (error) {
@@ -1295,14 +1297,14 @@ export default function App() {
       console.info('[App] Creating new schedule:', schedule);
       // Ensure orgId is set
       schedule.orgId = currentOrgId;
-      
+
       const created = await dataService.createSchedule(schedule);
       console.info('[App] Schedule created successfully:', created);
       setSchedules(prev => [...prev, created]);
-      
+
       // Audit: Schedule created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', created.id);
-      
+
       handleNotify('success', 'Schedule registered successfully');
     } catch (error) {
       console.error('[App] Error creating schedule:', error);
@@ -1320,10 +1322,10 @@ export default function App() {
       const updated = await dataService.updateSchedule(schedule.id, schedule);
       console.info('[App] Schedule updated successfully:', updated);
       setSchedules(prev => prev.map(s => s.id === schedule.id ? schedule : s));
-      
+
       // Audit: Schedule updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', schedule.id, undefined, existing, schedule);
-      
+
       handleNotify('success', 'Schedule updated successfully');
     } catch (error) {
       console.error('[App] Error updating schedule:', error);
@@ -1335,11 +1337,11 @@ export default function App() {
   const handleDeleteSchedule = async (id: string) => {
     try {
       console.info('[App] Checking schedule usage before deletion:', id);
-      
+
       // Check if schedule is used in other modules
       const usage = await dataService.checkScheduleUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete schedule. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete schedule.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false;
       }
@@ -1348,10 +1350,10 @@ export default function App() {
       console.info('[App] Deleting schedule:', id);
       await dataService.deleteSchedule(id);
       setSchedules(prev => prev.filter(s => s.id !== id));
-      
+
       // Audit: Schedule deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SCHEDULE', id);
-      
+
       handleNotify('success', 'Schedule deleted successfully');
       return true;
     } catch (error) {
@@ -1373,10 +1375,10 @@ export default function App() {
       const created = await dataService.createBatch(batchWithOrg);
       console.info('[App] Batch created successfully:', created);
       setBatches(prev => [...prev, created]);
-      
+
       // Audit: Batch created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', created.id, batch.name || batch.batchCode);
-      
+
       handleNotify('success', 'Batch created successfully');
     } catch (error) {
       console.error('[App] Error creating batch:', error);
@@ -1393,10 +1395,10 @@ export default function App() {
       const updated = await dataService.updateBatch(batch.id, batch);
       console.info('[App] Batch updated successfully:', updated);
       setBatches(prev => prev.map(b => b.id === batch.id ? batch : b));
-      
+
       // Audit: Batch updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', batch.id, batch.name || batch.batchCode, existing, batch);
-      
+
       handleNotify('success', 'Batch updated successfully');
     } catch (error) {
       console.error('[App] Error updating batch:', error);
@@ -1411,10 +1413,10 @@ export default function App() {
       const existing = batches.find(b => b.id === id);
       await dataService.deleteBatch(id);
       setBatches(prev => prev.filter(b => b.id !== id));
-      
+
       // Audit: Batch deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', id, existing?.name || existing?.batchCode);
-      
+
       handleNotify('success', 'Batch deleted successfully');
       return true;
     } catch (error) {
@@ -1435,10 +1437,10 @@ export default function App() {
       console.info('[App] Creating sponsor:', sponsorWithOrg);
       const created = await dataService.createSponsor(sponsorWithOrg);
       setSponsors(prev => [...prev, created]);
-      
+
       // Audit: Sponsor created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', created.id, sponsor.name);
-      
+
       handleNotify('success', `Sponsor "${created.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating sponsor:', error);
@@ -1453,10 +1455,10 @@ export default function App() {
       const existing = sponsors.find(s => s.id === sponsor.id);
       const updated = await dataService.updateSponsor(sponsor.id, sponsor);
       setSponsors(prev => prev.map(s => s.id === sponsor.id ? updated : s));
-      
+
       // Audit: Sponsor updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', sponsor.id, sponsor.name, existing, sponsor);
-      
+
       handleNotify('success', `Sponsor "${updated.name}" updated successfully`);
     } catch (error) {
       console.error('[App] Error updating sponsor:', error);
@@ -1469,11 +1471,11 @@ export default function App() {
     try {
       console.info('[App] Checking sponsor usage before deletion:', id);
       const existing = sponsors.find(s => s.id === id);
-      
+
       // Check if sponsor is used in other modules
       const usage = await dataService.checkSponsorUsage(id);
       if (usage.isUsed) {
-        const message = `Cannot delete sponsor. Referenced in: ${usage.usedIn.join(', ')}`;
+        const message = `Cannot delete sponsor.Referenced in: ${usage.usedIn.join(', ')} `;
         handleNotify('error', message);
         return false;
       }
@@ -1482,10 +1484,10 @@ export default function App() {
       console.info('[App] Deleting sponsor:', id);
       await dataService.deleteSponsor(id);
       setSponsors(prev => prev.filter(s => s.id !== id));
-      
+
       // Audit: Sponsor deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'SPONSOR', id, existing?.name);
-      
+
       handleNotify('success', 'Sponsor deleted successfully');
       return true;
     } catch (error) {
@@ -1506,14 +1508,14 @@ export default function App() {
       const bankWithOrg = { ...bank, orgId: currentOrgId } as BankAccount;
       const created = await dataService.createBankAccount(bankWithOrg);
       setBankAccounts(prev => [...prev, created]);
-      
+
       // Audit: Bank account created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', created.id, `${bank.bankName} - ${bank.accountNumber}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', created.id, `${bank.bankName} - ${bank.accountNumber} `);
+
       handleNotify('success', `Bank account "${created.bankName}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating bank account:', error);
-      handleNotify('error', `Failed to create bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to create bank account: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1523,14 +1525,14 @@ export default function App() {
       const existing = bankAccounts.find(b => b.id === id);
       const updated = await dataService.updateBankAccount(id, updates);
       setBankAccounts(prev => prev.map(b => b.id === id ? updated : b));
-      
+
       // Audit: Bank account updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', id, existing?.bankName, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Bank account updated successfully');
     } catch (error) {
       console.error('[App] Error updating bank account:', error);
-      handleNotify('error', `Failed to update bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to update bank account: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1540,15 +1542,15 @@ export default function App() {
       const existing = bankAccounts.find(b => b.id === id);
       await dataService.deleteBankAccount(id);
       setBankAccounts(prev => prev.filter(b => b.id !== id));
-      
+
       // Audit: Bank account deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_ACCOUNT', id, existing?.bankName);
-      
+
       handleNotify('success', 'Bank account deleted successfully');
       return true;
     } catch (error) {
       console.error('[App] Error deleting bank account:', error);
-      handleNotify('error', `Failed to delete bank account: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to delete bank account: ${error instanceof Error ? error.message : 'Unknown error'} `);
       return false;
     }
   };
@@ -1560,14 +1562,14 @@ export default function App() {
       const reconciliationWithOrg = { ...reconciliation, orgId: currentOrgId };
       const created = await dataService.createBankReconciliation(reconciliationWithOrg);
       setBankReconciliations(prev => [...prev, created]);
-      
+
       // Audit: Bank reconciliation created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', created.id, `Reconciliation as of ${created.asOfDate}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', created.id, `Reconciliation as of ${created.asOfDate} `);
+
       handleNotify('success', 'Bank reconciliation saved successfully');
     } catch (error) {
       console.error('[App] Error creating bank reconciliation:', error);
-      handleNotify('error', `Failed to save reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to save reconciliation: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1577,14 +1579,14 @@ export default function App() {
       const existing = bankReconciliations.find(r => r.id === id);
       const updated = await dataService.updateBankReconciliation(id, updates);
       setBankReconciliations(prev => prev.map(r => r.id === id ? updated : r));
-      
+
       // Audit: Bank reconciliation updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', id, existing?.asOfDate, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Bank reconciliation updated successfully');
     } catch (error) {
       console.error('[App] Error updating bank reconciliation:', error);
-      handleNotify('error', `Failed to update reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to update reconciliation: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1594,14 +1596,14 @@ export default function App() {
       const existing = bankReconciliations.find(r => r.id === id);
       await dataService.deleteBankReconciliation(id);
       setBankReconciliations(prev => prev.filter(r => r.id !== id));
-      
+
       // Audit: Bank reconciliation deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_RECONCILIATION', id, existing?.asOfDate);
-      
+
       handleNotify('success', 'Bank reconciliation deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting bank reconciliation:', error);
-      handleNotify('error', `Failed to delete reconciliation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to delete reconciliation: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1612,14 +1614,14 @@ export default function App() {
       const entryWithOrg = { ...entry, orgId: currentOrgId };
       const created = await dataService.createRecurringJournalEntry(entryWithOrg);
       setRecurringJournalEntries(prev => [...prev, created]);
-      
+
       // Audit: Recurring journal entry created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', created.id, `Recurring entry: ${created.name}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', created.id, `Recurring entry: ${created.name} `);
+
       handleNotify('success', 'Recurring journal entry created successfully');
     } catch (error) {
       console.error('[App] Error creating recurring journal entry:', error);
-      handleNotify('error', `Failed to create recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to create recurring entry: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1629,14 +1631,14 @@ export default function App() {
       const existing = recurringJournalEntries.find(e => e.id === id);
       const updated = await dataService.updateRecurringJournalEntry(id, updates);
       setRecurringJournalEntries(prev => prev.map(e => e.id === id ? updated : e));
-      
+
       // Audit: Recurring journal entry updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', id, existing?.name, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Recurring journal entry updated successfully');
     } catch (error) {
       console.error('[App] Error updating recurring journal entry:', error);
-      handleNotify('error', `Failed to update recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to update recurring entry: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1646,14 +1648,14 @@ export default function App() {
       const existing = recurringJournalEntries.find(e => e.id === id);
       await dataService.deleteRecurringJournalEntry(id);
       setRecurringJournalEntries(prev => prev.filter(e => e.id !== id));
-      
+
       // Audit: Recurring journal entry deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'RECURRING_JOURNAL_ENTRY', id, existing?.name);
-      
+
       handleNotify('success', 'Recurring journal entry deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting recurring journal entry:', error);
-      handleNotify('error', `Failed to delete recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to delete recurring entry: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1668,7 +1670,7 @@ export default function App() {
 
       // Import RecurringJournalEntryService to use its logic
       const { RecurringJournalEntryService } = await import('./services/RecurringJournalEntryService');
-      
+
       // Check if entry is due
       if (!RecurringJournalEntryService.isDueToRun(entry)) {
         handleNotify('warning', 'This recurring entry is not due to run yet');
@@ -1683,7 +1685,7 @@ export default function App() {
         entryDate,
         generatedId
       );
-      
+
       // Create journal entry with lines
       const newJournalEntry: Partial<JournalEntry> = {
         ...journalEntryData,
@@ -1691,7 +1693,7 @@ export default function App() {
         createdBy: currentUser?.id || 'system',
         createdAt: new Date().toISOString()
       };
-      
+
       const created = await dataService.createJournalEntry(newJournalEntry as JournalEntry);
       setJournalEntries(prev => [...prev, created]);
 
@@ -1701,12 +1703,12 @@ export default function App() {
       setRecurringJournalEntries(prev => prev.map(e => e.id === id ? updated : e));
 
       // Audit
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'JOURNAL_ENTRY', created.id, `Auto-generated from recurring entry: ${entry.name}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'JOURNAL_ENTRY', created.id, `Auto - generated from recurring entry: ${entry.name} `);
+
       handleNotify('success', 'Recurring journal entry executed and posted successfully');
     } catch (error) {
       console.error('[App] Error running recurring journal entry:', error);
-      handleNotify('error', `Failed to execute recurring entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to execute recurring entry: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -1717,15 +1719,15 @@ export default function App() {
       const checkWithOrg = { ...check, orgId: currentOrgId } as CheckVoucher;
       const created = await dataService.createCheckVoucher(checkWithOrg);
       setCheckVouchers(prev => [...prev, created]);
-      
+
       // Audit: Check voucher created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', created.id, `Check #${check.checkNumber}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', created.id, `Check #${check.checkNumber} `);
+
       handleNotify('success', `Check #${created.checkNumber} created successfully`);
       return created;
     } catch (error) {
       console.error('[App] Error creating check voucher:', error);
-      handleNotify('error', `Failed to create check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to create check: ${error instanceof Error ? error.message : 'Unknown error'} `);
       return null;
     }
   };
@@ -1736,18 +1738,18 @@ export default function App() {
       const existing = checkVouchers.find(c => c.id === id);
       const updated = await dataService.updateCheckVoucher(id, updates);
       setCheckVouchers(prev => prev.map(c => c.id === id ? updated : c));
-      
+
       // Audit: Check voucher updated (include status changes)
-      const statusChange = updates.status && existing?.status !== updates.status 
-        ? `Status: ${existing?.status} → ${updates.status}` 
+      const statusChange = updates.status && existing?.status !== updates.status
+        ? `Status: ${existing?.status} → ${updates.status} `
         : undefined;
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber}`, existing, { ...existing, ...updates });
-      
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber} `, existing, { ...existing, ...updates });
+
       handleNotify('success', 'Check voucher updated successfully');
       return updated;
     } catch (error) {
       console.error('[App] Error updating check voucher:', error);
-      handleNotify('error', `Failed to update check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to update check: ${error instanceof Error ? error.message : 'Unknown error'} `);
       return null;
     }
   };
@@ -1758,15 +1760,15 @@ export default function App() {
       const existing = checkVouchers.find(c => c.id === id);
       await dataService.deleteCheckVoucher(id);
       setCheckVouchers(prev => prev.filter(c => c.id !== id));
-      
+
       // Audit: Check voucher deleted
-      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber}`);
-      
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'CHECK_VOUCHER', id, `Check #${existing?.checkNumber} `);
+
       handleNotify('success', 'Check voucher deleted successfully');
       return true;
     } catch (error) {
       console.error('[App] Error deleting check voucher:', error);
-      handleNotify('error', `Failed to delete check: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      handleNotify('error', `Failed to delete check: ${error instanceof Error ? error.message : 'Unknown error'} `);
       return false;
     }
   };
@@ -1777,15 +1779,15 @@ export default function App() {
       const vendorWithOrg = { ...vendor, orgId: currentOrgId } as Vendor;
       const created = await dataService.createVendor(vendorWithOrg);
       setVendors(prev => [...prev, created]);
-      
+
       // Audit: Vendor created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', created.id, vendor.name);
-      
+
       handleNotify('success', `Vendor "${created.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating vendor:', error);
       handleNotify('error', 'Failed to create vendor. Falling back to memory storage.');
-      setVendors(prev => [...prev, { ...vendor, orgId: currentOrgId, id: `ven-${Date.now()}` } as Vendor]);
+      setVendors(prev => [...prev, { ...vendor, orgId: currentOrgId, id: `ven - ${Date.now()} ` } as Vendor]);
     }
   };
 
@@ -1795,10 +1797,10 @@ export default function App() {
       const existing = vendors.find(v => v.id === id);
       const updated = await dataService.updateVendor(id, updates);
       setVendors(prev => prev.map(v => v.id === id ? updated : v));
-      
+
       // Audit: Vendor updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Vendor updated successfully');
     } catch (error) {
       console.error('[App] Error updating vendor:', error);
@@ -1813,10 +1815,10 @@ export default function App() {
       const existing = vendors.find(v => v.id === id);
       await dataService.deleteVendor(id);
       setVendors(prev => prev.filter(v => v.id !== id));
-      
+
       // Audit: Vendor deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name);
-      
+
       handleNotify('success', 'Vendor deleted successfully');
       return true;
     } catch (error) {
@@ -1841,7 +1843,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error adding warehouse location:', error);
       handleNotify('error', 'Failed to create location. Falling back to memory storage.');
-      const locWithId: WarehouseLocation = { ...location, orgId: currentOrgId, id: `loc-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      const locWithId: WarehouseLocation = { ...location, orgId: currentOrgId, id: `loc - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
       setWarehouseLocations([...warehouseLocations, locWithId]);
     }
   };
@@ -1882,7 +1884,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error adding stock item:', error);
       handleNotify('error', 'Failed to create item. Falling back to memory storage.');
-      const itemWithId: StockItem = { ...item, orgId: currentOrgId, id: `item-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      const itemWithId: StockItem = { ...item, orgId: currentOrgId, id: `item - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
       setStockItems([...stockItems, itemWithId]);
     }
   };
@@ -1923,7 +1925,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error adding inventory level:', error);
       handleNotify('error', 'Failed to create inventory level. Falling back to memory storage.');
-      const levelWithId: InventoryLevel = { ...level, orgId: currentOrgId, id: `level-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      const levelWithId: InventoryLevel = { ...level, orgId: currentOrgId, id: `level - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
       setInventoryLevels([...inventoryLevels, levelWithId]);
     }
   };
@@ -1964,7 +1966,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error adding stock adjustment:', error);
       handleNotify('error', 'Failed to create adjustment. Falling back to memory storage.');
-      const adjWithId: StockAdjustment = { ...adjustment, orgId: currentOrgId, id: `adj-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      const adjWithId: StockAdjustment = { ...adjustment, orgId: currentOrgId, id: `adj - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
       setStockAdjustments([...stockAdjustments, adjWithId]);
     }
   };
@@ -2005,7 +2007,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error adding reorder point:', error);
       handleNotify('error', 'Failed to create reorder point. Falling back to memory storage.');
-      const pointWithId: ReorderPoint = { ...point, orgId: currentOrgId, id: `reorder-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
+      const pointWithId: ReorderPoint = { ...point, orgId: currentOrgId, id: `reorder - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
       setReorderPoints([...reorderPoints, pointWithId]);
     }
   };
@@ -2046,10 +2048,10 @@ export default function App() {
       const assetWithOrg = { ...asset, orgId: currentOrgId };
       const savedAsset = await dataService.createFixedAsset(assetWithOrg);
       setFixedAssets(prev => [...prev, savedAsset]);
-      
+
       // Audit: Fixed asset created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', savedAsset.id, `${asset.code} - ${asset.name}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', savedAsset.id, `${asset.code} - ${asset.name} `);
+
       handleNotify('success', `Fixed asset "${asset.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating fixed asset:', error);
@@ -2065,10 +2067,10 @@ export default function App() {
       const existing = fixedAssets.find(a => a.id === id);
       const updated = await dataService.updateFixedAsset(id, updates);
       setFixedAssets(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
-      
+
       // Audit: Fixed asset updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', id, existing?.name, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Fixed asset updated successfully');
     } catch (error) {
       console.error('[App] Error updating fixed asset:', error);
@@ -2083,10 +2085,10 @@ export default function App() {
       const existing = fixedAssets.find(a => a.id === id);
       await dataService.deleteFixedAsset(id);
       setFixedAssets(prev => prev.filter(a => a.id !== id));
-      
+
       // Audit: Fixed asset deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FIXED_ASSET', id, existing?.name);
-      
+
       handleNotify('success', 'Fixed asset deleted successfully');
     } catch (error) {
       console.error('[App] Error archiving fixed asset:', error);
@@ -2101,45 +2103,45 @@ export default function App() {
 
   const handleRestoreFromArchive = async (type: string, id: string) => {
     try {
-      console.info(`[App] Restoring ${type} from archive:`, id);
-      
+      console.info(`[App] Restoring ${type} from archive: `, id);
+
       const tableName = mapTypeToTable[type];
-      if (!tableName) throw new Error(`Unknown type: ${type}`);
-      
+      if (!tableName) throw new Error(`Unknown type: ${type} `);
+
       await dataService.restoreEntity(tableName, id);
-      
+
       // Update local state
       updateState(type, id, { isDeleted: false });
-      
+
       // Audit: Restored
       AuditService.logAction(currentOrgId, currentUser?.id || "system", currentUser?.name || "System", "RESTORED", type, id);
-      
+
       handleNotify('success', `${type} restored successfully`);
     } catch (error) {
-      console.error(`[App] Error restoring ${type}:`, error);
-      handleNotify('error', `Failed to restore ${type}`);
+      console.error(`[App] Error restoring ${type}: `, error);
+      handleNotify('error', `Failed to restore ${type} `);
     }
   };
 
   const handlePermanentDelete = async (type: string, id: string) => {
     try {
-      console.info(`[App] Permanent delete ${type}:`, id);
-      
+      console.info(`[App] Permanent delete ${type}: `, id);
+
       const tableName = mapTypeToTable[type];
-      if (!tableName) throw new Error(`Unknown type: ${type}`);
-      
+      if (!tableName) throw new Error(`Unknown type: ${type} `);
+
       await dataService.permanentDeleteEntity(tableName, id);
-      
+
       // Update local state - remove from list
       removeFromState(type, id);
-      
+
       // Audit: Permanent Delete
       AuditService.logAction(currentOrgId, currentUser?.id || "system", currentUser?.name || "System", "PERMANENT_DELETE", type, id);
-      
+
       handleNotify('success', `${type} deleted permanently`);
     } catch (error) {
-      console.error(`[App] Error permanent deleting ${type}:`, error);
-      handleNotify('error', `Failed to permanently delete ${type}`);
+      console.error(`[App] Error permanent deleting ${type}: `, error);
+      handleNotify('error', `Failed to permanently delete ${type} `);
     }
   };
 
@@ -2176,7 +2178,7 @@ export default function App() {
   };
 
   const updateState = (type: string, id: string, updates: any) => {
-    switch(type) {
+    switch (type) {
       case 'STUDENT': setStudents(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'TRAINER': setTrainers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'QUALIFICATION': setQualifications(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
@@ -2209,7 +2211,7 @@ export default function App() {
   };
 
   const removeFromState = (type: string, id: string) => {
-    switch(type) {
+    switch (type) {
       case 'STUDENT': setStudents(prev => prev.filter(x => x.id !== id)); break;
       case 'TRAINER': setTrainers(prev => prev.filter(x => x.id !== id)); break;
       case 'QUALIFICATION': setQualifications(prev => prev.filter(x => x.id !== id)); break;
@@ -2251,28 +2253,28 @@ export default function App() {
 
       // Calculate monthly depreciation: Purchase Cost / (Useful Life Years * 12)
       const monthlyDepreciation = asset.purchaseCost / (asset.usefulLifeYears * 12);
-      
+
       // Generate entry ID
-      const entryId = `depr-${Date.now()}`;
+      const entryId = `depr - ${Date.now()} `;
 
       // Create depreciation lines with proper journalEntryId reference
       const deprLines: JournalLine[] = [
         {
-          id: `line-${Date.now()}-debit`,
+          id: `line - ${Date.now()} -debit`,
           journalEntryId: entryId,
           accountId: '', // Depreciation expense account - will use blank for now
           debit: monthlyDepreciation,
           credit: 0,
-          description: `Depreciation expense - ${asset.name}`,
+          description: `Depreciation expense - ${asset.name} `,
           assetId: assetId
         },
         {
-          id: `line-${Date.now()}-credit`,
+          id: `line - ${Date.now()} -credit`,
           journalEntryId: entryId,
           accountId: asset.glAccountId, // Fixed Asset account
           debit: 0,
           credit: monthlyDepreciation,
-          description: `Accumulated depreciation - ${asset.name}`,
+          description: `Accumulated depreciation - ${asset.name} `,
           assetId: assetId
         }
       ];
@@ -2284,7 +2286,7 @@ export default function App() {
         periodId: '', // Will need period context
         date: new Date().toISOString().split('T')[0],
         description: `Monthly depreciation for ${asset.name}`,
-        reference: `DEP-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`,
+        reference: `DEP - ${new Date().getFullYear()} -${Math.floor(Math.random() * 100000).toString().padStart(5, '0')} `,
         status: 'POSTED',
         createdBy: currentUser?.id || 'system',
         sourceType: 'DEPRECIATION',
@@ -2305,7 +2307,7 @@ export default function App() {
       // Update accumulated depreciation on the asset
       const newAccumulated = (asset.accumulatedDepreciation || 0) + monthlyDepreciation;
       await handleUpdateFixedAsset(assetId, { accumulatedDepreciation: newAccumulated });
-      
+
       // Audit: Depreciation recorded
       AuditService.log({
         orgId: currentOrgId,
@@ -2315,7 +2317,7 @@ export default function App() {
         entityType: 'FIXED_ASSET',
         entityId: assetId,
         entityName: asset.name,
-        details: `Depreciation: ${monthlyDepreciation.toFixed(2)} | New Accumulated: ${newAccumulated.toFixed(2)}`
+        details: `Depreciation: ${monthlyDepreciation.toFixed(2)} | New Accumulated: ${newAccumulated.toFixed(2)} `
       });
 
       handleNotify('success', `Depreciation of ${monthlyDepreciation.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully`);
@@ -2332,10 +2334,10 @@ export default function App() {
       const itemWithOrg = { ...item, orgId: currentOrgId };
       const savedItem = await dataService.createItem(itemWithOrg);
       setItems(prev => [...prev, savedItem]);
-      
+
       // Audit: Item created
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', savedItem.id, `${item.code} - ${item.name}`);
-      
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', savedItem.id, `${item.code} - ${item.name} `);
+
       handleNotify('success', `Item "${item.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating item:', error);
@@ -2351,10 +2353,10 @@ export default function App() {
       const existing = items.find(i => i.id === id);
       const updated = await dataService.updateItem(id, updates);
       setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
-      
+
       // Audit: Item updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', id, existing?.name, existing, { ...existing, ...updates });
-      
+
       handleNotify('success', 'Item updated successfully');
     } catch (error) {
       console.error('[App] Error updating item:', error);
@@ -2369,10 +2371,10 @@ export default function App() {
       const existing = items.find(i => i.id === id);
       await dataService.deleteItem(id);
       setItems(prev => prev.filter(i => i.id !== id));
-      
+
       // Audit: Item deleted
       AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ITEM', id, existing?.name);
-      
+
       handleNotify('success', 'Item deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting item:', error);
@@ -2386,14 +2388,15 @@ export default function App() {
     try {
       console.info('[App] Creating course fee:', fee.feeName);
       const feeWithOrg = { ...fee, orgId: currentOrgId };
-      // For now, store in memory (can be wired to dataService later)
-      setCourseFees(prev => [...prev, feeWithOrg]);
-      
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', feeWithOrg.id, `${fee.feeCode} - ${fee.feeName}`);
+      const savedFee = await dataService.createCourseFee(feeWithOrg);
+      setCourseFees(prev => [...prev, savedFee]);
+
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', savedFee.id, `${fee.feeCode} - ${fee.feeName} `);
       handleNotify('success', `Course fee "${fee.feeName}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating course fee:', error);
-      handleNotify('error', 'Failed to create course fee.');
+      handleNotify('error', `Failed to create course fee: ${error instanceof Error ? error.message : 'Unknown error'} `);
+      throw error; // Re-throw so bulk creation can detect the failure
     }
   };
 
@@ -2401,13 +2404,14 @@ export default function App() {
     try {
       console.info('[App] Updating course fee:', fee.id);
       const existing = courseFees.find(f => f.id === fee.id);
-      setCourseFees(prev => prev.map(f => f.id === fee.id ? { ...f, ...fee, updatedAt: new Date().toISOString() } : f));
-      
+      const updated = await dataService.updateCourseFee(fee.id, fee);
+      setCourseFees(prev => prev.map(f => f.id === fee.id ? updated : f));
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', fee.id, fee.feeName, existing, fee);
       handleNotify('success', `Course fee "${fee.feeName}" updated successfully`);
     } catch (error) {
       console.error('[App] Error updating course fee:', error);
-      handleNotify('error', 'Failed to update course fee.');
+      handleNotify('error', `Failed to update course fee: ${error instanceof Error ? error.message : 'Unknown error'} `);
     }
   };
 
@@ -2415,14 +2419,15 @@ export default function App() {
     try {
       console.info('[App] Deleting course fee:', id);
       const existing = courseFees.find(f => f.id === id);
-      setCourseFees(prev => prev.map(f => f.id === id ? { ...f, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : f));
-      
-      AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', id, existing?.feeName);
+      await dataService.deleteCourseFee(id);
+      setCourseFees(prev => prev.filter(f => f.id !== id));
+
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'COURSE_FEE', id, existing?.feeName);
       handleNotify('success', 'Course fee deleted successfully');
       return true;
     } catch (error) {
       console.error('[App] Error deleting course fee:', error);
-      handleNotify('error', 'Failed to delete course fee.');
+      handleNotify('error', `Failed to delete course fee: ${error instanceof Error ? error.message : 'Unknown error'} `);
       return false;
     }
   };
@@ -2433,7 +2438,7 @@ export default function App() {
       console.info('[App] Creating enrollment for student:', enrollment.studentId);
       const enrollmentWithOrg = { ...enrollment, orgId: currentOrgId };
       setEnrollments(prev => [...prev, enrollmentWithOrg]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollmentWithOrg.id, enrollment.enrollmentCode || enrollment.id);
       handleNotify('success', 'Student enrolled successfully');
     } catch (error) {
@@ -2447,7 +2452,7 @@ export default function App() {
       console.info('[App] Updating enrollment:', enrollment.id);
       const existing = enrollments.find(e => e.id === enrollment.id);
       setEnrollments(prev => prev.map(e => e.id === enrollment.id ? { ...e, ...enrollment, updatedAt: new Date().toISOString() } : e));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollment.id, enrollment.enrollmentCode, existing, enrollment);
       handleNotify('success', 'Enrollment updated successfully');
     } catch (error) {
@@ -2461,7 +2466,7 @@ export default function App() {
       console.info('[App] Deleting enrollment:', id);
       const existing = enrollments.find(e => e.id === id);
       setEnrollments(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : e));
-      
+
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', id, existing?.enrollmentCode);
       handleNotify('success', 'Enrollment removed successfully');
       return true;
@@ -2478,7 +2483,7 @@ export default function App() {
       console.info('[App] Creating invoice:', invoice.invoiceNo);
       const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
       setInvoices(prev => [...prev, invoiceWithOrg]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoiceWithOrg.id, invoice.invoiceNo);
       handleNotify('success', `Invoice ${invoice.invoiceNo} created successfully`);
     } catch (error) {
@@ -2492,7 +2497,7 @@ export default function App() {
       console.info('[App] Updating invoice:', invoice.id);
       const existing = invoices.find(i => i.id === invoice.id);
       setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...invoice, updatedAt: new Date().toISOString() } : i));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoice.id, invoice.invoiceNo, existing, invoice);
       handleNotify('success', `Invoice ${invoice.invoiceNo} updated successfully`);
     } catch (error) {
@@ -2506,7 +2511,7 @@ export default function App() {
       console.info('[App] Deleting invoice:', id);
       const existing = invoices.find(i => i.id === id);
       setInvoices(prev => prev.map(i => i.id === id ? { ...i, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : i));
-      
+
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', id, existing?.invoiceNo);
       handleNotify('success', 'Invoice deleted successfully');
       return true;
@@ -2537,27 +2542,28 @@ export default function App() {
       const origJournal = journalEntries.find(j => j.sourceType === 'INVOICE' && j.sourceRef === id && j.status === 'POSTED');
       if (origJournal) {
         // Reverse all lines: swap debit/credit
-        const origLines = journalLines.filter(l => l.entryId === origJournal.id);
+        const origLines = journalLines.filter(l => l.journalEntryId === origJournal.id);
         const reversedLines = origLines.map(l => ({
           ...l,
-          id: `${l.id}-VOID`,
-          entryId: `${origJournal.id}-VOID`,
+          id: `${l.id} -VOID`,
+          journalEntryId: `${origJournal.id} -VOID`,
           debit: l.credit,
           credit: l.debit,
           createdAt: new Date().toISOString(),
           updatedAt: undefined
         }));
-        const voidJournal = {
+        const voidJournal: JournalEntry = {
           ...origJournal,
-          id: `${origJournal.id}-VOID`,
+          id: `${origJournal.id} -VOID`,
           status: 'POSTED',
           sourceType: 'VOID',
-          reference: `${origJournal.reference}-VOID`,
-          description: `[VOID] ${origJournal.description}`,
+          reference: `${origJournal.reference} -VOID`,
+          description: `[VOID] ${origJournal.description} `,
           createdAt: new Date().toISOString(),
           postedAt: new Date().toISOString(),
-          postedBy: currentUser?.id,
-          sourceRef: id
+          postedBy: currentUser?.id || 'system',
+          sourceRef: id,
+          isDeleted: false
         };
         setJournalEntries(prev => [...prev, voidJournal]);
         setJournalLines(prev => [...prev, ...reversedLines]);
@@ -2597,7 +2603,40 @@ export default function App() {
       console.info('[App] Creating payment:', payment.paymentNo);
       const paymentWithOrg = { ...payment, orgId: currentOrgId };
       setPayments(prev => [...prev, paymentWithOrg]);
-      
+
+      // 3. Create GL_Journal collection entry
+      const collectionEntry: Partial<JournalEntry> = {
+        orgId: currentOrgId,
+        periodId: '', // Default period
+        date: payment.paymentDate,
+        description: `Collection for Payment ${payment.paymentNo}`,
+        reference: payment.paymentNo,
+        status: 'POSTED',
+        sourceType: 'APPLICATION',
+        sourceRef: payment.id,
+        createdBy: currentUser?.id || 'system',
+        createdAt: new Date().toISOString()
+      };
+      const collectionLines: JournalLine[] = [
+        {
+          id: `line - ${Date.now()} -1`,
+          journalEntryId: '', // Placeholder
+          accountId: payment.bankAccountId || '', // Collection account / Bank
+          debit: payment.amountReceived,
+          credit: 0,
+          description: `Payment received: ${payment.paymentNo} `
+        },
+        {
+          id: `line - ${Date.now()} -2`,
+          journalEntryId: '', // Placeholder
+          accountId: '', // AR account
+          debit: 0,
+          credit: payment.amountReceived,
+          description: `AR offset for payment: ${payment.paymentNo} `
+        }
+      ];
+      await handlePostJournal(collectionEntry, collectionLines);
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentWithOrg.id, payment.paymentNo);
       handleNotify('success', `Payment ${payment.paymentNo} created successfully`);
     } catch (error) {
@@ -2611,7 +2650,7 @@ export default function App() {
       console.info('[App] Updating payment:', payment.id);
       const existing = payments.find(p => p.id === payment.id);
       setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...payment, updatedAt: new Date().toISOString() } : p));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', payment.id, payment.paymentNo, existing, payment);
       handleNotify('success', `Payment ${payment.paymentNo} updated successfully`);
     } catch (error) {
@@ -2625,7 +2664,7 @@ export default function App() {
       console.info('[App] Deleting payment:', id);
       const existing = payments.find(p => p.id === id);
       setPayments(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
-      
+
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, existing?.paymentNo);
       handleNotify('success', 'Payment deleted successfully');
       return true;
@@ -2640,12 +2679,12 @@ export default function App() {
     try {
       const payment = payments.find(p => p.id === id);
       if (payment) {
-        const voidedPayment = { 
-          ...payment, 
-          status: 'VOIDED' as const, 
-          voidedAt: new Date().toISOString(), 
+        const voidedPayment = {
+          ...payment,
+          status: 'VOIDED' as const,
+          voidedAt: new Date().toISOString(),
           voidedBy: currentUser?.id,
-          voidReason: reason 
+          voidReason: reason
         };
         setPayments(prev => prev.map(p => p.id === id ? voidedPayment : p));
         AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, payment.paymentNo, payment, voidedPayment);
@@ -2665,7 +2704,7 @@ export default function App() {
     if (!payment || !invoice) return;
 
     const newApplication = {
-      id: `appl-${Date.now()}`,
+      id: `appl - ${Date.now()} `,
       paymentId,
       invoiceId,
       amountApplied: amount,
@@ -2702,32 +2741,30 @@ export default function App() {
         orgId: currentOrgId,
         periodId: invoice.periodId,
         date: new Date().toISOString().split('T')[0],
-        description: `Payment Application to Invoice ${invoice.invoiceNo}`,
-        reference: `APPL-${invoice.invoiceNo}-${Date.now()}`,
+        description: `Payment Application to Invoice ${invoice.invoiceNo} `,
+        reference: `APPL - ${invoice.invoiceNo} -${Date.now()} `,
         status: 'POSTED',
-        sourceType: 'APPL',
+        sourceType: 'APPLICATION',
         sourceRef: invoiceId,
         createdBy: currentUser?.id,
         createdAt: new Date().toISOString()
       };
       const applLines: JournalLine[] = [
         {
-          id: `jl-${Date.now()}-1`,
-          entryId: '', // will be set by handlePostJournal
+          id: `jl - ${Date.now()} -1`,
+          journalEntryId: '', // will be set by handlePostJournal
           accountId: depositsAcct.id,
           debit: amount,
           credit: 0,
-          description: 'Apply from Customer Deposits',
-          createdAt: new Date().toISOString()
+          description: 'Apply from Customer Deposits'
         },
         {
-          id: `jl-${Date.now()}-2`,
-          entryId: '',
+          id: `jl - ${Date.now()} -2`,
+          journalEntryId: '',
           accountId: arAcct.id,
           debit: 0,
           credit: amount,
-          description: 'Reduce Accounts Receivable',
-          createdAt: new Date().toISOString()
+          description: 'Reduce Accounts Receivable'
         }
       ];
       await handlePostJournal(applEntry, applLines);
@@ -2776,36 +2813,34 @@ export default function App() {
     const arAcct = coa.find(a => a.code === '1200');
     const depositsAcct = coa.find(a => a.code === '2000');
     if (arAcct && depositsAcct) {
-      const rvrsEntry = {
+      const rvrsEntry: Partial<JournalEntry> = {
         orgId: currentOrgId,
         periodId: invoice.periodId,
         date: new Date().toISOString().split('T')[0],
         description: `Reversal of Payment Application for Invoice ${invoice.invoiceNo}`,
-        reference: `RVRS-${invoice.invoiceNo}-${Date.now()}`,
+        reference: `RVRS - ${invoice.invoiceNo} -${Date.now()} `,
         status: 'POSTED',
-        sourceType: 'RVRS',
+        sourceType: 'REVERSAL',
         sourceRef: invoice.id,
-        createdBy: currentUser?.id,
+        createdBy: currentUser?.id || 'system',
         createdAt: new Date().toISOString()
       };
-      const rvrsLines = [
+      const rvrsLines: JournalLine[] = [
         {
-          id: `jl-${Date.now()}-1`,
-          entryId: '',
+          id: `jl - ${Date.now()} -1`,
+          journalEntryId: '',
           accountId: arAcct.id,
           debit: reversedAmount,
           credit: 0,
-          description: 'Restore Accounts Receivable',
-          createdAt: new Date().toISOString()
+          description: 'Restore Accounts Receivable'
         },
         {
-          id: `jl-${Date.now()}-2`,
-          entryId: '',
+          id: `jl - ${Date.now()} -2`,
+          journalEntryId: '',
           accountId: depositsAcct.id,
           debit: 0,
           credit: reversedAmount,
-          description: 'Restore Customer Deposits',
-          createdAt: new Date().toISOString()
+          description: 'Restore Customer Deposits'
         }
       ];
       await handlePostJournal(rvrsEntry, rvrsLines);
@@ -2818,7 +2853,7 @@ export default function App() {
       console.info('[App] Creating bank deposit:', deposit.depositNo);
       const depositWithOrg = { ...deposit, orgId: currentOrgId };
       setBankDeposits(prev => [...prev, depositWithOrg]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', depositWithOrg.id, deposit.depositNo);
       handleNotify('success', `Deposit ${deposit.depositNo} created successfully`);
     } catch (error) {
@@ -2832,7 +2867,7 @@ export default function App() {
       console.info('[App] Updating bank deposit:', deposit.id);
       const existing = bankDeposits.find(d => d.id === deposit.id);
       setBankDeposits(prev => prev.map(d => d.id === deposit.id ? { ...d, ...deposit, updatedAt: new Date().toISOString() } : d));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', deposit.id, deposit.depositNo, existing, deposit);
       handleNotify('success', `Deposit ${deposit.depositNo} updated successfully`);
     } catch (error) {
@@ -2846,7 +2881,7 @@ export default function App() {
       console.info('[App] Deleting bank deposit:', id);
       const existing = bankDeposits.find(d => d.id === id);
       setBankDeposits(prev => prev.map(d => d.id === id ? { ...d, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : d));
-      
+
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', id, existing?.depositNo);
       handleNotify('success', 'Bank deposit deleted successfully');
       return true;
@@ -2861,12 +2896,12 @@ export default function App() {
     try {
       const deposit = bankDeposits.find(d => d.id === id);
       if (deposit) {
-        const voidedDeposit = { 
-          ...deposit, 
-          status: 'VOIDED' as const, 
-          voidedAt: new Date().toISOString(), 
+        const voidedDeposit = {
+          ...deposit,
+          status: 'VOIDED' as const,
+          voidedAt: new Date().toISOString(),
           voidedBy: currentUser?.id,
-          voidReason: reason 
+          voidReason: reason
         };
         setBankDeposits(prev => prev.map(d => d.id === id ? voidedDeposit : d));
         AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BANK_DEPOSIT', id, deposit.depositNo, deposit, voidedDeposit);
@@ -2885,8 +2920,8 @@ export default function App() {
       const empWithOrg = { ...employee, orgId: currentOrgId };
       const savedEmployee = await dataService.createEmployee(empWithOrg);
       setEmployees(prev => [...prev, savedEmployee]);
-      
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', savedEmployee.id, `${employee.firstName} ${employee.lastName}`);
+
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', savedEmployee.id, `${employee.firstName} ${employee.lastName} `);
       handleNotify('success', `Employee "${employee.firstName} ${employee.lastName}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating employee:', error);
@@ -2902,8 +2937,8 @@ export default function App() {
       const existing = employees.find(e => e.id === employee.id);
       const updated = await dataService.updateEmployee(employee.id, employee);
       setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, ...updated } : e));
-      
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', employee.id, `${employee.firstName} ${employee.lastName}`, existing, updated);
+
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', employee.id, `${employee.firstName} ${employee.lastName} `, existing, updated);
       handleNotify('success', 'Employee updated successfully');
     } catch (error) {
       console.error('[App] Error updating employee:', error);
@@ -2918,8 +2953,8 @@ export default function App() {
       const existing = employees.find(e => e.id === id);
       await dataService.deleteEmployee(id);
       setEmployees(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString() } : e));
-      
-      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', id, `${existing?.firstName} ${existing?.lastName}`);
+
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EMPLOYEE', id, `${existing?.firstName} ${existing?.lastName} `);
       handleNotify('success', 'Employee deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting employee:', error);
@@ -2935,8 +2970,8 @@ export default function App() {
       const acctWithOrg = { ...account, orgId: currentOrgId };
       const savedAccount = await dataService.createAccount(acctWithOrg);
       setAccounts(prev => [...prev, savedAccount]);
-      
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', savedAccount.id, `${account.code} - ${account.name}`);
+
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', savedAccount.id, `${account.code} - ${account.name} `);
       handleNotify('success', `Account "${account.code} - ${account.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error creating account:', error);
@@ -2952,8 +2987,8 @@ export default function App() {
       const existing = accounts.find(a => a.id === account.id);
       const updated = await dataService.updateAccount(account.id, account);
       setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, ...updated } : a));
-      
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', account.id, `${account.code} - ${account.name}`, existing, updated);
+
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', account.id, `${account.code} - ${account.name} `, existing, updated);
       handleNotify('success', 'Account updated successfully');
     } catch (error) {
       console.error('[App] Error updating account:', error);
@@ -2968,7 +3003,7 @@ export default function App() {
       const existing = accounts.find(a => a.id === id);
       await dataService.deleteAccount(id);
       setAccounts(prev => prev.filter(a => a.id !== id));
-      
+
       AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ACCOUNT', id, existing?.name);
       handleNotify('success', 'Account deleted successfully');
     } catch (error) {
@@ -2985,7 +3020,7 @@ export default function App() {
       const poWithOrg = { ...po, orgId: currentOrgId };
       const savedPO = await dataService.createPurchaseOrder(poWithOrg);
       setPurchaseOrders(prev => [...prev, savedPO]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PURCHASE_ORDER', savedPO.id, po.reference);
       handleNotify('success', `Purchase Order "${po.reference}" created successfully`);
     } catch (error) {
@@ -3000,7 +3035,7 @@ export default function App() {
     try {
       console.info('[App] Updating purchase order status:', id, status);
       const existing = purchaseOrders.find(p => p.id === id);
-      
+
       // Generate GL Entry Number when approving
       let updatePayload: any = { status: status as any };
       if (status === 'APPROVED' && existing && !existing.glEntryNumber) {
@@ -3009,19 +3044,19 @@ export default function App() {
         const postedJournals = journalEntries.filter(e => e.status === 'POSTED' && e.glEntryNumber);
         const approvedPOs = purchaseOrders.filter(p => p.glEntryNumber);
         const nextNum = postedJournals.length + approvedPOs.length + 1;
-        const glEntryNumber = `GL-${year}-${String(nextNum).padStart(5, '0')}`;
+        const glEntryNumber = `GL - ${year} -${String(nextNum).padStart(5, '0')} `;
         updatePayload.glEntryNumber = glEntryNumber;
         updatePayload.approvedBy = currentUser?.id;
         updatePayload.approvedAt = new Date().toISOString();
       }
-      
+
       const updated = await dataService.updatePurchaseOrder(id, updatePayload);
       setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PURCHASE_ORDER', id, existing?.reference, { status: existing?.status }, { status });
-      
+
       if (status === 'APPROVED' && updatePayload.glEntryNumber) {
-        handleNotify('success', `Purchase order approved. GL Entry #: ${updatePayload.glEntryNumber}`);
+        handleNotify('success', `Purchase order approved.GL Entry #: ${updatePayload.glEntryNumber} `);
       } else {
         handleNotify('success', 'Purchase order status updated successfully');
       }
@@ -3039,7 +3074,7 @@ export default function App() {
       const grWithOrg = { ...gr, orgId: currentOrgId };
       const savedGR = await dataService.createGoodsReceipt(grWithOrg);
       setGoodsReceipts(prev => [...prev, savedGR]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', savedGR.id, gr.grNumber);
       handleNotify('success', `Goods Receipt "${gr.grNumber}" created successfully`);
     } catch (error) {
@@ -3056,7 +3091,7 @@ export default function App() {
       const existing = goodsReceipts.find(g => g.id === id);
       const updated = await dataService.updateGoodsReceipt(id, updates);
       setGoodsReceipts(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.grNumber, existing, { ...existing, ...updates });
       handleNotify('success', 'Goods receipt updated successfully');
     } catch (error) {
@@ -3072,7 +3107,7 @@ export default function App() {
       const existing = goodsReceipts.find(g => g.id === id);
       await dataService.deleteGoodsReceipt(id);
       setGoodsReceipts(prev => prev.filter(g => g.id !== id));
-      
+
       AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'GOODS_RECEIPT', id, existing?.grNumber);
       handleNotify('success', 'Goods receipt deleted successfully');
     } catch (error) {
@@ -3089,7 +3124,7 @@ export default function App() {
       const batchWithOrg = { ...batch, orgId: currentOrgId };
       const savedBatch = await dataService.createEFTBatch(batchWithOrg);
       setEftBatches(prev => [...prev, savedBatch]);
-      
+
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', savedBatch.id, batch.batchNumber);
       handleNotify('success', `EFT Batch "${batch.batchNumber}" created successfully`);
     } catch (error) {
@@ -3106,7 +3141,7 @@ export default function App() {
       const existing = eftBatches.find(b => b.id === id);
       const updated = await dataService.updateEFTBatch(id, updates);
       setEftBatches(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
-      
+
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'EFT_BATCH', id, existing?.batchNumber, existing, { ...existing, ...updates });
       handleNotify('success', 'EFT batch updated successfully');
     } catch (error) {
@@ -3123,17 +3158,17 @@ export default function App() {
 
       // Proceed with archival
       await dataService.archiveEntity('eft_batches', id, currentUser?.id || 'system');
-      
+
       // Update local state by removing from active list
       setEftBatches(prev => prev.filter(b => b.id !== id));
-      
+
       // Audit: EFT batch archived
       AuditService.archive(
-        currentOrgId, 
-        currentUser?.id || 'system', 
-        currentUser?.name || 'System', 
-        'EFT_BATCH', 
-        id, 
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'EFT_BATCH',
+        id,
         existing?.batchNumber
       );
 
@@ -3150,11 +3185,11 @@ export default function App() {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
         <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-500/20 animate-pulse">
-           <Building2 size={40} />
+          <Building2 size={40} />
         </div>
         <div className="flex items-center gap-3">
-           <Loader2 className="animate-spin text-indigo-400" size={24} />
-           <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
+          <Loader2 className="animate-spin text-indigo-400" size={24} />
+          <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
         </div>
       </div>
     );
@@ -3163,7 +3198,7 @@ export default function App() {
   // Show Password Reset View
   if (showPasswordReset) {
     return (
-      <PasswordResetView 
+      <PasswordResetView
         onBackToLogin={() => {
           setShowPasswordReset(false);
           setResetToken(null);
@@ -3177,12 +3212,12 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <LoginView 
-        onLogin={handleLogin} 
-        onRegister={handleRegisterWithPersistence} 
+      <LoginView
+        onLogin={handleLogin}
+        onRegister={handleRegisterWithPersistence}
         onForgotPassword={() => setShowPasswordReset(true)}
-        organizations={organizations} 
-        users={users} 
+        organizations={organizations}
+        users={users}
       />
     );
   }
@@ -3192,19 +3227,18 @@ export default function App() {
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
         {toasts.map(toast => (
-          <div 
+          <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${
-              toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
               toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-              'bg-blue-50 border-blue-200 text-blue-800'
-            }`}
+                'bg-blue-50 border-blue-200 text-blue-800'
+              } `}
           >
             {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
             {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
             {toast.type === 'info' && <AlertCircle size={18} className="text-blue-500 shrink-0" />}
             <span className="text-sm font-medium">{toast.message}</span>
-            <button 
+            <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
               className="ml-auto text-current opacity-50 hover:opacity-100"
             >
@@ -3216,208 +3250,208 @@ export default function App() {
 
       <aside className={`${sidebarOpen ? 'w-80' : 'w-20'} bg-white flex flex-col transition-all duration-500 z-50 border-r border-slate-200`}>
         <div className="p-6 flex items-center justify-center border-b border-slate-200 bg-slate-50">
-           {sidebarOpen ? (
-             <div className="flex flex-col items-center gap-3 w-full">
-                <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
-                  style={{ backgroundColor: brandColor }}
-                >
-                   {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
-                </div>
-                <div className="w-full text-center">
-                   <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
-                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
-                </div>
-             </div>
-           ) : (
-             <div 
-               className="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-white shadow-xl"
-               style={{ backgroundColor: brandColor }}
-             >
-               <Building2 size={20} />
-             </div>
-           )}
+          {sidebarOpen ? (
+            <div className="flex flex-col items-center gap-3 w-full">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
+                style={{ backgroundColor: brandColor }}
+              >
+                {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
+              </div>
+              <div className="w-full text-center">
+                <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">{currentOrg?.name || 'No Organization'}</h1>
+                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{currentUser.role.replace('_', ' ')}</p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-white shadow-xl"
+              style={{ backgroundColor: brandColor }}
+            >
+              <Building2 size={20} />
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto py-8 px-4 scrollbar-hide">
-           {/* Navigation Items (unchanged logic) */}
-           {currentUser.role === 'STUDENT' && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
-               <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
-           )}
+          {/* Navigation Items (unchanged logic) */}
+          {currentUser.role === 'STUDENT' && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
+              <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
 
-           {currentUser.role === 'TRAINER' && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
-               <NavItem icon={<LayoutDashboard size={20}/>} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
-           )}
+          {currentUser.role === 'TRAINER' && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
+              <NavItem icon={<LayoutDashboard size={20} />} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
 
-           {isFinance && (
-             <NavSection 
-               label="Finance" 
-               isOpen={openSections.financial} 
-               onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
-               compact={!sidebarOpen}
-             >
-               <NavItem icon={<LayoutDashboard size={18}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<BookText size={18}/>} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<PieChart size={18}/>} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Landmark size={18}/>} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Printer size={18}/>} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
-               {isAR && <NavItem icon={<Receipt size={18}/>} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<TrendingUp size={18}/>} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<FileText size={18}/>} label="Invoices" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<Wallet size={18}/>} label="Payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAR && <NavItem icon={<ArrowDownToLine size={18}/>} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => setActiveTab('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<CreditCard size={18}/>} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<ShoppingCart size={18}/>} label="Purchase Orders" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
-               {isAP && <NavItem icon={<Package size={18}/>} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
-               <NavItem icon={<Briefcase size={18}/>} label="Payroll" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Calculator size={18}/>} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
-             </NavSection>
-           )}
+          {isFinance && (
+            <NavSection
+              label="Finance"
+              isOpen={openSections.financial}
+              onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Landmark size={18} />} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Printer size={18} />} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
+              {isAR && <NavItem icon={<Receipt size={18} />} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAR && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAR && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAR && <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAR && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => setActiveTab('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAP && <NavItem icon={<CreditCard size={18} />} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAP && <NavItem icon={<ShoppingCart size={18} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {isAP && <NavItem icon={<Package size={18} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
+              <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Calculator size={18} />} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
 
-           {isRegistrar && (
-             <NavSection 
-               label="Operations" 
-               isOpen={openSections.operations} 
-               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
-               compact={!sidebarOpen}
-             >
-               <NavItem icon={<Users size={20}/>} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<GraduationCap size={20}/>} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Award size={20}/>} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Receipt size={20}/>} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => setActiveTab('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Layers size={20}/>} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<UserCheck size={20}/>} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => setActiveTab('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<MapPin size={20}/>} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<CalendarClock size={20}/>} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
-             </NavSection>
-           )}
+          {isRegistrar && (
+            <NavSection
+              label="Operations"
+              isOpen={openSections.operations}
+              onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<Users size={20} />} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Receipt size={20} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => setActiveTab('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Layers size={20} />} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<UserCheck size={20} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => setActiveTab('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
 
-           {isFinance && (
-             <NavSection 
-               label="Registries" 
-               isOpen={openSections.registries} 
-               onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
-               compact={!sidebarOpen}
-             >
-               <NavItem icon={<Handshake size={20}/>} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Truck size={20}/>} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Tag size={20}/>} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Box size={20}/>} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
-             </NavSection>
-           )}
+          {isFinance && (
+            <NavSection
+              label="Registries"
+              isOpen={openSections.registries}
+              onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Truck size={20} />} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Tag size={20} />} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Box size={20} />} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
 
-           {isFinance && (
-             <NavSection 
-               label="Inventory" 
-               isOpen={openSections.inventory} 
-               onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
-               compact={!sidebarOpen}
-             >
-               <NavItem icon={<Package size={20}/>} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<MapPin size={20}/>} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Box size={20}/>} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Layers size={20}/>} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<AlertCircle size={20}/>} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Zap size={20}/>} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<History size={20}/>} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<TrendingUp size={20}/>} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
-             </NavSection>
-           )}
+          {isFinance && (
+            <NavSection
+              label="Inventory"
+              isOpen={openSections.inventory}
+              onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<Package size={20} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<MapPin size={20} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Box size={20} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Layers size={20} />} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<AlertCircle size={20} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Zap size={20} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={20} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<TrendingUp size={20} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
 
-           {isTenantAdmin && (
-             <NavSection 
-               label="Administration" 
-               isOpen={openSections.administration} 
-               onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))}
-               compact={!sidebarOpen}
-             >
-               <NavItem icon={<Users size={20}/>} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Settings size={20}/>} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<CalendarCheck size={20}/>} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Palette size={20}/>} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Wallet size={20}/>} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
-               <div className="relative">
-                 <NavItem icon={<CreditCard size={20}/>} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
-                 {paymentsDueSoon.length > 0 && (
-                   <div className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-full">
-                     {paymentsDueSoon.length}
-                   </div>
-                 )}
-               </div>
-               <NavItem icon={<UserCog size={20}/>} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<History size={20}/>} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
-             </NavSection>
-           )}
+          {isTenantAdmin && (
+            <NavSection
+              label="Administration"
+              isOpen={openSections.administration}
+              onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<Users size={20} />} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Settings size={20} />} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<CalendarCheck size={20} />} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Palette size={20} />} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
+              <div className="relative">
+                <NavItem icon={<CreditCard size={20} />} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
+                {paymentsDueSoon.length > 0 && (
+                  <div className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-full">
+                    {paymentsDueSoon.length}
+                  </div>
+                )}
+              </div>
+              <NavItem icon={<UserCog size={20} />} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
 
-           {isSysAdmin && (
-             <div className="mb-8">
-               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
-               <NavItem icon={<Wrench size={20}/>} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<HardDrive size={20}/>} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Terminal size={20}/>} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<Binary size={20}/>} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
-               <NavItem icon={<BarChart2 size={20}/>} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
-             </div>
-           )}
+          {isSysAdmin && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
+              <NavItem icon={<Wrench size={20} />} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<HardDrive size={20} />} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Terminal size={20} />} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
         </nav>
 
         {/* System Data Engine Status Badge - SYSTEM_ADMIN only */}
         {sidebarOpen && isSysAdmin && (
           <div className="px-8 mb-4">
-             <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
-                {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
-                <div className="min-w-0">
-                   <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
-                   <p className="text-[10px] uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
-                </div>
-             </div>
+            <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'} `}>
+              {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
+              <div className="min-w-0">
+                <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
+                <p className="text-[10px] uppercase truncate">{config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}</p>
+              </div>
+            </div>
           </div>
         )}
 
         <div className="p-6 mt-auto border-t border-slate-200">
-           <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
-              <LogOut size={20} />
-              {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
-           </button>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
+            <LogOut size={20} />
+            {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
+          </button>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header and Content Area (unchanged) */}
         <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between z-40">
-           <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)} 
-                className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all border border-slate-100"
-              >
-                 {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
-              </button>
-              <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
-           </div>
-           <div className="flex items-center gap-6">
-              <div className="h-10 w-px bg-slate-100 mx-2" />
-              <div className="flex items-center gap-3">
-                 <div className="text-right">
-                    <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
-                 </div>
-                 <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
-                    {currentUser.name.substring(0,2)}
-                 </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 transition-all border border-slate-100"
+            >
+              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="h-10 w-px bg-slate-100 mx-2" />
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
               </div>
-           </div>
+              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
+                {currentUser.name.substring(0, 2)}
+              </div>
+            </div>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-10 scrollbar-hide">
           {/* View Router (unchanged) */}
           {activeTab === 'student-portal' && currentUser.studentId && (
-            <StudentPortalView 
+            <StudentPortalView
               student={students.find(s => s.id === currentUser.studentId)!}
               batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
@@ -3431,7 +3465,7 @@ export default function App() {
           )}
 
           {activeTab === 'trainer-portal' && currentUser.trainerId && (
-            <TrainerPortalView 
+            <TrainerPortalView
               trainer={trainers.find(t => t.id === currentUser.trainerId)!}
               batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
@@ -3445,16 +3479,16 @@ export default function App() {
           {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
           {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
-          
+
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} />}
-          {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, {...bill, id: Date.now().toString()} as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? {...b, ...updates} : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
+          {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          
+
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
-          {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? {...p, ...updated} : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
           {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
@@ -3469,13 +3503,13 @@ export default function App() {
           {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
           {activeTab === 'inventory-transactions' && <InventoryTransactionsView transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} />}
           {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} />}
-          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? {...l, isCleared: !l.isCleared} : l))} onNotify={handleNotify} />}
+          {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? { ...l, isCleared: !l.isCleared } : l))} onNotify={handleNotify} />}
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          
+
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} />}
-          
+
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
           {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
@@ -3483,46 +3517,46 @@ export default function App() {
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
           {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
           {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
-          {activeTab === 'invoices' && <InvoicesView 
-            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} 
-            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
-            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
-            enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} 
-            batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
-            qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} 
-            courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} 
-            accounts={filteredAccounts} 
-            currency={currentOrg?.currency || 'PHP'} 
-            onAddInvoice={handleAddInvoice} 
-            onUpdateInvoice={handleUpdateInvoice} 
-            onDeleteInvoice={handleDeleteInvoice} 
-            onVoidInvoice={handleVoidInvoice} 
+          {activeTab === 'invoices' && <InvoicesView
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+            batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+            qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+            courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)}
+            accounts={filteredAccounts}
+            currency={currentOrg?.currency || 'PHP'}
+            onAddInvoice={handleAddInvoice}
+            onUpdateInvoice={handleUpdateInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onVoidInvoice={handleVoidInvoice}
             onUpdateEnrollment={handleUpdateEnrollment}
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
           />}
-          {activeTab === 'payments' && <PaymentsView 
-            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} 
-            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
-            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} 
-            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} 
-            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
-            currency={currentOrg?.currency || 'PHP'} 
-            onAddPayment={handleAddPayment} 
-            onUpdatePayment={handleUpdatePayment} 
-            onDeletePayment={handleDeletePayment} 
+          {activeTab === 'payments' && <PaymentsView
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+            currency={currentOrg?.currency || 'PHP'}
+            onAddPayment={handleAddPayment}
+            onUpdatePayment={handleUpdatePayment}
+            onDeletePayment={handleDeletePayment}
             onVoidPayment={handleVoidPayment}
             onApplyToInvoice={handleApplyToInvoice}
             onReverseApplication={handleReverseApplication}
-          /> }
-          {activeTab === 'bank-deposits' && <BankDepositsView 
-            deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)} 
-            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} 
-            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} 
-            currency={currentOrg?.currency || 'PHP'} 
-            onAddDeposit={handleAddBankDeposit} 
-            onUpdateDeposit={handleUpdateBankDeposit} 
-            onDeleteDeposit={handleDeleteBankDeposit} 
-            onVoidDeposit={handleVoidBankDeposit} 
+          />}
+          {activeTab === 'bank-deposits' && <BankDepositsView
+            deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)}
+            bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+            currency={currentOrg?.currency || 'PHP'}
+            onAddDeposit={handleAddBankDeposit}
+            onUpdateDeposit={handleUpdateBankDeposit}
+            onDeleteDeposit={handleDeleteBankDeposit}
+            onVoidDeposit={handleVoidBankDeposit}
             onPostDeposit={async (deposit) => {
               // 1. Update deposit status in state
               setBankDeposits(prev => prev.map(d => d.id === deposit.id ? { ...deposit, status: 'POSTED', postedAt: new Date().toISOString() } : d));
@@ -3538,38 +3572,36 @@ export default function App() {
 
               if (undepositedAcct && finalBankAcct) {
                 // 3. Create Journal Entry for DEPOSIT
-                const entry = {
+                const entry: Partial<JournalEntry> = {
                   orgId: currentOrgId,
                   periodId: deposit.periodId || '',
                   date: deposit.depositDate,
-                  description: `Bank Deposit #${deposit.depositNo}`,
-                  reference: `DEPOSIT-${deposit.depositNo}`,
+                  description: `Bank Deposit #${deposit.depositNo} `,
+                  reference: `DEPOSIT - ${deposit.depositNo} `,
                   status: 'POSTED',
                   sourceType: 'DEPOSIT',
                   sourceRef: deposit.id,
-                  createdBy: currentUser?.id,
+                  createdBy: currentUser?.id || 'system',
                   createdAt: new Date().toISOString(),
-                  postedBy: currentUser?.id,
+                  postedBy: currentUser?.id || 'system',
                   postedAt: new Date().toISOString()
                 };
-                const lines = [
+                const lines: JournalLine[] = [
                   {
-                    id: `jl-${Date.now()}-1`,
-                    entryId: '',
+                    id: `jl - ${Date.now()} -1`,
+                    journalEntryId: '',
                     accountId: finalBankAcct.id,
                     debit: deposit.totalAmount,
                     credit: 0,
-                    description: 'Deposit to Bank',
-                    createdAt: new Date().toISOString()
+                    description: 'Deposit to Bank'
                   },
                   {
-                    id: `jl-${Date.now()}-2`,
-                    entryId: '',
+                    id: `jl - ${Date.now()} -2`,
+                    journalEntryId: '',
                     accountId: undepositedAcct.id,
                     debit: 0,
                     credit: deposit.totalAmount,
-                    description: 'Clear Undeposited Funds',
-                    createdAt: new Date().toISOString()
+                    description: 'Clear Undeposited Funds'
                   }
                 ];
                 await handlePostJournal(entry, lines);
@@ -3592,25 +3624,25 @@ export default function App() {
           />}
           {activeTab === 'locations' && <LocationsView locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
           {activeTab === 'schedules' && <SchedulesView schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
-          {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => {}} />}
-          
-          {activeTab === 'employees' && <EmployeesView 
-            employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} 
-            onAddEmployee={handleAddEmployee} 
-            onUpdateEmployee={handleUpdateEmployee} 
-            onDeleteEmployee={handleDeleteEmployee} 
+          {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => { }} />}
+
+          {activeTab === 'employees' && <EmployeesView
+            employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+            onAddEmployee={handleAddEmployee}
+            onUpdateEmployee={handleUpdateEmployee}
+            onDeleteEmployee={handleDeleteEmployee}
           />}
-          {activeTab === 'users' && <UsersManagementView 
-            users={users.filter(u => u.orgId === currentOrgId)} 
+          {activeTab === 'users' && <UsersManagementView
+            users={users.filter(u => u.orgId === currentOrgId)}
             students={students.filter(s => s.orgId === currentOrgId)}
             trainers={trainers.filter(t => t.orgId === currentOrgId)}
-            onAddUser={handleAddUser} 
-            onDeleteUser={handleDeleteUser} 
+            onAddUser={handleAddUser}
+            onDeleteUser={handleDeleteUser}
           />}
           {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
-          {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => {}} onImport={() => {}} />}
+          {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />}
           {activeTab === 'backup-restore' && (
-            <BackupRestoreView 
+            <BackupRestoreView
               organizations={organizations}
               currentOrgId={currentOrgId}
               currentUserId={currentUser?.id || ''}
@@ -3635,7 +3667,7 @@ export default function App() {
       </main>
 
       {showJournalForm && (
-        <JournalForm 
+        <JournalForm
           accounts={filteredAccounts}
           students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
           trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
@@ -3662,12 +3694,12 @@ interface NavItemProps {
 
 function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemProps) {
   return (
-    <button 
+    <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
+      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
       style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
     >
-      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</div>
+      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'} `}>{icon}</div>
       {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
     </button>
   );
@@ -3684,7 +3716,7 @@ interface NavSectionProps {
 function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
   return (
     <div className="mb-8">
-      <button 
+      <button
         onClick={onToggle}
         className="w-full flex items-center justify-between mb-4 px-4 group"
       >

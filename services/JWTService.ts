@@ -33,7 +33,7 @@ export interface JWTPayload {
   iat: number;           // Issued at (Unix timestamp)
   nbf: number;           // Not before (Unix timestamp)
   jti: string;           // JWT ID (unique identifier)
-  
+
   // Custom claims
   email: string;
   name: string;
@@ -73,11 +73,11 @@ const JWT_CONFIG = {
   // Secret key for signing tokens
   // In production, this should come from environment variables
   secretKey: 'AT-ERP-JWT-SECRET-KEY-2024-CHANGE-IN-PRODUCTION',
-  
+
   // Token lifetimes
   accessTokenExpiry: 15 * 60,           // 15 minutes in seconds
   refreshTokenExpiry: 7 * 24 * 60 * 60, // 7 days in seconds
-  
+
   // Token metadata
   issuer: 'AT-ERP',
   audience: 'AT-ERP-Client',
@@ -135,7 +135,7 @@ async function hmacSha256(message: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyData = encoder.encode(secret);
   const messageData = encoder.encode(message);
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
     keyData,
@@ -143,9 +143,9 @@ async function hmacSha256(message: string, secret: string): Promise<string> {
     false,
     ['sign']
   );
-  
+
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-  
+
   // Convert to base64url
   const signatureArray = new Uint8Array(signature);
   const signatureString = Array.from(signatureArray).map(b => String.fromCharCode(b)).join('');
@@ -159,7 +159,7 @@ function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) {
     return false;
   }
-  
+
   let result = 0;
   for (let i = 0; i < a.length; i++) {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -174,6 +174,39 @@ function timingSafeEqual(a: string, b: string): boolean {
 class JWTServiceClass {
   private revokedTokens: Set<string> = new Set();
   private refreshTokenStore: Map<string, { userId: string; expiresAt: number }> = new Map();
+  private readonly STORAGE_KEY = 'at_erp_jwt_store_debug';
+
+  constructor() {
+    this.loadStore();
+  }
+
+  /**
+   * Load store from localStorage (simulates server-side persistence in this browser-only demo)
+   */
+  private loadStore() {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.refreshTokenStore = new Map(Object.entries(data));
+        console.debug('[JWT] Persistence: Loaded', this.refreshTokenStore.size, 'refresh tokens');
+      }
+    } catch (error) {
+      console.error('[JWT] Persistence: Failed to load store:', error);
+    }
+  }
+
+  /**
+   * Save store to localStorage
+   */
+  private saveStore() {
+    try {
+      const data = Object.fromEntries(this.refreshTokenStore.entries());
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+      console.error('[JWT] Persistence: Failed to save store:', error);
+    }
+  }
 
   /**
    * Create a JWT token
@@ -186,10 +219,10 @@ class JWTServiceClass {
 
     const headerEncoded = base64UrlEncode(JSON.stringify(header));
     const payloadEncoded = base64UrlEncode(JSON.stringify(payload));
-    
+
     const signatureInput = `${headerEncoded}.${payloadEncoded}`;
     const signature = await hmacSha256(signatureInput, JWT_CONFIG.secretKey);
-    
+
     return `${headerEncoded}.${payloadEncoded}.${signature}`;
   }
 
@@ -208,14 +241,14 @@ class JWTServiceClass {
       // Verify signature
       const signatureInput = `${headerEncoded}.${payloadEncoded}`;
       const expectedSignature = await hmacSha256(signatureInput, JWT_CONFIG.secretKey);
-      
+
       if (!timingSafeEqual(signature, expectedSignature)) {
         return { valid: false, expired: false, error: 'Invalid signature' };
       }
 
       // Decode payload
       const payload: JWTPayload = JSON.parse(base64UrlDecode(payloadEncoded));
-      
+
       // Check if token is revoked
       if (this.revokedTokens.has(payload.jti)) {
         return { valid: false, expired: false, error: 'Token has been revoked' };
@@ -296,6 +329,7 @@ class JWTServiceClass {
       userId: user.id,
       expiresAt: now + JWT_CONFIG.refreshTokenExpiry
     });
+    this.saveStore();
 
     console.debug('[JWT] Token pair generated for user:', user.id);
 
@@ -315,11 +349,11 @@ class JWTServiceClass {
   async refreshTokens(refreshToken: string): Promise<RefreshResult> {
     // Verify the refresh token
     const validation = await this.verifyToken(refreshToken);
-    
+
     if (!validation.valid) {
-      return { 
-        success: false, 
-        error: validation.error || 'Invalid refresh token' 
+      return {
+        success: false,
+        error: validation.error || 'Invalid refresh token'
       };
     }
 
@@ -339,6 +373,7 @@ class JWTServiceClass {
     // Revoke old refresh token (token rotation)
     this.refreshTokenStore.delete(payload.jti);
     this.revokedTokens.add(payload.jti);
+    this.saveStore();
 
     // Generate new token pair
     const user: User = {
@@ -366,12 +401,13 @@ class JWTServiceClass {
       const validation = await this.verifyToken(token);
       if (validation.payload) {
         this.revokedTokens.add(validation.payload.jti);
-        
+
         // If it's a refresh token, remove from store
         if (validation.payload.type === 'refresh') {
           this.refreshTokenStore.delete(validation.payload.jti);
+          this.saveStore();
         }
-        
+
         console.debug('[JWT] Token revoked:', validation.payload.jti);
         return true;
       }
@@ -393,6 +429,7 @@ class JWTServiceClass {
         this.revokedTokens.add(tokenId);
       }
     }
+    this.saveStore();
     console.debug('[JWT] All tokens revoked for user:', userId);
   }
 
@@ -401,7 +438,7 @@ class JWTServiceClass {
    */
   async extractUser(accessToken: string): Promise<User | null> {
     const validation = await this.verifyToken(accessToken);
-    
+
     if (!validation.valid || !validation.payload) {
       return null;
     }
@@ -465,6 +502,7 @@ class JWTServiceClass {
     }
 
     if (cleaned > 0) {
+      this.saveStore();
       console.debug('[JWT] Cleaned up expired tokens:', cleaned);
     }
   }

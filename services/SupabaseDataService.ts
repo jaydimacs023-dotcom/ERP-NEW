@@ -1,6 +1,7 @@
 
 import { IDataService, InitialData } from './IDataService';
 import { config } from '../config/app';
+import { TokenManager } from './TokenManager';
 
 /**
  * SupabaseDataService
@@ -24,10 +25,20 @@ export class SupabaseDataService implements IDataService {
   }
 
   // Helper method to get standard headers for Supabase requests
-  private getHeaders(): Record<string, string> {
+  // Now asynchronous to allow fetching the latest JWT token
+  private async getHeaders(): Promise<Record<string, string>> {
+    // Try to get authenticated token first
+    const accessToken = await TokenManager.getAccessToken();
+
+    // IMPORTANT: If using custom JWTs with Supabase, the tokens must be signed
+    // with the Supabase Project JWT Secret. If not configured, Supabase will
+    // reject the tokens with 401/PGRST301. Defaulting to anonKey for now
+    // to ensure data visibility and resolve "erased data" issues.
+    const effectiveToken = this.supabaseKey;
+
     return {
       'apikey': this.supabaseKey,
-      'Authorization': `Bearer ${this.supabaseKey}`,
+      'Authorization': `Bearer ${effectiveToken}`,
       'Content-Type': 'application/json',
     };
   }
@@ -45,13 +56,9 @@ export class SupabaseDataService implements IDataService {
     try {
       const url = `${this.supabaseUrl}/rest/v1/${table}?select=*`;
       console.debug(`[Supabase] 📡 Fetching ${table}...`);
-      
+
       const response = await fetch(url, {
-        headers: {
-          'apikey': this.supabaseKey,
-          'Authorization': `Bearer ${this.supabaseKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getHeaders(),
       });
 
       if (!response.ok) {
@@ -94,7 +101,7 @@ export class SupabaseDataService implements IDataService {
 
     try {
       console.info(`[Supabase] URL: ${this.supabaseUrl.substring(0, 50)}...`);
-      
+
       // Fetch all tables in parallel
       const [
         organizations,
@@ -133,6 +140,7 @@ export class SupabaseDataService implements IDataService {
         inventoryTransactions,
         stockAdjustments,
         reorderPoints,
+        courseFees,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -170,11 +178,12 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('inventory_transactions'),
         this.fetchFromSupabase('stock_adjustments'),
         this.fetchFromSupabase('reorder_points'),
+        this.fetchFromSupabase('course_fees'),
       ]);
 
       // Log data status
       const hasData = organizations && organizations.length > 0;
-      
+
       if (!hasData) {
         console.warn("[Supabase] ⚠️ No organizations found in Supabase. Database may be empty.");
       }
@@ -219,6 +228,7 @@ export class SupabaseDataService implements IDataService {
         inventoryTransactions: this.snakeToCamel(inventoryTransactions as any) || [],
         stockAdjustments: this.snakeToCamel(stockAdjustments as any) || [],
         reorderPoints: this.snakeToCamel(reorderPoints as any) || [],
+        courseFees: this.snakeToCamel(courseFees as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -257,14 +267,14 @@ export class SupabaseDataService implements IDataService {
         // Convert snake_case to camelCase: is_vat_registered → isVatRegistered
         const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
         let value = obj[key];
-        
+
         // Convert numeric string values to numbers for known numeric fields
         if (numericFields.has(key) || numericFields.has(camelKey)) {
           if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
             value = Number(value);
           }
         }
-        
+
         // Recursively convert values for nested JSONB objects
         camelCaseObj[camelKey] = this.snakeToCamel(value);
       }
@@ -307,7 +317,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.supabaseUrl}/rest/v1/${table}`;
       // Convert camelCase to snake_case for Supabase
       const snakeCaseData = this.camelToSnake(data);
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -349,7 +359,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.supabaseUrl}/rest/v1/${table}?id=eq.${id}`;
       // Convert camelCase to snake_case for Supabase
       const snakeCaseUpdates = this.camelToSnake(updates);
-      
+
       const response = await fetch(url, {
         method: 'PATCH',
         headers: {
@@ -389,11 +399,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.supabaseUrl}/rest/v1/${table}?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: {
-          'apikey': this.supabaseKey,
-          'Authorization': `Bearer ${this.supabaseKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: await this.getHeaders(),
       });
 
       if (!response.ok && response.status !== 204) {
@@ -421,10 +427,10 @@ export class SupabaseDataService implements IDataService {
     try {
       const url = `${this.baseUrl}/${table}`;
       console.debug(`[Supabase] 📝 Inserting into ${table}:`, data);
-      
+
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(data),
       });
 
@@ -457,10 +463,10 @@ export class SupabaseDataService implements IDataService {
     try {
       const url = `${this.baseUrl}/${table}?id=eq.${id}`;
       console.debug(`[Supabase] ✏️ Updating ${table} (${id}):`, data);
-      
+
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(data),
       });
 
@@ -526,6 +532,12 @@ export class SupabaseDataService implements IDataService {
         'released_by', 'released_at', 'voided_by', 'voided_at', 'void_reason',
         'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
       ],
+      course_fees: [
+        'id', 'org_id', 'fee_code', 'qualification_id', 'fee_name', 'amount',
+        'gl_account_id', 'tax_category_id', 'is_subject_to_ewt', 'ewt_rate',
+        'category', 'description', 'is_active', 'created_at', 'updated_at',
+        'is_deleted', 'deleted_at', 'deleted_by'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
@@ -535,7 +547,8 @@ export class SupabaseDataService implements IDataService {
       fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
       items: ['created_at', 'updated_at'],
       payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
-      check_vouchers: ['id', 'created_at', 'updated_at']
+      check_vouchers: ['id', 'created_at', 'updated_at'],
+      course_fees: ['id', 'created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -589,10 +602,10 @@ export class SupabaseDataService implements IDataService {
 
   async createUser(user: any): Promise<any> {
     console.debug('[Supabase] createUser() INPUT:', user);
-    
+
     const snakeCaseUser = this.camelToSnake(user);
     console.debug('[Supabase] After camelToSnake():', snakeCaseUser);
-    
+
     // Hash password BEFORE filtering (since password_hash is the valid column, not password)
     if (snakeCaseUser.password) {
       const plainPassword = snakeCaseUser.password;
@@ -607,7 +620,7 @@ export class SupabaseDataService implements IDataService {
       }
       delete snakeCaseUser.password;
     }
-    
+
     // Set defaults
     if (!snakeCaseUser.is_active) {
       snakeCaseUser.is_active = true;
@@ -615,25 +628,25 @@ export class SupabaseDataService implements IDataService {
     if (!snakeCaseUser.salt) {
       snakeCaseUser.salt = 'bcrypt'; // Indicator that bcrypt is used
     }
-    
+
     // Now filter to schema (password_hash is in schema, password is not)
     const filteredUser = this.filterToTableSchema('users', snakeCaseUser);
     console.debug('[Supabase] After filterToTableSchema():', filteredUser);
-    
+
     // Generate UUID if invalid or missing
     if ((filteredUser as any).id && !this.isValidUUID((filteredUser as any).id)) {
       console.debug('[Supabase] Removing invalid UUID, will auto-generate');
       delete (filteredUser as any).id;
     }
-    
+
     return this.insertToSupabaseRaw('users', filteredUser);
   }
 
   async updateUser(id: string, updates: Partial<any>): Promise<any> {
     console.debug('[Supabase] updateUser() INPUT:', { id, updates });
-    
+
     const snakeCaseUpdates = this.camelToSnake(updates);
-    
+
     // Hash password BEFORE filtering if being updated
     if (snakeCaseUpdates.password) {
       const plainPassword = snakeCaseUpdates.password;
@@ -649,10 +662,10 @@ export class SupabaseDataService implements IDataService {
       }
       delete snakeCaseUpdates.password;
     }
-    
+
     const filteredUpdates = this.filterToTableSchema('users', snakeCaseUpdates);
     console.debug('[Supabase] After filterToTableSchema():', filteredUpdates);
-    
+
     return this.updateInSupabaseRaw('users', id, filteredUpdates);
   }
 
@@ -666,11 +679,15 @@ export class SupabaseDataService implements IDataService {
 
   async createStudent(student: any): Promise<any> {
     console.debug('[Supabase] createStudent() INPUT:', student);
-    
+
     // Convert camelCase input to snake_case FIRST so filtering works correctly
     const snakeCaseStudent = this.camelToSnake(student);
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseStudent.location_id === '') snakeCaseStudent.location_id = null;
+    if (snakeCaseStudent.sponsor_id === '') snakeCaseStudent.sponsor_id = null;
     console.debug('[Supabase] After camelToSnake():', snakeCaseStudent);
-    
+
     // Ensure org_id is present
     if (!snakeCaseStudent.org_id) {
       console.warn('[Supabase] Warning: student missing org_id, using empty string');
@@ -691,7 +708,7 @@ export class SupabaseDataService implements IDataService {
       afterKeys: Object.keys(filteredStudent),
       removed: Object.keys(snakeCaseStudent).filter(k => !Object.keys(filteredStudent).includes(k))
     });
-    
+
     // Remove id if it's not a valid UUID (let Supabase generate it)
     if (filteredStudent.id && !this.isValidUUID(filteredStudent.id)) {
       console.debug('[Supabase] Removing invalid UUID:', filteredStudent.id);
@@ -702,14 +719,14 @@ export class SupabaseDataService implements IDataService {
     const now = new Date().toISOString();
     filteredStudent.created_at = now;
     filteredStudent.updated_at = now;
-    
+
     console.debug('[Supabase] FINAL data ready for POST:', {
       keys: Object.keys(filteredStudent),
       hasAge: 'age' in filteredStudent,
       hasAgeOfBirth: 'age_of_birth' in filteredStudent,
       fullData: JSON.stringify(filteredStudent)
     });
-    
+
     // Note: insertToSupabase will NOT apply camelToSnake again since data is already in snake_case
     // We need to call the API directly to avoid double-conversion
     return this.insertToSupabaseRaw('students', filteredStudent);
@@ -718,10 +735,14 @@ export class SupabaseDataService implements IDataService {
   async updateStudent(id: string, updates: Partial<any>): Promise<any> {
     // Convert updates to snake_case first so filtering works correctly
     let snakeCaseUpdates = this.camelToSnake(updates);
-    
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseUpdates.location_id === '') snakeCaseUpdates.location_id = null;
+    if (snakeCaseUpdates.sponsor_id === '') snakeCaseUpdates.sponsor_id = null;
+
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();
-    
+
     // Convert StudentDocument[] to text[] for Supabase
     // NOTE: In the current schema, students.documents is jsonb, so we should KEEP the full objects.
     if (snakeCaseUpdates.documents && Array.isArray(snakeCaseUpdates.documents)) {
@@ -731,13 +752,13 @@ export class SupabaseDataService implements IDataService {
 
     // Filter to only valid columns for students table
     const filteredUpdates = this.filterToTableSchema('students', snakeCaseUpdates);
-    
+
     console.debug('[Supabase] Filtered student updates ready for PATCH:', {
       keys: Object.keys(filteredUpdates),
       hasAge: 'age' in filteredUpdates,
       data: filteredUpdates
     });
-    
+
     return this.updateInSupabaseRaw('students', id, filteredUpdates);
   }
 
@@ -749,7 +770,7 @@ export class SupabaseDataService implements IDataService {
   async checkStudentUsage(studentId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
     // Check if student is referenced in other tables (batches, etc.)
     const usedIn: string[] = [];
-    
+
     try {
       // Check if student is enrolled in any batches
       const batchResponse = await fetch(
@@ -797,11 +818,15 @@ export class SupabaseDataService implements IDataService {
 
   async createTrainer(trainer: any): Promise<any> {
     console.debug('[Supabase] createTrainer() INPUT:', trainer);
-    
+
     // Convert camelCase input to snake_case FIRST so filtering works correctly
     const snakeCaseTrainer = this.camelToSnake(trainer);
+
+    // Convert empty qualification_ids string to empty array or null if needed
+    // In Supabase, qualification_ids is often text[] or jsonb
+    if (snakeCaseTrainer.qualification_ids === '') snakeCaseTrainer.qualification_ids = [];
     console.debug('[Supabase] After camelToSnake():', snakeCaseTrainer);
-    
+
     // Ensure org_id is present
     if (!snakeCaseTrainer.org_id) {
       console.warn('[Supabase] Warning: trainer missing org_id');
@@ -814,7 +839,7 @@ export class SupabaseDataService implements IDataService {
       afterKeys: Object.keys(filteredTrainer),
       removed: Object.keys(snakeCaseTrainer).filter(k => !Object.keys(filteredTrainer).includes(k))
     });
-    
+
     // Remove id if it's not a valid UUID (let Supabase generate it)
     if (filteredTrainer.id && !this.isValidUUID(filteredTrainer.id)) {
       console.debug('[Supabase] Removing invalid UUID:', filteredTrainer.id);
@@ -825,30 +850,33 @@ export class SupabaseDataService implements IDataService {
     const now = new Date().toISOString();
     filteredTrainer.created_at = now;
     filteredTrainer.updated_at = now;
-    
+
     console.debug('[Supabase] FINAL trainer data ready for POST:', {
       keys: Object.keys(filteredTrainer),
       fullData: JSON.stringify(filteredTrainer)
     });
-    
+
     return this.insertToSupabaseRaw('trainers', filteredTrainer);
   }
 
   async updateTrainer(id: string, updates: Partial<any>): Promise<any> {
     // Convert updates to snake_case first so filtering works correctly
     let snakeCaseUpdates = this.camelToSnake(updates);
-    
+
+    // Convert empty qualification_ids string to empty array
+    if (snakeCaseUpdates.qualification_ids === '') snakeCaseUpdates.qualification_ids = [];
+
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();
 
     // Filter to only valid columns for trainers table
     const filteredUpdates = this.filterToTableSchema('trainers', snakeCaseUpdates);
-    
+
     console.debug('[Supabase] Filtered trainer updates ready for PATCH:', {
       keys: Object.keys(filteredUpdates),
       data: filteredUpdates
     });
-    
+
     return this.updateInSupabaseRaw('trainers', id, filteredUpdates);
   }
 
@@ -860,7 +888,7 @@ export class SupabaseDataService implements IDataService {
   async checkTrainerUsage(trainerId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
     // Check if trainer is referenced in other tables (batches, schedules, users, etc.)
     const usedIn: string[] = [];
-    
+
     try {
       // Check if trainer is assigned to any batches
       const batchResponse = await fetch(
@@ -923,11 +951,11 @@ export class SupabaseDataService implements IDataService {
 
   async createQualification(qualification: any): Promise<any> {
     console.debug('[Supabase] createQualification() INPUT:', qualification);
-    
+
     // Convert camelCase input to snake_case FIRST so filtering works correctly
     const snakeCaseQual = this.camelToSnake(qualification);
     console.debug('[Supabase] After camelToSnake():', snakeCaseQual);
-    
+
     // Ensure org_id is present
     if (!snakeCaseQual.org_id) {
       console.warn('[Supabase] Warning: qualification missing org_id');
@@ -940,7 +968,7 @@ export class SupabaseDataService implements IDataService {
       afterKeys: Object.keys(filteredQual),
       removed: Object.keys(snakeCaseQual).filter(k => !Object.keys(filteredQual).includes(k))
     });
-    
+
     // Remove id if it's not a valid UUID (let Supabase generate it)
     if (filteredQual.id && !this.isValidUUID(filteredQual.id)) {
       console.debug('[Supabase] Removing invalid UUID:', filteredQual.id);
@@ -951,30 +979,30 @@ export class SupabaseDataService implements IDataService {
     const now = new Date().toISOString();
     filteredQual.created_at = now;
     filteredQual.updated_at = now;
-    
+
     console.debug('[Supabase] FINAL qualification data ready for POST:', {
       keys: Object.keys(filteredQual),
       fullData: JSON.stringify(filteredQual)
     });
-    
+
     return this.insertToSupabaseRaw('qualifications', filteredQual);
   }
 
   async updateQualification(id: string, updates: Partial<any>): Promise<any> {
     // Convert updates to snake_case first so filtering works correctly
     let snakeCaseUpdates = this.camelToSnake(updates);
-    
+
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();
 
     // Filter to only valid columns for qualifications table
     const filteredUpdates = this.filterToTableSchema('qualifications', snakeCaseUpdates);
-    
+
     console.debug('[Supabase] Filtered qualification updates ready for PATCH:', {
       keys: Object.keys(filteredUpdates),
       data: filteredUpdates
     });
-    
+
     return this.updateInSupabaseRaw('qualifications', id, filteredUpdates);
   }
 
@@ -986,7 +1014,7 @@ export class SupabaseDataService implements IDataService {
   async checkQualificationUsage(qualificationId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
     // Check if qualification is referenced in other tables (batches, trainers, etc.)
     const usedIn: string[] = [];
-    
+
     try {
       // Check if qualification is used in any batches
       const batchResponse = await fetch(
@@ -1036,15 +1064,15 @@ export class SupabaseDataService implements IDataService {
   async createBatch(batch: any): Promise<any> {
     // Preserve student_ids array
     const studentIdsBackup = batch.studentIds;
-    
+
     const snakeCaseBatch = this.camelToSnake(batch);
     let filteredBatch = this.filterToTableSchema('batches', snakeCaseBatch);
-    
+
     // Restore student_ids as PostgreSQL array format
     if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
       filteredBatch.student_ids = studentIdsBackup;
     }
-    
+
     // Handle empty optional foreign keys - convert empty string to null
     if (filteredBatch.sponsor_id === '' || filteredBatch.sponsor_id === undefined) {
       filteredBatch.sponsor_id = null;
@@ -1052,29 +1080,35 @@ export class SupabaseDataService implements IDataService {
     if (filteredBatch.location_id === '' || filteredBatch.location_id === undefined) {
       filteredBatch.location_id = null;
     }
-    
+    if (filteredBatch.trainer_id === '' || filteredBatch.trainer_id === undefined) {
+      filteredBatch.trainer_id = null;
+    }
+    if (filteredBatch.qualification_id === '' || filteredBatch.qualification_id === undefined) {
+      filteredBatch.qualification_id = null;
+    }
+
     // Remove invalid UUID
     if (filteredBatch.id && !this.isValidUUID(filteredBatch.id)) {
       delete filteredBatch.id;
     }
-    
+
     console.debug('[Supabase] createBatch - Final payload:', filteredBatch);
-    
+
     return this.insertToSupabaseRaw('batches', filteredBatch);
   }
 
   async updateBatch(id: string, updates: Partial<any>): Promise<any> {
     // Preserve student_ids array
     const studentIdsBackup = updates.studentIds;
-    
+
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('batches', snakeCaseUpdates);
-    
+
     // Restore student_ids as PostgreSQL array format
     if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
       filteredUpdates.student_ids = studentIdsBackup;
     }
-    
+
     // Handle empty optional foreign keys - convert empty string to null
     if (filteredUpdates.sponsor_id === '' || filteredUpdates.sponsor_id === undefined) {
       filteredUpdates.sponsor_id = null;
@@ -1082,7 +1116,16 @@ export class SupabaseDataService implements IDataService {
     if (filteredUpdates.location_id === '' || filteredUpdates.location_id === undefined) {
       filteredUpdates.location_id = null;
     }
-    
+    if (filteredUpdates.trainer_id === '' || filteredUpdates.trainer_id === undefined) {
+      filteredUpdates.trainer_id = null;
+    }
+    if (filteredUpdates.qualification_id === '' || filteredUpdates.qualification_id === undefined) {
+      filteredUpdates.qualification_id = null;
+    }
+    if (filteredUpdates.schedule_id === '' || filteredUpdates.schedule_id === undefined) {
+      filteredUpdates.schedule_id = null;
+    }
+
     return this.updateInSupabaseRaw('batches', id, filteredUpdates);
   }
 
@@ -1129,7 +1172,7 @@ export class SupabaseDataService implements IDataService {
       // Check if location is used in batches
       const batchesResponse = await fetch(
         `${this.baseUrl}/batches?location_id=eq.${locationId}&select=id,name`,
-        { headers: this.getHeaders() }
+        { headers: (await this.getHeaders()) }
       );
       if (batchesResponse.ok) {
         const batches = await batchesResponse.json();
@@ -1141,7 +1184,7 @@ export class SupabaseDataService implements IDataService {
       // Check if location is used in schedules
       const schedulesResponse = await fetch(
         `${this.baseUrl}/schedules?location_id=eq.${locationId}&select=id`,
-        { headers: this.getHeaders() }
+        { headers: (await this.getHeaders()) }
       );
       if (schedulesResponse.ok) {
         const schedules = await schedulesResponse.json();
@@ -1167,20 +1210,20 @@ export class SupabaseDataService implements IDataService {
   async createSchedule(schedule: any): Promise<any> {
     // Preserve the slots array as-is (JSONB should keep camelCase keys)
     const slotsBackup = schedule.slots;
-    
+
     const snakeCaseSchedule = this.camelToSnake(schedule);
     let filteredSchedule = this.filterToTableSchema('trainer_schedules', snakeCaseSchedule);
-    
+
     // Restore the original slots array (JSONB content should not be snake_cased)
     if (slotsBackup) {
       filteredSchedule.slots = slotsBackup;
     }
-    
+
     // Handle empty location_id - convert empty string to null for FK constraint
     if (filteredSchedule.location_id === '' || filteredSchedule.location_id === undefined) {
       filteredSchedule.location_id = null;
     }
-    
+
     console.debug('[Supabase] createSchedule - Final payload:', {
       original: schedule,
       filtered: filteredSchedule
@@ -1198,20 +1241,20 @@ export class SupabaseDataService implements IDataService {
   async updateSchedule(id: string, updates: Partial<any>): Promise<any> {
     // Preserve the slots array as-is (JSONB should keep camelCase keys)
     const slotsBackup = updates.slots;
-    
+
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('trainer_schedules', snakeCaseUpdates);
-    
+
     // Restore the original slots array (JSONB content should not be snake_cased)
     if (slotsBackup) {
       filteredUpdates.slots = slotsBackup;
     }
-    
+
     // Handle empty location_id - convert empty string to null for FK constraint
     if (filteredUpdates.location_id === '' || filteredUpdates.location_id === undefined) {
       filteredUpdates.location_id = null;
     }
-    
+
     return this.updateInSupabaseRaw('trainer_schedules', id, filteredUpdates);
   }
 
@@ -1226,7 +1269,7 @@ export class SupabaseDataService implements IDataService {
       // Check if schedule is referenced in batches (if there's a schedule_id field)
       const batchesResponse = await fetch(
         `${this.baseUrl}/batches?schedule_id=eq.${scheduleId}&select=id,name`,
-        { headers: this.getHeaders() }
+        { headers: (await this.getHeaders()) }
       );
       if (batchesResponse.ok) {
         const batches = await batchesResponse.json();
@@ -1251,17 +1294,20 @@ export class SupabaseDataService implements IDataService {
 
   async createSponsor(sponsor: any): Promise<any> {
     console.debug('[Supabase] createSponsor called with:', sponsor);
-    
+
     // Convert to snake_case
     const snakeCaseSponsor = this.camelToSnake(sponsor);
-    
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseSponsor.ar_account_id === '') snakeCaseSponsor.ar_account_id = null;
+
     // Filter to valid columns
     let filteredSponsor = this.filterToTableSchema('sponsors', snakeCaseSponsor);
     console.debug('[Supabase] After filterToTableSchema():', {
       snakeCaseSponsor,
       filteredSponsor
     });
-    
+
     // Validate or remove invalid ID
     if (filteredSponsor.id && !this.isValidUUID(filteredSponsor.id)) {
       console.warn(`[Supabase] Removing invalid UUID: ${filteredSponsor.id}`);
@@ -1277,7 +1323,10 @@ export class SupabaseDataService implements IDataService {
 
     // Convert to snake_case
     const snakeCaseUpdates = this.camelToSnake(updates);
-    
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseUpdates.ar_account_id === '') snakeCaseUpdates.ar_account_id = null;
+
     // Filter to valid columns
     const filteredUpdates = this.filterToTableSchema('sponsors', snakeCaseUpdates);
 
@@ -1292,14 +1341,14 @@ export class SupabaseDataService implements IDataService {
 
   async checkSponsorUsage(sponsorId: string): Promise<{ isUsed: boolean; usedIn: string[] }> {
     console.debug('[Supabase] checkSponsorUsage called with:', sponsorId);
-    
+
     try {
       const usedIn: string[] = [];
 
       // Check if sponsor is referenced in students
       const studentsResponse = await fetch(
         `${this.baseUrl}/students?sponsor_id=eq.${sponsorId}&select=id,first_name,last_name`,
-        { headers: this.getHeaders() }
+        { headers: (await this.getHeaders()) }
       );
       if (studentsResponse.ok) {
         const students = await studentsResponse.json();
@@ -1311,7 +1360,7 @@ export class SupabaseDataService implements IDataService {
       // Check if sponsor is referenced in batches (if there's a sponsor_id field)
       const batchesResponse = await fetch(
         `${this.baseUrl}/batches?sponsor_id=eq.${sponsorId}&select=id,name`,
-        { headers: this.getHeaders() }
+        { headers: (await this.getHeaders()) }
       );
       if (batchesResponse.ok) {
         const batches = await batchesResponse.json();
@@ -1338,12 +1387,12 @@ export class SupabaseDataService implements IDataService {
     // Convert to snake_case and filter
     const snakeCaseEntity = this.camelToSnake(entity);
     const filteredEntity = this.filterToTableSchema(table, snakeCaseEntity);
-    
+
     // Remove invalid IDs
     if ((filteredEntity as any).id && !this.isValidUUID((filteredEntity as any).id)) {
       delete (filteredEntity as any).id;
     }
-    
+
     return this.insertToSupabaseRaw(table, filteredEntity);
   }
 
@@ -1351,7 +1400,7 @@ export class SupabaseDataService implements IDataService {
     // Convert to snake_case and filter
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema(table, snakeCaseUpdates);
-    
+
     return this.updateInSupabaseRaw(table, id, filteredUpdates);
   }
 
@@ -1360,16 +1409,16 @@ export class SupabaseDataService implements IDataService {
   }
 
   async archiveEntity(table: string, id: string, userId: string): Promise<void> {
-    return this.updateInSupabaseRaw(table, id, { 
-      is_deleted: true, 
+    return this.updateInSupabaseRaw(table, id, {
+      is_deleted: true,
       deleted_at: new Date().toISOString(),
       deleted_by: userId
     });
   }
 
   async restoreEntity(table: string, id: string): Promise<void> {
-    return this.updateInSupabaseRaw(table, id, { 
-      is_deleted: false, 
+    return this.updateInSupabaseRaw(table, id, {
+      is_deleted: false,
       deleted_at: null,
       deleted_by: null
     });
@@ -1404,6 +1453,10 @@ export class SupabaseDataService implements IDataService {
    */
   async createFixedAsset(asset: any): Promise<any> {
     const snakeCaseAsset = this.camelToSnake(asset);
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseAsset.gl_account_id === '') snakeCaseAsset.gl_account_id = null;
+
     // Use isInsert: true to exclude generated columns (net_book_value, created_at, updated_at)
     const filteredAsset = this.filterToTableSchema('fixed_assets', snakeCaseAsset, true);
     if ((filteredAsset as any).id && !this.isValidUUID((filteredAsset as any).id)) {
@@ -1414,6 +1467,10 @@ export class SupabaseDataService implements IDataService {
 
   async updateFixedAsset(id: string, updates: Partial<any>): Promise<any> {
     const snakeCaseUpdates = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseUpdates.gl_account_id === '') snakeCaseUpdates.gl_account_id = null;
+
     const filteredUpdates = this.filterToTableSchema('fixed_assets', snakeCaseUpdates);
     return this.updateInSupabaseRaw('fixed_assets', id, filteredUpdates);
   }
@@ -1427,7 +1484,7 @@ export class SupabaseDataService implements IDataService {
    */
   async createItem(item: any): Promise<any> {
     const snakeCaseItem = this.camelToSnake(item);
-    
+
     // Convert empty strings to null for UUID columns
     if (snakeCaseItem.income_account_id === '') snakeCaseItem.income_account_id = null;
     if (snakeCaseItem.expense_account_id === '') snakeCaseItem.expense_account_id = null;
@@ -1443,7 +1500,7 @@ export class SupabaseDataService implements IDataService {
 
   async updateItem(id: string, updates: Partial<any>): Promise<any> {
     const snakeCaseUpdates = this.camelToSnake(updates);
-    
+
     // Convert empty strings to null for UUID columns
     if (snakeCaseUpdates.income_account_id === '') snakeCaseUpdates.income_account_id = null;
     if (snakeCaseUpdates.expense_account_id === '') snakeCaseUpdates.expense_account_id = null;
@@ -1457,11 +1514,76 @@ export class SupabaseDataService implements IDataService {
     return this.deleteFromSupabase('items', id);
   }
 
+  // ============================================================================
+  // COURSE FEE CRUD
+  // ============================================================================
+
+  async createCourseFee(fee: any): Promise<any> {
+    console.debug('[Supabase] createCourseFee called with:', fee);
+    const snake = this.camelToSnake(fee);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.tax_category_id === '') snake.tax_category_id = null;
+    if (snake.qualification_id === '') snake.qualification_id = null;
+
+    const filtered = this.filterToTableSchema('course_fees', snake, true);
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
+    }
+    return this.insertToSupabaseRaw('course_fees', filtered);
+  }
+
+  async updateCourseFee(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateCourseFee called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.tax_category_id === '') snake.tax_category_id = null;
+    if (snake.qualification_id === '') snake.qualification_id = null;
+
+    const filtered = this.filterToTableSchema('course_fees', snake);
+    return this.updateInSupabaseRaw('course_fees', id, filtered);
+  }
+
+  async deleteCourseFee(id: string): Promise<void> {
+    console.debug('[Supabase] deleteCourseFee called with:', id);
+    return this.deleteFromSupabase('course_fees', id);
+  }
+
+  async getCourseFeesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getCourseFeesByOrg called with:', orgId);
+    try {
+      const url = `${this.baseUrl}/course_fees?org_id=eq.${orgId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        throw new Error('Failed to fetch course fees');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching course fees:', error);
+      return [];
+    }
+  }
+
   /**
    * Payables CRUD Operations
    */
   async createPayable(payable: any): Promise<any> {
     const snake = this.camelToSnake(payable);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.vendor_id === '') snake.vendor_id = null;
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.journal_entry_id === '') snake.journal_entry_id = null;
+    if (snake.atc_item_id === '') snake.atc_item_id = null;
+    if (snake.atc_rate_id === '') snake.atc_rate_id = null;
+
     // Exclude generated columns on insert
     const filtered = this.filterToTableSchema('payables', snake, true);
     if ((filtered as any).id && !this.isValidUUID((filtered as any).id)) {
@@ -1472,6 +1594,14 @@ export class SupabaseDataService implements IDataService {
 
   async updatePayable(id: string, updates: Partial<any>): Promise<any> {
     const snake = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.vendor_id === '') snake.vendor_id = null;
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.journal_entry_id === '') snake.journal_entry_id = null;
+    if (snake.atc_item_id === '') snake.atc_item_id = null;
+    if (snake.atc_rate_id === '') snake.atc_rate_id = null;
+
     const filtered = this.filterToTableSchema('payables', snake);
     return this.updateInSupabaseRaw('payables', id, filtered);
   }
@@ -1486,6 +1616,13 @@ export class SupabaseDataService implements IDataService {
   async createBill(bill: any): Promise<any> {
     console.debug('[Supabase] createBill called with:', bill);
     const snake = this.camelToSnake(bill);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.vendor_id === '') snake.vendor_id = null;
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.atc_item_id === '') snake.atc_item_id = null;
+    if (snake.atc_rate_id === '') snake.atc_rate_id = null;
+
     const filtered = this.filterToTableSchema('bills', snake);
     if (!filtered.id || filtered.id === '') {
       delete (filtered as any).id;
@@ -1496,6 +1633,13 @@ export class SupabaseDataService implements IDataService {
   async updateBill(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateBill called with:', id, updates);
     const snake = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.vendor_id === '') snake.vendor_id = null;
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.atc_item_id === '') snake.atc_item_id = null;
+    if (snake.atc_rate_id === '') snake.atc_rate_id = null;
+
     const filtered = this.filterToTableSchema('bills', snake);
     return this.updateInSupabaseRaw('bills', id, filtered);
   }
@@ -1511,6 +1655,10 @@ export class SupabaseDataService implements IDataService {
   async createBankAccount(account: any): Promise<any> {
     console.debug('[Supabase] createBankAccount called with:', account);
     const snake = this.camelToSnake(account);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+
     const filtered = this.filterToTableSchema('bank_accounts', snake);
     // Remove id if it's undefined or empty string - let Supabase auto-generate UUID
     if (!filtered.id || filtered.id === '') {
@@ -1522,6 +1670,10 @@ export class SupabaseDataService implements IDataService {
   async updateBankAccount(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateBankAccount called with:', id, updates);
     const snake = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.gl_account_id === '') snake.gl_account_id = null;
+
     const filtered = this.filterToTableSchema('bank_accounts', snake);
     return this.updateInSupabaseRaw('bank_accounts', id, filtered);
   }
@@ -1561,7 +1713,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getBankReconciliationsByAccount called with:', bankAccountId);
     try {
       const url = `${this.baseUrl}/bank_reconciliations?bank_account_id=eq.${bankAccountId}&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return [];
@@ -1580,7 +1732,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getLatestBankReconciliation called with:', bankAccountId);
     try {
       const url = `${this.baseUrl}/bank_reconciliations?bank_account_id=eq.${bankAccountId}&order=created_at.desc&limit=1`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -1624,7 +1776,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRecurringJournalEntriesByOrg called with:', orgId);
     try {
       const url = `${this.baseUrl}/recurring_journal_entries?org_id=eq.${orgId}&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return [];
@@ -1643,7 +1795,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRecurringJournalEntryById called with:', id);
     try {
       const url = `${this.baseUrl}/recurring_journal_entries?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -1658,68 +1810,68 @@ export class SupabaseDataService implements IDataService {
     }
   }
 
-    // ============================================================================
-    // RECURRING INVOICE CRUD
-    // ============================================================================
-    async createRecurringInvoice(invoice: any): Promise<any> {
-      console.debug('[Supabase] createRecurringInvoice called with:', invoice);
-      const snake = this.camelToSnake(invoice);
-      const filtered = this.filterToTableSchema('recurring_invoices', snake);
-      if (!filtered.id || filtered.id === '') {
-        delete (filtered as any).id;
-      }
-      return this.insertToSupabaseRaw('recurring_invoices', filtered);
+  // ============================================================================
+  // RECURRING INVOICE CRUD
+  // ============================================================================
+  async createRecurringInvoice(invoice: any): Promise<any> {
+    console.debug('[Supabase] createRecurringInvoice called with:', invoice);
+    const snake = this.camelToSnake(invoice);
+    const filtered = this.filterToTableSchema('recurring_invoices', snake);
+    if (!filtered.id || filtered.id === '') {
+      delete (filtered as any).id;
     }
+    return this.insertToSupabaseRaw('recurring_invoices', filtered);
+  }
 
-    async updateRecurringInvoice(id: string, updates: any): Promise<any> {
-      console.debug('[Supabase] updateRecurringInvoice called with:', id, updates);
-      const snake = this.camelToSnake(updates);
-      const filtered = this.filterToTableSchema('recurring_invoices', snake);
-      return this.updateInSupabaseRaw('recurring_invoices', id, filtered);
-    }
+  async updateRecurringInvoice(id: string, updates: any): Promise<any> {
+    console.debug('[Supabase] updateRecurringInvoice called with:', id, updates);
+    const snake = this.camelToSnake(updates);
+    const filtered = this.filterToTableSchema('recurring_invoices', snake);
+    return this.updateInSupabaseRaw('recurring_invoices', id, filtered);
+  }
 
-    async deleteRecurringInvoice(id: string): Promise<void> {
-      console.debug('[Supabase] deleteRecurringInvoice called with:', id);
-      return this.deleteFromSupabase('recurring_invoices', id);
-    }
+  async deleteRecurringInvoice(id: string): Promise<void> {
+    console.debug('[Supabase] deleteRecurringInvoice called with:', id);
+    return this.deleteFromSupabase('recurring_invoices', id);
+  }
 
-    async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
-      console.debug('[Supabase] getRecurringInvoicesByOrg called with:', orgId);
-      try {
-        const url = `${this.baseUrl}/recurring_invoices?org_id=eq.${orgId}&order=created_at.desc`;
-        const response = await fetch(url, { headers: this.getHeaders() });
-        if (!response.ok) {
-          if (response.status === 404) {
-            return [];
-          }
-          throw new Error('Failed to fetch recurring invoices');
+  async getRecurringInvoicesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getRecurringInvoicesByOrg called with:', orgId);
+    try {
+      const url = `${this.baseUrl}/recurring_invoices?org_id=eq.${orgId}&order=created_at.desc`;
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
         }
-        const data = await response.json();
-        return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-      } catch (error) {
-        console.error('[Supabase] Error fetching recurring invoices:', error);
-        return [];
+        throw new Error('Failed to fetch recurring invoices');
       }
+      const data = await response.json();
+      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring invoices:', error);
+      return [];
     }
+  }
 
-    async getRecurringInvoiceById(id: string): Promise<any | null> {
-      console.debug('[Supabase] getRecurringInvoiceById called with:', id);
-      try {
-        const url = `${this.baseUrl}/recurring_invoices?id=eq.${id}`;
-        const response = await fetch(url, { headers: this.getHeaders() });
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error('Failed to fetch recurring invoice');
+  async getRecurringInvoiceById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getRecurringInvoiceById called with:', id);
+    try {
+      const url = `${this.baseUrl}/recurring_invoices?id=eq.${id}`;
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
         }
-        const data = await response.json();
-        return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
-      } catch (error) {
-        console.error('[Supabase] Error fetching recurring invoice:', error);
-        return null;
+        throw new Error('Failed to fetch recurring invoice');
       }
+      const data = await response.json();
+      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+    } catch (error) {
+      console.error('[Supabase] Error fetching recurring invoice:', error);
+      return null;
     }
+  }
 
   /**
    * Vendor CRUD Operations
@@ -1727,6 +1879,10 @@ export class SupabaseDataService implements IDataService {
   async createVendor(vendor: any): Promise<any> {
     console.debug('[Supabase] createVendor called with:', vendor);
     const snakeCaseVendor = this.camelToSnake(vendor);
+
+    // Convert empty strings to null for UUID columns
+    if (snakeCaseVendor.ap_account_id === '') snakeCaseVendor.ap_account_id = null;
+
     const filtered = this.filterToTableSchema('vendors', snakeCaseVendor, true);
     // Remove id if it's undefined, null, or empty string
     if (!filtered.id || filtered.id === '') {
@@ -1738,6 +1894,10 @@ export class SupabaseDataService implements IDataService {
   async updateVendor(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateVendor called with:', id, updates);
     const snake = this.camelToSnake(updates);
+
+    // Convert empty strings to null for UUID columns
+    if (snake.ap_account_id === '') snake.ap_account_id = null;
+
     const filtered = this.filterToTableSchema('vendors', snake);
     return this.updateInSupabaseRaw('vendors', id, filtered);
   }
@@ -1778,14 +1938,14 @@ export class SupabaseDataService implements IDataService {
     try {
       // Get the max check number for this bank account
       const url = `${this.baseUrl}/check_vouchers?org_id=eq.${orgId}&bank_account_id=eq.${bankAccountId}&select=check_number&order=check_number.desc&limit=1`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch check numbers');
-      
+
       const data = await response.json();
       if (data.length === 0) {
         return '000001'; // Start from 1 if no checks exist
       }
-      
+
       const lastNumber = data[0].check_number;
       const numericPart = parseInt(lastNumber.replace(/\D/g, '')) || 0;
       return String(numericPart + 1).padStart(6, '0');
@@ -1802,7 +1962,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getATCCategories called');
     const url = `${this.baseUrl}/atc_categories?order=code.asc`;
     try {
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch ATC categories');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -1814,12 +1974,12 @@ export class SupabaseDataService implements IDataService {
 
   async getATCItems(categoryId?: string): Promise<any[]> {
     console.debug('[Supabase] getATCItems called with categoryId:', categoryId);
-    const query = categoryId 
+    const query = categoryId
       ? `?category_id=eq.${categoryId}&order=atc_code.asc`
       : '?order=atc_code.asc';
     const url = `${this.baseUrl}/atc_items${query}`;
     try {
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch ATC items');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -1833,7 +1993,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getATCRates called with atcItemId:', atcItemId);
     const url = `${this.baseUrl}/atc_rates?atc_item_id=eq.${atcItemId}`;
     try {
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch ATC rates');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -1865,14 +2025,14 @@ export class SupabaseDataService implements IDataService {
 
   async deleteExchangeRate(id: string): Promise<void> {
     console.debug('[Supabase] deleteExchangeRate called with:', id);
-    await this.deleteInSupabaseRaw('exchange_rates', id);
+    await this.deleteFromSupabase('exchange_rates', id);
   }
 
   async getExchangeRatesByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getExchangeRatesByOrg called with orgId:', orgId);
     const url = `${this.baseUrl}/exchange_rates?org_id=eq.${orgId}&is_deleted=eq.false&order=effective_date.desc`;
     try {
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch exchange rates');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -1886,7 +2046,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getExchangeRateById called with:', id);
     try {
       const url = `${this.baseUrl}/exchange_rates?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -1911,7 +2071,7 @@ export class SupabaseDataService implements IDataService {
       console.debug('[Supabase] Converted payload (id removed):', payload);
       const url = `${this.baseUrl}/accounting_periods`;
       const headers = {
-        ...this.getHeaders(),
+        ...(await this.getHeaders()),
         'Prefer': 'return=representation'
       };
       console.debug('[Supabase] Posting to:', url);
@@ -1941,7 +2101,7 @@ export class SupabaseDataService implements IDataService {
       console.debug('[Supabase] Converted payload:', payload);
       const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
       const headers = {
-        ...this.getHeaders(),
+        ...(await this.getHeaders()),
         'Prefer': 'return=representation'
       };
       const response = await fetch(url, {
@@ -1969,7 +2129,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete accounting period');
@@ -1983,7 +2143,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountingPeriodsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/accounting_periods?org_id=eq.${orgId}&is_deleted=eq.false&order=start_date.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch accounting periods');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -1997,7 +2157,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountingPeriodById called with:', id);
     try {
       const url = `${this.baseUrl}/accounting_periods?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) {
         if (response.status === 404) {
           return null;
@@ -2016,7 +2176,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountingPeriodsByYear called with orgId:', orgId, 'year:', fiscalYear);
     try {
       const url = `${this.baseUrl}/accounting_periods?org_id=eq.${orgId}&fiscal_year=eq.${fiscalYear}&is_deleted=eq.false&order=period_number.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) throw new Error('Failed to fetch accounting periods by year');
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2039,7 +2199,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/warehouse_locations`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2061,7 +2221,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update warehouse location');
@@ -2079,7 +2239,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
     } catch (error) {
@@ -2092,7 +2252,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getWarehouseLocationsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/warehouse_locations?org_id=eq.${orgId}&is_deleted=eq.false&order=name.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2106,7 +2266,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getWarehouseLocationById called with id:', id);
     try {
       const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2125,7 +2285,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/stock_items`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2147,7 +2307,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update stock item');
@@ -2165,7 +2325,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
     } catch (error) {
@@ -2178,7 +2338,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockItemsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2192,7 +2352,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockItemById called with id:', id);
     try {
       const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2206,7 +2366,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockItemsByLocation called with orgId:', orgId, 'locationId:', locationId);
     try {
       const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&warehouse_location_id=eq.${locationId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2221,11 +2381,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createInventoryLevel called with:', level);
     try {
       const payload = this.camelToSnake(level);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/inventory_levels`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2244,10 +2409,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateInventoryLevel called with id:', id);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       const url = `${this.baseUrl}/inventory_levels?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update inventory level');
@@ -2265,7 +2435,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/inventory_levels?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true })
       });
     } catch (error) {
@@ -2278,7 +2448,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getInventoryLevelsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/inventory_levels?org_id=eq.${orgId}&is_deleted=eq.false&order=updated_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2292,7 +2462,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getInventoryLevelByItemAndLocation called');
     try {
       const url = `${this.baseUrl}/inventory_levels?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&warehouse_location_id=eq.${locationId}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2306,7 +2476,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockStatusView called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/v_inventory_status?org_id=eq.${orgId}&order=stock_status.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2321,11 +2491,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createInventoryTransaction called with:', transaction);
     try {
       const payload = this.camelToSnake(transaction);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/inventory_transactions`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2344,10 +2519,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateInventoryTransaction called with id:', id);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update inventory transaction');
@@ -2365,7 +2545,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
     } catch (error) {
@@ -2378,7 +2558,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getInventoryTransactionsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/inventory_transactions?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2392,7 +2572,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getInventoryTransactionById called with id:', id);
     try {
       const url = `${this.baseUrl}/inventory_transactions?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2406,7 +2586,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getInventoryTransactionsByItem called with stockItemId:', stockItemId);
     try {
       const url = `${this.baseUrl}/inventory_transactions?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2421,11 +2601,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createStockAdjustment called with:', adjustment);
     try {
       const payload = this.camelToSnake(adjustment);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/stock_adjustments`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2444,10 +2629,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateStockAdjustment called with id:', id);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
+
       const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update stock adjustment');
@@ -2465,7 +2655,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
     } catch (error) {
@@ -2478,7 +2668,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockAdjustmentsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2492,7 +2682,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockAdjustmentById called with id:', id);
     try {
       const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2506,7 +2696,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockAdjustmentsByItem called with stockItemId:', stockItemId);
     try {
       const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2521,11 +2711,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createReorderPoint called with:', reorder);
     try {
       const payload = this.camelToSnake(reorder);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/reorder_points`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2544,10 +2738,14 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateReorderPoint called with id:', id);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.stock_item_id === '') payload.stock_item_id = null;
+
       const url = `${this.baseUrl}/reorder_points?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) throw new Error('Failed to update reorder point');
@@ -2565,7 +2763,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/reorder_points?id=eq.${id}`;
       await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
     } catch (error) {
@@ -2578,7 +2776,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getReorderPointsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/reorder_points?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2592,7 +2790,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getReorderPointByItem called with stockItemId:', stockItemId);
     try {
       const url = `${this.baseUrl}/reorder_points?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2606,7 +2804,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getItemsNeedingReorder called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       // Note: Actual filtering logic should be in the service layer
@@ -2626,10 +2824,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createRevenueSchedule called');
     try {
       const snakeSchedule = this.camelToSnake(schedule);
+
+      // Convert empty strings to null for UUID columns
+      if (snakeSchedule.customer_id === '') snakeSchedule.customer_id = null;
+      if (snakeSchedule.invoice_id === '') snakeSchedule.invoice_id = null;
+      if (snakeSchedule.gl_account_id === '') snakeSchedule.gl_account_id = null;
+
       const url = `${this.baseUrl}/revenue_schedules`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(snakeSchedule)
       });
       if (!response.ok) {
@@ -2648,10 +2852,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateRevenueSchedule called with id:', id);
     try {
       const snakeUpdates = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (snakeUpdates.customer_id === '') snakeUpdates.customer_id = null;
+      if (snakeUpdates.invoice_id === '') snakeUpdates.invoice_id = null;
+      if (snakeUpdates.gl_account_id === '') snakeUpdates.gl_account_id = null;
+
       const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(snakeUpdates)
       });
       if (!response.ok) {
@@ -2672,7 +2882,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=minimal' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=minimal' },
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) {
@@ -2689,7 +2899,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRevenueSchedulesByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/revenue_schedules?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2703,7 +2913,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRevenueScheduleById called with id:', id);
     try {
       const url = `${this.baseUrl}/revenue_schedules?id=eq.${id}&is_deleted=eq.false`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2717,7 +2927,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRevenueSchedulesByCustomer called');
     try {
       const url = `${this.baseUrl}/revenue_schedules?org_id=eq.${orgId}&customer_id=eq.${customerId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2735,10 +2945,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createRevenueRecognitionEntry called');
     try {
       const snakeEntry = this.camelToSnake(entry);
+
+      // Convert empty strings to null for UUID columns
+      if (snakeEntry.schedule_id === '') snakeEntry.schedule_id = null;
+      if (snakeEntry.journal_entry_id === '') snakeEntry.journal_entry_id = null;
+
       const url = `${this.baseUrl}/revenue_recognition_entries`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(snakeEntry)
       });
       if (!response.ok) {
@@ -2757,10 +2972,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateRevenueRecognitionEntry called with id:', id);
     try {
       const snakeUpdates = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (snakeUpdates.schedule_id === '') snakeUpdates.schedule_id = null;
+      if (snakeUpdates.journal_entry_id === '') snakeUpdates.journal_entry_id = null;
+
       const url = `${this.baseUrl}/revenue_recognition_entries?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(snakeUpdates)
       });
       if (!response.ok) {
@@ -2781,7 +3001,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/revenue_recognition_entries?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: (await this.getHeaders())
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -2797,7 +3017,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRevenueRecognitionEntriesByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/revenue_recognition_entries?org_id=eq.${orgId}&order=recognition_date.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2811,7 +3031,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRevenueRecognitionEntriesBySchedule called with scheduleId:', scheduleId);
     try {
       const url = `${this.baseUrl}/revenue_recognition_entries?schedule_id=eq.${scheduleId}&order=recognition_date.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2829,11 +3049,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createPayrollRun called with:', run);
     try {
       const payload = this.camelToSnake(run);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.period_id === '') payload.period_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/payroll_runs`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2852,10 +3076,14 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updatePayrollRun called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.period_id === '') payload.period_id = null;
+
       const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2876,7 +3104,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete payroll run');
@@ -2890,7 +3118,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPayrollRunsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/payroll_runs?org_id=eq.${orgId}&is_deleted=eq.false&order=run_date.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2904,7 +3132,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPayrollRunById called with id:', id);
     try {
       const url = `${this.baseUrl}/payroll_runs?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -2926,7 +3154,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/payroll_lines`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2948,7 +3176,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/payroll_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -2969,7 +3197,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/payroll_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: (await this.getHeaders())
       });
       if (!response.ok) throw new Error('Failed to delete payroll line');
     } catch (error) {
@@ -2982,7 +3210,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPayrollLinesByRun called with runId:', runId);
     try {
       const url = `${this.baseUrl}/payroll_lines?run_id=eq.${runId}&order=employee_id.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -2996,7 +3224,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPayrollLinesByEmployee called with employeeId:', employeeId);
     try {
       const url = `${this.baseUrl}/payroll_lines?employee_id=eq.${employeeId}&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3018,7 +3246,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/employees`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3040,7 +3268,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/employees?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3061,7 +3289,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/employees?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete employee');
@@ -3075,7 +3303,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getEmployeesByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/employees?org_id=eq.${orgId}&is_deleted=eq.false&order=last_name.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3089,7 +3317,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getEmployeeById called with id:', id);
     try {
       const url = `${this.baseUrl}/employees?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -3107,11 +3335,16 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createAccount called with:', account);
     try {
       const payload = this.camelToSnake(account);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.class_id === '') payload.class_id = null;
+      if (payload.parent_id === '') payload.parent_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/chart_of_accounts`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3130,10 +3363,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateAccount called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.class_id === '') payload.class_id = null;
+      if (payload.parent_id === '') payload.parent_id = null;
+
       const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3154,7 +3392,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete account');
@@ -3168,7 +3406,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/chart_of_accounts?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3182,7 +3420,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountById called with id:', id);
     try {
       const url = `${this.baseUrl}/chart_of_accounts?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -3200,11 +3438,15 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createJournalEntry called with:', entry);
     try {
       const payload = this.camelToSnake(entry);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.period_id === '') payload.period_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/journal_entries`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3223,10 +3465,14 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateJournalEntry called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.period_id === '') payload.period_id = null;
+
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3247,7 +3493,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete journal entry');
@@ -3261,7 +3507,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getJournalEntriesByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/journal_entries?org_id=eq.${orgId}&is_deleted=eq.false&order=date.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3275,7 +3521,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getJournalEntryById called with id:', id);
     try {
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -3293,11 +3539,20 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] createJournalLine called with:', line);
     try {
       const payload = this.camelToSnake(line);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.journal_entry_id === '') payload.journal_entry_id = null;
+      if (payload.account_id === '') payload.account_id = null;
+      if (payload.contact_id === '') payload.contact_id = null;
+      if (payload.batch_id === '') payload.batch_id = null;
+      if (payload.item_id === '') payload.item_id = null;
+      if (payload.asset_id === '') payload.asset_id = null;
+
       delete payload.id;
       const url = `${this.baseUrl}/journal_lines`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3322,23 +3577,23 @@ export class SupabaseDataService implements IDataService {
         'journal_entry_id', 'account_id', 'debit', 'credit', 'memo',
         'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
       ];
-      
+
       const payloads = lines.map(line => {
         const payload = this.camelToSnake(line);
-        
+
         // Only include columns that exist in the database
         const normalizedPayload: any = {};
         for (const key of allKeys) {
-          normalizedPayload[key] = payload[key] !== undefined ? payload[key] : null;
+          normalizedPayload[key] = (payload[key] !== undefined && payload[key] !== '') ? payload[key] : null;
         }
         return normalizedPayload;
       });
       console.debug('[Supabase] Sample payload to send:', JSON.stringify(payloads[0]));
-      
+
       const url = `${this.baseUrl}/journal_lines`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payloads)
       });
       if (!response.ok) {
@@ -3361,10 +3616,19 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateJournalLine called with id:', id, 'updates:', updates);
     try {
       const payload = this.camelToSnake(updates);
+
+      // Convert empty strings to null for UUID columns
+      if (payload.journal_entry_id === '') payload.journal_entry_id = null;
+      if (payload.account_id === '') payload.account_id = null;
+      if (payload.contact_id === '') payload.contact_id = null;
+      if (payload.batch_id === '') payload.batch_id = null;
+      if (payload.item_id === '') payload.item_id = null;
+      if (payload.asset_id === '') payload.asset_id = null;
+
       const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3385,7 +3649,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: (await this.getHeaders())
       });
       if (!response.ok) throw new Error('Failed to delete journal line');
     } catch (error) {
@@ -3398,7 +3662,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getJournalLinesByEntry called with entryId:', entryId);
     try {
       const url = `${this.baseUrl}/journal_lines?journal_entry_id=eq.${entryId}&order=id.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3420,7 +3684,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/audit_logs`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3439,7 +3703,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAuditLogsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/audit_logs?org_id=eq.${orgId}&order=timestamp.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3461,7 +3725,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/purchase_orders`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3483,7 +3747,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3504,7 +3768,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete purchase order');
@@ -3518,7 +3782,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPurchaseOrdersByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/purchase_orders?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3532,7 +3796,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getPurchaseOrderById called with id:', id);
     try {
       const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -3554,7 +3818,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/goods_receipts`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3576,7 +3840,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3597,7 +3861,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: (await this.getHeaders()),
         body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
       });
       if (!response.ok) throw new Error('Failed to delete goods receipt');
@@ -3611,7 +3875,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getGoodsReceiptsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/goods_receipts?org_id=eq.${orgId}&is_deleted=eq.false&order=receipt_date.desc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3625,7 +3889,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getGoodsReceiptById called with id:', id);
     try {
       const url = `${this.baseUrl}/goods_receipts?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
@@ -3647,7 +3911,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/recurring_bills`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3669,7 +3933,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: { ...this.getHeaders(), 'Prefer': 'return=representation' },
+        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -3690,7 +3954,7 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: (await this.getHeaders())
       });
       if (!response.ok) throw new Error('Failed to delete recurring bill');
     } catch (error) {
@@ -3703,7 +3967,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRecurringBillsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/recurring_bills?org_id=eq.${orgId}&order=next_due_date.asc`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
@@ -3717,7 +3981,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getRecurringBillById called with id:', id);
     try {
       const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
       return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
