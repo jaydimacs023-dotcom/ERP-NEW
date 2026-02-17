@@ -85,6 +85,8 @@ export type ModuleTab =
   | 'payment-history'
   | 'users'
   | 'audit'
+  | 'enrollments'
+  | 'course-fees'
   // System Admin
   | 'maintenance'
   | 'backup-restore'
@@ -104,6 +106,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
+    'enrollments', 'course-fees',
     'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
     'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'
   ],
@@ -117,6 +120,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
+    'enrollments', 'course-fees',
     'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'
   ],
 
@@ -153,7 +157,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // AR_SPECIALIST: Accounts Receivable focused
   AR_SPECIALIST: [
     'dashboard',
-    'ar', 'recurring-invoices', 'revenue-recognition',
+    'ar', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees',
     'batches',
     'items',
     'sponsors'
@@ -223,7 +227,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 // ===== Module Groups for Sidebar Sections =====
 export const MODULE_GROUPS = {
   FINANCIAL_CORE: ['dashboard', 'ledger', 'reports', 'banking', 'checks'] as ModuleTab[],
-  AR_MODULES: ['ar', 'recurring-invoices', 'revenue-recognition'] as ModuleTab[],
+  AR_MODULES: ['ar', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees'] as ModuleTab[],
   AP_MODULES: ['payables', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],

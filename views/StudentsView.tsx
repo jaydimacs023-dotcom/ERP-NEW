@@ -1,15 +1,16 @@
 ﻿
-import React, { useState, useRef } from 'react';
-import { Student, StudentDocument } from '../types';
-import { 
-  Search, Plus, Filter, User, Calendar, Mail, Phone, FileText, 
+import React, { useState, useRef, useMemo } from 'react';
+import { Student, StudentDocument, Batch, Qualification } from '../types';
+import {
+  Search, Plus, Filter, User, Calendar, Mail, Phone, FileText,
   Upload, CheckCircle, Clock, Trash2, X, Camera, RefreshCw,
   UserCircle, UploadCloud, ShieldCheck, AlertCircle, FileSpreadsheet,
   CheckCircle2, AlertTriangle, ArrowRight, MapPin, Fingerprint,
   GraduationCap, Globe, Building2, Baby, Eye, ShieldAlert,
   ThumbsUp, ThumbsDown, Check, BookOpen, Briefcase, Heart,
   Printer, MoreVertical, ExternalLink, Shield, Download,
-  CheckSquare
+  CheckSquare, ChevronLeft, ChevronRight, Layers, Award,
+  ChevronsLeft, ChevronsRight, Users
 } from 'lucide-react';
 
 interface Toast {
@@ -20,6 +21,8 @@ interface Toast {
 
 interface StudentsViewProps {
   students: Student[];
+  batches?: Batch[];
+  qualifications?: Qualification[];
   onAddStudent: (student: Student) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
@@ -36,12 +39,17 @@ const MANDATORY_DOCS = [
 const CSV_HEADERS = [
   'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Contact Number',
   'E-mail Address', 'Street Address', 'Barangay', 'Municipality/City', 'District',
-  'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status', 
+  'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status',
   'Highest Educational Attainment', 'Nationality', 'ULI'
 ];
 
-const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
+const PAGE_SIZE = 10;
+
+const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'all' | 'batch'>('all');
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -52,7 +60,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
   const [showEditCamera, setShowEditCamera] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  
+
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
 
   const [mandatoryDocStatuses, setMandatoryDocStatuses] = useState<Record<string, 'PENDING' | 'UPLOADED' | 'VERIFIED'>>({
@@ -80,14 +88,50 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
     province: '', guardian: '',
   });
 
-  const filteredStudents = students.filter(s => 
-    `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.uli.includes(searchTerm)
-  );
+  // Optimized filtering with useMemo
+  const filteredStudents = useMemo(() => {
+    let base = students;
+
+    // If viewing by batch and a batch is selected, filter to only that batch's students
+    if (viewMode === 'batch' && selectedBatchId) {
+      const batch = batches.find(b => b.id === selectedBatchId);
+      if (batch) {
+        const batchStudentIds = new Set(batch.studentIds);
+        base = base.filter(s => batchStudentIds.has(s.id));
+      }
+    }
+
+    if (!searchTerm) return base;
+    const lower = searchTerm.toLowerCase();
+    return base.filter(s =>
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
+      s.uli.toLowerCase().includes(lower)
+    );
+  }, [students, searchTerm, viewMode, selectedBatchId, batches]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredStudents.slice(start, start + PAGE_SIZE);
+  }, [filteredStudents, currentPage]);
+
+  // Reset page when search or filter changes
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    setCurrentPage(1);
+  };
+
+  const handleSelectBatch = (batchId: string) => {
+    setSelectedBatchId(batchId);
+    setCurrentPage(1);
+  };
+
+  const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
   const downloadTemplate = () => {
     const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",");
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -113,7 +157,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
       for (let i = 1; i < lines.length; i++) {
         if (!lines[i].trim()) continue;
         const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-        
+
         // Mapping based on MIS file format:
         // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: Contact Number,
         // 5: E-mail Address, 6: Street Address, 7: Barangay, 8: Municipality/City, 9: District,
@@ -190,7 +234,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
   const handleDocumentAudit = (docId: string, action: 'VERIFY' | 'REJECT') => {
     if (!auditStudent) return;
     try {
-      const nextDocs = auditStudent.documents.map(d => 
+      const nextDocs = auditStudent.documents.map(d =>
         d.id === docId ? { ...d, status: action === 'VERIFY' ? 'VERIFIED' as const : 'REJECTED' as const } : d
       );
       const updated = { ...auditStudent, documents: nextDocs };
@@ -225,8 +269,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
     setShowCamera(true);
     setTimeout(async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } }
         });
         if (videoRef.current) videoRef.current.srcObject = stream;
       } catch (err) {
@@ -276,7 +320,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
     const id = `toast-${Date.now()}`;
     const toast: Toast = { id, message, type };
     setToasts(prev => [...prev, toast]);
-    
+
     // Auto-remove after 4 seconds
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -330,20 +374,109 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         </div>
       </div>
 
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => { setViewMode('all'); setSelectedBatchId(null); setCurrentPage(1); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold transition-all border ${viewMode === 'all'
+            ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
+            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
+            }`}
+        >
+          <Users size={16} /> All Learners
+        </button>
+        <button
+          onClick={() => { setViewMode('batch'); setCurrentPage(1); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold transition-all border ${viewMode === 'batch'
+            ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
+            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
+            }`}
+        >
+          <Layers size={16} /> By Batch
+        </button>
+      </div>
+
+      {/* Batch Selector Panel - only in batch mode */}
+      {viewMode === 'batch' && (
+        <div className="bg-white rounded-md border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Layers size={16} className="text-[#F47721]" />
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Select a Training Batch</h3>
+          </div>
+          {batches.length === 0 ? (
+            <p className="text-sm text-gray-400 italic py-4 text-center">No batches found.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {batches.map(batch => {
+                const qual = qualifications.find(q => q.id === batch.qualificationId);
+                const isSelected = selectedBatchId === batch.id;
+                return (
+                  <button
+                    key={batch.id}
+                    onClick={() => handleSelectBatch(batch.id)}
+                    className={`text-left p-4 rounded border transition-all group ${isSelected
+                      ? 'bg-[#F47721] border-[#E06610] text-white shadow-md'
+                      : 'bg-gray-50 border-gray-200 hover:border-orange-300 hover:shadow-sm'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? 'text-orange-200' : 'text-[#F47721]'}`}>
+                        FY {batch.year}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-500'}`}>
+                        <Users size={12} /> {batch.studentIds.length}
+                      </span>
+                    </div>
+                    <p className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-gray-800'}`}>{batch.name}</p>
+                    <p className={`text-xs truncate mt-0.5 ${isSelected ? 'text-orange-100' : 'text-gray-400'}`}>
+                      <Award size={10} className="inline mr-1" />{qual?.name || 'Unknown'}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected Batch Info Header */}
+      {viewMode === 'batch' && selectedBatch && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-md border border-orange-100 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-[#F47721] text-white rounded shadow-sm">
+              <Layers size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">{selectedBatch.name}</h3>
+              <p className="text-xs text-gray-500">
+                {qualifications.find(q => q.id === selectedBatch.qualificationId)?.name || 'Unknown'}
+                {' • '}{selectedBatch.studentIds.length} enrolled • {selectedBatch.startDate} to {selectedBatch.endDate}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setSelectedBatchId(null); setCurrentPage(1); }}
+            className="text-xs font-semibold text-gray-400 hover:text-[#F47721] transition-colors flex items-center gap-1"
+          >
+            <X size={14} /> Clear
+          </button>
+        </div>
+      )}
+
       <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            placeholder="Search by name or ULI..." 
+          <input
+            placeholder="Search by name or ULI..."
             className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-2 focus:ring-orange-400/20 outline-none font-bold"
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
-           <div className="px-5 py-3 bg-gray-100 rounded text-xs font-semibold uppercase tracking-wide text-gray-500 border border-gray-200">
-              Total Learners: {filteredStudents.length}
-           </div>
+        <div className="flex gap-2 items-center">
+          <div className="px-5 py-3 bg-gray-100 rounded text-xs font-semibold uppercase tracking-wide text-gray-500 border border-gray-200">
+            Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredStudents.length)}–{Math.min(currentPage * PAGE_SIZE, filteredStudents.length)} of {filteredStudents.length}
+          </div>
         </div>
       </div>
 
@@ -358,7 +491,16 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredStudents.map(student => {
+            {paginatedStudents.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-16 text-center">
+                  <Users size={32} className="mx-auto text-gray-200 mb-3" />
+                  <p className="text-sm text-gray-400 font-semibold">
+                    {viewMode === 'batch' && !selectedBatchId ? 'Select a batch above to view its enrolled learners.' : 'No learners found matching your criteria.'}
+                  </p>
+                </td>
+              </tr>
+            ) : paginatedStudents.map(student => {
               const pendingDocs = student.documents.filter(d => d.status === 'UPLOADED').length;
               const verifiedDocs = student.documents.filter(d => d.status === 'VERIFIED').length;
               const isCompliant = verifiedDocs === student.documents.length || student.isEnrollmentOverridden;
@@ -384,19 +526,19 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5">
-                       {isCompliant ? (
-                         <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-[#F47721] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
-                            <Check size={10} /> Qualified
-                         </span>
-                       ) : pendingDocs > 0 ? (
-                         <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 w-fit animate-pulse">
-                            <ShieldAlert size={10} /> {pendingDocs} Audit Pending
-                         </span>
-                       ) : (
-                         <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-200 w-fit">
-                            Incomplete
-                         </span>
-                       )}
+                      {isCompliant ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-[#F47721] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
+                          <Check size={10} /> Qualified
+                        </span>
+                      ) : pendingDocs > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 w-fit animate-pulse">
+                          <ShieldAlert size={10} /> {pendingDocs} Audit Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-200 w-fit">
+                          Incomplete
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-5">
@@ -420,70 +562,136 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         </table>
       </div>
 
+      {/* Pagination Controls */}
+      {filteredStudents.length > PAGE_SIZE && (
+        <div className="bg-white px-6 py-4 rounded-md border border-gray-200 shadow-sm flex items-center justify-between">
+          <p className="text-xs text-gray-400 font-semibold">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="First page"
+            >
+              <ChevronsLeft size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+              .reduce<(number | 'dots')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('dots');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === 'dots' ? (
+                  <span key={`dots-${idx}`} className="px-1 text-gray-300 text-xs">...</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setCurrentPage(item as number)}
+                    className={`w-8 h-8 rounded text-xs font-semibold transition-all ${currentPage === item
+                      ? 'bg-[#F47721] text-white shadow-sm'
+                      : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Last page"
+            >
+              <ChevronsRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Batch Import Preview Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-600 text-white rounded shadow-sm shadow-emerald-100"><FileSpreadsheet size={24} /></div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Batch Import Preview</h3>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Found {importPreview.length} Institutional Records</p>
-                  </div>
-               </div>
-               <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={28}/></button>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-600 text-white rounded shadow-sm shadow-emerald-100"><FileSpreadsheet size={24} /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Batch Import Preview</h3>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Found {importPreview.length} Institutional Records</p>
+                </div>
+              </div>
+              <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={28} /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-0 scrollbar-hide">
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50 sticky top-0 z-10">
-                   <tr>
-                     <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Identities</th>
-                     <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal Info</th>
-                     <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact & Residence</th>
-                     <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Registry Data</th>
-                   </tr>
+                  <tr>
+                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Identities</th>
+                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal Info</th>
+                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact & Residence</th>
+                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Registry Data</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                   {importPreview.map((p, idx) => (
-                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                       <td className="px-8 py-5">
-                          <p className="text-sm font-semibold text-gray-800 uppercase">{p.lastName}, {p.firstName}</p>
-                          <p className="text-xs font-mono font-bold text-[#F47721] uppercase mt-0.5">{p.uli}</p>
-                       </td>
-                       <td className="px-8 py-5">
-                          <p className="text-xs font-bold text-gray-600">{p.dateOfBirth} ({p.age}y)</p>
-                          <p className="text-xs text-gray-400 uppercase font-semibold">{p.sex} • {p.civilStatus}</p>
-                       </td>
-                       <td className="px-8 py-5">
-                          <p className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{p.email}</p>
-                          <p className="text-xs text-gray-400 uppercase font-semibold">{p.city}, {p.province}</p>
-                       </td>
-                       <td className="px-8 py-5">
-                          <p className="text-xs font-bold text-gray-600">{p.educationalAttainment}</p>
-                          <p className="text-xs text-gray-400 uppercase font-semibold">Guardian: {p.guardian || 'N/A'}</p>
-                       </td>
-                     </tr>
-                   ))}
+                  {importPreview.map((p, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-8 py-5">
+                        <p className="text-sm font-semibold text-gray-800 uppercase">{p.lastName}, {p.firstName}</p>
+                        <p className="text-xs font-mono font-bold text-[#F47721] uppercase mt-0.5">{p.uli}</p>
+                      </td>
+                      <td className="px-8 py-5">
+                        <p className="text-xs font-bold text-gray-600">{p.dateOfBirth} ({p.age}y)</p>
+                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.sex} • {p.civilStatus}</p>
+                      </td>
+                      <td className="px-8 py-5">
+                        <p className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{p.email}</p>
+                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.city}, {p.province}</p>
+                      </td>
+                      <td className="px-8 py-5">
+                        <p className="text-xs font-bold text-gray-600">{p.educationalAttainment}</p>
+                        <p className="text-xs text-gray-400 uppercase font-semibold">Guardian: {p.guardian || 'N/A'}</p>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
             <div className="p-8 bg-gray-800 flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/5">
-               <div className="flex items-center gap-4 text-white">
-                  <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center border border-white/10">
-                     <ShieldCheck size={24} className="text-brand" />
-                  </div>
-                  <div>
-                     <p className="text-sm font-semibold uppercase tracking-tight">Integrity Verification</p>
-                     <p className="text-xs text-gray-400 font-bold uppercase tracking-wide mt-1">Full registry alignment checked against institutional schema.</p>
-                  </div>
-               </div>
-               <div className="flex gap-4 w-full md:w-auto">
-                  <button onClick={() => setShowImportModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-white transition-colors">Discard Batch</button>
-                  <button onClick={commitBatch} className="flex-1 px-12 py-4 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-md shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">Commit {importPreview.length} Records</button>
-               </div>
+              <div className="flex items-center gap-4 text-white">
+                <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center border border-white/10">
+                  <ShieldCheck size={24} className="text-brand" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-tight">Integrity Verification</p>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wide mt-1">Full registry alignment checked against institutional schema.</p>
+                </div>
+              </div>
+              <div className="flex gap-4 w-full md:w-auto">
+                <button onClick={() => setShowImportModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-white transition-colors">Discard Batch</button>
+                <button onClick={commitBatch} className="flex-1 px-12 py-4 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-md shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">Commit {importPreview.length} Records</button>
+              </div>
             </div>
           </div>
         </div>
@@ -495,170 +703,167 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
             {/* Modal Header */}
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-6">
-                  <div className="w-16 h-16 rounded overflow-hidden bg-white border-4 border-white shadow-sm flex items-center justify-center shrink-0">
-                    {auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                      <img src={auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserCircle size={32} className="text-gray-300" />
-                    )}
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 rounded overflow-hidden bg-white border-4 border-white shadow-sm flex items-center justify-center shrink-0">
+                  {auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                    <img src={auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserCircle size={32} className="text-gray-300" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight leading-none mb-1">
+                    {auditStudent.lastName.toUpperCase()}, {auditStudent.firstName}
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-semibold text-[#F47721] uppercase tracking-wide bg-orange-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
+                    <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded border ${(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                      ? 'bg-emerald-50 text-[#F47721] border-emerald-100'
+                      : 'bg-amber-50 text-amber-600 border-amber-100'
+                      }`}>
+                      {auditStudent.isEnrollmentOverridden ? 'ADMIN OVERRIDE ACTIVE' : 'STANDARD REGISTRY'}
+                    </span>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight leading-none mb-1">
-                      {auditStudent.lastName.toUpperCase()}, {auditStudent.firstName}
-                    </h3>
-                    <div className="flex items-center gap-3">
-                       <span className="text-xs font-mono font-semibold text-[#F47721] uppercase tracking-wide bg-orange-50 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
-                       <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded border ${
-                         (auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
-                         ? 'bg-emerald-50 text-[#F47721] border-emerald-100'
-                         : 'bg-amber-50 text-amber-600 border-amber-100'
-                       }`}>
-                         {auditStudent.isEnrollmentOverridden ? 'ADMIN OVERRIDE ACTIVE' : 'STANDARD REGISTRY'}
-                       </span>
-                    </div>
-                  </div>
-               </div>
-               <div className="flex items-center gap-3">
-                  <button className="p-3 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-800 transition-colors"><Printer size={20} /></button>
-                  <button onClick={() => setAuditStudent(null)} className="p-3 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors"><X size={20} /></button>
-               </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button className="p-3 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-800 transition-colors"><Printer size={20} /></button>
+                <button onClick={() => setAuditStudent(null)} className="p-3 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors"><X size={20} /></button>
+              </div>
             </div>
 
             {/* Modal Body */}
             <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-               {/* Left Column: Comprehensive Profile */}
-               <div className="flex-1 overflow-y-auto p-5 space-y-12 scrollbar-hide border-r border-gray-100 bg-white">
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-3">
-                       <div className="p-2 bg-orange-50 text-[#F47721] rounded"><User size={18}/></div>
-                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal Registry Details</h4>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                       <DataPoint label="Birth Date" value={auditStudent.dateOfBirth} />
-                       <DataPoint label="Sex" value={auditStudent.sex} />
-                       <DataPoint label="Civil Status" value={auditStudent.civilStatus} />
-                       <DataPoint label="Nationality" value={auditStudent.nationality} />
-                       <DataPoint label="Birth Region" value={auditStudent.birthRegion} />
-                       <DataPoint label="Birth City" value={auditStudent.birthCity} />
-                       <DataPoint label="Educational Attainment" value={auditStudent.educationalAttainment} isSpan2 />
-                    </div>
-                  </section>
-
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-3">
-                       <div className="p-2 bg-orange-50 text-[#F47721] rounded"><MapPin size={18}/></div>
-                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Residence & Contact</h4>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <DataPoint label="Official Email" value={auditStudent.email} />
-                       <DataPoint label="Contact Number" value={auditStudent.contactNumber} />
-                    </div>
-                    <div className="p-6 bg-gray-50 rounded-md border border-gray-100">
-                       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Detailed Address</div>
-                       <p className="text-sm font-bold text-gray-800 uppercase leading-relaxed">
-                          {auditStudent.street}, {auditStudent.barangay}, {auditStudent.city}, {auditStudent.district}, {auditStudent.province}
-                       </p>
-                    </div>
-                  </section>
-
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-3">
-                       <div className="p-2 bg-orange-50 text-[#F47721] rounded"><Heart size={18}/></div>
-                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Family Background</h4>
-                    </div>
-                    <DataPoint label="Primary Guardian / Parent" value={auditStudent.guardian || 'Not Declared'} />
-                  </section>
-               </div>
-
-               {/* Right Column: Compliance Ledger & Audit */}
-               <div className="w-full md:w-[450px] bg-gray-50 overflow-y-auto p-5 flex flex-col shrink-0">
-                  <div className="flex items-center justify-between mb-8">
-                     <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
-                        <ShieldCheck size={18} className="text-[#F47721]" />
-                        Compliance Audit
-                     </h4>
-                     <button 
-                       onClick={handleToggleOverride}
-                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${
-                         auditStudent.isEnrollmentOverridden 
-                         ? 'bg-rose-600 text-white shadow-lg' 
-                         : 'bg-white border border-gray-200 text-gray-400 hover:text-rose-600'
-                       }`}
-                     >
-                       {auditStudent.isEnrollmentOverridden ? 'Revoke Override' : 'Force Qualify'}
-                     </button>
+              {/* Left Column: Comprehensive Profile */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-12 scrollbar-hide border-r border-gray-100 bg-white">
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 text-[#F47721] rounded"><User size={18} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal Registry Details</h4>
                   </div>
 
-                  <div className="space-y-6">
-                     {auditStudent.documents.map(doc => {
-                       const isUploaded = doc.status === 'UPLOADED' || doc.status === 'VERIFIED';
-                       const isVerified = doc.status === 'VERIFIED';
-                       const isRejected = doc.status === 'REJECTED';
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <DataPoint label="Birth Date" value={auditStudent.dateOfBirth} />
+                    <DataPoint label="Sex" value={auditStudent.sex} />
+                    <DataPoint label="Civil Status" value={auditStudent.civilStatus} />
+                    <DataPoint label="Nationality" value={auditStudent.nationality} />
+                    <DataPoint label="Birth Region" value={auditStudent.birthRegion} />
+                    <DataPoint label="Birth City" value={auditStudent.birthCity} />
+                    <DataPoint label="Educational Attainment" value={auditStudent.educationalAttainment} isSpan2 />
+                  </div>
+                </section>
 
-                       return (
-                         <div key={doc.id} className={`p-6 rounded border transition-all ${
-                           isVerified ? 'bg-emerald-50/50 border-emerald-100 shadow-sm' :
-                           isRejected ? 'bg-rose-50 border-rose-100' :
-                           isUploaded ? 'bg-white border-orange-100 shadow-sm' : 'bg-gray-100/50 border-gray-200 opacity-60'
-                         }`}>
-                            <div className="flex justify-between items-start mb-4">
-                               <div className="flex items-center gap-3 min-w-0">
-                                  {isVerified ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0"/> : 
-                                   isRejected ? <ShieldAlert size={20} className="text-rose-500 shrink-0"/> :
-                                   isUploaded ? <UploadCloud size={20} className="text-orange-500 shrink-0 animate-bounce"/> :
-                                   <Clock size={20} className="text-gray-300 shrink-0"/>}
-                                  <div className="min-w-0">
-                                     <p className="text-xs font-semibold text-gray-800 uppercase tracking-tight truncate">{doc.name}</p>
-                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Status: {doc.status}</p>
-                                  </div>
-                               </div>
-                               {doc.fileData && (
-                                 <button className="p-2 hover:bg-gray-100 rounded-lg text-[#F47721]"><ExternalLink size={16}/></button>
-                               )}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 text-[#F47721] rounded"><MapPin size={18} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Residence & Contact</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <DataPoint label="Official Email" value={auditStudent.email} />
+                    <DataPoint label="Contact Number" value={auditStudent.contactNumber} />
+                  </div>
+                  <div className="p-6 bg-gray-50 rounded-md border border-gray-100">
+                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Detailed Address</div>
+                    <p className="text-sm font-bold text-gray-800 uppercase leading-relaxed">
+                      {auditStudent.street}, {auditStudent.barangay}, {auditStudent.city}, {auditStudent.district}, {auditStudent.province}
+                    </p>
+                  </div>
+                </section>
+
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 text-[#F47721] rounded"><Heart size={18} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Family Background</h4>
+                  </div>
+                  <DataPoint label="Primary Guardian / Parent" value={auditStudent.guardian || 'Not Declared'} />
+                </section>
+              </div>
+
+              {/* Right Column: Compliance Ledger & Audit */}
+              <div className="w-full md:w-[450px] bg-gray-50 overflow-y-auto p-5 flex flex-col shrink-0">
+                <div className="flex items-center justify-between mb-8">
+                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-[#F47721]" />
+                    Compliance Audit
+                  </h4>
+                  <button
+                    onClick={handleToggleOverride}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${auditStudent.isEnrollmentOverridden
+                      ? 'bg-rose-600 text-white shadow-lg'
+                      : 'bg-white border border-gray-200 text-gray-400 hover:text-rose-600'
+                      }`}
+                  >
+                    {auditStudent.isEnrollmentOverridden ? 'Revoke Override' : 'Force Qualify'}
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {auditStudent.documents.map(doc => {
+                    const isUploaded = doc.status === 'UPLOADED' || doc.status === 'VERIFIED';
+                    const isVerified = doc.status === 'VERIFIED';
+                    const isRejected = doc.status === 'REJECTED';
+
+                    return (
+                      <div key={doc.id} className={`p-6 rounded border transition-all ${isVerified ? 'bg-emerald-50/50 border-emerald-100 shadow-sm' :
+                        isRejected ? 'bg-rose-50 border-rose-100' :
+                          isUploaded ? 'bg-white border-orange-100 shadow-sm' : 'bg-gray-100/50 border-gray-200 opacity-60'
+                        }`}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {isVerified ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0" /> :
+                              isRejected ? <ShieldAlert size={20} className="text-rose-500 shrink-0" /> :
+                                isUploaded ? <UploadCloud size={20} className="text-orange-500 shrink-0 animate-bounce" /> :
+                                  <Clock size={20} className="text-gray-300 shrink-0" />}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-800 uppercase tracking-tight truncate">{doc.name}</p>
+                              <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Status: {doc.status}</p>
                             </div>
-
-                            {doc.fileData && doc.status === 'UPLOADED' && (
-                              <div className="flex gap-2 pt-4 border-t border-gray-100">
-                                 <button onClick={() => handleDocumentAudit(doc.id, 'REJECT')} className="flex-1 py-2.5 bg-white border border-rose-100 text-rose-600 rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-rose-600 hover:text-white transition-all">
-                                    <ThumbsDown size={14}/> Reject
-                                 </button>
-                                 <button onClick={() => handleDocumentAudit(doc.id, 'VERIFY')} className="flex-1 py-2.5 bg-emerald-600 text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">
-                                    <ThumbsUp size={14}/> Verify
-                                 </button>
-                              </div>
-                            )}
-
-                            {isVerified && (
-                               <div className="text-xs font-semibold text-[#F47721] uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
-                            )}
-                         </div>
-                       )
-                     })}
-                  </div>
-
-                  <div className="mt-auto pt-10">
-                     <div className="bg-gray-800 rounded p-6 text-white shadow-md relative overflow-hidden">
-                        <div className="relative z-10 flex items-center gap-4">
-                           <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center border border-white/10">
-                              <Shield size={24} className="text-brand" />
-                           </div>
-                           <div>
-                              <p className="text-xs font-semibold text-brand uppercase tracking-wide">Enrollment Status</p>
-                              <p className="text-base font-semibold uppercase">
-                                 {(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
-                                 ? 'Qualified for Deployment'
-                                 : 'Incomplete Compliance'}
-                              </p>
-                           </div>
+                          </div>
+                          {doc.fileData && (
+                            <button className="p-2 hover:bg-gray-100 rounded-lg text-[#F47721]"><ExternalLink size={16} /></button>
+                          )}
                         </div>
-                        <div className="absolute top-0 right-0 p-8 opacity-5">
-                           <CheckCircle size={100} />
-                        </div>
-                     </div>
+
+                        {doc.fileData && doc.status === 'UPLOADED' && (
+                          <div className="flex gap-2 pt-4 border-t border-gray-100">
+                            <button onClick={() => handleDocumentAudit(doc.id, 'REJECT')} className="flex-1 py-2.5 bg-white border border-rose-100 text-rose-600 rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-rose-600 hover:text-white transition-all">
+                              <ThumbsDown size={14} /> Reject
+                            </button>
+                            <button onClick={() => handleDocumentAudit(doc.id, 'VERIFY')} className="flex-1 py-2.5 bg-emerald-600 text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">
+                              <ThumbsUp size={14} /> Verify
+                            </button>
+                          </div>
+                        )}
+
+                        {isVerified && (
+                          <div className="text-xs font-semibold text-[#F47721] uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-auto pt-10">
+                  <div className="bg-gray-800 rounded p-6 text-white shadow-md relative overflow-hidden">
+                    <div className="relative z-10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded bg-white/10 flex items-center justify-center border border-white/10">
+                        <Shield size={24} className="text-brand" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-brand uppercase tracking-wide">Enrollment Status</p>
+                        <p className="text-base font-semibold uppercase">
+                          {(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                            ? 'Qualified for Deployment'
+                            : 'Incomplete Compliance'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                      <CheckCircle size={100} />
+                    </div>
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -680,128 +885,128 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
               <form onSubmit={handleSubmit} className="space-y-12 pb-10">
                 {/* 1. Personal Identity */}
                 <section className="space-y-6">
-                   <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><Fingerprint size={16} /></div>
-                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personal Identification</h4>
-                   </div>
-                   
-                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><Fingerprint size={16} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personal Identification</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">ULI (Learner ID)</label>
-                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-semibold text-[#F47721] font-mono" value={formData.uli} onChange={e => setFormData({...formData, uli: e.target.value})} />
+                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-semibold text-[#F47721] font-mono" value={formData.uli} onChange={e => setFormData({ ...formData, uli: e.target.value })} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
                     </div>
                     <div className="md:col-span-2 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Middle</label>
-                      <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                      <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({ ...formData, middleName: e.target.value })} />
                     </div>
                     <div className="md:col-span-1 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Ext.</label>
-                      <input placeholder="Jr" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
+                      <input placeholder="Jr" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({ ...formData, extension: e.target.value })} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date</label>
-                        <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Computed Age</label>
-                        <input readOnly className="w-full px-4 py-3 bg-gray-100 border border-gray-100 rounded text-sm font-semibold text-gray-500" value={formData.age} />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Sex</label>
-                        <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({...formData, sex: e.target.value as any})}>
-                           <option value="Male">Male</option>
-                           <option value="Female">Female</option>
-                        </select>
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Civil Status</label>
-                        <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({...formData, civilStatus: e.target.value})}>
-                           <option value="Single">Single</option>
-                           <option value="Married">Married</option>
-                           <option value="Widowed">Widowed</option>
-                           <option value="Separated">Separated</option>
-                        </select>
-                     </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date</label>
+                      <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Computed Age</label>
+                      <input readOnly className="w-full px-4 py-3 bg-gray-100 border border-gray-100 rounded text-sm font-semibold text-gray-500" value={formData.age} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Sex</label>
+                      <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value as any })}>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Civil Status</label>
+                      <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({ ...formData, civilStatus: e.target.value })}>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Separated">Separated</option>
+                      </select>
+                    </div>
                   </div>
                 </section>
 
                 {/* 2. Contact & Address */}
                 <section className="space-y-6">
-                   <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><MapPin size={16} /></div>
-                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Contact & Residence</h4>
-                   </div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><MapPin size={16} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Contact & Residence</h4>
+                  </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email</label>
-                         <input required type="email" placeholder="learner@manila.edu.ph" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                      </div>
-                      <div className="space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
-                         <input required placeholder="09XX XXX XXXX" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
-                      </div>
-                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email</label>
+                      <input required type="email" placeholder="learner@manila.edu.ph" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
+                      <input required placeholder="09XX XXX XXXX" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
+                    </div>
+                  </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
-                      <div className="md:col-span-4 space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street</label>
-                         <input required placeholder="Kalsada St. / Bldg 123" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
-                      </div>
-                      <div className="md:col-span-3 space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
-                         <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
-                      </div>
-                      <div className="md:col-span-3 space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
-                         <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
-                      </div>
-                      <div className="md:col-span-2 space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
-                         <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
-                      </div>
-                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street</label>
+                      <input required placeholder="Kalsada St. / Bldg 123" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
+                    </div>
+                    <div className="md:col-span-3 space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
+                    </div>
+                    <div className="md:col-span-3 space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                    </div>
+                    <div className="md:col-span-2 space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
+                    </div>
+                  </div>
                 </section>
 
                 {/* 3. Education & Guardian */}
                 <section className="space-y-6">
-                   <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><BookOpen size={16} /></div>
-                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">III. Background & Guardian</h4>
-                   </div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><BookOpen size={16} /></div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">III. Background & Guardian</h4>
+                  </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
-                         <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
-                            <option value="Elementary Graduate">Elementary Graduate</option>
-                            <option value="High School Graduate">High School Graduate</option>
-                            <option value="College Level">College Level</option>
-                            <option value="College Graduate">College Graduate</option>
-                            <option value="TVET Graduate">TVET Graduate</option>
-                            <option value="Masteral/PhD">Masteral/PhD</option>
-                         </select>
-                      </div>
-                      <div className="space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
-                         <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
-                      </div>
-                      <div className="space-y-1">
-                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
-                         <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.guardian} onChange={e => setFormData({...formData, guardian: e.target.value})} />
-                      </div>
-                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
+                      <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
+                        <option value="Elementary Graduate">Elementary Graduate</option>
+                        <option value="High School Graduate">High School Graduate</option>
+                        <option value="College Level">College Level</option>
+                        <option value="College Graduate">College Graduate</option>
+                        <option value="TVET Graduate">TVET Graduate</option>
+                        <option value="Masteral/PhD">Masteral/PhD</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                      <input required placeholder="Name of parent or guardian" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800" value={formData.guardian} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
+                    </div>
+                  </div>
                 </section>
 
                 <div className="pt-4">
@@ -814,31 +1019,31 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-6 flex items-center gap-2">
                 <FileText size={16} className="text-[#F47721]" /> Compliance Folder
               </h4>
-              
+
               {/* Camera Hero Section */}
               <div className="mb-8 p-6 bg-gray-800 rounded-md text-white shadow-md relative overflow-hidden group">
-                 <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-4">
-                       <h5 className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Official Portrait</h5>
-                       <span className="px-2 py-0.5 bg-white/10 rounded text-xs font-semibold uppercase">Standard: 2x2</span>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <h5 className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Official Portrait</h5>
+                    <span className="px-2 py-0.5 bg-white/10 rounded text-xs font-semibold uppercase">Standard: 2x2</span>
+                  </div>
+                  {photoPreview ? (
+                    <div className="aspect-square w-32 mx-auto rounded border-2 border-orange-400/30 overflow-hidden bg-black shadow-md transition-transform group-hover:scale-105">
+                      <img src={photoPreview} className="w-full h-full object-cover" alt="Passport" />
                     </div>
-                    {photoPreview ? (
-                      <div className="aspect-square w-32 mx-auto rounded border-2 border-orange-400/30 overflow-hidden bg-black shadow-md transition-transform group-hover:scale-105">
-                         <img src={photoPreview} className="w-full h-full object-cover" alt="Passport" />
-                      </div>
-                    ) : (
-                      <div className="aspect-square w-32 mx-auto rounded border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-gray-500 group-hover:border-orange-400/50 transition-all">
-                         <User size={32} />
-                         <span className="text-xs font-semibold uppercase mt-2">No Photo</span>
-                      </div>
-                    )}
-                    <button onClick={startCamera} className="w-full mt-6 py-3 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-[#F47721] transition-all shadow-sm shadow-gray-300/30">
-                       <Camera size={14} /> Open System Camera
-                    </button>
-                 </div>
-                 <div className="absolute top-0 right-0 p-8 opacity-5">
-                    <ShieldCheck size={120} />
-                 </div>
+                  ) : (
+                    <div className="aspect-square w-32 mx-auto rounded border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-gray-500 group-hover:border-orange-400/50 transition-all">
+                      <User size={32} />
+                      <span className="text-xs font-semibold uppercase mt-2">No Photo</span>
+                    </div>
+                  )}
+                  <button onClick={startCamera} className="w-full mt-6 py-3 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-[#F47721] transition-all shadow-sm shadow-gray-300/30">
+                    <Camera size={14} /> Open System Camera
+                  </button>
+                </div>
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                  <ShieldCheck size={120} />
+                </div>
               </div>
 
               <div className="space-y-4 flex-1">
@@ -989,8 +1194,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                         setShowEditCamera(true);
                         setTimeout(async () => {
                           try {
-                            const stream = await navigator.mediaDevices.getUserMedia({ 
-                              video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } } 
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                              video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } }
                             });
                             if (editVideoRef.current) editVideoRef.current.srcObject = stream;
                           } catch (err) {
@@ -1008,7 +1213,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   )}
                 </div>
               </div>
-              
+
               {/* Personal Information */}
               <section className="space-y-6">
                 <div className="flex items-center gap-3 mb-2">
@@ -1023,26 +1228,26 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   </div>
                   <div className="md:col-span-2 space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
                   </div>
                   <div className="md:col-span-2 space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                   <div className="md:col-span-2 space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Middle Name</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({ ...formData, middleName: e.target.value })} />
                   </div>
                   <div className="md:col-span-1 space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Extension</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({...formData, extension: e.target.value})} />
+                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({ ...formData, extension: e.target.value })} />
                   </div>
                   <div className="md:col-span-1 space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Sex</label>
-                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({...formData, sex: e.target.value})}>
+                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value })}>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -1058,22 +1263,22 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Region</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthRegion || ''} onChange={e => setFormData({...formData, birthRegion: e.target.value})} placeholder="e.g. NCR, Region IV-A" />
+                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthRegion || ''} onChange={e => setFormData({ ...formData, birthRegion: e.target.value })} placeholder="e.g. NCR, Region IV-A" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Province</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthProvince || ''} onChange={e => setFormData({...formData, birthProvince: e.target.value})} placeholder="e.g. Metro Manila, Laguna" />
+                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthProvince || ''} onChange={e => setFormData({ ...formData, birthProvince: e.target.value })} placeholder="e.g. Metro Manila, Laguna" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth City/Municipality</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthCity || ''} onChange={e => setFormData({...formData, birthCity: e.target.value})} placeholder="e.g. Manila, Calamba" />
+                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.birthCity || ''} onChange={e => setFormData({ ...formData, birthCity: e.target.value })} placeholder="e.g. Manila, Calamba" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Civil Status</label>
-                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({...formData, civilStatus: e.target.value})}>
+                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({ ...formData, civilStatus: e.target.value })}>
                       <option value="Single">Single</option>
                       <option value="Married">Married</option>
                       <option value="Widowed">Widowed</option>
@@ -1083,11 +1288,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Email</label>
-                    <input type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                    <input type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
-                    <input type="tel" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                    <input type="tel" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
                   </div>
                 </div>
               </section>
@@ -1102,20 +1307,20 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Street Address</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} />
+                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({...formData, barangay: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({...formData, province: e.target.value})} />
+                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
                     </div>
                   </div>
                 </div>
@@ -1131,7 +1336,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
-                    <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({...formData, educationalAttainment: e.target.value})}>
+                    <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
                       <option value="Elementary Graduate">Elementary Graduate</option>
                       <option value="High School Graduate">High School Graduate</option>
                       <option value="College Level">College Level</option>
@@ -1142,11 +1347,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
+                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
-                    <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.guardian || ''} onChange={e => setFormData({...formData, guardian: e.target.value})} />
+                    <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-amber-600 outline-none text-sm font-bold text-gray-800" value={formData.guardian || ''} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
                   </div>
                 </div>
               </section>
@@ -1164,27 +1369,27 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
       {showCamera && (
         <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
           <div className="w-full max-w-md space-y-12">
-             <div className="text-center">
-                <h3 className="text-lg font-semibold text-white uppercase tracking-tight">Identity Capture</h3>
-                <p className="text-gray-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
-             </div>
-             <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white shadow-md ring-4 ring-orange-500/10">
-                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                <canvas ref={canvasRef} className="hidden" />
-                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                   <div className="w-3/4 h-3/4 border-2 border-dashed border-white/40 rounded relative">
-                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-1/2 h-1/2 border-2 border-white/20 rounded-full"></div>
-                   </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-white uppercase tracking-tight">Identity Capture</h3>
+              <p className="text-gray-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
+            </div>
+            <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white shadow-md ring-4 ring-orange-500/10">
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                <div className="w-3/4 h-3/4 border-2 border-dashed border-white/40 rounded relative">
+                  <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-1/2 h-1/2 border-2 border-white/20 rounded-full"></div>
                 </div>
-             </div>
-             <div className="flex items-center justify-center gap-12">
-                <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all">
-                  <X size={28} />
-                </button>
-                <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-gray-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-md ring-8 ring-white/10">
-                  <Camera size={40} />
-                </button>
-             </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-12">
+              <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all">
+                <X size={28} />
+              </button>
+              <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-gray-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-md ring-8 ring-white/10">
+                <Camera size={40} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1194,13 +1399,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
-              toast.type === 'success'
-                ? 'bg-emerald-50 border border-orange-200 text-orange-800'
-                : toast.type === 'error'
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
+              ? 'bg-emerald-50 border border-orange-200 text-orange-800'
+              : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
                 : 'bg-orange-50 border border-orange-200 text-orange-800'
-            }`}
+              }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-[#F47721]" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
@@ -1221,8 +1425,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, onAddStudent, onU
 
 const DataPoint: React.FC<{ label: string, value: string, isSpan2?: boolean }> = ({ label, value, isSpan2 }) => (
   <div className={isSpan2 ? 'md:col-span-2' : ''}>
-     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{label}</p>
-     <p className="text-sm font-semibold text-gray-800 leading-tight uppercase">{value || 'N/A'}</p>
+    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{label}</p>
+    <p className="text-sm font-semibold text-gray-800 leading-tight uppercase">{value || 'N/A'}</p>
   </div>
 );
 

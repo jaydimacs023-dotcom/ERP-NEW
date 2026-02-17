@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location } from '../types';
 import { generateUUID } from '../utils/uuid';
-import { 
-  Search, Plus, Layers, Award, GraduationCap, Users, Calendar, 
+import {
+  Search, Plus, Layers, Award, GraduationCap, Users, Calendar,
   Trash2, X, CheckCircle, Clock, MoreVertical, Edit2, AlertCircle,
   ChevronRight, Filter, LayoutGrid, List, Handshake, CalendarRange,
   ShieldCheck, Timer, MapPin, Calculator, CalendarDays, Loader2, Play
@@ -32,20 +32,20 @@ const getSlotHours = (start: string, end: string) => {
 };
 
 const calculateProjectedEndDate = (
-  startDateStr: string, 
-  durationDays: number, 
+  startDateStr: string,
+  durationDays: number,
   slots: DaySlot[]
 ): { endDate: string; totalHours: number; calendarDays: number; trainingDays: number } => {
   if (!startDateStr || durationDays <= 0 || !slots.length) {
     return { endDate: '', totalHours: 0, calendarDays: 0, trainingDays: 0 };
   }
-  
+
   // Rule: 1 Qualification Day = 8 Training Hours
   const totalRequiredHours = durationDays * 8;
   let remainingHours = totalRequiredHours;
   let currentDate = new Date(startDateStr);
   let calendarDaysPassed = 0;
-  
+
   // Guard against infinite loops if slots define 0 hours
   const hasWorkHours = slots.some(s => getSlotHours(s.startTime, s.endTime) > 0);
   if (!hasWorkHours) return { endDate: '', totalHours: 0, calendarDays: 0, trainingDays: 0 };
@@ -56,32 +56,32 @@ const calculateProjectedEndDate = (
     safetyCounter++;
     const dayOfWeek = currentDate.getDay();
     const slot = slots.find(s => s.dayIndex === dayOfWeek);
-    
+
     if (slot) {
       const dailyHours = getSlotHours(slot.startTime, slot.endTime);
       if (dailyHours > 0) {
         remainingHours -= dailyHours;
       }
     }
-    
+
     // Increment calendar day and count it
     calendarDaysPassed++;
     if (remainingHours > 0) {
       currentDate.setDate(currentDate.getDate() + 1);
     }
   }
-  
-  return { 
-    endDate: currentDate.toISOString().split('T')[0], 
+
+  return {
+    endDate: currentDate.toISOString().split('T')[0],
     totalHours: totalRequiredHours,
     calendarDays: calendarDaysPassed,
     trainingDays: durationDays
   };
 };
 
-const BatchesView: React.FC<BatchesViewProps> = ({ 
+const BatchesView: React.FC<BatchesViewProps> = ({
   batches, qualifications, trainers, students, sponsors, schedules, locations,
-  onAddBatch, onUpdateBatch, onDeleteBatch, onNotify 
+  onAddBatch, onUpdateBatch, onDeleteBatch, onNotify
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -112,18 +112,18 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     if (formData.startDate && formData.qualificationId && formData.trainerId) {
       const qual = qualifications.find(q => q.id === formData.qualificationId);
       const sch = schedules.find(s => s.trainerId === formData.trainerId);
-      
+
       if (qual && sch && sch.slots.length > 0) {
         const result = calculateProjectedEndDate(
-          formData.startDate, 
-          qual.durationDays, 
+          formData.startDate,
+          qual.durationDays,
           sch.slots
         );
 
         if (result.endDate !== formData.endDate) {
           setFormData(prev => ({ ...prev, endDate: result.endDate }));
-          setProjection({ 
-            totalHours: result.totalHours, 
+          setProjection({
+            totalHours: result.totalHours,
             calendarDays: result.calendarDays,
             trainingDays: result.trainingDays
           });
@@ -132,7 +132,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     }
   }, [formData.startDate, formData.qualificationId, formData.trainerId, qualifications, schedules]);
 
-  const filteredBatches = batches.filter(b => 
+  const filteredBatches = batches.filter(b =>
     b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -163,11 +163,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     setIsSaving(true);
     try {
       const studentCount = formData.studentIds?.length || 0;
-      
+
       if (editingBatch) {
         // Keep existing status if it's ongoing, completed or cancelled
-        const finalStatus = (editingBatch.status === BatchStatus.ONGOING || editingBatch.status === BatchStatus.COMPLETED || editingBatch.status === BatchStatus.CANCELLED) 
-          ? editingBatch.status 
+        const finalStatus = (editingBatch.status === BatchStatus.ONGOING || editingBatch.status === BatchStatus.COMPLETED || editingBatch.status === BatchStatus.CANCELLED)
+          ? editingBatch.status
           : BatchStatus.PLANNED;
         await onUpdateBatch({ ...editingBatch, ...formData, status: finalStatus, currentStudents: studentCount } as Batch);
         onNotify?.('success', 'Batch updated successfully');
@@ -218,16 +218,16 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
   // Commence Training - PLANNED → ONGOING (requires ≥5 students)
   const [isCommencing, setIsCommencing] = useState<string | null>(null);
-  
+
   const handleCommenceTraining = async (batch: Batch) => {
     if (isCommencing) return;
-    
+
     // Validate minimum 5 students
     if (batch.studentIds.length < 5) {
       onNotify?.('error', 'Cannot commence training. Minimum 5 students required.');
       return;
     }
-    
+
     setIsCommencing(batch.id);
     try {
       await onUpdateBatch({ ...batch, status: BatchStatus.ONGOING });
@@ -243,7 +243,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   // Auto-complete batches when end_date has passed
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    
+
     batches.forEach(async (batch) => {
       // Only auto-complete ONGOING batches where end_date has passed
       if (batch.status === BatchStatus.ONGOING && batch.endDate && batch.endDate < today) {
@@ -286,6 +286,29 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     }
   };
 
+  const getStudentConflict = (studentId: string) => {
+    if (!formData.startDate || !formData.endDate) return null;
+
+    return batches.find(b => {
+      // Skip current batch being edited
+      if (editingBatch && b.id === editingBatch.id) return false;
+
+      // Only check PLANNED or ONGOING batches
+      if (b.status !== BatchStatus.PLANNED && b.status !== BatchStatus.ONGOING) return false;
+
+      // Check if student is in this batch
+      if (!b.studentIds || !b.studentIds.includes(studentId)) return false;
+
+      // Logic overlap: (StartA <= EndB) and (EndA >= StartB)
+      const bStart = b.startDate;
+      const bEnd = b.endDate;
+      const fStart = formData.startDate!;
+      const fEnd = formData.endDate!;
+
+      return (fStart <= bEnd) && (fEnd >= bStart);
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -295,7 +318,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           </h2>
           <p className="text-sm text-gray-500 font-normal italic">Institutional program monitoring with hour-based compliance tracking.</p>
         </div>
-        <button 
+        <button
           onClick={() => { resetForm(); setShowModal(true); }}
           className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
         >
@@ -306,9 +329,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-md border shadow-sm">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by batch identifier..." 
+          <input
+            type="text"
+            placeholder="Search by batch identifier..."
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -338,7 +361,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 const trainer = trainers.find(t => t.id === batch.trainerId);
                 const sponsor = sponsors.find(s => s.id === batch.sponsorId);
                 const location = locations.find(l => l.id === batch.locationId);
-                
+
                 return (
                   <tr key={batch.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-5">
@@ -388,7 +411,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <td className="px-6 py-5 text-center">
                       {getStatusBadge(batch.status)}
                       {batch.status === 'PLANNED' && batch.currentStudents >= 5 && (
-                        <button 
+                        <button
                           onClick={() => handleCommenceTraining(batch)}
                           disabled={isCommencing === batch.id}
                           className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-all disabled:opacity-50"
@@ -415,14 +438,14 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button 
+                        <button
                           onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
                           className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
                           title="Edit Batch"
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(batch.id)}
                           disabled={isDeleting === batch.id}
                           className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
@@ -430,7 +453,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         >
                           {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         </button>
-                        <button 
+                        <button
                           onClick={() => setViewingBatch(batch)}
                           className="p-2 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600 transition-colors"
                           title="View Details"
@@ -466,27 +489,27 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Batch Code</label>
-                    <input 
-                      placeholder="e.g. BATCH-001" 
+                    <input
+                      placeholder="e.g. BATCH-001"
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
-                      value={formData.batchCode} onChange={e => setFormData({...formData, batchCode: e.target.value})} 
+                      value={formData.batchCode} onChange={e => setFormData({ ...formData, batchCode: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Batch Name</label>
-                    <input 
-                      required 
-                      placeholder="e.g. CSS-2024-B1" 
+                    <input
+                      required
+                      placeholder="e.g. CSS-2024-B1"
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
-                      value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
+                      value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Fiscal Year</label>
-                    <input 
-                      required type="number" 
+                    <input
+                      required type="number"
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
-                      value={formData.year} onChange={e => setFormData({...formData, year: Number(e.target.value)})} 
+                      value={formData.year} onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
                     />
                   </div>
                 </div>
@@ -494,12 +517,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1.5">
-                       <Award size={12} className="text-amber-500" /> Program Qualification
+                      <Award size={12} className="text-amber-500" /> Program Qualification
                     </label>
-                    <select 
-                      required 
+                    <select
+                      required
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
-                      value={formData.qualificationId} onChange={e => setFormData({...formData, qualificationId: e.target.value})}
+                      value={formData.qualificationId} onChange={e => setFormData({ ...formData, qualificationId: e.target.value })}
                     >
                       <option value="">Choose program...</option>
                       {qualifications.map(q => <option key={q.id} value={q.id}>{q.name} ({q.durationDays} Days)</option>)}
@@ -507,17 +530,17 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1.5">
-                       <GraduationCap size={12} className="text-[#F47721]" /> Lead Instructor
+                      <GraduationCap size={12} className="text-[#F47721]" /> Lead Instructor
                     </label>
-                    <select 
-                      required 
+                    <select
+                      required
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
-                      value={formData.trainerId} onChange={e => setFormData({...formData, trainerId: e.target.value})}
+                      value={formData.trainerId} onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
                     >
                       <option value="">Assign trainer...</option>
                       {trainers.map(t => {
                         const sch = schedules.find(s => s.trainerId === t.id);
-                        const weeklyHrs = sch?.slots.reduce((acc,s) => acc + getSlotHours(s.startTime, s.endTime), 0) || 0;
+                        const weeklyHrs = sch?.slots.reduce((acc, s) => acc + getSlotHours(s.startTime, s.endTime), 0) || 0;
                         return <option key={t.id} value={t.id}>{t.lastName}, {t.firstName} {weeklyHrs > 0 ? `(${weeklyHrs.toFixed(1)} hrs/wk)` : '(No Schedule)'}</option>;
                       })}
                     </select>
@@ -527,9 +550,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Training Location</label>
-                    <select 
+                    <select
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
-                      value={formData.locationId} onChange={e => setFormData({...formData, locationId: e.target.value})}
+                      value={formData.locationId} onChange={e => setFormData({ ...formData, locationId: e.target.value })}
                     >
                       <option value="">Remote / External</option>
                       {locations.map(l => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
@@ -537,9 +560,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Funding Sponsor</label>
-                    <select 
+                    <select
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
-                      value={formData.sponsorId} onChange={e => setFormData({...formData, sponsorId: e.target.value})}
+                      value={formData.sponsorId} onChange={e => setFormData({ ...formData, sponsorId: e.target.value })}
                     >
                       <option value="">Private / Individual</option>
                       {sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -550,22 +573,22 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Commencement Date</label>
-                    <input 
+                    <input
                       required type="date"
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold"
-                      value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} 
+                      value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide px-1 flex items-center gap-1.5">
-                       <ShieldCheck size={12} /> Projected Completion
+                      <ShieldCheck size={12} /> Projected Completion
                     </label>
                     <div className="relative">
-                      <input 
+                      <input
                         readOnly
                         placeholder="Pending schedule input..."
                         className="w-full px-5 py-3.5 bg-orange-50 border border-orange-100 rounded text-orange-700 font-semibold outline-none text-sm"
-                        value={formData.endDate} 
+                        value={formData.endDate}
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2">
                         <CheckCircle size={16} className="text-emerald-500" />
@@ -576,22 +599,22 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                 {projection && (
                   <div className="p-6 bg-gray-800 rounded space-y-4 shadow-md border border-gray-700 animate-in fade-in slide-in-from-top-2 duration-500">
-                     <div className="flex items-center gap-2 mb-2 text-orange-400">
-                        <Calculator size={18} />
-                        <h4 className="text-xs font-semibold uppercase tracking-wide">Compliance Forecast Breakdown</h4>
-                     </div>
-                     <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-1">
-                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Required Units</p>
-                           <p className="text-xl font-mono font-semibold text-white">{projection.trainingDays.toFixed(1)} <span className="text-xs text-orange-400">Full Days</span></p>
-                           <p className="text-xs text-gray-500 italic mt-1">(Totaling {projection.totalHours} Instructional Hours)</p>
-                        </div>
-                        <div className="space-y-1">
-                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wait Duration</p>
-                           <p className="text-xl font-mono font-semibold text-white">{projection.calendarDays} <span className="text-xs text-orange-400">Calendar Days</span></p>
-                           <p className="text-xs text-gray-500 italic mt-1">Reflecting Half-Day and Off-Day shifts.</p>
-                        </div>
-                     </div>
+                    <div className="flex items-center gap-2 mb-2 text-orange-400">
+                      <Calculator size={18} />
+                      <h4 className="text-xs font-semibold uppercase tracking-wide">Compliance Forecast Breakdown</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Required Units</p>
+                        <p className="text-xl font-mono font-semibold text-white">{projection.trainingDays.toFixed(1)} <span className="text-xs text-orange-400">Full Days</span></p>
+                        <p className="text-xs text-gray-500 italic mt-1">(Totaling {projection.totalHours} Instructional Hours)</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wait Duration</p>
+                        <p className="text-xl font-mono font-semibold text-white">{projection.calendarDays} <span className="text-xs text-orange-400">Calendar Days</span></p>
+                        <p className="text-xs text-gray-500 italic mt-1">Reflecting Half-Day and Off-Day shifts.</p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -616,52 +639,59 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
             <div className="w-full md:w-80 bg-gray-50 overflow-y-auto flex flex-col">
               <div className="p-8 border-b bg-white shrink-0">
-                 <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                   <Users size={20} className="text-[#F47721]" />
-                   Enrollment Registry
-                 </h4>
+                <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                  <Users size={20} className="text-[#F47721]" />
+                  Enrollment Registry
+                </h4>
               </div>
               <div className="p-6 space-y-3 flex-1 overflow-y-auto">
-                 {students.map(student => {
-                   const isSelected = formData.studentIds?.includes(student.id);
-                   return (
-                     <button 
-                       key={student.id}
-                       type="button"
-                       onClick={() => toggleStudent(student.id)}
-                       className={`w-full flex items-center gap-3 p-4 rounded transition-all border group ${
-                         isSelected ? 'bg-[#F47721] border-orange-600 text-white shadow-sm' : 'bg-white border-gray-100 hover:border-orange-200'
-                       }`}
-                     >
-                        <div className={`w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721]'
-                        }`}>
+                {students
+                  .filter(student => {
+                    const isSelected = formData.studentIds?.includes(student.id);
+                    if (isSelected) return true; // Always show if already selected
+                    return !getStudentConflict(student.id); // Otherwise only show if no conflict
+                  })
+                  .map(student => {
+                    const isSelected = formData.studentIds?.includes(student.id);
+
+                    return (
+                      <button
+                        key={student.id}
+                        type="button"
+                        onClick={() => toggleStudent(student.id)}
+                        className={`w-full flex items-center gap-3 p-4 rounded transition-all border group ${isSelected ? 'bg-[#F47721] border-orange-600 text-white shadow-sm' :
+                            'bg-white border-gray-100 hover:border-orange-200'
+                          }`}
+                      >
+                        <div className={`w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected ? 'bg-white/20 text-white' :
+                            'bg-gray-100 text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721]'
+                          }`}>
                           {student.lastName[0]}
                         </div>
                         <div className="flex-1 text-left overflow-hidden">
-                           <div className={`text-xs font-semibold truncate uppercase ${isSelected ? 'text-white' : 'text-gray-800'}`}>
-                             {student.lastName}, {student.firstName}
-                           </div>
-                           <div className={`text-xs font-mono mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-400'}`}>
-                             ULI: {student.uli.slice(-6)}
-                           </div>
+                          <div className={`text-xs font-semibold truncate uppercase ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+                            {student.lastName}, {student.firstName}
+                          </div>
+                          <div className={`text-xs font-mono mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-400'}`}>
+                            ULI: {student.uli.slice(-6)}
+                          </div>
                         </div>
                         {isSelected && <CheckCircle size={18} className="shrink-0 text-white" />}
-                     </button>
-                   );
-                 })}
-                 {students.length === 0 && (
-                    <div className="py-20 text-center px-4">
-                       <Users size={32} className="mx-auto text-gray-200 mb-4" />
-                       <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">No learners found in the registry.</p>
-                    </div>
-                 )}
+                      </button>
+                    );
+                  })}
+                {students.length === 0 && (
+                  <div className="py-20 text-center px-4">
+                    <Users size={32} className="mx-auto text-gray-200 mb-4" />
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">No learners found in the registry.</p>
+                  </div>
+                )}
               </div>
               <div className="p-8 bg-white border-t mt-auto">
-                 <div className="flex justify-between items-center text-xs font-semibold text-gray-800 uppercase tracking-wide">
-                    <span>Enrolled Learners</span>
-                    <span className="text-[#F47721]">{formData.studentIds?.length || 0}</span>
-                 </div>
+                <div className="flex justify-between items-center text-xs font-semibold text-gray-800 uppercase tracking-wide">
+                  <span>Enrolled Learners</span>
+                  <span className="text-[#F47721]">{formData.studentIds?.length || 0}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -685,7 +715,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   <h2 className="text-xl font-semibold uppercase tracking-tight mb-2">{viewingBatch.name}</h2>
                   <p className="text-orange-200 text-sm font-bold">Comprehensive Batch Intelligence Report</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setViewingBatch(null)}
                   className="p-3 hover:bg-white/20 rounded-full transition-colors text-white"
                 >
@@ -715,7 +745,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-1">Enrollment</p>
                   <p className="text-lg font-semibold text-gray-800">{viewingBatch.currentStudents} / {viewingBatch.maxStudents}</p>
                   <div className="mt-3 w-full bg-emerald-100 rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-emerald-600 h-2 rounded-full transition-all"
                       style={{ width: `${Math.min((viewingBatch.currentStudents / viewingBatch.maxStudents) * 100, 100)}%` }}
                     />
@@ -891,7 +921,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </div>
 
               <div className="mt-8 flex gap-3">
-                <button 
+                <button
                   onClick={() => {
                     setViewingBatch(null);
                     setEditingBatch(viewingBatch);
@@ -902,7 +932,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 >
                   <Edit2 size={18} /> Edit Batch
                 </button>
-                <button 
+                <button
                   onClick={() => setViewingBatch(null)}
                   className="px-8 py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all"
                 >
