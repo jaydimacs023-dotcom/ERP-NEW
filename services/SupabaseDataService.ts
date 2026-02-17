@@ -141,6 +141,7 @@ export class SupabaseDataService implements IDataService {
         stockAdjustments,
         reorderPoints,
         courseFees,
+        alumniReports,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -179,6 +180,7 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('stock_adjustments'),
         this.fetchFromSupabase('reorder_points'),
         this.fetchFromSupabase('course_fees'),
+        this.fetchFromSupabase('alumni_employment_reports'),
       ]);
 
       // Log data status
@@ -229,6 +231,7 @@ export class SupabaseDataService implements IDataService {
         stockAdjustments: this.snakeToCamel(stockAdjustments as any) || [],
         reorderPoints: this.snakeToCamel(reorderPoints as any) || [],
         courseFees: this.snakeToCamel(courseFees as any) || [],
+        alumniReports: this.snakeToCamel(alumniReports as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -538,6 +541,11 @@ export class SupabaseDataService implements IDataService {
         'category', 'description', 'is_active', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
+      alumni_employment_reports: [
+        'id', 'org_id', 'student_id', 'employment_status', 'employer_name', 'employer_address',
+        'position', 'employment_type', 'date_hired', 'salary_range', 'is_related_to_course',
+        'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
@@ -548,7 +556,8 @@ export class SupabaseDataService implements IDataService {
       items: ['created_at', 'updated_at'],
       payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
       check_vouchers: ['id', 'created_at', 'updated_at'],
-      course_fees: ['id', 'created_at', 'updated_at']
+      course_fees: ['id', 'created_at', 'updated_at'],
+      alumni_employment_reports: ['id', 'created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -3978,16 +3987,34 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getRecurringBillById(id: string): Promise<any | null> {
-    console.debug('[Supabase] getRecurringBillById called with id:', id);
-    try {
-      const url = `${this.baseUrl}/recurring_bills?id=eq.${id}`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
-    } catch (error) {
-      console.error('[Supabase] Error fetching recurring bill:', error);
-      return null;
+    return null;
+  }
+
+  // ============================================================================
+  // ALUMNI EMPLOYMENT REPORT CRUD
+  // ============================================================================
+
+  async createAlumniReport(report: any): Promise<any> {
+    const snakeCaseReport = this.camelToSnake(report);
+    const filteredReport = this.filterToTableSchema('alumni_employment_reports', snakeCaseReport);
+    if (filteredReport.id && !this.isValidUUID(filteredReport.id)) {
+      delete filteredReport.id;
     }
+    return this.insertToSupabaseRaw('alumni_employment_reports', filteredReport);
+  }
+
+  async updateAlumniReport(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('alumni_employment_reports', snakeCaseUpdates);
+    return this.updateInSupabaseRaw('alumni_employment_reports', id, filteredUpdates);
+  }
+
+  async deleteAlumniReport(id: string): Promise<void> {
+    return this.deleteFromSupabase('alumni_employment_reports', id);
+  }
+
+  async getAlumniReportsByOrg(orgId: string): Promise<any[]> {
+    const reports = await this.fetchFromSupabase<any>('alumni_employment_reports');
+    return this.snakeToCamel(reports.filter((r: any) => r.org_id === orgId));
   }
 }

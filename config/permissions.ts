@@ -92,7 +92,8 @@ export type ModuleTab =
   | 'backup-restore'
   | 'tenant-mgmt'
   | 'schema'
-  | 'payment-monitoring';
+  | 'payment-monitoring'
+  | 'alumni-reports';
 
 // ===== Permission Matrix =====
 // Maps each role to the tabs they can access
@@ -106,7 +107,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
-    'enrollments', 'course-fees',
+    'enrollments', 'course-fees', 'alumni-reports',
     'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
     'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'
   ],
@@ -119,7 +120,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
-    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
+    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
     'enrollments', 'course-fees',
     'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'
   ],
@@ -209,7 +210,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // REGISTRAR: Training/Student management
   REGISTRAR: [
     'dashboard',
-    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
+    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
     'sponsors' // For scholarship management
   ],
 
@@ -232,7 +233,7 @@ export const MODULE_GROUPS = {
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],
   INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports'] as ModuleTab[],
-  OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules'] as ModuleTab[],
+  OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports'] as ModuleTab[],
   ADMIN: ['employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'] as ModuleTab[],
   SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'] as ModuleTab[],
   PORTALS: ['student-portal', 'trainer-portal'] as ModuleTab[],

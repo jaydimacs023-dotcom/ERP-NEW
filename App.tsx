@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -65,6 +65,7 @@ import EnrollmentsView from './views/EnrollmentsView';
 import InvoicesView from './views/InvoicesView';
 import PaymentsView from './views/PaymentsView';
 import BankDepositsView from './views/BankDepositsView';
+import AlumniEmploymentView from './views/AlumniEmploymentView';
 
 // Lucide Icons
 import {
@@ -305,6 +306,7 @@ export default function App() {
   // Revenue Recognition & Deferred Revenue
   const [revenueSchedules, setRevenueSchedules] = useState<RevenueSchedule[]>([]);
   const [revenueRecognitionEntries, setRevenueRecognitionEntries] = useState<RevenueRecognitionEntry[]>([]);
+  const [alumniReports, setAlumniReports] = useState<AlumniEmploymentReport[]>([]);
 
   // Inventory Management State
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
@@ -408,6 +410,7 @@ export default function App() {
         setInventoryTransactions(data.inventoryTransactions || []);
         setStockAdjustments(data.stockAdjustments || []);
         setReorderPoints(data.reorderPoints || []);
+        setAlumniReports(data.alumniReports || []);
 
         // Load Course Fees
         setCourseFees(data.courseFees || []);
@@ -2098,6 +2101,50 @@ export default function App() {
   };
 
   // ============================================================================
+  // ALUMNI EMPLOYMENT REPORT HANDLERS
+  // ============================================================================
+
+  const handleAddAlumniReport = async (report: AlumniEmploymentReport) => {
+    try {
+      console.info('[App] Creating alumni report for student:', report.studentId);
+      const reportWithOrg = { ...report, orgId: currentOrgId };
+      const saved = await dataService.createAlumniReport(reportWithOrg);
+      setAlumniReports(prev => [...prev, saved]);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', saved.id, `Employment report for student: ${report.studentId}`);
+      handleNotify('success', 'Alumni employment report created successfully');
+    } catch (error) {
+      console.error('[App] Error creating alumni report:', error);
+      handleNotify('error', 'Failed to create alumni report');
+    }
+  };
+
+  const handleUpdateAlumniReport = async (report: AlumniEmploymentReport) => {
+    try {
+      console.info('[App] Updating alumni report:', report.id);
+      const updated = await dataService.updateAlumniReport(report.id, report);
+      setAlumniReports(prev => prev.map(r => r.id === report.id ? { ...r, ...updated } : r));
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', report.id, `Updated report for student: ${report.studentId}`, {}, report);
+      handleNotify('success', 'Alumni employment report updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating alumni report:', error);
+      handleNotify('error', 'Failed to update alumni report');
+    }
+  };
+
+  const handleDeleteAlumniReport = async (id: string) => {
+    try {
+      console.info('[App] Deleting alumni report:', id);
+      await dataService.deleteAlumniReport(id);
+      setAlumniReports(prev => prev.filter(r => r.id !== id));
+      AuditService.delete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', id, 'Alumni employment report');
+      handleNotify('success', 'Alumni employment report deleted successfully');
+    } catch (error) {
+      console.error('[App] Error deleting alumni report:', error);
+      handleNotify('error', 'Failed to delete alumni report');
+    }
+  };
+
+  // ============================================================================
   // ARCHIVE HANDLERS
   // ============================================================================
 
@@ -3329,6 +3376,7 @@ export default function App() {
               <NavItem icon={<Layers size={20} />} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<UserCheck size={20} />} label="Alumni Reports" active={activeTab === 'alumni-reports'} onClick={() => setActiveTab('alumni-reports')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -3529,6 +3577,17 @@ export default function App() {
           {activeTab === 'qualifications' && <QualificationsView qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
           {activeTab === 'batches' && <BatchesView batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications} trainers={trainers} students={students} sponsors={sponsors} schedules={schedules} locations={locations} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
+          {activeTab === 'alumni-reports' && (
+            <AlumniEmploymentView
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              alumniReports={alumniReports.filter(r => r.orgId === currentOrgId)}
+              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+              onAddReport={handleAddAlumniReport}
+              onUpdateReport={handleUpdateAlumniReport}
+              onDeleteReport={handleDeleteAlumniReport}
+            />
+          )}
           {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
           {activeTab === 'invoices' && <InvoicesView
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}

@@ -76,6 +76,7 @@ export type EntityType =
   | 'ENROLLMENT'
   | 'PAYMENT'
   | 'BANK_DEPOSIT'
+  | 'ALUMNI_REPORT'
   | 'BACKUP'
   | 'SYSTEM';
 

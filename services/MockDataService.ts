@@ -1,6 +1,6 @@
 
 import { IDataService, InitialData, TrainerUsageCheck, QualificationUsageCheck, LocationUsageCheck, ScheduleUsageCheck, SponsorUsageCheck } from './IDataService';
-import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem } from '../types';
+import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport } from '../types';
 
 /**
  * MockDataService - Empty Data Service
@@ -47,7 +47,8 @@ export class MockDataService implements IDataService {
       inventoryTransactions: [],
       stockAdjustments: [],
       reorderPoints: [],
-      courseFees: []
+      courseFees: [],
+      alumniReports: []
     };
   }
 
@@ -833,6 +834,23 @@ export class MockDataService implements IDataService {
   async getRecurringBillById(id: string): Promise<any | null> {
     console.warn('[MockDataService] getRecurringBillById returning null.');
     return null;
+  }
+
+  // Alumni Employment Report CRUD
+  async createAlumniReport(report: AlumniEmploymentReport): Promise<AlumniEmploymentReport> {
+    console.warn('[MockDataService] createAlumniReport is memory-only.');
+    return { ...report, id: report.id || `alumni-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async updateAlumniReport(id: string, updates: Partial<AlumniEmploymentReport>): Promise<AlumniEmploymentReport> {
+    console.warn('[MockDataService] updateAlumniReport is memory-only.');
+    return { id, ...updates } as AlumniEmploymentReport;
+  }
+  async deleteAlumniReport(id: string): Promise<void> {
+    console.warn('[MockDataService] deleteAlumniReport is memory-only.');
+  }
+  async getAlumniReportsByOrg(orgId: string): Promise<AlumniEmploymentReport[]> {
+    console.warn('[MockDataService] getAlumniReportsByOrg returning empty array.');
+    return [];
   }
 
   // Generic Entity CRUD

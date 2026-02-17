@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee
+  CourseFee, AlumniEmploymentReport
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -74,6 +74,7 @@ export interface InitialData {
   stockAdjustments: StockAdjustment[];
   reorderPoints: ReorderPoint[];
   courseFees: CourseFee[];
+  alumniReports: AlumniEmploymentReport[];
 }
 
 export interface IDataService {
@@ -336,6 +337,12 @@ export interface IDataService {
   deleteRecurringBill(id: string): Promise<void>;
   getRecurringBillsByOrg(orgId: string): Promise<RecurringBill[]>;
   getRecurringBillById(id: string): Promise<RecurringBill | null>;
+
+  // Alumni Employment Report CRUD
+  createAlumniReport(report: AlumniEmploymentReport): Promise<AlumniEmploymentReport>;
+  updateAlumniReport(id: string, updates: Partial<AlumniEmploymentReport>): Promise<AlumniEmploymentReport>;
+  deleteAlumniReport(id: string): Promise<void>;
+  getAlumniReportsByOrg(orgId: string): Promise<AlumniEmploymentReport[]>;
 
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;

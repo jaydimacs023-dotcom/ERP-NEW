@@ -44,6 +44,20 @@ export enum BatchStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export enum AlumniEmploymentStatus {
+  EMPLOYED = 'Employed',
+  SELF_EMPLOYED = 'Self-Employed',
+  UNEMPLOYED = 'Unemployed',
+  FURTHER_STUDIES = 'Further Studies'
+}
+
+export enum AlumniEmploymentType {
+  REGULAR = 'Regular',
+  CONTRACTUAL = 'Contractual',
+  PART_TIME = 'Part-time',
+  FREELANCE = 'Freelance'
+}
+
 export enum PurchaseOrderStatus {
   DRAFT = 'DRAFT',
   PENDING_APPROVAL = 'PENDING_APPROVAL',
@@ -2200,4 +2214,19 @@ export interface BIR1601CData extends BaseEntity {
   filedAt?: string;
   paidAt?: string;
   confirmationNumber?: string;
+}
+export interface AlumniEmploymentReport extends BaseEntity {
+  id: string;
+  orgId: string;
+  studentId: string; // FK -> Student
+  employmentStatus: AlumniEmploymentStatus;
+  employerName?: string;
+  employerAddress?: string;
+  position?: string;
+  employmentType?: AlumniEmploymentType;
+  dateHired?: string;
+  salaryRange?: string;
+  isRelatedToCourse: boolean;
+  createdAt: string;
+  updatedAt?: string;
 }
