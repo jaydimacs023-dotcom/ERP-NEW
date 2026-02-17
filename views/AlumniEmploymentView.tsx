@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification } from '../types';
+import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification, Enrollment } from '../types';
 import {
     Briefcase, Search, Plus, Filter, Download, ExternalLink,
     MapPin, Calendar, DollarSign, CheckCircle2, X, MoreVertical,
@@ -9,6 +9,7 @@ import {
 
 interface AlumniEmploymentViewProps {
     students: Student[];
+    enrollments: Enrollment[];
     alumniReports: AlumniEmploymentReport[];
     batches: Batch[];
     qualifications: Qualification[];
@@ -21,6 +22,7 @@ const PAGE_SIZE = 10;
 
 const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
     students,
+    enrollments,
     alumniReports,
     batches,
     qualifications,
@@ -40,6 +42,17 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
         isRelatedToCourse: true,
         employmentType: AlumniEmploymentType.REGULAR
     });
+
+    // Graduated Students Filtering
+    const graduates = useMemo(() => {
+        // A student is considered a graduate if they have at least one enrollment with status 'COMPLETED'
+        const graduatedStudentIds = new Set(
+            enrollments
+                .filter(e => e.enrollmentStatus === 'COMPLETED')
+                .map(e => e.studentId)
+        );
+        return students.filter(s => graduatedStudentIds.has(s.id));
+    }, [students, enrollments]);
 
     // Derived Stats
     const stats = useMemo(() => {
@@ -273,8 +286,8 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1.5">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider w-fit border ${report.employmentStatus === AlumniEmploymentStatus.EMPLOYED ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                                        report.employmentStatus === AlumniEmploymentStatus.FURTHER_STUDIES ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                            'bg-gray-50 text-gray-600 border-gray-100'
+                                                    report.employmentStatus === AlumniEmploymentStatus.FURTHER_STUDIES ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                        'bg-gray-50 text-gray-600 border-gray-100'
                                                     }`}>
                                                     {report.employmentStatus}
                                                 </span>
@@ -385,8 +398,8 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                 onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
                                                 className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
                                             >
-                                                <option value="">-- Choose Alumni --</option>
-                                                {students.map(s => (
+                                                <option value="">-- Choose Alumni (Graduates Only) --</option>
+                                                {graduates.map(s => (
                                                     <option key={s.id} value={s.id}>{s.lastName}, {s.firstName} ({s.uli})</option>
                                                 ))}
                                             </select>

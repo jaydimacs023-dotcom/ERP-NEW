@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport
+  CourseFee, AlumniEmploymentReport, Enrollment
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -74,6 +74,7 @@ export interface InitialData {
   stockAdjustments: StockAdjustment[];
   reorderPoints: ReorderPoint[];
   courseFees: CourseFee[];
+  enrollments: Enrollment[];
   alumniReports: AlumniEmploymentReport[];
 }
 

@@ -142,6 +142,7 @@ export class SupabaseDataService implements IDataService {
         reorderPoints,
         courseFees,
         alumniReports,
+        enrollments,
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -181,6 +182,7 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('reorder_points'),
         this.fetchFromSupabase('course_fees'),
         this.fetchFromSupabase('alumni_employment_reports'),
+        this.fetchFromSupabase('enrollments'),
       ]);
 
       // Log data status
@@ -231,6 +233,7 @@ export class SupabaseDataService implements IDataService {
         stockAdjustments: this.snakeToCamel(stockAdjustments as any) || [],
         reorderPoints: this.snakeToCamel(reorderPoints as any) || [],
         courseFees: this.snakeToCamel(courseFees as any) || [],
+        enrollments: this.snakeToCamel(enrollments as any) || [],
         alumniReports: this.snakeToCamel(alumniReports as any) || [],
       };
     } catch (error) {
@@ -545,6 +548,12 @@ export class SupabaseDataService implements IDataService {
         'id', 'org_id', 'student_id', 'employment_status', 'employer_name', 'employer_address',
         'position', 'employment_type', 'date_hired', 'salary_range', 'is_related_to_course',
         'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
+      enrollments: [
+        'id', 'org_id', 'enrollment_code', 'student_id', 'batch_id', 'sponsor_id',
+        'billing_status', 'enrollment_status', 'enrollment_date', 'completion_date',
+        'total_fees', 'billed_amount', 'notes', 'created_at', 'updated_at',
+        'is_deleted', 'deleted_at', 'deleted_by'
       ],
     };
 

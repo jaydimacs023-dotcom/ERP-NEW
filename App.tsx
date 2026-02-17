@@ -410,6 +410,7 @@ export default function App() {
         setInventoryTransactions(data.inventoryTransactions || []);
         setStockAdjustments(data.stockAdjustments || []);
         setReorderPoints(data.reorderPoints || []);
+        setEnrollments(data.enrollments || []);
         setAlumniReports(data.alumniReports || []);
 
         // Load Course Fees
@@ -3580,6 +3581,7 @@ export default function App() {
           {activeTab === 'alumni-reports' && (
             <AlumniEmploymentView
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
               alumniReports={alumniReports.filter(r => r.orgId === currentOrgId)}
               batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
