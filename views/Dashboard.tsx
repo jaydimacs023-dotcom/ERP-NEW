@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock } from 'lucide-react';
+import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus, Qualification, Enrollment } from '../types';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock, Award } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, Cell, AreaChart, Area, PieChart, Pie
@@ -17,6 +17,8 @@ interface DashboardProps {
   sponsors?: Sponsor[];
   entries?: JournalEntry[];
   batches?: Batch[];
+  qualifications?: Qualification[];
+  enrollments?: Enrollment[];
 }
 
 const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [] }) => {
@@ -450,12 +452,211 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
   );
 };
 
+const RegistrarDashboard: React.FC<DashboardProps> = ({ students = [], batches = [], qualifications = [], enrollments = [] }) => {
+  // 1. Enrollment Distribution by Status (for simple stat Cards)
+  const activeStudents = students.filter(s => !s.isDeleted).length;
+  const activeBatches = batches.filter(b => b.status === BatchStatus.ONGOING).length;
+  const plannedBatches = batches.filter(b => b.status === BatchStatus.PLANNED).length;
+  const totalQualifications = qualifications.length;
+
+  const pendingEnrollments = enrollments.filter(e => e.enrollmentStatus === 'ON_HOLD').length;
+
+  const capacityUsage = useMemo(() => {
+    const ongoingBatches = batches.filter(b => b.status === BatchStatus.ONGOING);
+    const totalMax = ongoingBatches.reduce((sum, b) => sum + (b.maxStudents || 0), 0);
+    const totalCurrent = ongoingBatches.reduce((sum, b) => sum + (b.currentStudents || 0), 0);
+    return totalMax > 0 ? Math.round((totalCurrent / totalMax) * 100) : 0;
+  }, [batches]);
+
+  // 2. Batches by Status (Pie Chart)
+  const batchesByStatus = useMemo(() => {
+    const counts = {
+      [BatchStatus.PLANNED]: 0,
+      [BatchStatus.ONGOING]: 0,
+      [BatchStatus.COMPLETED]: 0,
+      [BatchStatus.CANCELLED]: 0
+    };
+    batches.forEach(b => {
+      if (counts.hasOwnProperty(b.status)) {
+        counts[b.status]++;
+      }
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [batches]);
+
+  const STATUS_COLORS: Record<string, string> = {
+    [BatchStatus.PLANNED]: '#F59E0B',   // Amber
+    [BatchStatus.ONGOING]: '#3B82F6',   // Blue
+    [BatchStatus.COMPLETED]: '#10B981', // Emerald
+    [BatchStatus.CANCELLED]: '#EF4444'  // Rose
+  };
+
+  // 3. Batches by Qualification (Bar Chart)
+  const batchesByQual = useMemo(() => {
+    const qualMap: Record<string, number> = {};
+    batches.forEach(b => {
+      qualMap[b.qualificationId] = (qualMap[b.qualificationId] || 0) + 1;
+    });
+
+    return Object.entries(qualMap)
+      .map(([id, count]) => ({
+        name: qualifications.find(q => q.id === id)?.code || 'Unknown',
+        fullName: qualifications.find(q => q.id === id)?.name || 'Unknown Qualification',
+        count
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [batches, qualifications]);
+
+  // 4. Monthly Enrollment Trends (Last 6 Months)
+  const enrollmentTrends = useMemo(() => {
+    const today = new Date();
+    const months: any[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      months.push({
+        month: d.toLocaleDateString('en-US', { month: 'short' }),
+        count: 0,
+        rawMonth: d.getMonth(),
+        rawYear: d.getFullYear()
+      });
+    }
+
+    students.forEach(s => {
+      if (!s.createdAt) return;
+      const d = new Date(s.createdAt);
+      const match = months.find(m => m.rawMonth === d.getMonth() && m.rawYear === d.getFullYear());
+      if (match) match.count++;
+    });
+
+    return months;
+  }, [students]);
+
+  return (
+    <div className="space-y-6 pb-10 font-sans">
+      <header className="flex justify-between items-end border-b pb-4 border-gray-200">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight text-orange-600">Operations Console : Registrar</h2>
+          <p className="text-sm text-gray-500 mt-1">Registry Oversight &bull; {new Date().toLocaleDateString()}</p>
+        </div>
+      </header>
+
+      {/* Row 1: Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatCard title="Total Learners" value={activeStudents.toLocaleString()} icon={<Users size={16} />} color="blue" />
+        <StatCard title="Active Batches" value={activeBatches.toLocaleString()} icon={<Layers size={16} />} color="orange" />
+        <StatCard title="Planned Batches" value={plannedBatches.toLocaleString()} icon={<Calendar size={16} />} color="amber" />
+        <StatCard title="Qualifications" value={totalQualifications.toLocaleString()} icon={<Award size={16} />} color="indigo" />
+        <StatCard title="Pending Enrollments" value={pendingEnrollments.toLocaleString()} icon={<Clock size={16} />} color="rose" />
+        <StatCard title="Capacity Usage" value={`${capacityUsage}%`} icon={<Activity size={16} />} color="emerald" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Enrollment Trend */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <TrendingUp size={20} className="text-blue-500" /> New Learner Registrations
+          </h3>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={enrollmentTrends}>
+                <defs>
+                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Area type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" name="New Students" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Batch Status Distribution */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <Activity size={20} className="text-orange-500" /> Training Batch Pipeline
+          </h3>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 h-[250px]">
+            <div className="w-full md:w-1/2 h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={batchesByStatus}
+                    innerRadius={60}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {batchesByStatus.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name as string]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-full md:w-1/2 space-y-3">
+              {batchesByStatus.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center group">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS[item.name as string] }} />
+                    <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors uppercase tracking-tight">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-bold text-gray-800">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Batches by Qualification */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+          <Award size={20} className="text-indigo-500" /> Program Distribution (Top 8)
+        </h3>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={batchesByQual}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11 }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                formatter={(value, name, props) => [value, 'Batches']}
+                labelFormatter={(value) => batchesByQual.find(b => b.name === value)?.fullName || value}
+              />
+              <Bar dataKey="count" fill="#6366F1" radius={[4, 4, 0, 0]} barSize={40}>
+                {batchesByQual.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fillOpacity={0.8 - (index * 0.05)} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { summaries, currency = 'USD', lines, accounts, currentUser } = props;
 
   // Conditional Render for AR Specialist
   if (currentUser?.role === 'AR_SPECIALIST') {
     return <ARDashboard {...props} />;
+  }
+
+  // Conditional Render for Registrar
+  if (currentUser?.role === 'REGISTRAR') {
+    return <RegistrarDashboard {...props} />;
   }
 
   const assets = summaries.filter(s => s.accountClass === AccountClass.ASSET).reduce((sum, s) => sum + s.balance, 0);

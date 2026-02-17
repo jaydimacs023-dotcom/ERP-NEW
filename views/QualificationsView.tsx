@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { Qualification } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
-import { 
-  Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle, 
+import {
+  Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle,
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
   LayoutGrid, List, Timer, MoreVertical, Edit2, Loader2,
   CheckCircle, AlertCircle
@@ -31,7 +31,9 @@ const SECTORS = [
   'Agriculture',
   'Automotive',
   'Health & Social Services',
-  'Electronics'
+  'Electronics',
+  'Metal & Engineering',
+  'Others'
 ];
 
 const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
@@ -49,11 +51,11 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     sector: 'ICT'
   });
 
-  const filteredQuals = qualifications.filter(q => 
+  const filteredQuals = qualifications.filter(q =>
     !q.isDeleted && (
-    q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    q.sector?.toLowerCase().includes(searchTerm.toLowerCase())
+      q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.sector?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
 
@@ -66,7 +68,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     const id = `toast-${Date.now()}`;
     const toast: Toast = { id, message, type };
     setToasts(prev => [...prev, toast]);
-    
+
     // Auto-remove after 4 seconds
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -89,7 +91,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     if (!formData.name || !formData.code || !formData.durationDays) return;
 
     setIsSubmitting(true);
-    
+
     try {
       if (editingQual) {
         // Update existing qualification
@@ -117,7 +119,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         await onAddQualification(newQual);
         showToast(`Qualification "${formData.name}" registered successfully!`, 'success');
       }
-      
+
       setShowModal(false);
       resetForm();
     } catch (error) {
@@ -130,7 +132,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this qualification? This action cannot be undone.')) return;
-    
+
     const qualToDelete = qualifications.find(q => q.id === id);
     setDeletingId(id);
     try {
@@ -154,6 +156,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
       case 'Construction': return 'amber';
       case 'Manufacturing': return 'rose';
       case 'Health & Social Services': return 'sky';
+      case 'Metal & Engineering': return 'indigo';
       default: return 'slate';
     }
   };
@@ -165,13 +168,12 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
-              toast.type === 'success'
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : toast.type === 'error'
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-orange-50 border border-orange-200 text-orange-800'
-            }`}
+                  ? 'bg-red-50 border border-red-200 text-red-800'
+                  : 'bg-orange-50 border border-orange-200 text-orange-800'
+              }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
@@ -195,7 +197,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           </h2>
           <p className="text-sm text-gray-500 font-normal">TESDA Registered Program Catalog (Training Regulations Compliance)</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-all shadow-sm font-medium text-sm"
         >
@@ -206,9 +208,9 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-md border border-gray-200 shadow-sm">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by code, name, or sector..." 
+          <input
+            type="text"
+            placeholder="Search by code, name, or sector..."
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -216,13 +218,13 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button 
+            <button
               onClick={() => setViewMode('list')}
               className={`p-2 rounded transition-all ${viewMode === 'list' ? 'bg-white text-orange-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <List size={18} />
             </button>
-            <button 
+            <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded transition-all ${viewMode === 'grid' ? 'bg-white text-orange-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             >
@@ -273,23 +275,23 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                         <Clock size={14} className="text-amber-500" /> {qual.durationDays} Days
                       </div>
                       <div className="w-16 h-1.5 bg-gray-100 rounded-full mt-2 overflow-hidden">
-                         <div 
-                           className="h-full bg-amber-500 rounded-full" 
-                           style={{ width: `${Math.min(100, (qual.durationDays / 40) * 100)}%` }} 
-                         />
+                        <div
+                          className="h-full bg-amber-500 rounded-full"
+                          style={{ width: `${Math.min(100, (qual.durationDays / 40) * 100)}%` }}
+                        />
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
+                      <button
                         onClick={() => openEditModal(qual)}
                         className="p-2 hover:bg-orange-50 text-gray-300 hover:text-orange-500 rounded transition-all"
                         title="Edit"
                       >
                         <Edit2 size={18} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(qual.id)}
                         disabled={deletingId === qual.id}
                         className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded transition-all disabled:opacity-50"
@@ -303,7 +305,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               )) : (
                 <tr>
                   <td colSpan={4} className="px-6 py-12">
-                    <EmptyState 
+                    <EmptyState
                       title="No qualifications registered"
                       description="Add your first professional qualification to your TESDA-registered program catalog."
                       actionLabel="Add Qualification"
@@ -343,34 +345,34 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                     <div>
                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Standard Term</p>
                       <div className="flex items-center gap-2">
-                         <Timer size={18} className="text-amber-500" />
-                         <span className="text-lg font-semibold text-gray-800">{qual.durationDays} Days</span>
+                        <Timer size={18} className="text-amber-500" />
+                        <span className="text-lg font-semibold text-gray-800">{qual.durationDays} Days</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50/80 px-5 py-4 flex items-center justify-between border-t border-gray-100">
-                   <div className="flex gap-2">
-                      <button 
-                        onClick={() => openEditModal(qual)}
-                        className="p-2 hover:bg-white text-gray-400 hover:text-orange-500 rounded transition-all border border-transparent hover:border-gray-200"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(qual.id)}
-                        disabled={deletingId === qual.id}
-                        className="p-2 hover:bg-white text-gray-400 hover:text-rose-600 rounded transition-all border border-transparent hover:border-gray-200 disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {deletingId === qual.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                      </button>
-                   </div>
-                   <button className="text-orange-500 text-xs font-medium uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
-                      Details <ChevronRight size={16} strokeWidth={3} />
-                   </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEditModal(qual)}
+                      className="p-2 hover:bg-white text-gray-400 hover:text-orange-500 rounded transition-all border border-transparent hover:border-gray-200"
+                      title="Edit"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(qual.id)}
+                      disabled={deletingId === qual.id}
+                      className="p-2 hover:bg-white text-gray-400 hover:text-rose-600 rounded transition-all border border-transparent hover:border-gray-200 disabled:opacity-50"
+                      title="Delete"
+                    >
+                      {deletingId === qual.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                  <button className="text-orange-500 text-xs font-medium uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
+                    Details <ChevronRight size={16} strokeWidth={3} />
+                  </button>
                 </div>
               </div>
             );
@@ -403,33 +405,33 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Qualification Title</label>
-                  <input 
-                    required 
+                  <input
+                    required
                     autoFocus
                     placeholder="e.g., Computer Systems Servicing NC II"
                     className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-gray-800 font-medium"
                     value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Official Ref Code</label>
-                    <input 
-                      required 
+                    <input
+                      required
                       placeholder="e.g., CSS211-1218"
                       className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-mono text-orange-500 font-semibold"
                       value={formData.code}
-                      onChange={e => setFormData({...formData, code: e.target.value})}
+                      onChange={e => setFormData({ ...formData, code: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Industry Sector</label>
-                    <select 
+                    <select
                       className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-medium appearance-none"
                       value={formData.sector}
-                      onChange={e => setFormData({...formData, sector: e.target.value})}
+                      onChange={e => setFormData({ ...formData, sector: e.target.value })}
                     >
                       {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -439,13 +441,13 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Standard Duration (Days)</label>
                   <div className="relative">
-                    <input 
-                      required 
+                    <input
+                      required
                       type="number"
                       placeholder="e.g., 35"
                       className="w-full pl-3 pr-14 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-gray-800 font-semibold text-lg"
                       value={formData.durationDays || ''}
-                      onChange={e => setFormData({...formData, durationDays: e.target.value === '' ? 0 : Number(e.target.value)})}
+                      onChange={e => setFormData({ ...formData, durationDays: e.target.value === '' ? 0 : Number(e.target.value) })}
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400 uppercase">Days</div>
                   </div>
@@ -453,16 +455,16 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               </div>
 
               <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                 <ShieldCheck size={20} className="text-orange-500 shrink-0" />
-                 <p className="text-xs text-orange-900 leading-relaxed font-medium">
-                   Registration into the institutional catalog enables this qualification for batch enrollment and automated curriculum planning within the MIS system.
-                 </p>
+                <ShieldCheck size={20} className="text-orange-500 shrink-0" />
+                <p className="text-xs text-orange-900 leading-relaxed font-medium">
+                  Registration into the institutional catalog enables this qualification for batch enrollment and automated curriculum planning within the MIS system.
+                </p>
               </div>
 
               <div className="pt-2 flex gap-3">
                 <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-50 rounded transition-all">Discard</button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="flex-1 py-2.5 bg-orange-500 text-white rounded text-sm font-medium shadow-sm hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >

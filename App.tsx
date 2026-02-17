@@ -3476,7 +3476,20 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'dashboard' && <Dashboard summaries={summaries} currency={currentOrg?.currency} lines={filteredLines} accounts={filteredAccounts} />}
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              summaries={summaries}
+              currency={currentOrg?.currency}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currentUser={currentUser}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+              entries={activeJournalEntries}
+              enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+            />
+          )}
           {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
