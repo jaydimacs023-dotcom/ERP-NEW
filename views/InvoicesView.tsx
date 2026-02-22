@@ -80,8 +80,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     invoiceDate: string;
     dueDate: string;
     status: InvoiceStatus;
-    isSubjectToEwt: boolean;
-    ewtRate: number;
     reference: string;
     terms: string;
     notes: string;
@@ -95,8 +93,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     status: 'DRAFT',
-    isSubjectToEwt: false,
-    ewtRate: 0.02,
     reference: '',
     terms: 'Net 30',
     notes: '',
@@ -117,13 +113,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   // Calculate totals
-  const calculateTotals = (lines: InvoiceLine[], isSubjectToEwt: boolean, ewtRate: number, isVat: boolean = false) => {
+  const calculateTotals = (lines: InvoiceLine[], isVat: boolean = false) => {
     let subtotal = 0;
     let vatAmount = 0;
 
     if (isVat) {
-      // For VAT-registered (inclusive), subtotal is the sum of (amount / 1.12)
-      // and total VAT is sum of (amount - subtotal)
       lines.forEach(line => {
         const lineNet = line.amount / 1.12;
         subtotal += lineNet;
@@ -135,9 +129,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
 
     const grandTotal = subtotal + vatAmount;
-    const totalEwtAmount = isSubjectToEwt ? subtotal * ewtRate : 0;
-    const netAmountDue = grandTotal - totalEwtAmount;
-    return { subtotal, vatAmount, grandTotal, totalEwtAmount, netAmountDue, balanceDue: netAmountDue };
+    return { subtotal, vatAmount, grandTotal, totalEwtAmount: 0, netAmountDue: grandTotal, balanceDue: grandTotal };
   };
 
   // Reset form
@@ -151,8 +143,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       invoiceDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       status: 'DRAFT',
-      isSubjectToEwt: false,
-      ewtRate: 0.02,
       reference: '',
       terms: 'Net 30',
       notes: '',
@@ -179,8 +169,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       invoiceDate: invoice.invoiceDate,
       dueDate: invoice.dueDate,
       status: invoice.status,
-      isSubjectToEwt: invoice.isSubjectToEwt,
-      ewtRate: invoice.ewtRate || 0.02,
       reference: invoice.reference || '',
       terms: invoice.terms || '',
       notes: invoice.notes || '',
@@ -197,15 +185,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // Handle sponsor change - auto-fill EWT rate
   const handleSponsorChange = (sponsorId: string) => {
-    setFormData(prev => {
-      const sponsor = sponsors.find(s => s.id === sponsorId);
-      return {
-        ...prev,
-        sponsorId,
-        isSubjectToEwt: sponsor?.ewtRate ? true : prev.isSubjectToEwt,
-        ewtRate: sponsor?.ewtRate || prev.ewtRate
-      };
-    });
+    setFormData(prev => ({
+      ...prev,
+      sponsorId
+    }));
   };
 
   // Handle batch change - auto-fill sponsor, quantity, and line items
@@ -235,17 +218,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       glAccountId: fee.glAccountId
     }));
 
-    setFormData(prev => {
-      const sponsor = sponsors.find(s => s.id === sponsorId);
-      return {
-        ...prev,
-        batchId,
-        sponsorId: sponsorId || prev.sponsorId,
-        isSubjectToEwt: sponsor?.ewtRate ? true : prev.isSubjectToEwt,
-        ewtRate: sponsor?.ewtRate || prev.ewtRate,
-        lines: newLines
-      };
-    });
+    setFormData(prev => ({
+      ...prev,
+      batchId,
+      sponsorId: sponsorId || prev.sponsorId,
+      lines: newLines
+    }));
   };
 
   // Add line
@@ -331,7 +309,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
 
     const sponsor = sponsors.find(s => s.id === formData.sponsorId);
-    const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
+    const totals = calculateTotals(formData.lines, sponsor?.taxType === 'VAT');
 
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
@@ -347,12 +325,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       subtotal: totals.subtotal,
       vatAmount: totals.vatAmount,
       grandTotal: totals.grandTotal,
-      totalEwtAmount: totals.totalEwtAmount,
-      netAmountDue: totals.netAmountDue,
+      totalEwtAmount: 0,
+      netAmountDue: totals.grandTotal,
       amountPaid: editingInvoice?.amountPaid || 0,
-      balanceDue: totals.netAmountDue - (editingInvoice?.amountPaid || 0),
-      ewtRate: formData.isSubjectToEwt ? formData.ewtRate : undefined,
-      isSubjectToEwt: formData.isSubjectToEwt,
+      balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: formData.notes || undefined,
@@ -383,7 +359,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
 
     const sponsor = sponsors.find(s => s.id === formData.sponsorId);
-    const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
+    const totals = calculateTotals(formData.lines, sponsor?.taxType === 'VAT');
 
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
@@ -399,12 +375,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       subtotal: totals.subtotal,
       vatAmount: totals.vatAmount,
       grandTotal: totals.grandTotal,
-      totalEwtAmount: totals.totalEwtAmount,
-      netAmountDue: totals.netAmountDue,
+      totalEwtAmount: 0,
+      netAmountDue: totals.grandTotal,
       amountPaid: editingInvoice?.amountPaid || 0,
-      balanceDue: totals.netAmountDue - (editingInvoice?.amountPaid || 0),
-      ewtRate: formData.isSubjectToEwt ? formData.ewtRate : undefined,
-      isSubjectToEwt: formData.isSubjectToEwt,
+      balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: formData.notes || undefined,
@@ -514,12 +488,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   const getStatusBadge = (status: InvoiceStatus) => {
-    switch (status) {
-      case 'DRAFT': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 flex items-center gap-1"><Clock size={12} />Draft</span>;
-      case 'OPEN': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600 flex items-center gap-1"><CheckCircle size={12} />Open</span>;
-      case 'CLOSED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600 flex items-center gap-1"><CheckCircle size={12} />Closed</span>;
-      case 'VOIDED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-rose-100 text-rose-600 flex items-center gap-1"><XCircle size={12} />Voided</span>;
-    }
+    const colors: Record<InvoiceStatus, string> = {
+      'DRAFT': 'text-gray-500',
+      'OPEN': 'text-blue-600',
+      'CLOSED': 'text-green-600',
+      'VOIDED': 'text-rose-600'
+    };
+    return <span className={`text-xs font-bold uppercase tracking-wider ${colors[status]}`}>{status}</span>;
   };
 
   const getSponsorName = (id?: string) => sponsors.find(s => s.id === id)?.name || '-';
@@ -537,8 +512,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   const formTotals = useMemo(() => {
     const sponsor = sponsors.find(s => s.id === formData.sponsorId);
-    return calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
-  }, [formData.lines, formData.isSubjectToEwt, formData.ewtRate, formData.sponsorId, sponsors]);
+    return calculateTotals(formData.lines, sponsor?.taxType === 'VAT');
+  }, [formData.lines, formData.sponsorId, sponsors]);
 
   // ============================================
   // GENERATE FROM ENROLLMENTS LOGIC
@@ -575,14 +550,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // Calculate preview totals for selected enrollments
   const generatePreviewTotals = useMemo(() => {
     if (selectedEnrollmentIds.size === 0) {
-      return { subtotal: 0, vatAmount: 0, grandTotal: 0, ewtAmount: 0, netAmountDue: 0, lineItems: [] };
+      return { subtotal: 0, vatAmount: 0, grandTotal: 0, netAmountDue: 0, lineItems: [] };
     }
 
     const sponsor = sponsors.find(s => s.id === selectedSponsorId);
     const isVat = sponsor?.taxType === 'VAT';
-    const ewtRate = sponsor?.ewtRate || 0;
 
-    // Group selected enrollments by batch (for line consolidation)
     const enrollmentsByBatch = new Map<string, Enrollment[]>();
     selectedEnrollmentIds.forEach(enrollmentId => {
       const enrollment = enrollments.find(e => e.id === enrollmentId);
@@ -596,23 +569,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     });
 
     let subtotal = 0;
-    let totalEwtBase = 0;
-    const lineItems: { description: string; quantity: number; unitPrice: number; amount: number; vatAmount: number; isEwtSubject: boolean }[] = [];
+    const lineItems: { description: string; quantity: number; unitPrice: number; amount: number; vatAmount: number }[] = [];
 
-    // For each batch, find the applicable course fee and create a line
     enrollmentsByBatch.forEach((batchEnrollments, batchId) => {
       const batch = batches.find(b => b.id === batchId);
       const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
-
-      // Find primary course fee for this qualification
       const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive && !cf.isDeleted);
 
-      // If no specific course fee, use enrollment totalFees
       const unitPrice = courseFee?.amount || (batchEnrollments[0]?.totalFees || 0);
       const quantity = batchEnrollments.length;
       const amount = unitPrice * quantity;
       const vatAmount = isVat ? amount * 0.12 : 0;
-      const isEwtSubject = courseFee?.isSubjectToEwt || false;
 
       const description = qualification
         ? `${qualification.name} - ${batch?.batchCode || 'Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`
@@ -623,22 +590,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         quantity,
         unitPrice,
         amount,
-        vatAmount,
-        isEwtSubject
+        vatAmount
       });
 
       subtotal += amount;
-      if (isEwtSubject) {
-        totalEwtBase += amount;
-      }
     });
 
     const vatAmount = lineItems.reduce((sum, l) => sum + l.vatAmount, 0);
     const grandTotal = subtotal + vatAmount;
-    const ewtAmount = totalEwtBase * ewtRate;
-    const netAmountDue = grandTotal - ewtAmount;
 
-    return { subtotal, vatAmount, grandTotal, ewtAmount, netAmountDue, lineItems };
+    return { subtotal, vatAmount, grandTotal, netAmountDue: grandTotal, lineItems };
   }, [selectedEnrollmentIds, selectedSponsorId, enrollments, batches, qualifications, courseFees, sponsors]);
 
   // Reset generate modal state
@@ -684,9 +645,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       return;
     }
 
-    const { subtotal, vatAmount, grandTotal, ewtAmount, netAmountDue, lineItems } = generatePreviewTotals;
-    const hasEwtSubjectItems = lineItems.some(l => l.isEwtSubject);
-    const ewtRate = sponsor.ewtRate || 0;
+    const { subtotal, vatAmount, grandTotal, netAmountDue, lineItems } = generatePreviewTotals;
 
     // Create invoice lines
     const invoiceLines: InvoiceLine[] = lineItems.map((item, idx) => ({
@@ -713,12 +672,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       subtotal,
       vatAmount,
       grandTotal,
-      totalEwtAmount: ewtAmount,
+      totalEwtAmount: 0,
       netAmountDue,
       amountPaid: 0,
       balanceDue: netAmountDue,
-      ewtRate: hasEwtSubjectItems && ewtRate > 0 ? ewtRate : undefined,
-      isSubjectToEwt: hasEwtSubjectItems && ewtRate > 0,
       terms: 'Net 30',
       notes: `Generated from ${selectedEnrollmentIds.size} enrollment(s)`,
       lines: invoiceLines.map(l => ({ ...l, invoiceId })),
@@ -826,17 +783,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100">
-              <Percent size={20} className="text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Total EWT</p>
-              <p className="text-lg font-bold text-purple-600">{formatCurrency(stats.totalEwt)}</p>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       {/* Filters */}
@@ -882,8 +829,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sponsor/Student</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Grand Total</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">EWT</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net Due</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
@@ -915,15 +860,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         (() => {
                           const je = journalEntries.find(j => j.id === inv.journalEntryId);
                           const glNum = je?.glEntryNumber || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`;
-                          return (
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
-                              title={`GL Journal Entry: ${glNum}`}
-                            >
-                              <Receipt size={10} />
-                              {glNum}
-                            </span>
-                          );
+                          return <span className="text-xs font-medium text-gray-600">{glNum}</span>;
                         })()
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -938,8 +875,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     </td>
                     <td className="px-4 py-3">{getStatusBadge(inv.status)}</td>
                     <td className="px-4 py-3 text-right font-medium">{formatCurrency(inv.grandTotal)}</td>
-                    <td className="px-4 py-3 text-right text-purple-600">{formatCurrency(inv.totalEwtAmount)}</td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(inv.netAmountDue)}</td>
                     <td className="px-4 py-3 text-right font-bold" style={{ color: inv.balanceDue > 0 ? brandColor : '#10B981' }}>
                       {formatCurrency(inv.balanceDue)}
                     </td>
@@ -1153,35 +1088,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               )}
 
-              {/* EWT Configuration */}
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.isSubjectToEwt}
-                      onChange={e => setFormData({ ...formData, isSubjectToEwt: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-300"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Subject to EWT</span>
-                  </label>
-                  {formData.isSubjectToEwt && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-500">EWT Rate:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        value={formData.ewtRate * 100}
-                        onChange={e => setFormData({ ...formData, ewtRate: parseFloat(e.target.value) / 100 || 0 })}
-                        className="w-20 px-2 py-1 border rounded text-sm"
-                      />
-                      <span className="text-xs text-gray-500">%</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+
 
               {/* Line Items */}
               <div>
@@ -1293,12 +1200,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <span className="font-medium">Grand Total:</span>
                     <span className="font-bold text-lg">{formatCurrency(formTotals.grandTotal)}</span>
                   </div>
-                  {formData.isSubjectToEwt && (
-                    <div className="flex justify-between text-purple-600">
-                      <span>Less: EWT ({(formData.ewtRate * 100).toFixed(0)}%):</span>
-                      <span>({formatCurrency(formTotals.totalEwtAmount)})</span>
-                    </div>
-                  )}
+
                   <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
                     <span className="font-bold">Net Amount Due:</span>
                     <span className="font-bold text-lg">{formatCurrency(formTotals.netAmountDue)}</span>
@@ -1749,9 +1651,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <div key={idx} className="flex justify-between text-sm">
                         <span className="text-gray-600">
                           {item.description}
-                          {item.isEwtSubject && (
-                            <span className="ml-2 text-xs px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">EWT</span>
-                          )}
                         </span>
                         <span className="font-medium">{formatCurrency(item.amount)}</span>
                       </div>
@@ -1774,12 +1673,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <span className="font-medium">Grand Total:</span>
                       <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.grandTotal)}</span>
                     </div>
-                    {generatePreviewTotals.ewtAmount > 0 && (
-                      <div className="flex justify-between text-purple-600">
-                        <span>Less: EWT ({((sponsors.find(s => s.id === selectedSponsorId)?.ewtRate || 0) * 100).toFixed(0)}%):</span>
-                        <span>({formatCurrency(generatePreviewTotals.ewtAmount)})</span>
-                      </div>
-                    )}
+
                     <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
                       <span className="font-bold">Net Amount Due:</span>
                       <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.netAmountDue)}</span>

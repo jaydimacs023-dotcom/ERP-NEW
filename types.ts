@@ -686,14 +686,14 @@ export interface Invoice extends BaseEntity {
   subtotal: number;            // Sum of line amounts before tax
   vatAmount: number;           // Total VAT amount
   grandTotal: number;          // Subtotal + VAT
-  totalEwtAmount: number;      // Total EWT withheld by sponsor
-  netAmountDue: number;        // Grand Total - EWT
+  totalEwtAmount?: number;     // Total EWT withheld by sponsor
+  netAmountDue?: number;       // Grand Total - EWT
   amountPaid: number;          // Payments received
   balanceDue: number;          // Net Amount Due - Amount Paid
 
   // EWT Configuration
   ewtRate?: number;            // EWT rate applied (e.g., 0.02 for 2%)
-  isSubjectToEwt: boolean;     // Whether invoice is subject to EWT
+  isSubjectToEwt?: boolean;    // Whether invoice is subject to EWT
 
   // Reference fields
   reference?: string;          // External reference number

@@ -2596,11 +2596,7 @@ export default function App() {
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id;
 
-        // EWT: Deferred Tax Asset or similar – code 1600 or "withholding"
-        const ewtAssetId =
-          filteredAccounts.find(a => a.code === '1600')?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('ewt'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('withholding'))?.id;
+
 
         if (!arAccountId) {
           handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found. Please set up your Chart of Accounts.');
@@ -2657,17 +2653,7 @@ export default function App() {
             } as JournalLine);
           }
 
-          // 4. Debit EWT Receivable (reduces net amount due from payor)
-          if (invoice.isSubjectToEwt && invoice.totalEwtAmount > 0 && ewtAssetId) {
-            jLines.push({
-              id: `${jeId}-ewt`,
-              journalEntryId: jeId,
-              accountId: ewtAssetId,
-              debit: invoice.totalEwtAmount,
-              credit: 0,
-              description: `EWT Receivable: ${glRef}`,
-            } as JournalLine);
-          }
+
 
           // ── Post the journal entry ──────────────────────────────────────────
           const jeEntry: Partial<JournalEntry> = {
