@@ -91,6 +91,21 @@ export class SupabaseDataService implements IDataService {
     }
   }
 
+  /**
+   * Helper to execute promises in batches to avoid browser connection limits
+   * and potential CORS/preflight timeouts on many parallel requests.
+   */
+  private async fetchInBatches<T>(fetchers: (() => Promise<T>)[], batchSize = 10): Promise<T[]> {
+    const results: T[] = [];
+    for (let i = 0; i < fetchers.length; i += batchSize) {
+      const batch = fetchers.slice(i, i + batchSize);
+      console.debug(`[Supabase] 📦 Fetching batch ${Math.floor(i / batchSize) + 1} (${batch.length} tables)...`);
+      const batchResults = await Promise.all(batch.map(f => f()));
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
   async getInitialData(): Promise<InitialData> {
     console.info("[Supabase] ☁️ Fetching data from Supabase...");
 
@@ -102,92 +117,35 @@ export class SupabaseDataService implements IDataService {
     try {
       console.info(`[Supabase] URL: ${this.supabaseUrl.substring(0, 50)}...`);
 
-      // Fetch all tables in parallel
+      const tablesToFetch = [
+        'organizations', 'users', 'students', 'qualifications', 'trainers',
+        'batches', 'sponsors', 'items', 'vendors', 'locations',
+        'trainer_schedules', 'employees', 'bank_accounts', 'bank_reconciliations',
+        'recurring_journal_entries', 'chart_of_accounts', 'journal_entries', 'journal_lines',
+        'payroll_runs', 'payroll_lines', 'audit_logs', 'purchase_orders',
+        'payment_histories', 'fixed_assets', 'vendor_tax_settings', 'atc_categories',
+        'atc_items', 'atc_rates', 'payables', 'bills',
+        'warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions',
+        'stock_adjustments', 'reorder_points', 'course_fees', 'alumni_employment_reports',
+        'enrollments', 'invoices', 'invoice_lines'
+      ];
+
+      const fetchers = tablesToFetch.map(table => () => this.fetchFromSupabase(table));
+
+      const results = await this.fetchInBatches(fetchers, 8);
+
       const [
-        organizations,
-        users,
-        students,
-        qualifications,
-        trainers,
-        batches,
-        sponsors,
-        items,
-        vendors,
-        locations,
-        schedules,
-        employees,
-        bankAccounts,
-        bankReconciliations,
-        recurringJournalEntries,
-        accounts,
-        journalEntries,
-        journalLines,
-        payrollRuns,
-        payrollLines,
-        auditLogs,
-        purchaseOrders,
-        paymentHistories,
-        fixedAssets,
-        vendorTaxSettings,
-        atcCategories,
-        atcItems,
-        atcRates,
-        payables,
-        bills,
-        warehouseLocations,
-        stockItems,
-        inventoryLevels,
-        inventoryTransactions,
-        stockAdjustments,
-        reorderPoints,
-        courseFees,
-        alumniReports,
-        enrollments,
-        invoices,
-        invoiceLines
-      ] = await Promise.all([
-        this.fetchFromSupabase('organizations'),
-        this.fetchFromSupabase('users'),
-        this.fetchFromSupabase('students'),
-        this.fetchFromSupabase('qualifications'),
-        this.fetchFromSupabase('trainers'),
-        this.fetchFromSupabase('batches'),
-        this.fetchFromSupabase('sponsors'),
-        this.fetchFromSupabase('items'),
-        this.fetchFromSupabase('vendors'),
-        this.fetchFromSupabase('locations'),
-        this.fetchFromSupabase('trainer_schedules'),
-        this.fetchFromSupabase('employees'),
-        this.fetchFromSupabase('bank_accounts'),
-        this.fetchFromSupabase('bank_reconciliations'),
-        this.fetchFromSupabase('recurring_journal_entries'),
-        this.fetchFromSupabase('chart_of_accounts'),
-        this.fetchFromSupabase('journal_entries'),
-        this.fetchFromSupabase('journal_lines'),
-        this.fetchFromSupabase('payroll_runs'),
-        this.fetchFromSupabase('payroll_lines'),
-        this.fetchFromSupabase('audit_logs'),
-        this.fetchFromSupabase('purchase_orders'),
-        this.fetchFromSupabase('payment_histories'),
-        this.fetchFromSupabase('fixed_assets'),
-        this.fetchFromSupabase('vendor_tax_settings'),
-        this.fetchFromSupabase('atc_categories'),
-        this.fetchFromSupabase('atc_items'),
-        this.fetchFromSupabase('atc_rates'),
-        this.fetchFromSupabase('payables'),
-        this.fetchFromSupabase('bills'),
-        this.fetchFromSupabase('warehouse_locations'),
-        this.fetchFromSupabase('stock_items'),
-        this.fetchFromSupabase('inventory_levels'),
-        this.fetchFromSupabase('inventory_transactions'),
-        this.fetchFromSupabase('stock_adjustments'),
-        this.fetchFromSupabase('reorder_points'),
-        this.fetchFromSupabase('course_fees'),
-        this.fetchFromSupabase('alumni_employment_reports'),
-        this.fetchFromSupabase('enrollments'),
-        this.fetchFromSupabase('invoices'),
-        this.fetchFromSupabase('invoice_lines'),
-      ]);
+        organizations, users, students, qualifications, trainers,
+        batches, sponsors, items, vendors, locations,
+        schedules, employees, bankAccounts, bankReconciliations,
+        recurringJournalEntries, accounts, journalEntries, journalLines,
+        payrollRuns, payrollLines, auditLogs, purchaseOrders,
+        paymentHistories, fixedAssets, vendorTaxSettings, atcCategories,
+        atcItems, atcRates, payables, bills,
+        warehouseLocations, stockItems, inventoryLevels, inventoryTransactions,
+        stockAdjustments, reorderPoints, courseFees, alumniReports,
+        enrollments, invoices, invoiceLines
+      ] = results as any[];
 
       // Log data status
       const hasData = organizations && organizations.length > 0;
@@ -208,6 +166,12 @@ export class SupabaseDataService implements IDataService {
         lines: camInvoiceLines.filter((line: any) => line.invoiceId === inv.id)
       }));
 
+      // Link lines to journal entries
+      const journalEntriesWithLines = this.snakeToCamel(journalEntries as any).map((entry: any) => ({
+        ...entry,
+        lines: this.snakeToCamel(journalLines as any).filter((line: any) => line.journalEntryId === entry.id)
+      }));
+
       return {
         organizations: this.snakeToCamel(organizations as any) || [],
         users: this.snakeToCamel(users as any) || [],
@@ -225,7 +189,7 @@ export class SupabaseDataService implements IDataService {
         bankReconciliations: this.snakeToCamel(bankReconciliations as any) || [],
         recurringJournalEntries: this.snakeToCamel(recurringJournalEntries as any) || [],
         accounts: this.snakeToCamel(accounts as any) || [],
-        journalEntries: this.snakeToCamel(journalEntries as any) || [],
+        journalEntries: journalEntriesWithLines,
         journalLines: this.snakeToCamel(journalLines as any) || [],
         payrollRuns: this.snakeToCamel(payrollRuns as any) || [],
         payrollLines: this.snakeToCamel(payrollLines as any) || [],
@@ -612,9 +576,18 @@ export class SupabaseDataService implements IDataService {
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
-        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
+        'id', 'org_id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
         'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount', 'tax_category_id', 'gl_account_id',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
+      ],
+      journal_entries: [
+        'id', 'org_id', 'period_id', 'date', 'description', 'reference', 'gl_entry_number',
+        'status', 'created_by', 'created_at', 'source_type', 'source_ref', 'posted_by', 'posted_at',
+        'approved_by', 'approved_at', 'reversed_by', 'reversed_at', 'reversal_reason', 'original_entry_id'
+      ],
+      journal_lines: [
+        'id', 'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
+        'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
       ],
     };
 
@@ -630,7 +603,14 @@ export class SupabaseDataService implements IDataService {
       alumni_employment_reports: ['id', 'created_at', 'updated_at'],
       sponsors: ['id', 'created_at', 'updated_at'],
       invoices: ['id', 'created_at', 'updated_at'],
-      invoice_lines: ['id', 'created_at', 'updated_at']
+      invoice_lines: [
+        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id',
+        'enrollment_id', 'quantity', 'unit_price', 'amount', 'tax_category_id',
+        'vat_amount', 'gl_account_id', 'is_deleted', 'deleted_at', 'deleted_by',
+        'created_at', 'updated_at'
+      ],
+      journal_entries: ['id', 'created_at', 'updated_at'],
+      journal_lines: ['id', 'created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -3664,7 +3644,7 @@ export class SupabaseDataService implements IDataService {
       // Define only the columns that exist in the actual database table
       // Supabase bulk insert requires all objects to have the same keys (PGRST102 error)
       const allKeys = [
-        'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
+        'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
         'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared',
         'goods_receipt_id', 'goods_receipt_line_id', 'purchase_order_id', 'purchase_order_line_id'
       ];
@@ -4092,7 +4072,8 @@ export class SupabaseDataService implements IDataService {
     if (invoiceLines.length > 0) {
       const savedLines = await this.createInvoiceLines(invoiceLines.map((line: any) => ({
         ...line,
-        invoiceId: savedInvoice.id
+        invoiceId: savedInvoice.id,
+        orgId: savedInvoice.orgId || invoice.orgId
       })));
       savedInvoice.lines = savedLines;
     }
@@ -4139,7 +4120,7 @@ export class SupabaseDataService implements IDataService {
 
       // Insert new lines
       if (lines.length > 0) {
-        await this.createInvoiceLines(lines.map(l => ({ ...l, invoiceId: id })));
+        await this.createInvoiceLines(lines.map(l => ({ ...l, invoiceId: id, orgId: updates.orgId || updatedInvoice.orgId })));
       }
       (updatedInvoice as any).lines = lines;
     }

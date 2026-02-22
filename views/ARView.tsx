@@ -33,12 +33,14 @@ interface ARViewProps {
   currentUser?: any;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
   onNavigate?: (tab: string) => void;
+  orgId: string;
 }
 
 type ARTab = 'invoices' | 'collections' | 'aging' | 'item-groups';
 
 const ARView: React.FC<ARViewProps> = ({
-  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate
+  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
+  orgId
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -52,9 +54,9 @@ const ARView: React.FC<ARViewProps> = ({
   const [approvalAction, setApprovalAction] = useState<'approve' | 'revision'>('approve');
   const [editingItemGroup, setEditingItemGroup] = useState<ItemGroup | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'ALL'|'INVOICE'|'CREDIT'|'OTHER'>('ALL');
-  const [filterStatus, setFilterStatus] = useState<'ALL'|'On Hold'|'Open'|'Closed'|'Voided'>('ALL');
-  const [filterDateRange, setFilterDateRange] = useState<'ALL'|'30D'|'MTD'|'YTD'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'INVOICE' | 'CREDIT' | 'OTHER'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'On Hold' | 'Open' | 'Closed' | 'Voided'>('ALL');
+  const [filterDateRange, setFilterDateRange] = useState<'ALL' | '30D' | 'MTD' | 'YTD'>('ALL');
   const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
 
   // Item Group Form State
@@ -255,7 +257,7 @@ const ARView: React.FC<ARViewProps> = ({
   const handleExportInvoices = () => {
     if (!filteredInvoices || filteredInvoices.length === 0) return onNotify('info', 'No records to export.');
 
-    const headers = ['Type','GL Nbr','Reference Nbr','Status','Date','Post Period','Customer ID','Customer Name','Description','Currency','Amount'];
+    const headers = ['Type', 'GL Nbr', 'Reference Nbr', 'Status', 'Date', 'Post Period', 'Customer ID', 'Customer Name', 'Description', 'Currency', 'Amount'];
     const rows: string[] = [];
 
     filteredInvoices.forEach(inv => {
@@ -524,12 +526,12 @@ const ARView: React.FC<ARViewProps> = ({
     const batchId = selectedBatchId || undefined;
 
     const finalizedLines: JournalLine[] = [];
-    finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType, batchId });
+    finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, orgId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType, batchId });
     invoiceLines.forEach((il, idx) => {
       const item = items.find(i => i.id === il.itemId);
-      if (item) finalizedLines.push({ id: `l-rev-${idx}-${Date.now()}`, journalEntryId: entryId, accountId: item.incomeAccountId, debit: 0, credit: il.qty * il.price, contactId: recipientId, contactType: recipientType, itemId: il.itemId, batchId });
+      if (item) finalizedLines.push({ id: `l-rev-${idx}-${Date.now()}`, journalEntryId: entryId, orgId, accountId: item.incomeAccountId, debit: 0, credit: il.qty * il.price, contactId: recipientId, contactType: recipientType, itemId: il.itemId, batchId });
     });
-    if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType, batchId });
+    if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, orgId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType, batchId });
 
     // Build description including batch info if selected
     const recipientName = recipientType === 'SPONSOR' ? sponsors.find(s => s.id === recipientId)?.name : students.find(s => s.id === recipientId)?.lastName;
@@ -575,8 +577,8 @@ const ARView: React.FC<ARViewProps> = ({
     const payerName = collPayerType === 'SPONSOR' ? sponsors.find(s => s.id === collPayerId)?.name : `${students.find(s => s.id === collPayerId)?.lastName}, ${students.find(s => s.id === collPayerId)?.firstName}`;
 
     const finalizedLines: JournalLine[] = [
-      { id: `l-cash-${Date.now()}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: collAmount, credit: 0, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType },
-      { id: `l-ar-cr-${Date.now()}`, journalEntryId: entryId, accountId: arAccountId, debit: 0, credit: collAmount, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType }
+      { id: `l-cash-${Date.now()}`, journalEntryId: entryId, orgId, accountId: bank.glAccountId, debit: collAmount, credit: 0, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType },
+      { id: `l-ar-cr-${Date.now()}`, journalEntryId: entryId, orgId, accountId: arAccountId, debit: 0, credit: collAmount, memo: `Collection ${collRef} from ${payerName}`, contactId: collPayerId, contactType: collPayerType }
     ];
 
     onPostInvoice({ id: entryId, date: collDate, reference: collRef, description: `Collection Payment: ${payerName}`, sourceType: 'COLLECTION', status: 'POSTED' }, finalizedLines);

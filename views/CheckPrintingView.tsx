@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { 
-  CheckVoucher, CheckStatus, BankAccount, Vendor, Payable, 
+import {
+  CheckVoucher, CheckStatus, BankAccount, Vendor, Payable,
   JournalEntry, JournalLine, ChartOfAccount
 } from '../types';
 import { AccountingService } from '../accountingService';
@@ -77,23 +77,23 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   });
 
   // Filter data
-  const orgChecks = useMemo(() => 
+  const orgChecks = useMemo(() =>
     checks.filter(c => c.orgId === orgId && !c.isDeleted),
     [checks, orgId]
   );
 
-  const orgBankAccounts = useMemo(() => 
+  const orgBankAccounts = useMemo(() =>
     bankAccounts.filter(b => b.orgId === orgId && !b.isDeleted && b.type !== 'CASH'),
     [bankAccounts, orgId]
   );
 
-  const orgVendors = useMemo(() => 
+  const orgVendors = useMemo(() =>
     vendors.filter(v => v.orgId === orgId && !v.isDeleted),
     [vendors, orgId]
   );
 
-  const orgPayables = useMemo(() => 
-    payables.filter(p => p.orgId === orgId && !p.isDeleted && 
+  const orgPayables = useMemo(() =>
+    payables.filter(p => p.orgId === orgId && !p.isDeleted &&
       (p.status === 'approved' || p.status === 'partially_paid')),
     [payables, orgId]
   );
@@ -101,7 +101,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   // Search & Filter
   const filteredChecks = useMemo(() => {
     return orgChecks.filter(c => {
-      const matchesSearch = 
+      const matchesSearch =
         c.checkNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.payeeName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
@@ -116,7 +116,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
     const printed = orgChecks.filter(c => c.status === 'PRINTED');
     const released = orgChecks.filter(c => c.status === 'RELEASED');
     const cleared = orgChecks.filter(c => c.status === 'CLEARED');
-    
+
     return {
       draftCount: drafts.length,
       draftAmount: drafts.reduce((sum, c) => sum + c.amount, 0),
@@ -132,19 +132,19 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   const getNextCheckNumber = (bankAccountId: string) => {
     const settings = checkNumberSettings[bankAccountId];
     const bankChecks = orgChecks.filter(c => c.bankAccountId === bankAccountId);
-    
+
     // Find max existing check number
     const maxNum = bankChecks.reduce((max, c) => {
       const num = parseInt(c.checkNumber.replace(/\D/g, '')) || 0;
       return num > max ? num : max;
     }, 0);
-    
+
     // If settings exist and start number is higher, use that
     let nextNum = maxNum + 1;
     if (settings && settings.startNumber > nextNum) {
       nextNum = settings.startNumber;
     }
-    
+
     const prefix = settings?.prefix || '';
     return prefix + String(nextNum).padStart(6, '0');
   };
@@ -163,9 +163,9 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
       'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    
+
     if (num === 0) return 'Zero';
-    
+
     const convert = (n: number): string => {
       if (n < 20) return ones[n];
       if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
@@ -173,10 +173,10 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       if (n < 1000000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + convert(n % 1000) : '');
       return convert(Math.floor(n / 1000000)) + ' Million' + (n % 1000000 ? ' ' + convert(n % 1000000) : '');
     };
-    
+
     const pesos = Math.floor(num);
     const centavos = Math.round((num - pesos) * 100);
-    
+
     let result = convert(pesos) + ' Pesos';
     if (centavos > 0) {
       result += ' and ' + convert(centavos) + ' Centavos';
@@ -187,7 +187,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   // Handlers
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.bankAccountId) {
       onNotify('error', 'Please select a bank account.');
       return;
@@ -202,15 +202,15 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
     }
 
     // Check for duplicate check number
-    const isDuplicate = orgChecks.some(c => 
-      c.bankAccountId === formData.bankAccountId && 
+    const isDuplicate = orgChecks.some(c =>
+      c.bankAccountId === formData.bankAccountId &&
       c.checkNumber === formData.checkNumber
     );
     if (isDuplicate) {
       onNotify('error', `Check number ${formData.checkNumber} already exists for this bank account.`);
       return;
     }
-    
+
     const newCheck: Partial<CheckVoucher> = {
       orgId,
       checkNumber: formData.checkNumber,
@@ -264,7 +264,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
     // Trigger browser print
     window.print();
-    
+
     onNotify('success', `Check #${selectedCheck.checkNumber} marked as printed.`);
     setShowPrintPreview(false);
     setSelectedCheck(null);
@@ -301,6 +301,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
           {
             id: `jl-${Date.now()}-1`,
             journalEntryId: '',
+            orgId,
             accountId: apAccount.id,
             description: `Payment to ${check.payeeName}`,
             debit: check.amount,
@@ -311,6 +312,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
           {
             id: `jl-${Date.now()}-2`,
             journalEntryId: '',
+            orgId,
             accountId: bank.glAccountId,
             description: `Check #${check.checkNumber}`,
             debit: 0,
@@ -408,7 +410,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
           <p className="text-sm text-gray-500 font-normal italic">Prepare, print, and track check payments.</p>
         </div>
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={() => openSettings()}
             disabled={orgBankAccounts.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -416,7 +418,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
           >
             <Hash size={18} /> Settings
           </button>
-          <button 
+          <button
             onClick={() => { resetForm(); setShowCreateModal(true); }}
             disabled={orgBankAccounts.length === 0}
             className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -436,7 +438,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             <div className="flex-1">
               <h3 className="font-semibold text-amber-800 mb-1">No Checking/Savings Accounts Found</h3>
               <p className="text-sm text-amber-700 leading-relaxed">
-                To create check vouchers, you need at least one <strong>CHECKING</strong> or <strong>SAVINGS</strong> bank account configured. 
+                To create check vouchers, you need at least one <strong>CHECKING</strong> or <strong>SAVINGS</strong> bank account configured.
                 Cash accounts cannot be used for check printing.
               </p>
               <p className="text-sm text-amber-600 mt-2">
@@ -474,9 +476,9 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded border shadow-sm">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search checks..." 
+          <input
+            type="text"
+            placeholder="Search checks..."
             className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -531,7 +533,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .map(check => {
                   const statusConfig = STATUS_CONFIG[check.status];
-                  
+
                   return (
                     <tr key={check.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
@@ -619,7 +621,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             ) : (
               <tr>
                 <td colSpan={6} className="py-16 text-center">
-                  <EmptyState 
+                  <EmptyState
                     icon={<FileText className="text-gray-300" size={48} />}
                     title="No checks found"
                     description="Create your first check voucher to get started."
@@ -651,7 +653,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Account *</label>
-                  <select 
+                  <select
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.bankAccountId}
@@ -665,13 +667,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Number *</label>
-                  <input 
+                  <input
                     type="text"
                     required
                     placeholder="000001"
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
                     value={formData.checkNumber}
-                    onChange={e => setFormData({...formData, checkNumber: e.target.value})}
+                    onChange={e => setFormData({ ...formData, checkNumber: e.target.value })}
                   />
                   <p className="text-xs text-gray-400">Auto-filled from sequence or enter manually</p>
                 </div>
@@ -680,10 +682,10 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payee Type</label>
-                  <select 
+                  <select
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.payeeType}
-                    onChange={e => setFormData({...formData, payeeType: e.target.value as 'VENDOR' | 'EMPLOYEE' | 'OTHER', payeeId: '', payeeName: ''})}
+                    onChange={e => setFormData({ ...formData, payeeType: e.target.value as 'VENDOR' | 'EMPLOYEE' | 'OTHER', payeeId: '', payeeName: '' })}
                   >
                     <option value="VENDOR">Vendor</option>
                     <option value="EMPLOYEE">Employee</option>
@@ -692,12 +694,12 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Date *</label>
-                  <input 
+                  <input
                     type="date"
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.checkDate}
-                    onChange={e => setFormData({...formData, checkDate: e.target.value})}
+                    onChange={e => setFormData({ ...formData, checkDate: e.target.value })}
                   />
                 </div>
               </div>
@@ -705,12 +707,12 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               {formData.payeeType === 'VENDOR' && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Vendor</label>
-                  <select 
+                  <select
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.payeeId}
                     onChange={e => {
                       const vendor = orgVendors.find(v => v.id === e.target.value);
-                      setFormData({...formData, payeeId: e.target.value, payeeName: vendor?.name || ''});
+                      setFormData({ ...formData, payeeId: e.target.value, payeeName: vendor?.name || '' });
                     }}
                   >
                     <option value="">Select Vendor...</option>
@@ -723,26 +725,26 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payee Name *</label>
-                <input 
+                <input
                   type="text"
                   required
                   placeholder="Pay to the order of..."
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                   value={formData.payeeName}
-                  onChange={e => setFormData({...formData, payeeName: e.target.value})}
+                  onChange={e => setFormData({ ...formData, payeeName: e.target.value })}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount *</label>
-                <input 
+                <input
                   type="number"
                   step="0.01"
                   min="0"
                   required
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                   value={formData.amount || ''}
-                  onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
+                  onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                 />
                 {formData.amount > 0 && (
                   <p className="text-xs text-gray-500 italic mt-1">{numberToWords(formData.amount)}</p>
@@ -750,15 +752,15 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setShowCreateModal(false)} 
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100"
                 >
                   Create Check
@@ -837,13 +839,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </div>
 
             <div className="p-6 border-t bg-gray-50 flex gap-3 no-print">
-              <button 
+              <button
                 onClick={() => setShowPrintPreview(false)}
                 className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={confirmPrint}
                 className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors flex items-center justify-center gap-2"
               >
@@ -894,13 +896,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               Are you sure you want to delete check #{orgChecks.find(c => c.id === confirmDelete)?.checkNumber}? This action cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => setConfirmDelete(null)}
                 className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded text-sm font-bold hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => handleDelete(confirmDelete)}
                 className="flex-1 py-2.5 bg-rose-600 text-white rounded text-sm font-bold hover:bg-rose-700 transition-colors"
               >
@@ -930,7 +932,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             <div className="p-6 space-y-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Account</label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                   value={settingsBank}
                   onChange={e => {
@@ -949,7 +951,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check Number Prefix (Optional)</label>
-                <input 
+                <input
                   type="text"
                   placeholder="e.g., CHK-"
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
@@ -961,7 +963,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Starting Check Number</label>
-                <input 
+                <input
                   type="number"
                   min="1"
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
@@ -978,13 +980,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button 
+                <button
                   onClick={() => setShowSettingsModal(false)}
                   className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded text-sm font-bold hover:bg-gray-200"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={saveSettings}
                   className="flex-1 py-2.5 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610]"
                 >

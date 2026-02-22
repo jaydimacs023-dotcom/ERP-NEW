@@ -1,11 +1,11 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { 
-  GoodsReceipt, GoodsReceiptLine, GoodsReceiptStatus, PurchaseOrder, 
+import {
+  GoodsReceipt, GoodsReceiptLine, GoodsReceiptStatus, PurchaseOrder,
   Vendor, ChartOfAccount, JournalEntry, JournalLine
 } from '../types';
 import EmptyState from '../components/EmptyState';
 import {
-  Package, Plus, Search, Filter, ChevronDown, X, CheckCircle, 
+  Package, Plus, Search, Filter, ChevronDown, X, CheckCircle,
   Clock, XCircle, Eye, Edit, Trash2, AlertCircle, FileText,
   Truck, Calendar, Building, ArrowRight, Link, Unlink, Layers, ShoppingCart
 } from 'lucide-react';
@@ -60,17 +60,17 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
   });
 
   // Filter data
-  const orgGRs = useMemo(() => 
+  const orgGRs = useMemo(() =>
     goodsReceipts.filter(gr => gr.orgId === orgId && !gr.isDeleted),
     [goodsReceipts, orgId]
   );
 
-  const orgPOs = useMemo(() => 
+  const orgPOs = useMemo(() =>
     purchaseOrders.filter(po => po.orgId === orgId && !po.isDeleted && po.status === 'APPROVED'),
     [purchaseOrders, orgId]
   );
 
-  const orgVendors = useMemo(() => 
+  const orgVendors = useMemo(() =>
     vendors.filter(v => v.orgId === orgId && !v.isDeleted),
     [vendors, orgId]
   );
@@ -89,7 +89,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
   const summaryMetrics = useMemo(() => {
     const drafts = orgGRs.filter(gr => gr.status === 'DRAFT');
     const posted = orgGRs.filter(gr => gr.status === 'POSTED');
-    
+
     return {
       draftCount: drafts.length,
       draftValue: drafts.reduce((sum, gr) => sum + gr.totalValue, 0),
@@ -153,7 +153,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
   // Handlers
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.purchaseOrderId) {
       onNotify('error', 'Please select a Purchase Order.');
       return;
@@ -201,10 +201,10 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
     // DR Inventory (Asset)
     // CR GR/IR Clearing (Liability)
     if (onPostJournal) {
-      const inventoryAccount = accounts.find(a => 
+      const inventoryAccount = accounts.find(a =>
         a.name.toLowerCase().includes('inventory') && a.accountClass === 'ASSET'
       );
-      const grirAccount = accounts.find(a => 
+      const grirAccount = accounts.find(a =>
         a.name.toLowerCase().includes('gr/ir') || a.name.toLowerCase().includes('goods receipt')
       ) || accounts.find(a => a.accountClass === 'LIABILITY');
 
@@ -213,6 +213,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           {
             id: `jl-${Date.now()}-1`,
             journalEntryId: '',
+            orgId,
             accountId: inventoryAccount.id,
             description: `Inventory receipt - ${gr.grNumber}`,
             debit: gr.totalValue,
@@ -222,6 +223,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           {
             id: `jl-${Date.now()}-2`,
             journalEntryId: '',
+            orgId,
             accountId: grirAccount.id,
             description: `GR/IR Clearing - ${gr.grNumber}`,
             debit: 0,
@@ -298,7 +300,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Goods Receipt (GR/IR)</h2>
           <p className="text-sm text-gray-500 font-normal italic">Receive goods against Purchase Orders with GR/IR clearing integration.</p>
         </div>
-        <button 
+        <button
           onClick={() => { resetForm(); setShowCreateModal(true); }}
           className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all"
         >
@@ -315,30 +317,30 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-orange-800 mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
             <p className="text-sm text-orange-700 leading-relaxed font-medium">
-              When goods are received, the system debits <strong className="font-semibold">Inventory</strong> and credits <strong className="font-semibold">GR/IR Clearing</strong>. 
-              When the vendor invoice is posted, it debits <strong className="font-semibold">GR/IR Clearing</strong> and credits <strong className="font-semibold">Accounts Payable</strong>. 
+              When goods are received, the system debits <strong className="font-semibold">Inventory</strong> and credits <strong className="font-semibold">GR/IR Clearing</strong>.
+              When the vendor invoice is posted, it debits <strong className="font-semibold">GR/IR Clearing</strong> and credits <strong className="font-semibold">Accounts Payable</strong>.
               This ensures proper matching between receipts and invoices.
             </p>
             <div className="flex items-center gap-6 mt-4 pt-4 border-t border-orange-200/50">
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
-                    <Package size={14} className="text-orange-700" />
-                 </div>
-                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Goods Receipt</span>
+                <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
+                  <Package size={14} className="text-orange-700" />
+                </div>
+                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Goods Receipt</span>
               </div>
               <ArrowRight size={14} className="text-orange-400" />
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
-                    <FileText size={14} className="text-orange-700" />
-                 </div>
-                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Invoice Match</span>
+                <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
+                  <FileText size={14} className="text-orange-700" />
+                </div>
+                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Invoice Match</span>
               </div>
               <ArrowRight size={14} className="text-orange-400" />
               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-lg bg-[#F47721] text-white flex items-center justify-center shadow-lg shadow-gray-300/20">
-                    <CheckCircle size={14} />
-                 </div>
-                 <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Clearing Complete</span>
+                <div className="w-8 h-8 rounded-lg bg-[#F47721] text-white flex items-center justify-center shadow-lg shadow-gray-300/20">
+                  <CheckCircle size={14} />
+                </div>
+                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Clearing Complete</span>
               </div>
             </div>
           </div>
@@ -349,7 +351,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-             <Clock size={12} className="text-gray-400" /> Draft Index
+            <Clock size={12} className="text-gray-400" /> Draft Index
           </p>
           <div className="flex items-end justify-between">
             <div>
@@ -369,7 +371,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
         <div className="bg-gray-800 p-6 rounded-md shadow-sm shadow-gray-300/20 flex flex-col justify-between group relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-[#F47721]/10 rounded-full -mr-8 -mt-8 blur-2xl" />
           <p className="text-xs font-semibold text-orange-400/80 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-             <CheckCircle size={12} className="text-orange-400" /> Posted Ledger
+            <CheckCircle size={12} className="text-orange-400" /> Posted Ledger
           </p>
           <div className="flex items-end justify-between">
             <div>
@@ -388,7 +390,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-             <Layers size={12} className="text-[#F47721]" /> Total Lines
+            <Layers size={12} className="text-[#F47721]" /> Total Lines
           </p>
           <div className="flex items-end justify-between">
             <div>
@@ -402,7 +404,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
         <div className="bg-[#F47721] p-6 rounded-md shadow-sm shadow-gray-300/30 flex flex-col justify-between group">
           <p className="text-xs font-semibold text-orange-100 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-             <ShoppingCart size={12} className="text-orange-100" /> Open POs
+            <ShoppingCart size={12} className="text-orange-100" /> Open POs
           </p>
           <div className="flex items-end justify-between">
             <div>
@@ -417,32 +419,32 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Registry Filters */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-         <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input 
-               type="text" 
-               placeholder="Search goods receipts..." 
-               className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
-               value={searchTerm}
-               onChange={e => setSearchTerm(e.target.value)}
-            />
-         </div>
-         <div className="flex items-center gap-3">
-            <div className="relative font-bold">
-               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-               <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
-                  className="pl-10 pr-10 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-xs font-semibold uppercase tracking-wide text-gray-600 appearance-none min-w-[160px]"
-               >
-                  <option value="all">All Statuses</option>
-                  {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                     <option key={value} value={value}>{config.label}</option>
-                  ))}
-               </select>
-               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
-            </div>
-         </div>
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search goods receipts..."
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative font-bold">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
+              className="pl-10 pr-10 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-xs font-semibold uppercase tracking-wide text-gray-600 appearance-none min-w-[160px]"
+            >
+              <option value="all">All Statuses</option>
+              {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                <option key={value} value={value}>{config.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+          </div>
+        </div>
       </div>
 
       {/* GRs Table */}
@@ -465,7 +467,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .map(gr => {
                   const statusConfig = STATUS_CONFIG[gr.status];
-                  
+
                   return (
                     <tr key={gr.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
@@ -535,7 +537,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             ) : (
               <tr>
                 <td colSpan={7} className="py-16 text-center">
-                  <EmptyState 
+                  <EmptyState
                     icon={<Package className="text-gray-300" size={48} />}
                     title="No goods receipts found"
                     description="Create a goods receipt from an approved Purchase Order."
@@ -545,28 +547,28 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             )}
           </tbody>
           <tfoot className="border-t-4 border-gray-800">
-             <tr className="bg-gray-50">
-                <td colSpan={4} className="px-8 py-6">
-                   <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-[#F47721] animate-pulse" />
-                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Institutional Receipt Intelligence Active</p>
-                   </div>
-                </td>
-                <td className="px-6 py-6 text-right">
-                   <div className="space-y-1">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Aggregated Valuation</p>
-                      <p className="text-xl font-semibold text-gray-900 font-mono">
-                         {"\u20B1"}{formatCurrency(filteredGRs.reduce((sum, gr) => sum + gr.totalValue, 0))}
-                      </p>
-                   </div>
-                </td>
-                <td colSpan={2} className="px-8 py-6 text-right">
-                   <div className="space-y-1">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Records</p>
-                      <p className="text-sm font-semibold text-gray-900 uppercase">{filteredGRs.length} TRANSACTIONS</p>
-                   </div>
-                </td>
-             </tr>
+            <tr className="bg-gray-50">
+              <td colSpan={4} className="px-8 py-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-[#F47721] animate-pulse" />
+                  <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Institutional Receipt Intelligence Active</p>
+                </div>
+              </td>
+              <td className="px-6 py-6 text-right">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Aggregated Valuation</p>
+                  <p className="text-xl font-semibold text-gray-900 font-mono">
+                    {"\u20B1"}{formatCurrency(filteredGRs.reduce((sum, gr) => sum + gr.totalValue, 0))}
+                  </p>
+                </div>
+              </td>
+              <td colSpan={2} className="px-8 py-6 text-right">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Records</p>
+                  <p className="text-sm font-semibold text-gray-900 uppercase">{filteredGRs.length} TRANSACTIONS</p>
+                </div>
+              </td>
+            </tr>
           </tfoot>
         </table>
       </div>
@@ -591,7 +593,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Purchase Order *</label>
-                  <select 
+                  <select
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.purchaseOrderId}
@@ -607,12 +609,12 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Receipt Date *</label>
-                  <input 
+                  <input
                     type="date"
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.receiptDate}
-                    onChange={e => setFormData({...formData, receiptDate: e.target.value})}
+                    onChange={e => setFormData({ ...formData, receiptDate: e.target.value })}
                   />
                 </div>
               </div>
@@ -620,22 +622,22 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Delivery Note #</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="Vendor's delivery note number..."
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.deliveryNote}
-                    onChange={e => setFormData({...formData, deliveryNote: e.target.value})}
+                    onChange={e => setFormData({ ...formData, deliveryNote: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Warehouse Location</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="Where goods are stored..."
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                     value={formData.warehouseLocation}
-                    onChange={e => setFormData({...formData, warehouseLocation: e.target.value})}
+                    onChange={e => setFormData({ ...formData, warehouseLocation: e.target.value })}
                   />
                 </div>
               </div>
@@ -709,14 +711,14 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             </form>
 
             <div className="p-6 border-t bg-gray-50 flex gap-3">
-              <button 
-                type="button" 
-                onClick={() => setShowCreateModal(false)} 
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
                 className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleCreate as any}
                 disabled={!formData.purchaseOrderId || formData.lines.length === 0}
                 className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -812,14 +814,14 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             </div>
 
             <div className="p-6 border-t bg-gray-50 flex gap-3">
-              <button 
+              <button
                 onClick={() => setShowDetailModal(false)}
                 className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
               >
                 Close
               </button>
               {selectedGR.status === 'DRAFT' && (
-                <button 
+                <button
                   onClick={() => { handlePost(selectedGR); setShowDetailModal(false); }}
                   className="flex-1 py-3 bg-emerald-600 text-white rounded text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                 >

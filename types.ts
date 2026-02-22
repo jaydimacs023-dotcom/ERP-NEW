@@ -346,7 +346,7 @@ export type PayableStatus = 'for_approval' | 'approved' | 'paid' | 'partially_pa
 
 export type InvoiceType = 'standard' | 'prepayment' | 'credit_memo' | 'debit_memo';
 
-export type PayablePaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_debit' | 'ewallet';
+export type PayablePaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_debit' | 'ewallet' | 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'AUTO_DEBIT' | 'EWALLET';
 
 export interface Payable extends BaseEntity {
   id: string;
@@ -657,6 +657,7 @@ export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'VOIDED';
 
 export interface InvoiceLine extends BaseEntity {
   id: string;
+  orgId: string;
   invoiceId: string;
   lineNumber: number;
   description: string;
@@ -929,6 +930,7 @@ export interface RecurringJournalEntry extends BaseEntity {
 
 export interface JournalLine {
   id: string;
+  orgId: string;
   journalEntryId: string;
   accountId: string;
   debit: number;
@@ -1107,6 +1109,9 @@ export interface GoodsReceipt extends BaseEntity {
   journalEntryId?: string;
   // Amounts
   totalAmount: number;
+  totalValue: number;
+  deliveryNote?: string;
+  warehouseLocation?: string;
   // Audit
   createdBy?: string;
   createdAt: string;

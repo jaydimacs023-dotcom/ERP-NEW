@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { 
+import {
   AccountingPeriod, PeriodStatus, Payable, JournalEntry, JournalLine,
   ChartOfAccount, AccountClass
 } from '../types';
@@ -74,34 +74,34 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   });
 
   // Filter periods by org and year
-  const orgPeriods = useMemo(() => 
+  const orgPeriods = useMemo(() =>
     periods.filter(p => p.orgId === orgId && p.fiscalYear === yearFilter && !p.isDeleted)
       .sort((a, b) => a.periodNumber - b.periodNumber),
     [periods, orgId, yearFilter]
   );
 
-  const orgPayables = useMemo(() => 
+  const orgPayables = useMemo(() =>
     payables.filter(p => p.orgId === orgId && !p.isDeleted),
     [payables, orgId]
   );
 
-  const orgEntries = useMemo(() => 
+  const orgEntries = useMemo(() =>
     entries.filter(e => e.orgId === orgId),
     [entries, orgId]
   );
 
-  const expenseAccounts = useMemo(() => 
+  const expenseAccounts = useMemo(() =>
     accounts.filter(a => a.orgId === orgId && a.class === AccountClass.EXPENSE && !a.isHeader),
     [accounts, orgId]
   );
 
-  const liabilityAccounts = useMemo(() => 
+  const liabilityAccounts = useMemo(() =>
     accounts.filter(a => a.orgId === orgId && a.class === AccountClass.LIABILITY && !a.isHeader),
     [accounts, orgId]
   );
 
   // Get current open period
-  const currentPeriod = useMemo(() => 
+  const currentPeriod = useMemo(() =>
     orgPeriods.find(p => p.status === 'OPEN'),
     [orgPeriods]
   );
@@ -112,7 +112,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
     const currentYear = new Date().getFullYear();
     years.add(currentYear);
     years.add(currentYear + 1);
-    return Array.from(years).sort((a, b) => b - a);
+    return Array.from(years).sort((a: number, b: number) => b - a);
   }, [periods, orgId]);
 
   // Period statistics
@@ -217,13 +217,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle create period
   const handleCreatePeriod = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const existing = orgPeriods.find(p => 
-      p.fiscalYear === formData.fiscalYear && 
-      p.periodType === formData.periodType && 
+
+    const existing = orgPeriods.find(p =>
+      p.fiscalYear === formData.fiscalYear &&
+      p.periodType === formData.periodType &&
       p.periodNumber === formData.periodNumber
     );
-    
+
     if (existing) {
       onNotify('error', 'This period already exists.');
       return;
@@ -255,7 +255,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle AP closing
   const handleCloseAP = () => {
     if (!selectedPeriod) return;
-    
+
     onUpdatePeriod(selectedPeriod.id, {
       apClosed: true,
       apClosedBy: currentUserId,
@@ -267,10 +267,10 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle period soft close
   const handleSoftClose = () => {
     if (!selectedPeriod) return;
-    
+
     const checklist = getClosingChecklist(selectedPeriod);
     const blockingItems = checklist.filter(c => !c.isComplete && !c.canClose);
-    
+
     if (blockingItems.length > 0) {
       onNotify('error', 'Cannot soft close. Please complete all required items.');
       return;
@@ -292,7 +292,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle hard close
   const handleHardClose = () => {
     if (!selectedPeriod) return;
-    
+
     if (selectedPeriod.status !== 'SOFT_CLOSE') {
       onNotify('error', 'Period must be soft closed first.');
       return;
@@ -311,7 +311,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle lock
   const handleLockPeriod = () => {
     if (!selectedPeriod) return;
-    
+
     if (selectedPeriod.status !== 'HARD_CLOSE') {
       onNotify('error', 'Period must be hard closed before locking.');
       return;
@@ -329,7 +329,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle reopen (only from SOFT_CLOSE or HARD_CLOSE, not LOCKED)
   const handleReopenPeriod = () => {
     if (!selectedPeriod) return;
-    
+
     if (selectedPeriod.status === 'LOCKED') {
       onNotify('error', 'Cannot reopen a locked period.');
       return;
@@ -348,15 +348,15 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   // Handle post accrual
   const handlePostAccrual = () => {
     if (!selectedPeriod || !onPostJournal) return;
-    
+
     if (!accrualData.accountId || !accrualData.amount) {
       onNotify('error', 'Please fill all required fields.');
       return;
     }
 
     const expenseAccount = accounts.find(a => a.id === accrualData.accountId);
-    const accrualAccount = liabilityAccounts.find(a => 
-      a.name.toLowerCase().includes('accrued') || 
+    const accrualAccount = liabilityAccounts.find(a =>
+      a.name.toLowerCase().includes('accrued') ||
       a.name.toLowerCase().includes('accrual')
     ) || liabilityAccounts[0];
 
@@ -369,6 +369,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
       {
         id: `jl-${Date.now()}-1`,
         journalEntryId: '',
+        orgId,
         accountId: accrualData.accountId,
         description: accrualData.description,
         debit: accrualData.amount,
@@ -377,6 +378,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
       {
         id: `jl-${Date.now()}-2`,
         journalEntryId: '',
+        orgId,
         accountId: accrualAccount.id,
         description: `Accrual: ${accrualData.description}`,
         debit: 0,
@@ -398,7 +400,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
 
     // If auto-reverse, create reversal for next period
     if (accrualData.autoReverse) {
-      const nextPeriod = orgPeriods.find(p => 
+      const nextPeriod = orgPeriods.find(p =>
         p.periodNumber === selectedPeriod.periodNumber + 1 ||
         (selectedPeriod.periodNumber === 12 && p.periodNumber === 1 && p.fiscalYear === selectedPeriod.fiscalYear + 1)
       );
@@ -408,6 +410,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           {
             id: `jl-${Date.now()}-3`,
             journalEntryId: '',
+            orgId,
             accountId: accrualAccount.id,
             description: `Reversal: ${accrualData.description}`,
             debit: accrualData.amount,
@@ -416,6 +419,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           {
             id: `jl-${Date.now()}-4`,
             journalEntryId: '',
+            orgId,
             accountId: accrualData.accountId,
             description: `Reversal: ${accrualData.description}`,
             debit: 0,
@@ -450,14 +454,14 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
   const handleGenerateYear = () => {
     const year = formData.fiscalYear;
     let created = 0;
-    
+
     for (let month = 1; month <= 12; month++) {
-      const existing = orgPeriods.find(p => 
-        p.fiscalYear === year && 
-        p.periodType === 'MONTHLY' && 
+      const existing = orgPeriods.find(p =>
+        p.fiscalYear === year &&
+        p.periodType === 'MONTHLY' &&
         p.periodNumber === month
       );
-      
+
       if (!existing) {
         const dates = generatePeriodDates(year, 'MONTHLY', month);
         const newPeriod: AccountingPeriod = {
@@ -479,7 +483,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
         created++;
       }
     }
-    
+
     onNotify('success', `Created ${created} periods for ${year}.`);
     setShowCreateModal(false);
   };
@@ -509,7 +513,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               ))}
             </select>
           </div>
-          <button 
+          <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-medium text-sm"
           >
@@ -554,13 +558,12 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             const stats = getPeriodStats(period);
             const statusConfig = STATUS_CONFIG[period.status];
             const StatusIcon = statusConfig.icon;
-            
+
             return (
-              <div 
+              <div
                 key={period.id}
-                className={`bg-white rounded border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
-                  selectedPeriod?.id === period.id ? 'ring-2 ring-orange-400' : ''
-                }`}
+                className={`bg-white rounded border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${selectedPeriod?.id === period.id ? 'ring-2 ring-orange-400' : ''
+                  }`}
                 onClick={() => setSelectedPeriod(period)}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -570,11 +573,11 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                     {statusConfig.label}
                   </span>
                 </div>
-                
+
                 <p className="text-xs text-gray-400 mb-3">
                   {period.startDate} — {period.endDate}
                 </p>
-                
+
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-gray-50 rounded-lg p-2">
                     <p className="text-gray-400 font-medium">Invoices</p>
@@ -611,7 +614,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           })
         ) : (
           <div className="col-span-full py-16">
-            <EmptyState 
+            <EmptyState
               icon={<CalendarDays className="text-gray-300" size={48} />}
               title="No periods for this year"
               description="Create accounting periods to track and close your financial activities."
@@ -639,10 +642,10 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             <form onSubmit={handleCreatePeriod} className="p-6 space-y-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fiscal Year</label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                   value={formData.fiscalYear}
-                  onChange={e => setFormData({...formData, fiscalYear: Number(e.target.value)})}
+                  onChange={e => setFormData({ ...formData, fiscalYear: Number(e.target.value) })}
                 >
                   {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => (
                     <option key={y} value={y}>{y}</option>
@@ -657,12 +660,11 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setFormData({...formData, periodType: type, periodNumber: type === 'ANNUAL' ? 1 : formData.periodNumber})}
-                      className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${
-                        formData.periodType === type
-                          ? 'bg-[#F47721] text-white border-orange-500'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
-                      }`}
+                      onClick={() => setFormData({ ...formData, periodType: type, periodNumber: type === 'ANNUAL' ? 1 : formData.periodNumber })}
+                      className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${formData.periodType === type
+                        ? 'bg-[#F47721] text-white border-orange-500'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                        }`}
                     >
                       {type}
                     </button>
@@ -673,10 +675,10 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               {formData.periodType === 'MONTHLY' && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Month</label>
-                  <select 
+                  <select
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.periodNumber}
-                    onChange={e => setFormData({...formData, periodNumber: Number(e.target.value)})}
+                    onChange={e => setFormData({ ...formData, periodNumber: Number(e.target.value) })}
                   >
                     {MONTHS.map((m, i) => (
                       <option key={i} value={i + 1}>{m}</option>
@@ -688,10 +690,10 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               {formData.periodType === 'QUARTERLY' && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quarter</label>
-                  <select 
+                  <select
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                     value={formData.periodNumber}
-                    onChange={e => setFormData({...formData, periodNumber: Number(e.target.value)})}
+                    onChange={e => setFormData({ ...formData, periodNumber: Number(e.target.value) })}
                   >
                     <option value={1}>Q1 (Jan-Mar)</option>
                     <option value={2}>Q2 (Apr-Jun)</option>
@@ -702,22 +704,22 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               )}
 
               <div className="flex gap-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setShowCreateModal(false)} 
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={handleGenerateYear}
                   className="flex-1 py-3 border-2 border-orange-500 text-[#F47721] rounded text-sm font-bold hover:bg-orange-50 transition-colors"
                 >
                   Generate Year
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100"
                 >
                   Create
@@ -796,7 +798,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                     </button>
                   </>
                 )}
-                
+
                 {selectedPeriod.status === 'SOFT_CLOSE' && (
                   <>
                     <button
@@ -866,10 +868,10 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             <div className="p-6 space-y-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Expense Account *</label>
-                <select 
+                <select
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-medium"
                   value={accrualData.accountId}
-                  onChange={e => setAccrualData({...accrualData, accountId: e.target.value})}
+                  onChange={e => setAccrualData({ ...accrualData, accountId: e.target.value })}
                 >
                   <option value="">Select Expense Account...</option>
                   {expenseAccounts.map(a => (
@@ -880,33 +882,33 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount *</label>
-                <input 
+                <input
                   type="number"
                   step="0.01"
                   min="0"
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
                   value={accrualData.amount || ''}
-                  onChange={e => setAccrualData({...accrualData, amount: parseFloat(e.target.value) || 0})}
+                  onChange={e => setAccrualData({ ...accrualData, amount: parseFloat(e.target.value) || 0 })}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description *</label>
-                <input 
+                <input
                   type="text"
                   placeholder="e.g., Accrued utilities expense"
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
                   value={accrualData.description}
-                  onChange={e => setAccrualData({...accrualData, description: e.target.value})}
+                  onChange={e => setAccrualData({ ...accrualData, description: e.target.value })}
                 />
               </div>
 
               <div className="flex items-center gap-3 p-3 bg-violet-50 rounded border border-violet-100">
-                <input 
+                <input
                   type="checkbox"
                   id="autoReverse"
                   checked={accrualData.autoReverse}
-                  onChange={e => setAccrualData({...accrualData, autoReverse: e.target.checked})}
+                  onChange={e => setAccrualData({ ...accrualData, autoReverse: e.target.checked })}
                   className="w-4 h-4 accent-violet-600"
                 />
                 <label htmlFor="autoReverse" className="text-sm text-violet-700">
@@ -916,13 +918,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button 
+                <button
                   onClick={() => setShowAccrualModal(false)}
                   className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handlePostAccrual}
                   className="flex-1 py-3 bg-violet-600 text-white rounded text-sm font-bold shadow-lg shadow-violet-100 flex items-center justify-center gap-2"
                 >
