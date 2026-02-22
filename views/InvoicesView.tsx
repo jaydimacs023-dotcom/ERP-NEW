@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry } from '../types';
 import { generateUUID } from '../utils/uuid';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
@@ -19,18 +19,23 @@ interface InvoicesViewProps {
   courseFees: CourseFee[];
   accounts: ChartOfAccount[];
   currency: string;
+  isVatRegistered?: boolean;
   onAddInvoice: (invoice: Invoice) => void;
   onUpdateInvoice: (invoice: Invoice) => void;
   onDeleteInvoice: (id: string) => Promise<boolean>;
   onPostInvoice?: (invoice: Invoice) => void;
   onVoidInvoice?: (id: string, reason: string) => void;
   onUpdateEnrollment?: (enrollment: Enrollment) => void; // For updating billing status after invoice generation
+  journalEntries?: JournalEntry[];
   onAddStudentLedgerEntry?: (entry: StudentLedger) => void; // For AR subsidiary ledger
+  onViewJournal?: (journalEntryId: string) => void;
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
-  invoices, sponsors, students, enrollments, batches, qualifications, courseFees, accounts, currency,
-  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry
+  invoices, sponsors, students, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
+  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
+  onViewJournal,
+  journalEntries = []
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -112,11 +117,25 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   // Calculate totals
-  const calculateTotals = (lines: InvoiceLine[], isSubjectToEwt: boolean, ewtRate: number) => {
-    const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
-    const vatAmount = lines.reduce((sum, line) => sum + (line.vatAmount || 0), 0);
+  const calculateTotals = (lines: InvoiceLine[], isSubjectToEwt: boolean, ewtRate: number, isVat: boolean = false) => {
+    let subtotal = 0;
+    let vatAmount = 0;
+
+    if (isVat) {
+      // For VAT-registered (inclusive), subtotal is the sum of (amount / 1.12)
+      // and total VAT is sum of (amount - subtotal)
+      lines.forEach(line => {
+        const lineNet = line.amount / 1.12;
+        subtotal += lineNet;
+        vatAmount += (line.amount - lineNet);
+      });
+    } else {
+      subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+      vatAmount = lines.reduce((sum, line) => sum + (line.vatAmount || 0), 0);
+    }
+
     const grandTotal = subtotal + vatAmount;
-    const totalEwtAmount = isSubjectToEwt ? grandTotal * ewtRate : 0;
+    const totalEwtAmount = isSubjectToEwt ? subtotal * ewtRate : 0;
     const netAmountDue = grandTotal - totalEwtAmount;
     return { subtotal, vatAmount, grandTotal, totalEwtAmount, netAmountDue, balanceDue: netAmountDue };
   };
@@ -250,7 +269,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       lines[index] = { ...lines[index], [field]: value };
       // Recalculate amount
       if (field === 'quantity' || field === 'unitPrice') {
-        lines[index].amount = lines[index].quantity * lines[index].unitPrice;
+        const qty = lines[index].quantity || 0;
+        const price = lines[index].unitPrice || 0;
+        lines[index].amount = qty * price;
+
+        // Auto-calculate VAT amount if sponsor is VAT
+        const sponsor = sponsors.find(s => s.id === prev.sponsorId);
+        if (sponsor?.taxType === 'VAT') {
+          lines[index].vatAmount = lines[index].amount - (lines[index].amount / 1.12);
+        } else {
+          lines[index].vatAmount = 0;
+        }
       }
       return { ...prev, lines };
     });
@@ -268,13 +297,25 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const handleApplyCourseFee = (index: number, courseFeeId: string) => {
     const fee = courseFees.find(f => f.id === courseFeeId);
     if (fee) {
-      handleUpdateLine(index, 'courseFeeId', courseFeeId);
-      handleUpdateLine(index, 'description', fee.feeName);
-      handleUpdateLine(index, 'unitPrice', fee.amount || 0);
-      handleUpdateLine(index, 'amount', (formData.lines[index].quantity || 1) * (fee.amount || 0));
-      if (fee.glAccountId) {
-        handleUpdateLine(index, 'glAccountId', fee.glAccountId);
-      }
+      const sponsor = sponsors.find(s => s.id === formData.sponsorId);
+      const isVat = sponsor?.taxType === 'VAT';
+      const qty = formData.lines[index].quantity || 1;
+      const unitPrice = fee.amount || 0;
+      const amount = qty * unitPrice;
+      const vatAmount = isVat ? amount - (amount / 1.12) : 0;
+
+      const updatedLines = [...formData.lines];
+      updatedLines[index] = {
+        ...updatedLines[index],
+        courseFeeId,
+        description: fee.feeName,
+        unitPrice,
+        amount,
+        vatAmount,
+        glAccountId: fee.glAccountId || updatedLines[index].glAccountId
+      };
+
+      setFormData(prev => ({ ...prev, lines: updatedLines }));
     }
   };
 
@@ -289,7 +330,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       return;
     }
 
-    const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate);
+    const sponsor = sponsors.find(s => s.id === formData.sponsorId);
+    const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
 
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
@@ -317,6 +359,59 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
+    };
+
+    if (editingInvoice) {
+      onUpdateInvoice(invoice);
+    } else {
+      onAddInvoice(invoice);
+    }
+
+    setShowModal(false);
+    resetForm();
+  };
+
+  // Approve invoice
+  const handleApprove = () => {
+    if (!formData.sponsorId && !formData.studentId) {
+      alert('Please select a sponsor or student.');
+      return;
+    }
+    if (formData.lines.length === 0) {
+      alert('Please add at least one line item.');
+      return;
+    }
+
+    const sponsor = sponsors.find(s => s.id === formData.sponsorId);
+    const totals = calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
+
+    const invoice: Invoice = {
+      id: editingInvoice?.id || generateUUID(),
+      orgId: editingInvoice?.orgId || '',
+      invoiceNo: formData.invoiceNo,
+      sponsorId: formData.sponsorId || undefined,
+      studentId: formData.studentId || undefined,
+      enrollmentId: formData.enrollmentId || undefined,
+      batchId: formData.batchId || undefined,
+      invoiceDate: formData.invoiceDate,
+      dueDate: formData.dueDate,
+      status: 'OPEN',
+      subtotal: totals.subtotal,
+      vatAmount: totals.vatAmount,
+      grandTotal: totals.grandTotal,
+      totalEwtAmount: totals.totalEwtAmount,
+      netAmountDue: totals.netAmountDue,
+      amountPaid: editingInvoice?.amountPaid || 0,
+      balanceDue: totals.netAmountDue - (editingInvoice?.amountPaid || 0),
+      ewtRate: formData.isSubjectToEwt ? formData.ewtRate : undefined,
+      isSubjectToEwt: formData.isSubjectToEwt,
+      reference: formData.reference || undefined,
+      terms: formData.terms || undefined,
+      notes: formData.notes || undefined,
+      lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
+      createdAt: editingInvoice?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      postedAt: new Date().toISOString()
     };
 
     if (editingInvoice) {
@@ -421,7 +516,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const getStatusBadge = (status: InvoiceStatus) => {
     switch (status) {
       case 'DRAFT': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 flex items-center gap-1"><Clock size={12} />Draft</span>;
-      case 'OPEN': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600 flex items-center gap-1"><Send size={12} />Open</span>;
+      case 'OPEN': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600 flex items-center gap-1"><CheckCircle size={12} />Open</span>;
       case 'CLOSED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600 flex items-center gap-1"><CheckCircle size={12} />Closed</span>;
       case 'VOIDED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-rose-100 text-rose-600 flex items-center gap-1"><XCircle size={12} />Voided</span>;
     }
@@ -440,10 +535,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     [accounts]
   );
 
-  const formTotals = useMemo(() =>
-    calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate),
-    [formData.lines, formData.isSubjectToEwt, formData.ewtRate]
-  );
+  const formTotals = useMemo(() => {
+    const sponsor = sponsors.find(s => s.id === formData.sponsorId);
+    return calculateTotals(formData.lines, formData.isSubjectToEwt, formData.ewtRate, sponsor?.taxType === 'VAT');
+  }, [formData.lines, formData.isSubjectToEwt, formData.ewtRate, formData.sponsorId, sponsors]);
 
   // ============================================
   // GENERATE FROM ENROLLMENTS LOGIC
@@ -534,7 +629,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
       subtotal += amount;
       if (isEwtSubject) {
-        totalEwtBase += amount + vatAmount;
+        totalEwtBase += amount;
       }
     });
 
@@ -782,6 +877,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GL Ref</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sponsor/Student</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -805,15 +901,33 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 <React.Fragment key={inv.id}>
                   <tr
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => toggleRow(inv.id)}
-                    onDoubleClick={() => handleEdit(inv)}
-                    title="Double-click to edit"
+                    onClick={() => handleEdit(inv)}
+                    title="Click to edit"
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {expandedRows.has(inv.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {inv.journalEntryId ? (
+                        (() => {
+                          const je = journalEntries.find(j => j.id === inv.journalEntryId);
+                          const glNum = je?.glEntryNumber || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`;
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                              title={`GL Journal Entry: ${glNum}`}
+                            >
+                              <Receipt size={10} />
+                              {glNum}
+                            </span>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{inv.invoiceDate}</td>
                     <td className="px-4 py-3">
@@ -897,9 +1011,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
-              <h3 className="text-lg font-bold text-gray-800">
-                {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
-              </h3>
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">
+                  {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+                </h3>
+                {formData.invoiceNo && (
+                  <p className="text-xs font-medium text-gray-500 mt-0.5">
+                    Invoice No: <span className="text-gray-900">{formData.invoiceNo}</span>
+                  </p>
+                )}
+              </div>
               <button onClick={() => { setShowModal(false); resetForm(); }} className="p-1 hover:bg-gray-200 rounded">
                 <X size={20} />
               </button>
@@ -951,15 +1072,29 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
 
               {/* Bill To */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-gray-500">Invoice No</label>
-                  <input
-                    type="text"
-                    value={formData.invoiceNo}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 font-medium"
-                    readOnly
-                  />
+                  <label className="text-xs font-medium text-gray-500">GL Reference</label>
+                  <div className="mt-1">
+                    {editingInvoice?.journalEntryId ? (
+                      (() => {
+                        const je = journalEntries.find(j => j.id === editingInvoice.journalEntryId);
+                        const glNum = je?.glEntryNumber || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`;
+                        return (
+                          <button
+                            onClick={() => onViewJournal && onViewJournal(editingInvoice.journalEntryId!)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-mono font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors w-full justify-center"
+                            title="Click to view GL Accounting Entries"
+                          >
+                            <Receipt size={14} />
+                            {glNum}
+                          </button>
+                        );
+                      })()
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-gray-400 bg-gray-50 border rounded-lg text-center">—</div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Sponsor</label>
@@ -983,6 +1118,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     placeholder="External ref"
                     className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Terms</label>
+                  <select
+                    value={formData.terms}
+                    onChange={e => setFormData({ ...formData, terms: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="COD">COD</option>
+                    <option value="Net 7">Net 7</option>
+                    <option value="Net 15">Net 15</option>
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 60">Net 60</option>
+                  </select>
                 </div>
               </div>
 
@@ -1179,12 +1328,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg"
-                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 <Save size={18} />
-                {editingInvoice ? 'Update Invoice' : 'Save as Draft'}
+                {editingInvoice ? 'Update Changes' : 'Save as Draft'}
               </button>
+              {(formData.status === 'DRAFT' || !editingInvoice) && (
+                <button
+                  onClick={handleApprove}
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: '#10B981' }}
+                >
+                  <CheckCircle size={18} />
+                  {editingInvoice ? 'Approve Invoice' : 'Approve & Save'}
+                </button>
+              )}
             </div>
           </div>
         </div>

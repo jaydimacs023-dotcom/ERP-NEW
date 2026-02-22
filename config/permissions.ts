@@ -47,6 +47,7 @@ export type ModuleTab =
   | 'ar'
   | 'invoices'
   | 'payments'
+  | 'bank-deposits'
   | 'customers'
   | 'credit-debit-memo'
   | 'write-off'
@@ -124,7 +125,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // ADMIN: Full organization access (no system admin modules)
   ADMIN: [
     'dashboard', 'ledger', 'reports', 'banking', 'checks',
-    'ar', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -146,7 +147,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // FINANCE_MANAGER: All finance modules
   FINANCE_MANAGER: [
     'dashboard', 'ledger', 'reports', 'banking', 'checks',
-    'ar', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -157,7 +158,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // ACCOUNTANT: General Ledger, Reporting, Journal Entries
   ACCOUNTANT: [
     'dashboard', 'ledger', 'reports', 'banking',
-    'ar', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -350,7 +351,7 @@ export function getDefaultTab(role: UserRole | string | undefined): ModuleTab {
     case 'TRAINER':
       return 'trainer-portal';
     case 'AR_SPECIALIST':
-      return 'ar';
+      return 'dashboard';
     case 'AP_SPECIALIST':
     case 'AP_CLERK':
     case 'AP_SUPERVISOR':

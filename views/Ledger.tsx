@@ -1,8 +1,8 @@
 ﻿
 import React, { useState } from 'react';
-import { 
-  ChartOfAccount, JournalEntry, JournalLine, Student, 
-  Trainer, Sponsor, Batch, NonStockItem 
+import {
+  ChartOfAccount, JournalEntry, JournalLine, Student,
+  Trainer, Sponsor, Batch, NonStockItem
 } from '../types';
 import { Search, Filter, RotateCcw, BookText, Plus, Database, ArrowRight } from 'lucide-react';
 import JournalForm from '../components/JournalForm';
@@ -20,17 +20,19 @@ interface LedgerProps {
   onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onApproveJournal?: (entryId: string) => void;
   onReverseJournal?: (entryId: string) => void;
+  initialSearchTerm?: string;
 }
 
-const Ledger: React.FC<LedgerProps> = ({ 
-  accounts, entries, lines, students, sponsors, trainers, batches, items, 
-  currentUser, onPostEntry, onApproveJournal, onReverseJournal 
+const Ledger: React.FC<LedgerProps> = ({
+  accounts, entries, lines, students, sponsors, trainers, batches, items,
+  currentUser, onPostEntry, onApproveJournal, onReverseJournal,
+  initialSearchTerm = ''
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [showEntryForm, setShowEntryForm] = useState(false);
 
-  const filteredEntries = entries.filter(e => 
-    e.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredEntries = entries.filter(e =>
+    e.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (e.glEntryNumber && e.glEntryNumber.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -45,15 +47,15 @@ const Ledger: React.FC<LedgerProps> = ({
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Filter by ref or memo..." 
+            <input
+              type="text"
+              placeholder="Filter by ref or memo..."
               className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded outline-none focus:ring-2 focus:ring-orange-400/20 transition-all font-bold text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button 
+          <button
             onClick={() => setShowEntryForm(true)}
             className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-200 hover:bg-[#E06610] transition-all active:scale-95 shrink-0"
           >
@@ -93,8 +95,8 @@ const Ledger: React.FC<LedgerProps> = ({
                     <td className="px-8 py-6 align-top">
                       <div className="text-sm font-bold text-gray-800 line-clamp-1">{entry.description}</div>
                       <div className="text-xs text-gray-400 font-semibold uppercase mt-1.5 flex items-center gap-1.5">
-                         <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
-                         {entry.sourceType}
+                        <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                        {entry.sourceType}
                       </div>
                     </td>
                     <td className="px-8 py-6">
@@ -128,11 +130,10 @@ const Ledger: React.FC<LedgerProps> = ({
                     </td>
                     <td className="px-8 py-6 text-center align-top">
                       <div className="flex flex-col items-center gap-2">
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded uppercase border tracking-wide ${
-                          entry.status === 'POSTED' ? 'bg-orange-50 text-[#F47721] border-orange-100' : 
-                          entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                          'bg-amber-50 text-[#F47721] border-amber-100 animate-pulse'
-                        }`}>
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded uppercase border tracking-wide ${entry.status === 'POSTED' ? 'bg-orange-50 text-[#F47721] border-orange-100' :
+                            entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                              'bg-amber-50 text-[#F47721] border-amber-100 animate-pulse'
+                          }`}>
                           {entry.status || 'DRAFT'}
                         </span>
                         {entry.status === 'DRAFT' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
@@ -144,7 +145,7 @@ const Ledger: React.FC<LedgerProps> = ({
                           </button>
                         )}
                         {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (
-                          <button 
+                          <button
                             onClick={() => onReverseJournal?.(entry.id)}
                             className="p-1.5 text-gray-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
                             title="Post Reversal"
@@ -164,22 +165,22 @@ const Ledger: React.FC<LedgerProps> = ({
         {filteredEntries.length === 0 && (
           <div className="py-16 text-center bg-gray-50">
             <div className="p-6 bg-white rounded shadow-sm inline-block mb-6 border border-gray-100">
-               <BookText size={48} className="text-gray-200" />
+              <BookText size={48} className="text-gray-200" />
             </div>
             <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">No Journal Records</h3>
             <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto italic font-medium">The ledger is currently empty. Direct manual entries or system-generated receipts will appear here once posted.</p>
-            <button 
+            <button
               onClick={() => setShowEntryForm(true)}
               className="mt-8 px-8 py-3 bg-gray-800 text-white rounded text-xs font-semibold uppercase tracking-wide shadow-md active:scale-95 transition-all"
             >
-               Create First Entry
+              Create First Entry
             </button>
           </div>
         )}
       </div>
 
       {showEntryForm && (
-        <JournalForm 
+        <JournalForm
           accounts={accounts}
           students={students}
           trainers={trainers}

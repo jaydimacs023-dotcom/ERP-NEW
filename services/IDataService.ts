@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport, Enrollment
+  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -76,6 +76,8 @@ export interface InitialData {
   courseFees: CourseFee[];
   enrollments: Enrollment[];
   alumniReports: AlumniEmploymentReport[];
+  invoices: Invoice[];
+  invoiceLines: InvoiceLine[];
 }
 
 export interface IDataService {
@@ -155,8 +157,22 @@ export interface IDataService {
   createRecurringInvoice(invoice: RecurringInvoice): Promise<RecurringInvoice>;
   updateRecurringInvoice(id: string, updates: Partial<RecurringInvoice>): Promise<RecurringInvoice>;
   deleteRecurringInvoice(id: string): Promise<void>;
-  getRecurringInvoicesByOrg(orgId: string): Promise<RecurringInvoice[]>;
   getRecurringInvoiceById(id: string): Promise<RecurringInvoice | null>;
+
+  // Invoice CRUD
+  createInvoice(invoice: Invoice): Promise<Invoice>;
+  updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice>;
+  deleteInvoice(id: string): Promise<void>;
+  getInvoicesByOrg(orgId: string): Promise<Invoice[]>;
+  getInvoiceById(id: string): Promise<Invoice | null>;
+  voidInvoice(id: string, voidedBy: string, reason: string): Promise<void>;
+
+  // Invoice Line CRUD
+  createInvoiceLine(line: InvoiceLine): Promise<InvoiceLine>;
+  updateInvoiceLine(id: string, updates: Partial<InvoiceLine>): Promise<InvoiceLine>;
+  deleteInvoiceLine(id: string): Promise<void>;
+  getInvoiceLinesByInvoice(invoiceId: string): Promise<InvoiceLine[]>;
+  createInvoiceLines(lines: InvoiceLine[]): Promise<InvoiceLine[]>;
 
   // Fixed Asset CRUD
   createFixedAsset(asset: FixedAsset): Promise<FixedAsset>;

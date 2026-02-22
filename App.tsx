@@ -89,6 +89,7 @@ export default function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [ledgerSearchTerm, setLedgerSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Navigation section state
@@ -413,6 +414,7 @@ export default function App() {
         setReorderPoints(data.reorderPoints || []);
         setEnrollments(data.enrollments || []);
         setAlumniReports(data.alumniReports || []);
+        setInvoices(data.invoices || []);
 
         // Load Course Fees
         setCourseFees(data.courseFees || []);
@@ -556,7 +558,7 @@ export default function App() {
     setActiveTab(getDefaultTab(user.role));
   };
 
-  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
+  const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const fullEntry = {
       ...entry,
       id: entry.id || `je-${Date.now()}`,
@@ -593,6 +595,8 @@ export default function App() {
         savedEntry.id,
         `Posted ${savedEntry.sourceType}: ${savedEntry.description} (${savedLines.length} lines)`
       );
+
+      return savedEntry;
     } catch (error) {
       console.error('[App] Error posting journal entry:', error);
       // Fallback to memory storage
@@ -608,6 +612,7 @@ export default function App() {
         fullEntry.id,
         `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
       );
+      return fullEntry;
     }
   };
 
@@ -636,12 +641,25 @@ export default function App() {
         'JOURNAL_ENTRY',
         entryId,
         entryId,
-        `Approved and posted draft journal: ${entry.reference} `
+        `Approved and posted draft journal: ${entry.reference}`
       );
     } catch (error) {
       console.error('[App] Error approving journal entry:', error);
       handleNotify('error', 'Failed to approve journal entry');
     }
+  };
+
+  const handleViewJournal = (journalEntryId: string) => {
+    const entry = journalEntries.find(e => e.id === journalEntryId);
+    if (entry) {
+      setLedgerSearchTerm(entry.glEntryNumber || entry.reference);
+      setActiveTab('ledger');
+    }
+  };
+
+  const navigateTo = (tab: string) => {
+    setActiveTab(tab);
+    setLedgerSearchTerm('');
   };
 
   const handleConvertToBill = (po: PurchaseOrder) => {
@@ -2223,7 +2241,9 @@ export default function App() {
     'GOODS_RECEIPT': 'goods_receipts',
     'EFT_BATCH': 'eft_batches',
     'ORGANIZATION': 'organizations',
-    'USER': 'users'
+    'USER': 'users',
+    'INVOICE': 'invoices',
+    'INVOICE_LINE': 'invoice_lines'
   };
 
   const updateState = (type: string, id: string, updates: any) => {
@@ -2256,6 +2276,7 @@ export default function App() {
       case 'EFT_BATCH': setEftBatches(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'USER': setUsers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'INVOICE': setInvoices(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
     }
   };
 
@@ -2289,6 +2310,7 @@ export default function App() {
       case 'EFT_BATCH': setEftBatches(prev => prev.filter(x => x.id !== id)); break;
       case 'ORGANIZATION': setOrganizations(prev => prev.filter(x => x.id !== id)); break;
       case 'USER': setUsers(prev => prev.filter(x => x.id !== id)); break;
+      case 'INVOICE': setInvoices(prev => prev.filter(x => x.id !== id)); break;
     }
   };
 
@@ -2531,9 +2553,10 @@ export default function App() {
     try {
       console.info('[App] Creating invoice:', invoice.invoiceNo);
       const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
-      setInvoices(prev => [...prev, invoiceWithOrg]);
+      const saved = await dataService.createInvoice(invoiceWithOrg);
+      setInvoices(prev => [...prev, saved]);
 
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoiceWithOrg.id, invoice.invoiceNo);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', saved.id, invoice.invoiceNo);
       handleNotify('success', `Invoice ${invoice.invoiceNo} created successfully`);
     } catch (error) {
       console.error('[App] Error creating invoice:', error);
@@ -2545,21 +2568,195 @@ export default function App() {
     try {
       console.info('[App] Updating invoice:', invoice.id);
       const existing = invoices.find(i => i.id === invoice.id);
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...invoice, updatedAt: new Date().toISOString() } : i));
+
+      // ── Accounting Posting: trigger when status transitions to OPEN ──────────
+      if (invoice.status === 'OPEN' && existing?.status !== 'OPEN' && !existing?.journalEntryId) {
+        const now = new Date().toISOString();
+        const jeId = crypto.randomUUID();
+
+        // ── Generate sequential GL reference number (GL00000001, GL00000002, …) ──
+        const existingGlNumbers = journalEntries
+          .map(je => je.glEntryNumber)
+          .filter((n): n is string => !!n && n.startsWith('GL'))
+          .map(n => parseInt(n.replace('GL', ''), 10))
+          .filter(n => !isNaN(n));
+        const nextSeq = existingGlNumbers.length > 0 ? Math.max(...existingGlNumbers) + 1 : 1;
+        const glRef = `GL${String(nextSeq).padStart(8, '0')}`;
+
+        // ── Find GL accounts ───────────────────────────────────────────────────
+        // AR Account: prefer sponsor's arAccountId, else first account with code 1200 or named "receivable"
+        const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
+        const arAccountId =
+          (sponsor as any)?.arAccountId ||
+          filteredAccounts.find(a => a.code === '1200')?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('receivable'))?.id;
+
+        const vatPayableId =
+          filteredAccounts.find(a => a.code === '2200')?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id;
+
+        // EWT: Deferred Tax Asset or similar – code 1600 or "withholding"
+        const ewtAssetId =
+          filteredAccounts.find(a => a.code === '1600')?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('ewt'))?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('withholding'))?.id;
+
+        if (!arAccountId) {
+          handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found. Please set up your Chart of Accounts.');
+        } else {
+          // ── Build journal lines ─────────────────────────────────────────────
+          const jLines: JournalLine[] = [];
+
+          // 1. Debit AR for the full grand total
+          jLines.push({
+            id: `${jeId}-ar`,
+            journalEntryId: jeId,
+            accountId: arAccountId,
+            debit: invoice.grandTotal,
+            credit: 0,
+            description: `AR: ${glRef}`,
+            contactId: invoice.sponsorId || invoice.studentId || undefined,
+            contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+          } as JournalLine);
+
+          // 2. Credit Revenue for each invoice line
+          const invoiceLines = invoice.lines || [];
+          invoiceLines.forEach((line, idx) => {
+            // Fallback revenue account: code 4000 or named "revenue/income"
+            const revenueAccountId =
+              line.glAccountId ||
+              filteredAccounts.find(a => a.code === '4000')?.id ||
+              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tuition'))?.id ||
+              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
+              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
+
+            if (revenueAccountId && line.amount > 0) {
+              jLines.push({
+                id: `${jeId}-rev-${idx}`,
+                journalEntryId: jeId,
+                accountId: revenueAccountId,
+                debit: 0,
+                credit: line.amount,
+                description: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
+                contactId: invoice.sponsorId || invoice.studentId || undefined,
+                contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+              } as JournalLine);
+            }
+          });
+
+          // 3. Credit VAT Payable
+          if (invoice.vatAmount > 0 && vatPayableId) {
+            jLines.push({
+              id: `${jeId}-vat`,
+              journalEntryId: jeId,
+              accountId: vatPayableId,
+              debit: 0,
+              credit: invoice.vatAmount,
+              description: `Output VAT: ${glRef}`,
+            } as JournalLine);
+          }
+
+          // 4. Debit EWT Receivable (reduces net amount due from payor)
+          if (invoice.isSubjectToEwt && invoice.totalEwtAmount > 0 && ewtAssetId) {
+            jLines.push({
+              id: `${jeId}-ewt`,
+              journalEntryId: jeId,
+              accountId: ewtAssetId,
+              debit: invoice.totalEwtAmount,
+              credit: 0,
+              description: `EWT Receivable: ${glRef}`,
+            } as JournalLine);
+          }
+
+          // ── Post the journal entry ──────────────────────────────────────────
+          const jeEntry: Partial<JournalEntry> = {
+            id: jeId,
+            orgId: currentOrgId,
+            date: invoice.invoiceDate,
+            reference: glRef,
+            glEntryNumber: glRef,
+            description: `Sales Invoice: ${invoice.invoiceNo}`,
+            sourceType: 'INVOICE',
+            sourceRef: invoice.id,
+            status: 'POSTED',
+            createdBy: currentUser?.id || 'system',
+            createdAt: now,
+          };
+
+          const savedJournalEntry = await handlePostJournal(jeEntry, jLines);
+
+          // ── Link journal entry back to invoice (use real DB-assigned UUID) ──
+          const realJeId = savedJournalEntry?.id || jeId;
+          invoice = { ...invoice, journalEntryId: realJeId };
+
+          // ── Subsidiary Ledger entries ───────────────────────────────────────
+          // Walk-in student invoice → debit student ledger
+          if (invoice.studentId && !invoice.sponsorId) {
+            setStudentLedger(prev => [...prev, {
+              id: `sl-${jeId}`,
+              orgId: currentOrgId,
+              studentId: invoice.studentId!,
+              invoiceId: invoice.id,
+              date: invoice.invoiceDate,
+              description: `Sales Invoice ${invoice.invoiceNo} – ${glRef}`,
+              debit: invoice.netAmountDue,
+              credit: 0,
+              balance: invoice.netAmountDue,
+              createdAt: now,
+            } as StudentLedger]);
+          }
+
+          // Sponsor invoice → distribute across enrolled students in the batch
+          if (invoice.sponsorId) {
+            const covered = enrollments.filter(e =>
+              e.sponsorId === invoice.sponsorId &&
+              (!invoice.batchId || e.batchId === invoice.batchId) &&
+              !e.isDeleted
+            );
+            const perStudent = covered.length > 0 ? invoice.netAmountDue / covered.length : 0;
+            const sponsorName = sponsors.find(s => s.id === invoice.sponsorId)?.name || 'Sponsor';
+            const newEntries: StudentLedger[] = covered.map((e, idx) => ({
+              id: `sl-${jeId}-${idx}`,
+              orgId: currentOrgId,
+              studentId: e.studentId!,
+              invoiceId: invoice.id,
+              date: invoice.invoiceDate,
+              description: `Sponsor-billed (${sponsorName}): Invoice ${invoice.invoiceNo} – ${glRef}`,
+              debit: 0,
+              credit: perStudent,
+              balance: 0,
+              sponsorId: invoice.sponsorId,
+              createdAt: now,
+            } as StudentLedger));
+            setStudentLedger(prev => [...prev, ...newEntries]);
+          }
+
+          handleNotify('success', `Invoice ${invoice.invoiceNo} approved and posted to GL as ${glRef}`);
+        }
+      }
+
+      // ── Persist the invoice update ──────────────────────────────────────────
+      const updated = await dataService.updateInvoice(invoice.id, invoice);
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...updated, journalEntryId: invoice.journalEntryId, updatedAt: new Date().toISOString() } : i));
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoice.id, invoice.invoiceNo, existing, invoice);
-      handleNotify('success', `Invoice ${invoice.invoiceNo} updated successfully`);
+      if (invoice.status !== 'OPEN' || existing?.status === 'OPEN') {
+        handleNotify('success', `Invoice ${invoice.invoiceNo} updated successfully`);
+      }
     } catch (error) {
       console.error('[App] Error updating invoice:', error);
       handleNotify('error', 'Failed to update invoice.');
     }
   };
 
+
   const handleDeleteInvoice = async (id: string): Promise<boolean> => {
     try {
       console.info('[App] Deleting invoice:', id);
       const existing = invoices.find(i => i.id === id);
-      setInvoices(prev => prev.map(i => i.id === id ? { ...i, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : i));
+      await dataService.deleteInvoice(id);
+      setInvoices(prev => prev.filter(i => i.id !== id));
 
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', id, existing?.invoiceNo);
       handleNotify('success', 'Invoice deleted successfully');
@@ -2629,7 +2826,9 @@ export default function App() {
         }
       }
 
-      // 4. Mark invoice as voided
+      // 4. Mark invoice as voided in database
+      await dataService.voidInvoice(id, currentUser?.id || 'system', reason);
+
       const voidedInvoice = {
         ...invoice,
         status: 'VOIDED' as const,
@@ -3341,17 +3540,24 @@ export default function App() {
           {currentUser.role === 'AR_SPECIALIST' && (
             <div className="mb-8">
               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">AR Role Modules</p>}
-              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Users size={18} />} label="Customer Master List" active={activeTab === 'customers'} onClick={() => setActiveTab('customers')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Wallet size={18} />} label="Payments and Application" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Receipt size={18} />} label="Credit and Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => setActiveTab('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Zap size={18} />} label="Write Off / Adjustments" active={activeTab === 'write-off'} onClick={() => setActiveTab('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => setActiveTab('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<FileText size={18} />} label="Statement of Account" active={activeTab === 'soa'} onClick={() => setActiveTab('soa')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => setActiveTab('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Handshake size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => setActiveTab('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Users size={18} />} label="Customer Master List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wallet size={18} />} label="Payments and Application" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Receipt size={18} />} label="Credit and Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Zap size={18} />} label="Write Off / Adjustments" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<FileText size={18} />} label="Statement of Account" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Handshake size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
+
+          {currentUser.role === 'TRAINER' && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
+              <NavItem icon={<LayoutDashboard size={20} />} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => navigateTo('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
 
@@ -3362,23 +3568,24 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => setActiveTab('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Landmark size={18} />} label="Cash Management" active={activeTab === 'banking'} onClick={() => setActiveTab('banking')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Printer size={18} />} label="Check Printing" active={activeTab === 'checks'} onClick={() => setActiveTab('checks')} compact={!sidebarOpen} brandColor={brandColor} />
-              {isAR && <NavItem icon={<Receipt size={18} />} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => setActiveTab('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => setActiveTab('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => setActiveTab('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => setActiveTab('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAR && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => setActiveTab('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAP && <NavItem icon={<CreditCard size={18} />} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => setActiveTab('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAP && <NavItem icon={<ShoppingCart size={18} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => setActiveTab('po')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {isAP && <NavItem icon={<Package size={18} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => setActiveTab('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
-              <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => setActiveTab('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Calculator size={18} />} label="Budgets" active={activeTab === 'budgets'} onClick={() => setActiveTab('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Landmark size={18} />} label="Cash Management" active={activeTab === 'banking'} onClick={() => navigateTo('banking')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Printer size={18} />} label="Check Printing" active={activeTab === 'checks'} onClick={() => navigateTo('checks')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('ar') && <NavItem icon={<Receipt size={18} />} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => navigateTo('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('revenue-recognition') && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => navigateTo('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('customers') && <NavItem icon={<Users size={18} />} label="Learners & Customers" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('invoices') && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('enrollments') && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => navigateTo('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('po') && <NavItem icon={<ShoppingCart size={18} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => navigateTo('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('goods-receipt') && <NavItem icon={<Package size={18} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => navigateTo('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
+              <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => navigateTo('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Calculator size={18} />} label="Budgets" active={activeTab === 'budgets'} onClick={() => navigateTo('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -3389,13 +3596,13 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<Users size={20} />} label="Learners" active={activeTab === 'students'} onClick={() => setActiveTab('students')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => setActiveTab('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => setActiveTab('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Layers size={20} />} label="Training Batches" active={activeTab === 'batches'} onClick={() => setActiveTab('batches')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => setActiveTab('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<UserCheck size={20} />} label="Alumni Reports" active={activeTab === 'alumni-reports'} onClick={() => setActiveTab('alumni-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Users size={20} />} label="Learners" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => navigateTo('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => navigateTo('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Layers size={20} />} label="Training Batches" active={activeTab === 'batches'} onClick={() => navigateTo('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => navigateTo('locations')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => navigateTo('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<UserCheck size={20} />} label="Alumni Reports" active={activeTab === 'alumni-reports'} onClick={() => navigateTo('alumni-reports')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -3406,10 +3613,10 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => setActiveTab('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Truck size={20} />} label="Vendors" active={activeTab === 'vendors'} onClick={() => setActiveTab('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Tag size={20} />} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => setActiveTab('items')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Box size={20} />} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => navigateTo('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Truck size={20} />} label="Vendors" active={activeTab === 'vendors'} onClick={() => navigateTo('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Tag size={20} />} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => navigateTo('items')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Box size={20} />} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => navigateTo('assets')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -3420,14 +3627,14 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<Package size={20} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<MapPin size={20} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => setActiveTab('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Box size={20} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => setActiveTab('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Layers size={20} />} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => setActiveTab('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<AlertCircle size={20} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => setActiveTab('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Zap size={20} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => setActiveTab('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<History size={20} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => setActiveTab('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<TrendingUp size={20} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => setActiveTab('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Package size={20} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => navigateTo('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<MapPin size={20} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => navigateTo('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Box size={20} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => navigateTo('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Layers size={20} />} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => navigateTo('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<AlertCircle size={20} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => navigateTo('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Zap size={20} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => navigateTo('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={20} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => navigateTo('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<TrendingUp size={20} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => navigateTo('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -3438,32 +3645,32 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<Users size={20} />} label="Employees" active={activeTab === 'employees'} onClick={() => setActiveTab('employees')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Settings size={20} />} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => setActiveTab('coa')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<CalendarCheck size={20} />} label="Period Closing" active={activeTab === 'periods'} onClick={() => setActiveTab('periods')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Palette size={20} />} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => setActiveTab('branding')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Users size={20} />} label="Employees" active={activeTab === 'employees'} onClick={() => navigateTo('employees')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Settings size={20} />} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => navigateTo('coa')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<CalendarCheck size={20} />} label="Period Closing" active={activeTab === 'periods'} onClick={() => navigateTo('periods')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Palette size={20} />} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => navigateTo('branding')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <div className="relative">
-                <NavItem icon={<CreditCard size={20} />} label="Payment History" active={activeTab === 'payment-history'} onClick={() => setActiveTab('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<CreditCard size={20} />} label="Payment History" active={activeTab === 'payment-history'} onClick={() => navigateTo('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
                 {paymentsDueSoon.length > 0 && (
                   <div className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-black px-2 py-1 rounded-full">
                     {paymentsDueSoon.length}
                   </div>
                 )}
               </div>
-              <NavItem icon={<UserCog size={20} />} label="Security/RBAC" active={activeTab === 'users'} onClick={() => setActiveTab('users')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<UserCog size={20} />} label="Security/RBAC" active={activeTab === 'users'} onClick={() => navigateTo('users')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
           {isSysAdmin && (
             <div className="mb-8">
               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">System Administration</p>}
-              <NavItem icon={<Wrench size={20} />} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => setActiveTab('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<HardDrive size={20} />} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => setActiveTab('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Terminal size={20} />} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => setActiveTab('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => setActiveTab('schema')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => setActiveTab('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wrench size={20} />} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => navigateTo('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<HardDrive size={20} />} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => navigateTo('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Terminal size={20} />} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => navigateTo('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => navigateTo('schema')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => navigateTo('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
         </nav>
@@ -3557,7 +3764,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} />}
@@ -3619,12 +3826,15 @@ export default function App() {
             courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)}
             accounts={filteredAccounts}
             currency={currentOrg?.currency || 'PHP'}
+            isVatRegistered={currentOrg?.isVatRegistered || false}
             onAddInvoice={handleAddInvoice}
             onUpdateInvoice={handleUpdateInvoice}
             onDeleteInvoice={handleDeleteInvoice}
             onVoidInvoice={handleVoidInvoice}
             onUpdateEnrollment={handleUpdateEnrollment}
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
+            journalEntries={activeJournalEntries}
+            onViewJournal={handleViewJournal}
           />}
           {activeTab === 'payments' && <PaymentsView
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
@@ -3766,6 +3976,14 @@ export default function App() {
               qualifications={qualifications}
               accounts={accounts}
               brandColor={brandColor}
+              onAddSponsor={handleAddSponsor}
+              onUpdateSponsor={handleUpdateSponsor}
+              onDeleteSponsor={handleDeleteSponsor}
+              onAddStudent={handleAddStudent}
+              onUpdateStudent={handleUpdateStudent}
+              onDeleteStudent={handleDeleteStudent}
+              onBatchAddStudents={handleBatchAddStudents}
+              onNotify={handleNotify}
             />
           )}
 

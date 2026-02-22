@@ -143,6 +143,8 @@ export class SupabaseDataService implements IDataService {
         courseFees,
         alumniReports,
         enrollments,
+        invoices,
+        invoiceLines
       ] = await Promise.all([
         this.fetchFromSupabase('organizations'),
         this.fetchFromSupabase('users'),
@@ -183,6 +185,8 @@ export class SupabaseDataService implements IDataService {
         this.fetchFromSupabase('course_fees'),
         this.fetchFromSupabase('alumni_employment_reports'),
         this.fetchFromSupabase('enrollments'),
+        this.fetchFromSupabase('invoices'),
+        this.fetchFromSupabase('invoice_lines'),
       ]);
 
       // Log data status
@@ -195,6 +199,15 @@ export class SupabaseDataService implements IDataService {
       console.info("[Supabase] ✅ Data loaded from Supabase");
 
       // Convert all snake_case data from Supabase to camelCase for the app
+      const camInvoices = this.snakeToCamel(invoices as any) || [];
+      const camInvoiceLines = this.snakeToCamel(invoiceLines as any) || [];
+
+      // Link lines to invoices for components that expect attached lines
+      const invoicesWithLines = camInvoices.map((inv: any) => ({
+        ...inv,
+        lines: camInvoiceLines.filter((line: any) => line.invoiceId === inv.id)
+      }));
+
       return {
         organizations: this.snakeToCamel(organizations as any) || [],
         users: this.snakeToCamel(users as any) || [],
@@ -235,6 +248,8 @@ export class SupabaseDataService implements IDataService {
         courseFees: this.snakeToCamel(courseFees as any) || [],
         enrollments: this.snakeToCamel(enrollments as any) || [],
         alumniReports: this.snakeToCamel(alumniReports as any) || [],
+        invoices: invoicesWithLines,
+        invoiceLines: camInvoiceLines,
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -264,7 +279,7 @@ export class SupabaseDataService implements IDataService {
       'rate', 'total', 'subtotal', 'tax', 'vat', 'discount', 'net', 'gross', 'fee', 'charge',
       'cost', 'value', 'salary', 'hours', 'overtime', 'deductions', 'contributions', 'netPay', 'net_pay',
       'withholding_amount', 'withholdingAmount', 'applied_rate_percent', 'appliedRatePercent',
-      'net_payable', 'netPayable', 'capacity', 'limit'
+      'net_payable', 'netPayable', 'capacity', 'limit', 'ewt_rate', 'ewtRate'
     ]);
 
     const camelCaseObj: any = {};
@@ -378,8 +393,9 @@ export class SupabaseDataService implements IDataService {
       });
 
       if (!response.ok) {
-        console.error(`[Supabase] Error updating ${table}: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to update ${table}`);
+        const errorText = await response.text();
+        console.error(`[Supabase] Error updating ${table}: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`Failed to update ${table}: ${errorText}`);
       }
 
       const result = await response.json();
@@ -414,6 +430,33 @@ export class SupabaseDataService implements IDataService {
       }
 
       console.info(`[Supabase] ✅ Deleted from ${table} (id: ${id})`);
+    } catch (error) {
+      console.error(`[Supabase] Network error deleting from ${table}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * DELETE from Supabase table using a custom filter string
+   */
+  private async deleteByFilter(table: string, filter: string): Promise<void> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
+    }
+
+    try {
+      const url = `${this.supabaseUrl}/rest/v1/${table}?${filter}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: await this.getHeaders(),
+      });
+
+      if (!response.ok && response.status !== 204) {
+        console.error(`[Supabase] Error deleting from ${table} with filter ${filter}: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to delete from ${table}`);
+      }
+
+      console.info(`[Supabase] ✅ Deleted from ${table} with filter: ${filter}`);
     } catch (error) {
       console.error(`[Supabase] Network error deleting from ${table}:`, error);
       throw error;
@@ -513,7 +556,11 @@ export class SupabaseDataService implements IDataService {
       employees: ['id', 'org_id', 'first_name', 'last_name', 'designation', 'tin', 'sss', 'philhealth', 'pagibig', 'basic_salary', 'bank_name', 'bank_account', 'is_active', 'created_at', 'updated_at'],
       locations: ['id', 'org_id', 'code', 'name', 'address', 'capacity', 'created_at', 'updated_at'],
       trainer_schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
-      sponsors: ['id', 'org_id', 'name', 'contact_person', 'email', 'phone', 'address', 'ar_account_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'],
+      sponsors: [
+        'id', 'org_id', 'sponsor_code', 'name', 'contact_person', 'email', 'phone', 'address',
+        'tin', 'tax_type', 'ewt_rate', 'ar_account_id', 'created_at', 'updated_at',
+        'is_deleted', 'deleted_at', 'deleted_by'
+      ],
       batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
       vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'created_at', 'updated_at'],
       atc_categories: ['id', 'code', 'name', 'created_at', 'updated_at'],
@@ -555,6 +602,19 @@ export class SupabaseDataService implements IDataService {
         'total_fees', 'billed_amount', 'notes', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
+      invoices: [
+        'id', 'org_id', 'invoice_no', 'sponsor_id', 'student_id', 'enrollment_id', 'batch_id',
+        'invoice_date', 'due_date', 'status', 'subtotal', 'vat_amount', 'grand_total',
+        'total_ewt_amount', 'net_amount_due', 'amount_paid', 'balance_due',
+        'ewt_rate', 'is_subject_to_ewt', 'reference', 'terms', 'notes', 'journal_entry_id',
+        'posted_by', 'posted_at', 'voided_by', 'voided_at', 'void_reason',
+        'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
+      ],
+      invoice_lines: [
+        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
+        'quantity', 'unit_price', 'amount', 'tax_category_id', 'vat_amount', 'gl_account_id',
+        'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
@@ -566,7 +626,10 @@ export class SupabaseDataService implements IDataService {
       payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
       check_vouchers: ['id', 'created_at', 'updated_at'],
       course_fees: ['id', 'created_at', 'updated_at'],
-      alumni_employment_reports: ['id', 'created_at', 'updated_at']
+      alumni_employment_reports: ['id', 'created_at', 'updated_at'],
+      sponsors: ['id', 'created_at', 'updated_at'],
+      invoices: ['id', 'created_at', 'updated_at'],
+      invoice_lines: ['id', 'created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -1320,15 +1383,16 @@ export class SupabaseDataService implements IDataService {
     if (snakeCaseSponsor.ar_account_id === '') snakeCaseSponsor.ar_account_id = null;
 
     // Filter to valid columns
-    let filteredSponsor = this.filterToTableSchema('sponsors', snakeCaseSponsor);
-    console.debug('[Supabase] After filterToTableSchema():', {
-      snakeCaseSponsor,
-      filteredSponsor
-    });
+    let filteredSponsor = this.filterToTableSchema('sponsors', snakeCaseSponsor, true);
+
+    // Set timestamps
+    const now = new Date().toISOString();
+    filteredSponsor.created_at = now;
+    filteredSponsor.updated_at = now;
 
     // Validate or remove invalid ID
     if (filteredSponsor.id && !this.isValidUUID(filteredSponsor.id)) {
-      console.warn(`[Supabase] Removing invalid UUID: ${filteredSponsor.id}`);
+      console.debug(`[Supabase] Removing invalid UUID: ${filteredSponsor.id}`);
       delete filteredSponsor.id;
     }
 
@@ -1345,8 +1409,15 @@ export class SupabaseDataService implements IDataService {
     // Convert empty strings to null for UUID columns
     if (snakeCaseUpdates.ar_account_id === '') snakeCaseUpdates.ar_account_id = null;
 
+    // Set updated timestamp
+    snakeCaseUpdates.updated_at = new Date().toISOString();
+
     // Filter to valid columns
     const filteredUpdates = this.filterToTableSchema('sponsors', snakeCaseUpdates);
+
+    // Remove id and created_at from updates if they exist (PostgREST doesn't like updating them)
+    delete filteredUpdates.id;
+    delete filteredUpdates.created_at;
 
     // Update in Supabase
     return this.updateInSupabaseRaw('sponsors', id, filteredUpdates);
@@ -3997,6 +4068,146 @@ export class SupabaseDataService implements IDataService {
 
   async getRecurringBillById(id: string): Promise<any | null> {
     return null;
+  }
+
+  // ============================================================================
+  // INVOICE CRUD
+  // ============================================================================
+
+  async createInvoice(invoice: any): Promise<any> {
+    console.debug('[Supabase] createInvoice called with:', invoice);
+    const invoiceLines = invoice.lines || [];
+    const invoiceData = { ...invoice };
+    delete invoiceData.lines;
+
+    const snakeCaseInvoice = this.camelToSnake(invoiceData);
+    const filteredInvoice = this.filterToTableSchema('invoices', snakeCaseInvoice, true);
+
+    // Insert invoice
+    const savedInvoice = await this.insertToSupabaseRaw<any>('invoices', filteredInvoice);
+
+    // Insert lines if any
+    if (invoiceLines.length > 0) {
+      const savedLines = await this.createInvoiceLines(invoiceLines.map((line: any) => ({
+        ...line,
+        invoiceId: savedInvoice.id
+      })));
+      savedInvoice.lines = savedLines;
+    }
+
+    return savedInvoice;
+  }
+
+  async updateInvoice(id: string, updates: Partial<any>): Promise<any> {
+    const lines = updates.lines;
+
+    // 1. Convert to snake_case for schema filtering
+    const snakeCaseUpdates = this.camelToSnake(updates);
+
+    // 2. Filter to only valid table columns
+    const filteredUpdates = this.filterToTableSchema('invoices', snakeCaseUpdates);
+
+    // 3. CRITICAL: Remove read-only/identity columns from the PATCH body
+    // Including 'id' in the body of a PATCH request with ?id=eq.xxx will cause a 400 or 409 error
+    delete filteredUpdates.id;
+    delete filteredUpdates.org_id;
+    delete filteredUpdates.created_at;
+    delete filteredUpdates.created_by;
+    delete filteredUpdates.lines; // Lines are handled separately
+
+    // 4. Sanitize UUID fields: convert empty strings to null
+    // PostgREST/Supabase will throw a 400 error if it receives "" for a UUID column
+    const uuidFields = ['sponsor_id', 'student_id', 'enrollment_id', 'batch_id', 'journal_entry_id'];
+    uuidFields.forEach(field => {
+      if (filteredUpdates[field] === '') {
+        filteredUpdates[field] = null;
+      }
+    });
+
+    console.debug('[Supabase] Filtered update payload for invoices:', filteredUpdates);
+
+    // Call generic update with the filtered snake_case payload
+    const updatedInvoice = await this.updateInSupabase<any>('invoices', id, filteredUpdates);
+
+    // Sync lines if provided
+    if (lines && Array.isArray(lines)) {
+      console.debug('[Supabase] Syncing lines for invoice:', id, 'Count:', lines.length);
+      // Delete existing lines
+      await this.deleteByFilter('invoice_lines', `invoice_id=eq.${id}`);
+
+      // Insert new lines
+      if (lines.length > 0) {
+        await this.createInvoiceLines(lines.map(l => ({ ...l, invoiceId: id })));
+      }
+      (updatedInvoice as any).lines = lines;
+    }
+
+    return updatedInvoice;
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    console.debug('[Supabase] deleteInvoice called with id:', id);
+    return this.deleteFromSupabase('invoices', id);
+  }
+
+  async getInvoicesByOrg(orgId: string): Promise<any[]> {
+    console.debug('[Supabase] getInvoicesByOrg called with orgId:', orgId);
+    const invoices = await this.fetchFromSupabase<any>('invoices');
+    return this.snakeToCamel(invoices.filter((i: any) => i.org_id === orgId && !i.is_deleted));
+  }
+
+  async getInvoiceById(id: string): Promise<any | null> {
+    console.debug('[Supabase] getInvoiceById called with id:', id);
+    const invoices = await this.fetchFromSupabase<any>('invoices');
+    const invoice = invoices.find((i: any) => i.id === id);
+    if (!invoice) return null;
+
+    const camelInvoice = this.snakeToCamel(invoice);
+    camelInvoice.lines = await this.getInvoiceLinesByInvoice(id);
+    return camelInvoice;
+  }
+
+  async voidInvoice(id: string, voidedBy: string, reason: string): Promise<void> {
+    console.debug('[Supabase] voidInvoice called with id:', id, 'voidedBy:', voidedBy, 'reason:', reason);
+    await this.updateInvoice(id, {
+      status: 'VOIDED',
+      voidedBy,
+      voidedAt: new Date().toISOString(),
+      voidReason: reason
+    });
+  }
+
+  // ============================================================================
+  // INVOICE LINE CRUD
+  // ============================================================================
+
+  async createInvoiceLine(line: any): Promise<any> {
+    const snakeCaseLine = this.camelToSnake(line);
+    const filteredLine = this.filterToTableSchema('invoice_lines', snakeCaseLine, true);
+    return this.insertToSupabaseRaw('invoice_lines', filteredLine);
+  }
+
+  async updateInvoiceLine(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('invoice_lines', snakeCaseUpdates);
+    return this.updateInSupabaseRaw('invoice_lines', id, filteredUpdates);
+  }
+
+  async deleteInvoiceLine(id: string): Promise<void> {
+    return this.deleteFromSupabase('invoice_lines', id);
+  }
+
+  async getInvoiceLinesByInvoice(invoiceId: string): Promise<any[]> {
+    const lines = await this.fetchFromSupabase<any>('invoice_lines');
+    return this.snakeToCamel(lines.filter((l: any) => l.invoice_id === invoiceId && !l.is_deleted));
+  }
+
+  async createInvoiceLines(lines: any[]): Promise<any[]> {
+    const savedLines = [];
+    for (const line of lines) {
+      savedLines.push(await this.createInvoiceLine(line));
+    }
+    return savedLines;
   }
 
   // ============================================================================

@@ -654,6 +654,7 @@ export interface Enrollment extends BaseEntity {
 // Invoice - AR Invoice for sponsors/students with EWT tracking
 export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'VOIDED';
 
+
 export interface InvoiceLine extends BaseEntity {
   id: string;
   invoiceId: string;
