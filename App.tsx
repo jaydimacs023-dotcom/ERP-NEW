@@ -66,6 +66,7 @@ import InvoicesView from './views/InvoicesView';
 import PaymentsView from './views/PaymentsView';
 import BankDepositsView from './views/BankDepositsView';
 import AlumniEmploymentView from './views/AlumniEmploymentView';
+import CustomerMasterListView from './views/CustomerMasterListView';
 
 // Lucide Icons
 import {
@@ -3337,7 +3338,24 @@ export default function App() {
             </div>
           )}
 
-          {isFinance && (
+          {currentUser.role === 'AR_SPECIALIST' && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">AR Role Modules</p>}
+              <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Users size={18} />} label="Customer Master List" active={activeTab === 'customers'} onClick={() => setActiveTab('customers')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => setActiveTab('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wallet size={18} />} label="Payments and Application" active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Receipt size={18} />} label="Credit and Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => setActiveTab('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Zap size={18} />} label="Write Off / Adjustments" active={activeTab === 'write-off'} onClick={() => setActiveTab('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => setActiveTab('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<FileText size={18} />} label="Statement of Account" active={activeTab === 'soa'} onClick={() => setActiveTab('soa')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => setActiveTab('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Handshake size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => setActiveTab('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => setActiveTab('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
+
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Finance"
               isOpen={openSections.financial}
@@ -3364,7 +3382,7 @@ export default function App() {
             </NavSection>
           )}
 
-          {isRegistrar && (
+          {isRegistrar && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Operations"
               isOpen={openSections.operations}
@@ -3381,7 +3399,7 @@ export default function App() {
             </NavSection>
           )}
 
-          {isFinance && (
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Registries"
               isOpen={openSections.registries}
@@ -3395,7 +3413,7 @@ export default function App() {
             </NavSection>
           )}
 
-          {isFinance && (
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Inventory"
               isOpen={openSections.inventory}
@@ -3413,7 +3431,7 @@ export default function App() {
             </NavSection>
           )}
 
-          {isTenantAdmin && (
+          {isTenantAdmin && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Administration"
               isOpen={openSections.administration}
@@ -3737,6 +3755,39 @@ export default function App() {
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'schema' && <SchemaManualView />}
           {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
+
+          {activeTab === 'customers' && (
+            <CustomerMasterListView
+              sponsors={sponsors}
+              students={students}
+              invoices={invoices}
+              enrollments={enrollments}
+              batches={batches}
+              qualifications={qualifications}
+              accounts={accounts}
+              brandColor={brandColor}
+            />
+          )}
+
+          {/* New AR Modules Placeholder Views */}
+          {['credit-debit-memo', 'write-off', 'aging-report', 'soa', 'customer-ledger', 'collection-receipt'].includes(activeTab) && (
+            <div className="h-full flex flex-col items-center justify-center p-10 text-center">
+              <div
+                className="w-24 h-24 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl animate-bounce"
+                style={{ backgroundColor: `${brandColor}10`, color: brandColor }}
+              >
+                <Wrench size={40} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">
+                {activeTab.replace('-', ' ')} Module
+              </h2>
+              <div className="h-1 w-20 bg-slate-200 rounded-full mb-6 mx-auto" />
+              <p className="max-w-md text-slate-500 font-medium leading-relaxed">
+                This module is currently being optimized for the enhanced Accounts Receivable workflow.
+                Full functionality will be restored in the next system update.
+              </p>
+            </div>
+          )}
         </div>
       </main>
 

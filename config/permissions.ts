@@ -45,6 +45,15 @@ export type ModuleTab =
   | 'checks'
   // AR Modules
   | 'ar'
+  | 'invoices'
+  | 'payments'
+  | 'customers'
+  | 'credit-debit-memo'
+  | 'write-off'
+  | 'aging-report'
+  | 'soa'
+  | 'customer-ledger'
+  | 'collection-receipt'
   | 'recurring-invoices'
   | 'revenue-recognition'
   // AP Modules
@@ -155,13 +164,19 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'coa', 'periods', 'audit'
   ],
 
-  // AR_SPECIALIST: Accounts Receivable focused
+  // AR_SPECIALIST: Accounts Receivable focused - Exactly 11 modules as requested
   AR_SPECIALIST: [
     'dashboard',
-    'ar', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees',
-    'batches',
-    'items',
-    'sponsors'
+    'customers',
+    'invoices',
+    'payments',
+    'credit-debit-memo',
+    'write-off',
+    'aging-report',
+    'soa',
+    'customer-ledger',
+    'collection-receipt',
+    'audit'
   ],
 
   // AP_SPECIALIST: Accounts Payable focused
