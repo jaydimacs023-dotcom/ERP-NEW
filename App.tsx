@@ -2593,13 +2593,18 @@ export default function App() {
 
         const vatPayableId =
           filteredAccounts.find(a => a.code === '2200')?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id ||
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id;
-
-
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output tax'))?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tax payable'))?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('sales tax'))?.id ||
+          filteredAccounts.find(a => (a.name || '').toLowerCase().trim() === 'vat')?.[0]?.id || // Handle potential array from filter/find edge cases
+          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat'))?.id;
 
         if (!arAccountId) {
           handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found. Please set up your Chart of Accounts.');
+        } else if (invoice.vatAmount > 0 && !vatPayableId) {
+          handleNotify('error', 'Cannot post GL: Output VAT / VAT Payable account (2200) not found. Please set up your Chart of Accounts.');
         } else {
           // ── Build journal lines ─────────────────────────────────────────────
           const jLines: JournalLine[] = [];
@@ -2612,12 +2617,15 @@ export default function App() {
             debit: invoice.grandTotal,
             credit: 0,
             description: `AR: ${glRef}`,
+            memo: `AR: ${glRef}`,
             contactId: invoice.sponsorId || invoice.studentId || undefined,
             contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
           } as JournalLine);
 
           // 2. Credit Revenue for each invoice line
+          // We use the pre-computed netAmount from each line item
           const invoiceLines = invoice.lines || [];
+
           invoiceLines.forEach((line, idx) => {
             // Fallback revenue account: code 4000 or named "revenue/income"
             const revenueAccountId =
@@ -2627,14 +2635,17 @@ export default function App() {
               filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
               filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
 
-            if (revenueAccountId && line.amount > 0) {
+            const netRevenue = line.netAmount !== undefined ? line.netAmount : line.amount;
+
+            if (revenueAccountId && netRevenue > 0) {
               jLines.push({
                 id: `${jeId}-rev-${idx}`,
                 journalEntryId: jeId,
                 accountId: revenueAccountId,
                 debit: 0,
-                credit: line.amount,
+                credit: netRevenue,
                 description: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
+                memo: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
                 contactId: invoice.sponsorId || invoice.studentId || undefined,
                 contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
               } as JournalLine);
@@ -2649,7 +2660,8 @@ export default function App() {
               accountId: vatPayableId,
               debit: 0,
               credit: invoice.vatAmount,
-              description: `Output VAT: ${glRef}`,
+              description: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
+              memo: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
             } as JournalLine);
           }
 

@@ -664,9 +664,11 @@ export interface InvoiceLine extends BaseEntity {
   enrollmentId?: string;       // FK to Enrollment (optional)
   quantity: number;
   unitPrice: number;
-  amount: number;              // quantity * unitPrice
+  netAmount: number;           // Exclusive of VAT: qty * unitPrice (if exclusive) or gross / 1.12 (if inclusive)
+  vatAmount: number;           // Component VAT amount
+  grossAmount: number;         // Inclusive of VAT: netAmount + vatAmount
+  amount: number;              // Same as grossAmount (for compatibility)
   taxCategoryId?: string;      // FK to TaxCategory
-  vatAmount?: number;          // VAT amount for this line
   glAccountId?: string;        // Revenue G/L account
 }
 
@@ -681,6 +683,8 @@ export interface Invoice extends BaseEntity {
   invoiceDate: string;         // Invoice date
   dueDate: string;             // Payment due date
   status: InvoiceStatus;       // DRAFT, OPEN, CLOSED, VOIDED
+  vatPricing: 'EXCLUSIVE' | 'INCLUSIVE' | 'EXEMPT'; // Pricing type for VAT calculation
+  vatRate: number;             // VAT rate applied (e.g., 0.12 for 12%)
 
   // Amounts
   subtotal: number;            // Sum of line amounts before tax

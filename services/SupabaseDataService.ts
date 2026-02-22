@@ -279,7 +279,8 @@ export class SupabaseDataService implements IDataService {
       'rate', 'total', 'subtotal', 'tax', 'vat', 'discount', 'net', 'gross', 'fee', 'charge',
       'cost', 'value', 'salary', 'hours', 'overtime', 'deductions', 'contributions', 'netPay', 'net_pay',
       'withholding_amount', 'withholdingAmount', 'applied_rate_percent', 'appliedRatePercent',
-      'net_payable', 'netPayable', 'capacity', 'limit', 'ewt_rate', 'ewtRate'
+      'net_payable', 'netPayable', 'capacity', 'limit', 'ewt_rate', 'ewtRate',
+      'net_amount', 'netAmount', 'vat_amount', 'vatAmount', 'gross_amount', 'grossAmount'
     ]);
 
     const camelCaseObj: any = {};
@@ -607,12 +608,12 @@ export class SupabaseDataService implements IDataService {
         'invoice_date', 'due_date', 'status', 'subtotal', 'vat_amount', 'grand_total',
         'total_ewt_amount', 'net_amount_due', 'amount_paid', 'balance_due',
         'ewt_rate', 'is_subject_to_ewt', 'reference', 'terms', 'notes', 'journal_entry_id',
-        'posted_by', 'posted_at', 'voided_by', 'voided_at', 'void_reason',
+        'vat_pricing', 'vat_rate', 'posted_by', 'posted_at', 'voided_by', 'voided_at', 'void_reason',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
         'id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
-        'quantity', 'unit_price', 'amount', 'tax_category_id', 'vat_amount', 'gl_account_id',
+        'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount', 'tax_category_id', 'gl_account_id',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
       ],
     };
@@ -3663,8 +3664,9 @@ export class SupabaseDataService implements IDataService {
       // Define only the columns that exist in the actual database table
       // Supabase bulk insert requires all objects to have the same keys (PGRST102 error)
       const allKeys = [
-        'journal_entry_id', 'account_id', 'debit', 'credit', 'memo',
-        'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
+        'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
+        'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared',
+        'goods_receipt_id', 'goods_receipt_line_id', 'purchase_order_id', 'purchase_order_line_id'
       ];
 
       const payloads = lines.map(line => {
