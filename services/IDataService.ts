@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine
+  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -78,6 +78,7 @@ export interface InitialData {
   alumniReports: AlumniEmploymentReport[];
   invoices: Invoice[];
   invoiceLines: InvoiceLine[];
+  taxCategories: TaxCategoryEntry[];
 }
 
 export interface IDataService {
@@ -166,6 +167,9 @@ export interface IDataService {
   getInvoicesByOrg(orgId: string): Promise<Invoice[]>;
   getInvoiceById(id: string): Promise<Invoice | null>;
   voidInvoice(id: string, voidedBy: string, reason: string): Promise<void>;
+
+  // Tax Category CRUD
+  fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]>;
 
   // Invoice Line CRUD
   createInvoiceLine(line: InvoiceLine): Promise<InvoiceLine>;

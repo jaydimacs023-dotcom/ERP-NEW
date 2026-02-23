@@ -1,6 +1,6 @@
 
 import { IDataService, InitialData, TrainerUsageCheck, QualificationUsageCheck, LocationUsageCheck, ScheduleUsageCheck, SponsorUsageCheck } from './IDataService';
-import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport } from '../types';
+import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport, Invoice, InvoiceLine, Enrollment, TaxCategoryEntry, FixedAsset, Vendor, Bill, Payable, BankAccount, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate, StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint, RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, CourseFee, PayrollRun, PayrollLine, Employee, AuditLog, PurchaseOrder, CheckVoucher } from '../types';
 
 /**
  * MockDataService - Empty Data Service
@@ -48,7 +48,11 @@ export class MockDataService implements IDataService {
       stockAdjustments: [],
       reorderPoints: [],
       courseFees: [],
-      alumniReports: []
+      alumniReports: [],
+      invoices: [],
+      invoiceLines: [],
+      enrollments: [],
+      taxCategories: []
     };
   }
 
@@ -771,6 +775,41 @@ export class MockDataService implements IDataService {
   async getAuditLogsByOrg(orgId: string): Promise<any[]> {
     console.warn('[MockDataService] getAuditLogsByOrg returning empty array.');
     return [];
+  }
+
+  async fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]> {
+    return [];
+  }
+
+  // Invoice CRUD
+  async createInvoice(invoice: Invoice): Promise<Invoice> {
+    return { ...invoice, id: invoice.id || `inv-${Date.now()}` };
+  }
+  async updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice> {
+    return { id, ...updates } as Invoice;
+  }
+  async deleteInvoice(id: string): Promise<void> { }
+  async getInvoicesByOrg(orgId: string): Promise<Invoice[]> {
+    return [];
+  }
+  async getInvoiceById(id: string): Promise<Invoice | null> {
+    return null;
+  }
+  async voidInvoice(id: string, voidedBy: string, reason: string): Promise<void> { }
+
+  // Invoice Line CRUD
+  async createInvoiceLine(line: InvoiceLine): Promise<InvoiceLine> {
+    return { ...line, id: line.id || `invl-${Date.now()}` };
+  }
+  async updateInvoiceLine(id: string, updates: Partial<InvoiceLine>): Promise<InvoiceLine> {
+    return { id, ...updates } as InvoiceLine;
+  }
+  async deleteInvoiceLine(id: string): Promise<void> { }
+  async getInvoiceLinesByInvoice(invoiceId: string): Promise<InvoiceLine[]> {
+    return [];
+  }
+  async createInvoiceLines(lines: InvoiceLine[]): Promise<InvoiceLine[]> {
+    return lines.map(l => ({ ...l, id: l.id || `invl-${Date.now()}` }));
   }
 
   // Purchase Order CRUD

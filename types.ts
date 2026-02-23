@@ -24,6 +24,19 @@ export enum TaxCategory {
   ZERO_RATED = 'ZERO_RATED'
 }
 
+export interface TaxCategoryEntry extends BaseEntity {
+  id: string;
+  orgId: string;
+  code: string;
+  description: string;
+  taxType: 'VAT' | 'NON_VAT' | 'VAT_EXEMPT' | 'ZERO_RATED';
+  rate: number;
+  isInclusive: boolean;
+  outputAccountId?: string; // FK to chart_of_accounts
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export enum WHTCategory {
   NONE = 0,
   GOODS = 0.01,

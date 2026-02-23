@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry } from '../types';
 import { generateUUID } from '../utils/uuid';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
@@ -31,6 +31,7 @@ interface InvoicesViewProps {
   onAddStudentLedgerEntry?: (entry: StudentLedger) => void; // For AR subsidiary ledger
   onViewJournal?: (journalEntryId: string) => void;
   orgId: string;
+  taxCategories: TaxCategoryEntry[];
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
@@ -38,7 +39,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
-  orgId
+  orgId,
+  taxCategories
 }) => {
   const [viewMode, setViewMode] = useState<'LIST' | 'FORM'>('LIST');
   const [showModal, setShowModal] = useState(false);
@@ -365,7 +367,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         vatAmount,
         grossAmount,
         amount: grossAmount,
-        glAccountId: fee.glAccountId || updatedLines[index].glAccountId
+        glAccountId: fee.glAccountId || updatedLines[index].glAccountId,
+        taxCategoryId: fee.taxCategoryId || updatedLines[index].taxCategoryId
       };
 
       setFormData(prev => ({ ...prev, lines: updatedLines }));
@@ -950,7 +953,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           {inv.journalEntryId ? (
                             (() => {
                               const je = journalEntries.find(j => j.id === inv.journalEntryId);
-                              const glNum = je?.glEntryNumber || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`;
+                              const glNum = je?.glEntryNumber || je?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`;
                               return <span className="text-xs font-medium text-gray-600">{glNum}</span>;
                             })()
                           ) : (
@@ -1134,7 +1137,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     {editingInvoice?.journalEntryId ? (
                       (() => {
                         const je = journalEntries.find(j => j.id === editingInvoice.journalEntryId);
-                        const glNum = je?.glEntryNumber || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`;
+                        const glNum = je?.glEntryNumber || je?.reference || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`;
                         return (
                           <button
                             onClick={() => onViewJournal && onViewJournal(editingInvoice.journalEntryId!)}
@@ -1229,6 +1232,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         <th className="px-3 py-2 text-left w-8">#</th>
                         <th className="px-3 py-2 text-left">Description</th>
                         <th className="px-3 py-2 text-left w-32">Course Fee</th>
+                        <th className="px-3 py-2 text-left w-32">Tax Cat</th>
                         <th className="px-3 py-2 text-right w-20">Qty</th>
                         <th className="px-3 py-2 text-right w-28">Unit Price</th>
                         <th className="px-3 py-2 text-right w-28">Amount</th>
@@ -1264,6 +1268,18 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 <option value="">-- Select --</option>
                                 {courseFees.map(cf => (
                                   <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={line.taxCategoryId || ''}
+                                onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
+                                className="w-full px-2 py-1 border rounded text-xs"
+                              >
+                                <option value="">-- None --</option>
+                                {taxCategories.map(tc => (
+                                  <option key={tc.id} value={tc.id}>{tc.code} - {tc.rate}%</option>
                                 ))}
                               </select>
                             </td>

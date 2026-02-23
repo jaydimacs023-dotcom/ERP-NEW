@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -285,6 +285,7 @@ export default function App() {
   const [atcRates, setAtcRates] = useState<any[]>([]);
   const [exchangeRates, setExchangeRates] = useState<any[]>([]);
   const [accountingPeriods, setAccountingPeriods] = useState<any[]>([]);
+  const [taxCategories, setTaxCategories] = useState<TaxCategoryEntry[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -418,6 +419,7 @@ export default function App() {
 
         // Load Course Fees
         setCourseFees(data.courseFees || []);
+        setTaxCategories(data.taxCategories || []);
         if (data.organizations.length > 0) {
           // Get the restored session to check user's orgId
           const restoredSession = authService.getSession();
@@ -561,7 +563,7 @@ export default function App() {
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const fullEntry = {
       ...entry,
-      id: entry.id || `je-${Date.now()}`,
+      id: entry.id || `je - ${Date.now()} `,
       orgId: currentOrgId,
       status: 'POSTED',
       createdBy: currentUser?.id || 'system',
@@ -642,7 +644,7 @@ export default function App() {
         'JOURNAL_ENTRY',
         entryId,
         entryId,
-        `Approved and posted draft journal: ${entry.reference}`
+        `Approved and posted draft journal: ${entry.reference} `
       );
     } catch (error) {
       console.error('[App] Error approving journal entry:', error);
@@ -744,7 +746,7 @@ export default function App() {
       }
 
       // Update payable status to approved with exception notes
-      const exceptionNotes = `3-Way Match Exception Approved: ${notes}`;
+      const exceptionNotes = `3-way Match Exception Approved: ${notes} `;
       const updates: Partial<Payable> = {
         status: 'approved',
         notes: exceptionNotes,
@@ -761,7 +763,7 @@ export default function App() {
         currentUser?.name || 'System',
         'PAYABLE_EXCEPTION_APPROVED',
         payableId,
-        `3 - Way Match Exception: ${notes} `
+        `3-way Match Exception: ${notes} `
       );
 
       handleNotify('success', '3-Way Match exception approved successfully');
@@ -2131,7 +2133,7 @@ export default function App() {
       const reportWithOrg = { ...report, orgId: currentOrgId };
       const saved = await dataService.createAlumniReport(reportWithOrg);
       setAlumniReports(prev => [...prev, saved]);
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', saved.id, `Employment report for student: ${report.studentId}`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', saved.id, `Employment report for student: ${report.studentId} `);
       handleNotify('success', 'Alumni employment report created successfully');
     } catch (error) {
       console.error('[App] Error creating alumni report:', error);
@@ -2144,7 +2146,7 @@ export default function App() {
       console.info('[App] Updating alumni report:', report.id);
       const updated = await dataService.updateAlumniReport(report.id, report);
       setAlumniReports(prev => prev.map(r => r.id === report.id ? { ...r, ...updated } : r));
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', report.id, `Updated report for student: ${report.studentId}`, {}, report);
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ALUMNI_REPORT', report.id, `Updated report for student: ${report.studentId} `, {}, report);
       handleNotify('success', 'Alumni employment report updated successfully');
     } catch (error) {
       console.error('[App] Error updating alumni report:', error);
@@ -2335,7 +2337,7 @@ export default function App() {
           id: `line - ${Date.now()} -debit`,
           journalEntryId: entryId,
           orgId: currentOrgId,
-          accountId: '', // Depreciation expense account - will use blank for now
+          accountId: '', // Depreciation expense account-will use blank for now
           debit: monthlyDepreciation,
           credit: 0,
           description: `Depreciation expense - ${asset.name} `,
@@ -2555,6 +2557,15 @@ export default function App() {
   const handleAddInvoice = async (invoice: Invoice) => {
     try {
       console.info('[App] Creating invoice:', invoice.invoiceNo);
+
+      // ── Accounting Posting: trigger if status is OPEN ──────────
+      if (invoice.status === 'OPEN' && !invoice.journalEntryId) {
+        const postingResult = await postInvoiceToGL(invoice);
+        if (postingResult) {
+          invoice = { ...invoice, journalEntryId: postingResult.jeId };
+        }
+      }
+
       const invoiceWithOrg = { ...invoice, orgId: currentOrgId };
       const saved = await dataService.createInvoice(invoiceWithOrg);
       setInvoices(prev => [...prev, saved]);
@@ -2567,6 +2578,136 @@ export default function App() {
     }
   };
 
+  const postInvoiceToGL = async (invoice: Invoice): Promise<{ jeId: string, glRef: string, now: string } | null> => {
+    const now = new Date().toISOString();
+    const jeId = crypto.randomUUID();
+
+    // ── Generate sequential GL reference number scoped to organization ──
+    const orgJournalEntries = journalEntries.filter(je => je.orgId === currentOrgId);
+    const existingGlNumbers = orgJournalEntries
+      .map(je => je.glEntryNumber)
+      .filter((n): n is string => !!n && n.startsWith('GL'))
+      .map(n => parseInt(n.replace('GL', ''), 10))
+      .filter(n => !isNaN(n));
+
+    const nextSeq = existingGlNumbers.length > 0 ? Math.max(...existingGlNumbers) + 1 : 1;
+    const glRef = `GL${String(nextSeq).padStart(8, '0')} `;
+
+    // ── Find GL accounts ───────────────────────────────────────────────────
+    const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
+    const arAccountId =
+      (sponsor as any)?.arAccountId ||
+      filteredAccounts.find(a => a.code === '1200')?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('receivable'))?.id;
+
+    const vatPayableId =
+      filteredAccounts.find(a => a.code === '2200')?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output tax'))?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tax payable'))?.id ||
+      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('sales tax'))?.id ||
+      filteredAccounts.find(a => /\bvat\b/i.test(a.name || ''))?.id;
+
+    if (!arAccountId) {
+      handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found.');
+      return null;
+    } else if (invoice.vatAmount > 0 && !vatPayableId) {
+      handleNotify('error', 'Cannot post GL: Output VAT account (2200) not found.');
+      return null;
+    }
+
+    // ── Build journal lines ─────────────────────────────────────────────
+    const jLines: JournalLine[] = [];
+    jLines.push({
+      id: `${jeId}-ar`,
+      orgId: currentOrgId,
+      journalEntryId: jeId,
+      accountId: arAccountId,
+      debit: invoice.grandTotal,
+      credit: 0,
+      description: `AR: ${glRef}`,
+      memo: `AR: ${glRef}`,
+      contactId: invoice.sponsorId || invoice.studentId || undefined,
+      contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+    } as JournalLine);
+
+    const invoiceLines = invoice.lines || [];
+    const vatGrouped: Record<string, number> = {};
+
+    invoiceLines.forEach((line, idx) => {
+      const revenueAccountId =
+        line.glAccountId ||
+        filteredAccounts.find(a => a.code === '4000')?.id ||
+        filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tuition'))?.id ||
+        filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
+        filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
+
+      const netRevenue = line.netAmount !== undefined ? line.netAmount : line.amount;
+
+      // Group VAT by Account
+      if (line.vatAmount > 0) {
+        const taxCat = taxCategories.find(tc => tc.id === line.taxCategoryId);
+        const vatAccountId = taxCat?.outputAccountId || vatPayableId;
+        if (vatAccountId) {
+          vatGrouped[vatAccountId] = (vatGrouped[vatAccountId] || 0) + line.vatAmount;
+        }
+      }
+
+      if (revenueAccountId && netRevenue > 0) {
+        jLines.push({
+          id: `${jeId}-rev-${idx}`,
+          orgId: currentOrgId,
+          journalEntryId: jeId,
+          accountId: revenueAccountId,
+          debit: 0,
+          credit: netRevenue,
+          description: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
+          memo: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
+          contactId: invoice.sponsorId || invoice.studentId || undefined,
+          contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+        } as JournalLine);
+      }
+    });
+
+    // Add grouped VAT lines
+    Object.entries(vatGrouped).forEach(([accountId, amount], idx) => {
+      if (amount > 0) {
+        jLines.push({
+          id: `${jeId}-vat-${idx}`,
+          orgId: currentOrgId,
+          journalEntryId: jeId,
+          accountId: accountId,
+          debit: 0,
+          credit: amount,
+          description: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
+          memo: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
+        } as JournalLine);
+      }
+    });
+
+    const jeEntry: Partial<JournalEntry> = {
+      id: jeId,
+      orgId: currentOrgId,
+      date: invoice.invoiceDate,
+      reference: glRef,
+      glEntryNumber: glRef,
+      description: `Sales Invoice: ${invoice.invoiceNo} `,
+      sourceType: 'INVOICE',
+      sourceRef: invoice.id,
+      status: 'POSTED',
+      createdBy: currentUser?.id || 'system',
+      createdAt: now,
+    };
+
+    const savedJournalEntry = await handlePostJournal(jeEntry, jLines);
+    return {
+      jeId: savedJournalEntry?.id || jeId,
+      glRef,
+      now
+    };
+  };
+
   const handleUpdateInvoice = async (invoice: Invoice) => {
     try {
       console.info('[App] Updating invoice:', invoice.id);
@@ -2574,132 +2715,21 @@ export default function App() {
 
       // ── Accounting Posting: trigger when status transitions to OPEN ──────────
       if (invoice.status === 'OPEN' && existing?.status !== 'OPEN' && !existing?.journalEntryId) {
-        const now = new Date().toISOString();
-        const jeId = crypto.randomUUID();
-
-        // ── Generate sequential GL reference number (GL00000001, GL00000002, …) ──
-        const existingGlNumbers = journalEntries
-          .map(je => je.glEntryNumber)
-          .filter((n): n is string => !!n && n.startsWith('GL'))
-          .map(n => parseInt(n.replace('GL', ''), 10))
-          .filter(n => !isNaN(n));
-        const nextSeq = existingGlNumbers.length > 0 ? Math.max(...existingGlNumbers) + 1 : 1;
-        const glRef = `GL${String(nextSeq).padStart(8, '0')}`;
-
-        // ── Find GL accounts ───────────────────────────────────────────────────
-        // AR Account: prefer sponsor's arAccountId, else first account with code 1200 or named "receivable"
-        const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
-        const arAccountId =
-          (sponsor as any)?.arAccountId ||
-          filteredAccounts.find(a => a.code === '1200')?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('receivable'))?.id;
-
-        const vatPayableId =
-          filteredAccounts.find(a => a.code === '2200')?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output vat'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat payable'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output tax'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tax payable'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('sales tax'))?.id ||
-          filteredAccounts.find(a => /\bvat\b/i.test(a.name || ''))?.id;
-
-        if (!arAccountId) {
-          handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found. Please set up your Chart of Accounts.');
-        } else if (invoice.vatAmount > 0 && !vatPayableId) {
-          handleNotify('error', 'Cannot post GL: Output VAT / VAT Payable account (2200) not found. Please set up your Chart of Accounts.');
-        } else {
-          // ── Build journal lines ─────────────────────────────────────────────
-          const jLines: JournalLine[] = [];
-
-          // 1. Debit AR for the full grand total
-          jLines.push({
-            id: `${jeId}-ar`,
-            journalEntryId: jeId,
-            accountId: arAccountId,
-            debit: invoice.grandTotal,
-            credit: 0,
-            description: `AR: ${glRef}`,
-            memo: `AR: ${glRef}`,
-            contactId: invoice.sponsorId || invoice.studentId || undefined,
-            contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
-          } as JournalLine);
-
-          // 2. Credit Revenue for each invoice line
-          // We use the pre-computed netAmount from each line item
-          const invoiceLines = invoice.lines || [];
-
-          invoiceLines.forEach((line, idx) => {
-            // Fallback revenue account: code 4000 or named "revenue/income"
-            const revenueAccountId =
-              line.glAccountId ||
-              filteredAccounts.find(a => a.code === '4000')?.id ||
-              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tuition'))?.id ||
-              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
-              filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
-
-            const netRevenue = line.netAmount !== undefined ? line.netAmount : line.amount;
-
-            if (revenueAccountId && netRevenue > 0) {
-              jLines.push({
-                id: `${jeId}-rev-${idx}`,
-                journalEntryId: jeId,
-                accountId: revenueAccountId,
-                debit: 0,
-                credit: netRevenue,
-                description: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
-                memo: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
-                contactId: invoice.sponsorId || invoice.studentId || undefined,
-                contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
-              } as JournalLine);
-            }
-          });
-
-          // 3. Credit VAT Payable
-          if (invoice.vatAmount > 0 && vatPayableId) {
-            jLines.push({
-              id: `${jeId}-vat`,
-              journalEntryId: jeId,
-              accountId: vatPayableId,
-              debit: 0,
-              credit: invoice.vatAmount,
-              description: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
-              memo: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
-            } as JournalLine);
-          }
-
-
-
-          // ── Post the journal entry ──────────────────────────────────────────
-          const jeEntry: Partial<JournalEntry> = {
-            id: jeId,
-            orgId: currentOrgId,
-            date: invoice.invoiceDate,
-            reference: glRef,
-            glEntryNumber: glRef,
-            description: `Sales Invoice: ${invoice.invoiceNo}`,
-            sourceType: 'INVOICE',
-            sourceRef: invoice.id,
-            status: 'POSTED',
-            createdBy: currentUser?.id || 'system',
-            createdAt: now,
-          };
-
-          const savedJournalEntry = await handlePostJournal(jeEntry, jLines);
-
-          // ── Link journal entry back to invoice (use real DB-assigned UUID) ──
-          const realJeId = savedJournalEntry?.id || jeId;
-          invoice = { ...invoice, journalEntryId: realJeId };
+        const postingResult = await postInvoiceToGL(invoice);
+        if (postingResult) {
+          const { jeId, glRef, now } = postingResult;
+          invoice = { ...invoice, journalEntryId: jeId };
 
           // ── Subsidiary Ledger entries ───────────────────────────────────────
           // Walk-in student invoice → debit student ledger
           if (invoice.studentId && !invoice.sponsorId) {
             setStudentLedger(prev => [...prev, {
-              id: `sl-${jeId}`,
+              id: `sl - ${jeId} `,
               orgId: currentOrgId,
               studentId: invoice.studentId!,
               invoiceId: invoice.id,
               date: invoice.invoiceDate,
-              description: `Sales Invoice ${invoice.invoiceNo} – ${glRef}`,
+              description: `Sales Invoice ${invoice.invoiceNo} – ${glRef} `,
               debit: invoice.netAmountDue,
               credit: 0,
               balance: invoice.netAmountDue,
@@ -2717,12 +2747,12 @@ export default function App() {
             const perStudent = covered.length > 0 ? invoice.netAmountDue / covered.length : 0;
             const sponsorName = sponsors.find(s => s.id === invoice.sponsorId)?.name || 'Sponsor';
             const newEntries: StudentLedger[] = covered.map((e, idx) => ({
-              id: `sl-${jeId}-${idx}`,
+              id: `sl - ${jeId} -${idx} `,
               orgId: currentOrgId,
               studentId: e.studentId!,
               invoiceId: invoice.id,
               date: invoice.invoiceDate,
-              description: `Sponsor-billed (${sponsorName}): Invoice ${invoice.invoiceNo} – ${glRef}`,
+              description: `Sponsor - billed(${sponsorName}): Invoice ${invoice.invoiceNo} – ${glRef} `,
               debit: 0,
               credit: perStudent,
               balance: 0,
@@ -2732,7 +2762,7 @@ export default function App() {
             setStudentLedger(prev => [...prev, ...newEntries]);
           }
 
-          handleNotify('success', `Invoice ${invoice.invoiceNo} approved and posted to GL as ${glRef}`);
+          handleNotify('success', `Invoice ${invoice.invoiceNo} approved and posted to GL as ${glRef} `);
         }
       }
 
@@ -3486,7 +3516,7 @@ export default function App() {
             className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
               toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
                 'bg-blue-50 border-blue-200 text-blue-800'
-              } `}
+              }`}
           >
             {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
             {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
@@ -3544,19 +3574,27 @@ export default function App() {
           )}
 
           {currentUser.role === 'AR_SPECIALIST' && (
-            <div className="mb-8">
-              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">AR Role Modules</p>}
+            <div className="space-y-6">
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Users size={18} />} label="Customer Master List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Wallet size={18} />} label="Payments and Application" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Receipt size={18} />} label="Credit and Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Zap size={18} />} label="Write Off / Adjustments" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<FileText size={18} />} label="Statement of Account" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Handshake size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+
+              <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
+                <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
+              </NavSection>
+
+              <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
+                <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Zap size={18} />} label="Write Offs" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<CreditCard size={18} />} label="Credit/Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
+              </NavSection>
+
+              <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
+                <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+              </NavSection>
             </div>
           )}
 
@@ -3684,7 +3722,7 @@ export default function App() {
         {/* System Data Engine Status Badge - SYSTEM_ADMIN only */}
         {sidebarOpen && isSysAdmin && (
           <div className="px-8 mb-4">
-            <div className={`p-3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'} `}>
+            <div className={`p - 3 rounded-2xl border flex items-center gap-3 transition-all ${config.useMockData ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'} `}>
               {config.useMockData ? <Database size={16} /> : <Cloud size={16} />}
               <div className="min-w-0">
                 <p className="text-[8px] uppercase tracking-widest leading-none mb-1">Engine Active</p>
@@ -3842,6 +3880,7 @@ export default function App() {
             journalEntries={activeJournalEntries}
             onViewJournal={handleViewJournal}
             orgId={currentOrgId}
+            taxCategories={taxCategories}
           />}
           {activeTab === 'payments' && <PaymentsView
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
@@ -4001,7 +4040,7 @@ export default function App() {
             <div className="h-full flex flex-col items-center justify-center p-10 text-center">
               <div
                 className="w-24 h-24 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl animate-bounce"
-                style={{ backgroundColor: `${brandColor}10`, color: brandColor }}
+                style={{ backgroundColor: `${brandColor} 10`, color: brandColor }}
               >
                 <Wrench size={40} />
               </div>
@@ -4048,8 +4087,8 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
-      style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
+      className={`w - full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
+      style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px - 5px ${brandColor} 66` } : {}}
     >
       <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'} `}>{icon}</div>
       {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
@@ -4077,7 +4116,7 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
             {label}
           </p>
         )}
-        <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+        <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''} `}>
           ▼
         </span>
       </button>

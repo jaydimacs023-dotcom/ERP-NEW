@@ -2,6 +2,7 @@
 import { IDataService, InitialData } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
+import { Invoice, TaxCategoryEntry } from '../types';
 
 /**
  * SupabaseDataService
@@ -127,7 +128,7 @@ export class SupabaseDataService implements IDataService {
         'atc_items', 'atc_rates', 'payables', 'bills',
         'warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions',
         'stock_adjustments', 'reorder_points', 'course_fees', 'alumni_employment_reports',
-        'enrollments', 'invoices', 'invoice_lines'
+        'enrollments', 'invoices', 'invoice_lines', 'tax_categories'
       ];
 
       const fetchers = tablesToFetch.map(table => () => this.fetchFromSupabase(table));
@@ -144,7 +145,7 @@ export class SupabaseDataService implements IDataService {
         atcItems, atcRates, payables, bills,
         warehouseLocations, stockItems, inventoryLevels, inventoryTransactions,
         stockAdjustments, reorderPoints, courseFees, alumniReports,
-        enrollments, invoices, invoiceLines
+        enrollments, invoices, invoice_lines, taxCategories
       ] = results as any[];
 
       // Log data status
@@ -158,7 +159,7 @@ export class SupabaseDataService implements IDataService {
 
       // Convert all snake_case data from Supabase to camelCase for the app
       const camInvoices = this.snakeToCamel(invoices as any) || [];
-      const camInvoiceLines = this.snakeToCamel(invoiceLines as any) || [];
+      const camInvoiceLines = this.snakeToCamel(invoice_lines as any) || [];
 
       // Link lines to invoices for components that expect attached lines
       const invoicesWithLines = camInvoices.map((inv: any) => ({
@@ -213,7 +214,8 @@ export class SupabaseDataService implements IDataService {
         enrollments: this.snakeToCamel(enrollments as any) || [],
         alumniReports: this.snakeToCamel(alumniReports as any) || [],
         invoices: invoicesWithLines,
-        invoiceLines: camInvoiceLines,
+        invoiceLines: this.snakeToCamel(invoice_lines as any) || [],
+        taxCategories: this.snakeToCamel(taxCategories as any) || [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -588,6 +590,9 @@ export class SupabaseDataService implements IDataService {
       journal_lines: [
         'id', 'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
         'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
+      ],
+      tax_categories: [
+        'id', 'org_id', 'code', 'description', 'tax_type', 'rate', 'is_inclusive', 'output_account_id', 'created_at', 'updated_at'
       ],
     };
 
@@ -4136,7 +4141,12 @@ export class SupabaseDataService implements IDataService {
     return this.deleteFromSupabase('invoices', id);
   }
 
-  async getInvoicesByOrg(orgId: string): Promise<any[]> {
+  async fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]> {
+    const data = await this.fetchFromSupabase<any>('tax_categories');
+    return this.snakeToCamel(data.filter((d: any) => d.org_id === orgId));
+  }
+
+  async getInvoicesByOrg(orgId: string): Promise<Invoice[]> {
     console.debug('[Supabase] getInvoicesByOrg called with orgId:', orgId);
     const invoices = await this.fetchFromSupabase<any>('invoices');
     return this.snakeToCamel(invoices.filter((i: any) => i.org_id === orgId && !i.is_deleted));

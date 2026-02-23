@@ -103,11 +103,12 @@ const Ledger: React.FC<LedgerProps> = ({
                       <div className="space-y-2">
                         {entryLines.map(line => {
                           const acc = accounts.find(a => a.id === line.accountId);
+                          const accountName = acc?.name || (line.accountId ? `[ID: ${line.accountId.slice(0, 8)}]` : 'Unknown Account');
                           return (
                             <div key={line.id} className="text-xs font-bold flex items-center gap-2">
                               {line.credit > 0 && <ArrowRight size={10} className="text-gray-300 ml-4" />}
                               <span className={line.credit > 0 ? 'text-gray-500 italic' : 'text-gray-700'}>
-                                {acc?.name}
+                                {accountName}
                               </span>
                             </div>
                           );
@@ -131,8 +132,8 @@ const Ledger: React.FC<LedgerProps> = ({
                     <td className="px-8 py-6 text-center align-top">
                       <div className="flex flex-col items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded uppercase border tracking-wide ${entry.status === 'POSTED' ? 'bg-orange-50 text-[#F47721] border-orange-100' :
-                            entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                              'bg-amber-50 text-[#F47721] border-amber-100 animate-pulse'
+                          entry.status === 'REVERSED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                            'bg-amber-50 text-[#F47721] border-amber-100 animate-pulse'
                           }`}>
                           {entry.status || 'DRAFT'}
                         </span>
