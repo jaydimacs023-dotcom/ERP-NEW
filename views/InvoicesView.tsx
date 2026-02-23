@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry } from '../types';
 import { generateUUID } from '../utils/uuid';
 import {
@@ -190,6 +190,46 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }));
   };
 
+  // Recalculate VAT for all lines when VAT settings change or during initial edit load
+  useEffect(() => {
+    if (viewMode === 'FORM' && formData.lines.length > 0) {
+      setFormData(prev => {
+        let linesChanged = false;
+        const sponsor = sponsors.find(s => s.id === prev.sponsorId);
+        const taxType = sponsor?.taxType || 'NON_VAT';
+        const isInclusive = prev.vatPricing === 'INCLUSIVE';
+
+        const mappedLines = prev.lines.map(line => {
+          // Compute correct VAT breakdown for loaded lines
+          const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
+            line.quantity || 1,
+            line.unitPrice || 0,
+            taxType,
+            isInclusive,
+            prev.vatRate
+          );
+
+          if (line.netAmount !== netAmount || line.vatAmount !== vatAmount || line.grossAmount !== grossAmount) {
+            linesChanged = true;
+            return {
+              ...line,
+              netAmount,
+              vatAmount,
+              grossAmount,
+              amount: grossAmount
+            };
+          }
+          return line;
+        });
+
+        if (linesChanged) {
+          return { ...prev, lines: mappedLines };
+        }
+        return prev;
+      });
+    }
+  }, [viewMode, formData.vatPricing, formData.vatRate, formData.sponsorId, sponsors]);
+
   // Handle batch change - auto-fill sponsor, quantity, and line items
   const handleBatchChange = (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
@@ -266,13 +306,19 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const lines = [...prev.lines];
       lines[index] = { ...lines[index], [field]: value };
 
-      // Recalculate VAT components
-      if (field === 'quantity' || field === 'unitPrice' || field === 'vatAmount') {
+      // Recompute amounts if quantity or unit price changes
+      if (field === 'quantity' || field === 'unitPrice') {
+        const qty = lines[index].quantity || 0;
+        const price = lines[index].unitPrice || 0;
+
+        // Use basic computation if VatService is complex to re-init here, 
+        // assuming standard non-VAT or inclusive for manual entry as a fallback,
+        // or properly call VatService.computeLineVat
         const sponsor = sponsors.find(s => s.id === prev.sponsorId);
         const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
-          lines[index].quantity,
-          lines[index].unitPrice,
-          sponsor?.taxType,
+          qty,
+          price,
+          sponsor?.taxType || 'NON_VAT', // Fallback, would be better to have taxType on the line
           prev.vatPricing === 'INCLUSIVE',
           prev.vatRate
         );

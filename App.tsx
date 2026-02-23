@@ -2601,8 +2601,7 @@ export default function App() {
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('output tax'))?.id ||
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('tax payable'))?.id ||
           filteredAccounts.find(a => (a.name || '').toLowerCase().includes('sales tax'))?.id ||
-          filteredAccounts.find(a => (a.name || '').toLowerCase().trim() === 'vat')?.[0]?.id || // Handle potential array from filter/find edge cases
-          filteredAccounts.find(a => (a.name || '').toLowerCase().includes('vat'))?.id;
+          filteredAccounts.find(a => /\bvat\b/i.test(a.name || ''))?.id;
 
         if (!arAccountId) {
           handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found. Please set up your Chart of Accounts.');

@@ -576,8 +576,8 @@ export class SupabaseDataService implements IDataService {
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
-        'id', 'org_id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
-        'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount', 'tax_category_id', 'gl_account_id',
+        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
+        'quantity', 'unit_price', 'vat_amount', 'amount', 'tax_category_id', 'gl_account_id',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
       ],
       journal_entries: [
@@ -602,13 +602,7 @@ export class SupabaseDataService implements IDataService {
       course_fees: ['id', 'created_at', 'updated_at'],
       alumni_employment_reports: ['id', 'created_at', 'updated_at'],
       sponsors: ['id', 'created_at', 'updated_at'],
-      invoices: ['id', 'created_at', 'updated_at'],
-      invoice_lines: [
-        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id',
-        'enrollment_id', 'quantity', 'unit_price', 'amount', 'tax_category_id',
-        'vat_amount', 'gl_account_id', 'is_deleted', 'deleted_at', 'deleted_by',
-        'created_at', 'updated_at'
-      ],
+      invoice_lines: ['id', 'created_at', 'updated_at'],
       journal_entries: ['id', 'created_at', 'updated_at'],
       journal_lines: ['id', 'created_at', 'updated_at']
     };
@@ -4070,12 +4064,21 @@ export class SupabaseDataService implements IDataService {
 
     // Insert lines if any
     if (invoiceLines.length > 0) {
-      const savedLines = await this.createInvoiceLines(invoiceLines.map((line: any) => ({
-        ...line,
-        invoiceId: savedInvoice.id,
-        orgId: savedInvoice.orgId || invoice.orgId
-      })));
-      savedInvoice.lines = savedLines;
+      try {
+        const savedLines = await this.createInvoiceLines(invoiceLines.map((line: any) => ({
+          ...line,
+          invoiceId: savedInvoice.id,
+          orgId: savedInvoice.orgId || invoice.orgId
+        })));
+        savedInvoice.lines = savedLines;
+      } catch (error) {
+        // Rollback: delete the invoice if lines failed to save
+        console.error('[Supabase] Failed to save invoice lines, rolling back invoice creation:', error);
+        await this.deleteFromSupabase('invoices', savedInvoice.id).catch(e =>
+          console.error('[Supabase] Failed to rollback invoice after line insertion error:', e)
+        );
+        throw error; // Re-throw to be caught by the App.tsx handler
+      }
     }
 
     return savedInvoice;
