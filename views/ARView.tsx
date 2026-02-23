@@ -22,6 +22,7 @@ interface ARViewProps {
   bankAccounts: BankAccount[];
   batches: Batch[];
   qualifications: Qualification[];
+  taxCategories: TaxCategory[]; // available tax categories for selection
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onUpdateInvoice?: (entryId: string, entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onApproveInvoice?: (entryId: string, comment?: string) => void;
@@ -39,7 +40,7 @@ interface ARViewProps {
 type ARTab = 'invoices' | 'collections' | 'aging' | 'item-groups';
 
 const ARView: React.FC<ARViewProps> = ({
-  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
+  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], taxCategories = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
   orgId
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('invoices');
@@ -74,9 +75,11 @@ const ARView: React.FC<ARViewProps> = ({
   const [recipientId, setRecipientId] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedArAccountId, setSelectedArAccountId] = useState('');
-  const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number }[]>([
-    { itemId: '', qty: 1, price: 0 }
+  const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number, taxCategoryId?: string }[]>([
+    { itemId: '', qty: 1, price: 0, taxCategoryId: '' }
   ]);
+  // tax categories available for invoice modal
+  const [localTaxCats, setLocalTaxCats] = useState<TaxCategory[]>(taxCategories);
 
   // Get batches filtered by selected sponsor (only show batches with sponsorId matching recipientId)
   const sponsoredBatches = useMemo(() => {
@@ -335,14 +338,18 @@ const ARView: React.FC<ARViewProps> = ({
     return Object.values(buckets).filter(b => Math.abs(b.total) > 0.01);
   }, [agingAsOf, lines, entries, accounts, students, sponsors]);
 
-  const handleAddInvoiceLine = () => setInvoiceLines([...invoiceLines, { itemId: '', qty: 1, price: 0 }]);
+  const handleAddInvoiceLine = () => setInvoiceLines([...invoiceLines, { itemId: '', qty: 1, price: 0, taxCategoryId: '' }]);
   const handleRemoveInvoiceLine = (i: number) => setInvoiceLines(invoiceLines.filter((_, idx) => idx !== i));
   const updateInvoiceLine = (index: number, updates: any) => {
     const newLines = [...invoiceLines];
     newLines[index] = { ...newLines[index], ...updates };
     if (updates.itemId) {
       const item = items.find(i => i.id === updates.itemId);
-      if (item) newLines[index].price = item.unitPrice;
+      if (item) {
+        newLines[index].price = item.unitPrice;
+        // default tax category from item if available
+        if (item.taxCategoryId) newLines[index].taxCategoryId = item.taxCategoryId;
+      }
     }
     setInvoiceLines(newLines);
   };
@@ -369,6 +376,25 @@ const ARView: React.FC<ARViewProps> = ({
   };
 
   // Edit invoice - populate form with existing invoice data
+  // keep tax categories up-to-date when modal opens
+  useEffect(() => {
+    if (showInvoiceModal) {
+      // merge prop into local state
+      if (taxCategories && taxCategories.length > 0) {
+        setLocalTaxCats(taxCategories);
+      }
+      // also fetch directly in case prop was empty
+      if ((!taxCategories || taxCategories.length === 0) && orgId) {
+        import('../services/DataServiceFactory').then(({ DataServiceFactory }) => {
+          DataServiceFactory.getService()
+            .fetchTaxCategories(orgId)
+            .then(cats => setLocalTaxCats(cats))
+            .catch(err => console.error('[ARView] failed to fetch tax categories', err));
+        });
+      }
+    }
+  }, [showInvoiceModal, taxCategories, orgId]);
+
   const handleEditInvoice = (invoice: JournalEntry) => {
     setEditingInvoice(invoice);
     setInvoiceDate(invoice.date);
@@ -392,10 +418,11 @@ const ARView: React.FC<ARViewProps> = ({
       setInvoiceLines(revenueLines.map(rl => ({
         itemId: rl.itemId || '',
         qty: 1, // We don't store qty separately, so we need to calculate
-        price: rl.credit
+        price: rl.credit,
+        taxCategoryId: items.find(i => i.id === rl.itemId)?.taxCategoryId || ''
       })));
     } else {
-      setInvoiceLines([{ itemId: '', qty: 1, price: 0 }]);
+      setInvoiceLines([{ itemId: '', qty: 1, price: 0, taxCategoryId: '' }]);
     }
 
     setShowInvoiceModal(true);
@@ -493,11 +520,22 @@ const ARView: React.FC<ARViewProps> = ({
   const totalInvoiceNet = useMemo(() => invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0), [invoiceLines]);
 
   const vatableSales = useMemo(() => invoiceLines.reduce((sum, l) => {
-    const item = items.find(i => i.id === l.itemId);
-    return (item?.taxCategoryId === 'VAT') ? sum + (l.qty * l.price) : sum;
-  }, 0), [invoiceLines, items]);
+    const cat = localTaxCats.find(tc => tc.id === l.taxCategoryId);
+    if (cat && cat.taxType === 'VAT' && cat.rate) {
+      return sum + (l.qty * l.price);
+    }
+    return sum;
+  }, 0), [invoiceLines, localTaxCats]);
 
-  const totalVat = Math.round(vatableSales * 0.12 * 100) / 100;
+  const totalVat = useMemo(() => {
+    return invoiceLines.reduce((sum, l) => {
+      const cat = localTaxCats.find(tc => tc.id === l.taxCategoryId);
+      if (cat && cat.taxType === 'VAT' && cat.rate) {
+        return sum + (l.qty * l.price * (cat.rate / 100));
+      }
+      return sum;
+    }, 0);
+  }, [invoiceLines, localTaxCats]);
   const grossInvoiceAmount = totalInvoiceNet + totalVat;
 
   const handlePostInvoice = (e: React.FormEvent) => {
@@ -529,7 +567,19 @@ const ARView: React.FC<ARViewProps> = ({
     finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, orgId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType, batchId });
     invoiceLines.forEach((il, idx) => {
       const item = items.find(i => i.id === il.itemId);
-      if (item) finalizedLines.push({ id: `l-rev-${idx}-${Date.now()}`, journalEntryId: entryId, orgId, accountId: item.incomeAccountId, debit: 0, credit: il.qty * il.price, contactId: recipientId, contactType: recipientType, itemId: il.itemId, batchId });
+      if (item) finalizedLines.push({
+        id: `l-rev-${idx}-${Date.now()}`,
+        journalEntryId: entryId,
+        orgId,
+        accountId: item.incomeAccountId,
+        debit: 0,
+        credit: il.qty * il.price,
+        contactId: recipientId,
+        contactType: recipientType,
+        itemId: il.itemId,
+        taxCategoryId: il.taxCategoryId,
+        batchId
+      });
     });
     if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, orgId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType, batchId });
 
@@ -1177,7 +1227,8 @@ const ARView: React.FC<ARViewProps> = ({
 
               <div className="space-y-4">
                 <div className="grid grid-cols-12 gap-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                  <div className="col-span-12 sm:col-span-5">Item / Service</div>
+                  <div className="col-span-12 sm:col-span-4">Item / Service</div>
+                  <div className="col-span-12 sm:col-span-2">Tax Cat</div>
                   <div className="col-span-4 sm:col-span-2 text-center">Qty</div>
                   <div className="col-span-4 sm:col-span-2 text-right">Rate</div>
                   <div className="col-span-4 sm:col-span-2 text-right">Subtotal</div>
@@ -1186,10 +1237,18 @@ const ARView: React.FC<ARViewProps> = ({
 
                 {invoiceLines.map((line, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded border border-gray-100 hover:border-[#025959]/20 transition-all">
-                    <div className="col-span-12 sm:col-span-5">
+                    <div className="col-span-12 sm:col-span-4">
                       <select required className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
                         <option value="">Select Item...</option>
                         {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-span-12 sm:col-span-2">
+                      <select className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs" value={line.taxCategoryId || ''} onChange={e => updateInvoiceLine(idx, { taxCategoryId: e.target.value })}>
+                        <option value="">-- None --</option>
+                        {localTaxCats.map(tc => (
+                          <option key={tc.id} value={tc.id}>{tc.code || tc.description} {tc.rate ? `(${tc.rate}%)` : ''}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-span-4 sm:col-span-2"><input type="number" min="1" className="w-full px-4 py-2 bg-gray-50 border-none rounded text-center text-xs font-semibold" value={line.qty} onChange={e => updateInvoiceLine(idx, { qty: Number(e.target.value) })} /></div>

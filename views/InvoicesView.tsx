@@ -8,7 +8,8 @@ import {
   ChevronDown, ChevronUp, MoreVertical, Send, Ban, Wand2, Users,
   GraduationCap, CheckSquare, Square, Calculator
 } from 'lucide-react';
-import { VatService } from '../services/VatService';
+
+
 
 interface InvoicesViewProps {
   invoices: Invoice[];
@@ -43,7 +44,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   taxCategories
 }) => {
   const [viewMode, setViewMode] = useState<'LIST' | 'FORM'>('LIST');
-  const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false); // Generate from enrollments wizard
@@ -54,6 +54,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // local copy of tax categories; we fetch from backend when form is active
+  const [localTaxCats, setLocalTaxCats] = useState<TaxCategoryEntry[]>(taxCategories);
+
 
   // Derived: Students in the batch for annex
   const batchStudents = React.useMemo(() => {
@@ -119,13 +123,18 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return `INV-${year}-${String(nextNum).padStart(5, '0')}`;
   };
 
-  // Calculate totals
+  // Calculate totals (simple version without VatService)
   const calculateTotals = (lines: InvoiceLine[]) => {
+    const subtotal = lines.reduce((sum, l) => sum + (l.netAmount || 0), 0);
+    const vatAmount = lines.reduce((sum, l) => sum + (l.vatAmount || 0), 0);
+    const grandTotal = lines.reduce((sum, l) => sum + (l.grossAmount || 0), 0);
     return {
-      ...VatService.calculateTotals(lines),
+      subtotal,
+      vatAmount,
+      grandTotal,
       totalEwtAmount: 0,
-      netAmountDue: lines.reduce((sum, l) => sum + (l.grossAmount || 0), 0),
-      balanceDue: lines.reduce((sum, l) => sum + (l.grossAmount || 0), 0)
+      netAmountDue: grandTotal,
+      balanceDue: grandTotal
     };
   };
 
@@ -178,6 +187,32 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     setViewMode('FORM');
   };
 
+  // keep localTaxCats in sync with prop; fetch from backend if still empty
+  // keep in sync with parent property
+  useEffect(() => {
+    if (taxCategories && taxCategories.length > 0) {
+      setLocalTaxCats(taxCategories);
+    }
+  }, [taxCategories]);
+
+  // refresh tax categories when invoice form becomes active (viewMode changes)
+  useEffect(() => {
+    if (viewMode === 'FORM' && orgId) {
+      import('../services/DataServiceFactory').then(({ DataServiceFactory }) => {
+        DataServiceFactory.getService()
+          .fetchTaxCategories(orgId)
+          .then(cats => {
+            console.debug('[InvoicesView] fetched tax categories', cats);
+            if (!cats || cats.length === 0) {
+              console.warn('[InvoicesView] no tax categories returned for org', orgId);
+            }
+            setLocalTaxCats(cats);
+          })
+          .catch(err => console.error('Failed to fetch tax categories', err));
+      });
+    }
+  }, [viewMode, orgId]);
+
   // View invoice details
   const handleView = (invoice: Invoice) => {
     setViewingInvoice(invoice);
@@ -202,15 +237,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         const isInclusive = prev.vatPricing === 'INCLUSIVE';
 
         const mappedLines = prev.lines.map(line => {
-          // Compute correct VAT breakdown for loaded lines
-          const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
-            line.quantity || 1,
-            line.unitPrice || 0,
-            taxType,
-            isInclusive,
-            prev.vatRate
-          );
-
+          const { netAmount, vatAmount, grossAmount } = computeAmounts(line as InvoiceLine);
           if (line.netAmount !== netAmount || line.vatAmount !== vatAmount || line.grossAmount !== grossAmount) {
             linesChanged = true;
             return {
@@ -247,18 +274,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     const studentCount = batchEnrollments.length || batch.studentIds?.length || 0;
     const sponsorId = batch.sponsorId || '';
 
-    const isInclusive = formData.vatPricing === 'INCLUSIVE';
     const sponsor = sponsors.find(s => s.id === (batch.sponsorId || formData.sponsorId));
-    const taxType = sponsor?.taxType;
 
     const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => {
-      const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
-        studentCount,
-        fee.amount || 0,
-        taxType,
-        isInclusive,
-        formData.vatRate
-      );
+      const netAmount = Math.round(studentCount * (fee.amount || 0) * 100) / 100;
+      const vatAmount = 0;
+      const grossAmount = netAmount;
 
       return {
         id: generateUUID(),
@@ -297,9 +318,34 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       netAmount: 0,
       vatAmount: 0,
       grossAmount: 0,
-      amount: 0
+      amount: 0,
+      taxCategoryId: ''
     };
     setFormData(prev => ({ ...prev, lines: [...prev.lines, newLine] }));
+  };
+
+  // helper – calculate amounts based on selected tax category
+  const computeAmounts = (line: InvoiceLine) => {
+    const qty = line.quantity || 0;
+    const price = line.unitPrice || 0;
+    let netAmount = Math.round(qty * price * 100) / 100;
+    let vatAmount = 0;
+    let grossAmount = netAmount;
+
+    if (line.taxCategoryId) {
+      const cat = localTaxCats.find(c => c.id === line.taxCategoryId);
+      if (cat && cat.taxType === 'VAT' && typeof cat.rate === 'number') {
+        if (cat.isInclusive) {
+          grossAmount = netAmount;
+          netAmount = Math.round((grossAmount / (1 + cat.rate)) * 100) / 100;
+          vatAmount = Math.round((grossAmount - netAmount) * 100) / 100;
+        } else {
+          vatAmount = Math.round(netAmount * cat.rate * 100) / 100;
+          grossAmount = Math.round((netAmount + vatAmount) * 100) / 100;
+        }
+      }
+    }
+    return { netAmount, vatAmount, grossAmount };
   };
 
   // Update line
@@ -308,23 +354,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const lines = [...prev.lines];
       lines[index] = { ...lines[index], [field]: value };
 
-      // Recompute amounts if quantity or unit price changes
-      if (field === 'quantity' || field === 'unitPrice') {
-        const qty = lines[index].quantity || 0;
-        const price = lines[index].unitPrice || 0;
-
-        // Use basic computation if VatService is complex to re-init here, 
-        // assuming standard non-VAT or inclusive for manual entry as a fallback,
-        // or properly call VatService.computeLineVat
-        const sponsor = sponsors.find(s => s.id === prev.sponsorId);
-        const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
-          qty,
-          price,
-          sponsor?.taxType || 'NON_VAT', // Fallback, would be better to have taxType on the line
-          prev.vatPricing === 'INCLUSIVE',
-          prev.vatRate
-        );
-
+      // Recompute amounts when quantity, unit price, or tax category changes
+      if (field === 'quantity' || field === 'unitPrice' || field === 'taxCategoryId') {
+        const { netAmount, vatAmount, grossAmount } = computeAmounts(lines[index]);
         lines[index].netAmount = netAmount;
         lines[index].vatAmount = vatAmount;
         lines[index].grossAmount = grossAmount;
@@ -349,13 +381,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const sponsor = sponsors.find(s => s.id === formData.sponsorId);
       const qty = formData.lines[index].quantity || 1;
       const unitPrice = fee.amount || 0;
-      const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
-        qty,
+      const tempLine: InvoiceLine = {
+        ...formData.lines[index],
+        quantity: qty,
         unitPrice,
-        sponsor?.taxType,
-        formData.vatPricing === 'INCLUSIVE',
-        formData.vatRate
-      );
+        taxCategoryId: fee.taxCategoryId || formData.lines[index].taxCategoryId || ''
+      };
+      const { netAmount, vatAmount, grossAmount } = computeAmounts(tempLine);
 
       const updatedLines = [...formData.lines];
       updatedLines[index] = {
@@ -661,12 +693,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const unitPrice = courseFee?.amount || (batchEnrollments[0]?.totalFees || 0);
       const quantity = batchEnrollments.length;
 
-      const { netAmount, vatAmount, grossAmount } = VatService.computeLineVat(
+      // determine a tax category for this fee if provided
+      const tempLine: InvoiceLine = {
+        id: '',
+        orgId,
+        lineNumber: 0,
+        description: '',
         quantity,
         unitPrice,
-        sponsor?.taxType,
-        vatPricing === 'INCLUSIVE'
-      );
+        netAmount: 0,
+        vatAmount: 0,
+        grossAmount: 0,
+        amount: 0,
+        taxCategoryId: courseFee?.taxCategoryId || ''
+      } as any;
+      const { netAmount, vatAmount, grossAmount } = computeAmounts(tempLine);
 
       const description = qualification
         ? `${qualification.name} - ${batch?.batchCode || 'Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`
@@ -1061,7 +1102,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             <div className="flex-1 p-6 space-y-8">
               {/* Prerequisite: Batch Selection */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-bold text-orange-800 flex items-center gap-2">
                       <Plus size={16} /> Step 1: Select Batch (Prerequisite)
@@ -1078,30 +1119,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     </select>
                     <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-500">VAT Pricing *</label>
-                      <select
-                        value={formData.vatPricing}
-                        onChange={e => setFormData({ ...formData, vatPricing: e.target.value as any })}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                      >
-                        <option value="INCLUSIVE">VAT Inclusive</option>
-                        <option value="EXCLUSIVE">VAT Exclusive</option>
-                        <option value="EXEMPT">VAT Exempt</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-500">VAT Rate (%)</label>
-                      <input
-                        type="number"
-                        value={formData.vatRate * 100}
-                        onChange={e => setFormData({ ...formData, vatRate: parseFloat(e.target.value) / 100 })}
-                        placeholder="12"
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                      />
-                    </div>
-                  </div>
+
                 </div>
               </div>
 
@@ -1278,8 +1296,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 className="w-full px-2 py-1 border rounded text-xs"
                               >
                                 <option value="">-- None --</option>
-                                {taxCategories.map(tc => (
-                                  <option key={tc.id} value={tc.id}>{tc.code} - {tc.rate}%</option>
+                                {localTaxCats.map(tc => (
+                                  <option key={tc.id} value={tc.id}>{tc.code || tc.description} {tc.rate ? `(${tc.rate}%)` : ''}</option>
                                 ))}
                               </select>
                             </td>

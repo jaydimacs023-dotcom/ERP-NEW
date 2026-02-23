@@ -16,6 +16,10 @@ describe('ARView smoke tests', () => {
       bankAccounts: undefined,
       batches: undefined,
       qualifications: undefined,
+      taxCategories: [
+        { id: 'tc1', orgId: 'org', code: 'VATGOODS', description: 'VAT Goods', taxType: 'VAT', rate: 12.0, isInclusive: false, outputAccountId: '', createdAt: '' },
+        { id: 'tc2', orgId: 'org', code: 'EXEMPT', description: 'Exempt', taxType: 'EXEMPT', rate: 0, isInclusive: false, outputAccountId: '', createdAt: '' }
+      ],
       onPostInvoice: vi.fn(),
       onNotify: vi.fn(),
     };
@@ -29,5 +33,13 @@ describe('ARView smoke tests', () => {
     const newInvoiceBtn = screen.getByText(/New Invoice/i);
     fireEvent.click(newInvoiceBtn);
     expect(screen.getByText(/Target G\/L Receivable Account/i)).toBeInTheDocument();
+    // tax category column should be available in line items
+    expect(screen.getByText(/Tax Cat/i)).toBeInTheDocument();
+    // and dropdown should include options from passed taxCategories
+    const combos = screen.getAllByRole('combobox');
+    expect(combos.length).toBeGreaterThan(0);
+    fireEvent.change(combos[0], { target: { value: 'tc1' } });
+    expect(screen.getByRole('option', { name: /VATGOODS/ })).toBeInTheDocument();
+
   });
 });

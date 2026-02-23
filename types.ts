@@ -954,6 +954,7 @@ export interface JournalLine {
   contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
   batchId?: string;
   itemId?: string;
+  taxCategoryId?: string;   // optional category used for AR/AP tracking
   assetId?: string;
   isCleared?: boolean;
   // GR/IR Clearing support
