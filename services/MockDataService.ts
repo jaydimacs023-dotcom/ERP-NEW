@@ -778,7 +778,12 @@ export class MockDataService implements IDataService {
   }
 
   async fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]> {
-    return [];
+    // return minimal hardcoded set so that components relying on dynamic fetch
+    // won't break during tests or when using mock service in development
+    return [
+      { id: 'mock-vat', orgId, code: 'VAT', description: 'VAT Goods', taxType: 'VAT', rate: 0.12, isInclusive: false, outputAccountId: '', createdAt: new Date().toISOString() },
+      { id: 'mock-exempt', orgId, code: 'EXEMPT', description: 'Tax Exempt', taxType: 'EXEMPT', rate: 0, isInclusive: false, outputAccountId: '', createdAt: new Date().toISOString() }
+    ];
   }
 
   // Invoice CRUD

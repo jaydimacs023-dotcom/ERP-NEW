@@ -4142,8 +4142,15 @@ export class SupabaseDataService implements IDataService {
   }
 
   async fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]> {
-    const data = await this.fetchFromSupabase<any>('tax_categories');
-    return this.snakeToCamel(data.filter((d: any) => d.org_id === orgId));
+    // previous attempt to include the filter in the table string produced
+    // a malformed URL because fetchFromSupabase appends `?select=*` unconditionally.
+    // To avoid the 400 error, fetch everything and filter in JS (dataset is small).
+    const all = await this.fetchFromSupabase<any>('tax_categories');
+    const filtered = Array.isArray(all) ? all.filter((d: any) => d.org_id === orgId) : [];
+    if (filtered.length === 0) {
+      console.debug('[Supabase] fetchTaxCategories returned empty set for org', orgId);
+    }
+    return this.snakeToCamel(filtered);
   }
 
   async getInvoicesByOrg(orgId: string): Promise<Invoice[]> {

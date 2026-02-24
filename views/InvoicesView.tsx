@@ -127,7 +127,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const calculateTotals = (lines: InvoiceLine[]) => {
     const subtotal = lines.reduce((sum, l) => sum + (l.netAmount || 0), 0);
     const vatAmount = lines.reduce((sum, l) => sum + (l.vatAmount || 0), 0);
-    const grandTotal = lines.reduce((sum, l) => sum + (l.grossAmount || 0), 0);
+    // grand total should be subtotal + vat, not sum of gross amounts
+    const grandTotal = Math.round((subtotal + vatAmount) * 100) / 100;
     return {
       subtotal,
       vatAmount,
@@ -191,13 +192,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // keep in sync with parent property
   useEffect(() => {
     if (taxCategories && taxCategories.length > 0) {
+      console.debug('[InvoicesView] prop taxCategories', taxCategories.length);
       setLocalTaxCats(taxCategories);
+    } else {
+      console.debug('[InvoicesView] prop taxCategories empty or undefined');
     }
   }, [taxCategories]);
 
   // refresh tax categories when invoice form becomes active (viewMode changes)
   useEffect(() => {
     if (viewMode === 'FORM' && orgId) {
+      console.debug('[InvoicesView] viewMode FORM; fetching tax categories for org', orgId);
       import('../services/DataServiceFactory').then(({ DataServiceFactory }) => {
         DataServiceFactory.getService()
           .fetchTaxCategories(orgId)
@@ -212,6 +217,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       });
     }
   }, [viewMode, orgId]);
+
+  // whenever the list of tax categories changes, recompute net/vat/gross for existing lines
+  // but do NOT touch the visible amount – leave whatever the user entered intact
+  useEffect(() => {
+    console.debug('[InvoicesView] localTaxCats changed', localTaxCats.length);
+    if (viewMode === 'FORM' && formData.lines.length > 0 && localTaxCats.length > 0) {
+      setFormData(prev => {
+        const updated = prev.lines.map(line => {
+          const { netAmount, vatAmount, grossAmount } = computeAmounts(line);
+          return { ...line, netAmount, vatAmount, grossAmount };
+        });
+        return { ...prev, lines: updated };
+      });
+    }
+  }, [localTaxCats, viewMode, formData.lines.length]);
 
   // View invoice details
   const handleView = (invoice: Invoice) => {
@@ -244,8 +264,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               ...line,
               netAmount,
               vatAmount,
-              grossAmount,
-              amount: grossAmount
+              grossAmount
+              // amount left untouched so user entries persist
             };
           }
           return line;
@@ -267,6 +287,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       return;
     }
 
+    // if there are already lines, do not override description/course fee/unit price/amount
+    if (formData.lines.length > 0) {
+      setFormData(prev => ({ ...prev, batchId, sponsorId: batch.sponsorId || prev.sponsorId }));
+      return;
+    }
+
     const qualificationFees = courseFees.filter(f => f.qualificationId === batch.qualificationId && f.isActive && !f.isDeleted);
 
     // Count students from enrollments
@@ -279,7 +305,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => {
       const netAmount = Math.round(studentCount * (fee.amount || 0) * 100) / 100;
       const vatAmount = 0;
-      const grossAmount = netAmount;
+      const grossAmount = netAmount; // initially no tax
 
       return {
         id: generateUUID(),
@@ -292,7 +318,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         netAmount,
         vatAmount,
         grossAmount,
-        amount: grossAmount,
+        amount: netAmount,
         glAccountId: fee.glAccountId
       };
     });
@@ -325,22 +351,62 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   // helper – calculate amounts based on selected tax category
+  //
+  // The amount calculation always revolves around a *base* value which
+  // helper – calculate amounts based on selected tax category
+  //
+  // The amount calculation always revolves around a *base* value which
+  // originally represented the gross figure but we now display the net
+  // amount in the invoice lines. By default the base is computed as quantity
+  // × unitPrice, but if an explicit `line.amount` value is present we treat
+  // that as the base so manual adjustments (e.g. import or override) are
+  // respected.
+  //
+  // Once we have the base, the tax category determines how we split it:
+  //
+  // * exclusive (isInclusive=false): base = net; VAT is computed on it and
+  //   gross = net + vat
+  // * inclusive (isInclusive=true): base = gross; net is derived by removing
+  //   the tax portion and vat = gross - net
+  //
+  // The resulting `grossAmount` is written back into the line along with
+  // `netAmount` and `vatAmount`.  Totals are calculated separately:
+  // `subtotal` sums all net amounts, `vatAmount` sums the tax lines, and
+  // `grandTotal` sums gross amounts.
   const computeAmounts = (line: InvoiceLine) => {
     const qty = line.quantity || 0;
     const price = line.unitPrice || 0;
-    let netAmount = Math.round(qty * price * 100) / 100;
+    // start with qty*price but allow explicit override
+    let base = Math.round(qty * price * 100) / 100;
+    if (line.amount && line.amount > 0) {
+      base = line.amount;
+    }
+
+    let netAmount = base;
     let vatAmount = 0;
-    let grossAmount = netAmount;
+    let grossAmount = base;
 
     if (line.taxCategoryId) {
       const cat = localTaxCats.find(c => c.id === line.taxCategoryId);
       if (cat && cat.taxType === 'VAT' && typeof cat.rate === 'number') {
-        if (cat.isInclusive) {
-          grossAmount = netAmount;
-          netAmount = Math.round((grossAmount / (1 + cat.rate)) * 100) / 100;
-          vatAmount = Math.round((grossAmount - netAmount) * 100) / 100;
+        // The database may store percent rates (e.g. 12) or decimals (0.12).
+        // Normalize so we always work with a fraction.
+        const rate = cat.rate > 1 ? cat.rate / 100 : cat.rate;
+        const isInclusive = cat.isInclusive;
+
+        if (isInclusive) {
+          // For inclusive tax categories the user-entered amount represents
+          // the gross price.  We calculate VAT simply as rate × gross, then
+          // derive the net by subtracting the VAT portion.  (This matches the
+          // behaviour described by the user: 39 720 gross at 12% -> VAT
+          // 4 766.40 and net 34 953.60.)
+          grossAmount = base;
+          vatAmount = Math.round(grossAmount * rate * 100) / 100;
+          netAmount = Math.round((grossAmount - vatAmount) * 100) / 100;
         } else {
-          vatAmount = Math.round(netAmount * cat.rate * 100) / 100;
+          // Exclusive VAT: base is the net amount, as before.
+          netAmount = base;
+          vatAmount = Math.round(netAmount * rate * 100) / 100;
           grossAmount = Math.round((netAmount + vatAmount) * 100) / 100;
         }
       }
@@ -354,13 +420,24 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const lines = [...prev.lines];
       lines[index] = { ...lines[index], [field]: value };
 
-      // Recompute amounts when quantity, unit price, or tax category changes
-      if (field === 'quantity' || field === 'unitPrice' || field === 'taxCategoryId') {
+      // when qty or unit price change, we may want to auto‑populate the amount
+      if ((field === 'quantity' || field === 'unitPrice')) {
+        // only update the amount if the user hasn't already overridden it (i.e. it's zero)
+        if (!lines[index].amount) {
+          const qty = lines[index].quantity || 0;
+          const upr = lines[index].unitPrice || 0;
+          lines[index].amount = Math.round(qty * upr * 100) / 100;
+        }
+      }
+
+      // Recompute net/vat/gross when any of the relevant fields change
+      if (field === 'quantity' || field === 'unitPrice' || field === 'taxCategoryId' || field === 'amount') {
         const { netAmount, vatAmount, grossAmount } = computeAmounts(lines[index]);
         lines[index].netAmount = netAmount;
         lines[index].vatAmount = vatAmount;
         lines[index].grossAmount = grossAmount;
-        lines[index].amount = grossAmount;
+        // do not touch `amount` when tax category changes – user value stays
+        // if the user edited the amount directly we already set it above
       }
       return { ...prev, lines };
     });
@@ -398,7 +475,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         netAmount,
         vatAmount,
         grossAmount,
-        amount: grossAmount,
+        amount: netAmount,
         glAccountId: fee.glAccountId || updatedLines[index].glAccountId,
         taxCategoryId: fee.taxCategoryId || updatedLines[index].taxCategoryId
       };
@@ -1243,6 +1320,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </button>
                 </div>
 
+                {viewMode === 'FORM' && localTaxCats.length === 0 && (
+                  <div className="p-2 text-red-600 bg-red-100 text-xs">
+                    ⚠️ No tax categories loaded. Please ensure your organization has entries in the <code>tax_categories</code> table and that RLS policies permit access.
+                  </div>
+                )}
+
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
@@ -1297,7 +1380,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               >
                                 <option value="">-- None --</option>
                                 {localTaxCats.map(tc => (
-                                  <option key={tc.id} value={tc.id}>{tc.code || tc.description} {tc.rate ? `(${tc.rate}%)` : ''}</option>
+                                  <option key={tc.id} value={tc.id}>
+                                    {tc.code || tc.description || tc.id} {tc.rate ? `(${tc.rate}%)` : ''}
+                                  </option>
                                 ))}
                               </select>
                             </td>
@@ -1321,7 +1406,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               />
                             </td>
                             <td className="px-3 py-2 text-right font-medium">
-                              {formatCurrency(line.amount)}
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={line.amount}
+                                onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                className="w-full px-2 py-1 border rounded text-right"
+                              />
                             </td>
                             <td className="px-3 py-2">
                               <button
