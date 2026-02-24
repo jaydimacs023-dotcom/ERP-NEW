@@ -1361,7 +1361,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               <select
                                 value={line.courseFeeId || ''}
                                 onChange={e => handleApplyCourseFee(idx, e.target.value)}
-                                className="w-full px-3 py-1 border rounded text-xs"
+                                className="w-full px-3 py-1 rounded text-xs"
                               >
                                 <option value="">-- Select --</option>
                                 {courseFees.map(cf => (
@@ -1375,14 +1375,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 value={line.description}
                                 onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
                                 placeholder="Description"
-                                className="w-full px-2 py-1 border rounded"
+                                className="w-full px-2 py-1 rounded"
                               />
                             </td>
                             <td className="px-3 py-2">
                               <select
                                 value={line.taxCategoryId || ''}
                                 onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
-                                className="w-full px-2 py-1 border rounded text-xs"
+                                className="w-full px-2 py-1 rounded text-xs"
                               >
                                 <option value="">-- None --</option>
                                 {localTaxCats.map(tc => (
@@ -1398,7 +1398,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="1"
                                 value={line.quantity}
                                 onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
-                                className="w-full px-2 py-1 border rounded text-right"
+                                className="w-full px-2 py-1 rounded text-right"
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -1408,7 +1408,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="0"
                                 value={line.unitPrice}
                                 onChange={e => handleUpdateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 border rounded text-right"
+                                className="w-full px-2 py-1 rounded text-right"
                               />
                             </td>
                             <td className="px-3 py-2 text-right font-medium">
@@ -1418,7 +1418,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="0"
                                 value={line.amount}
                                 onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 border rounded text-right"
+                                className="w-full px-2 py-1 rounded text-right"
                               />
                             </td>
                             <td className="px-3 py-2">
