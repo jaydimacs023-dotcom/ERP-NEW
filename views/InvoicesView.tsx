@@ -1260,10 +1260,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Transaction Description</label>
-                  <textarea
+                  <input
                     value={formData.notes}
                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                    rows={2}
                     className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
                     placeholder="Invoice notes or memo..."
                   />
