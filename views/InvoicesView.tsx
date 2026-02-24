@@ -1178,7 +1178,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
                 </h3>
                 {formData.invoiceNo && (
-                  <p className="text-xs font-medium text-gray-500 mt-0.5">
+                  <p className="text-xl font-medium text-red-500 mt-0.5">
                     Invoice No: <span className="text-gray-900">{formData.invoiceNo}</span>
                   </p>
                 )}
@@ -1186,55 +1186,88 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
 
             <div className="flex-1 p-6 space-y-8">
-              {/* Prerequisite: Batch Selection */}
+              {/* Batch / Sponsor / Dates row */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* sponsor on left */}
                   <div>
-                    <label className="text-sm font-bold text-orange-800 flex items-center gap-2">
-                      <Plus size={16} /> Step 1: Select Batch (Prerequisite)
-                    </label>
+                    <label className="text-xs font-medium text-gray-500">Sponsor</label>
+                    <select
+                      value={formData.sponsorId}
+                      onChange={e => handleSponsorChange(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    >
+                      <option value="">-- Select Sponsor --</option>
+                      {sponsors.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* batch in center */}
+                  <div>
+                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items.</p>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
-                      className="w-full mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200"
+                      className="mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 w-full"
                     >
                       <option value="">-- Select Batch --</option>
                       {batches.map(b => (
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
-                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items.</p>
+                    
                   </div>
-
-                </div>
-              </div>
-
-              {/* Invoice Dates */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
-                    <input
-                      type="date"
-                      value={formData.invoiceDate}
-                      onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">Due Date *</label>
-                    <input
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
-                    />
+                  {/* dates on right */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
+                      <input
+                        type="date"
+                        value={formData.invoiceDate}
+                        onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Due Date *</label>
+                      <input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Bill To */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Terms</label>
+                  <select
+                    value={formData.terms}
+                    onChange={e => setFormData({ ...formData, terms: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="COD">COD</option>
+                    <option value="Net 7">Net 7</option>
+                    <option value="Net 15">Net 15</option>
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 60">Net 60</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Transaction Description</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                    rows={2}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    placeholder="Invoice notes or memo..."
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">GL Reference</label>
                   <div className="mt-1">
@@ -1257,43 +1290,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <div className="px-3 py-2 text-sm text-gray-400 bg-gray-50 border rounded-lg text-center">—</div>
                     )}
                   </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Sponsor</label>
-                  <select
-                    value={formData.sponsorId}
-                    onChange={e => handleSponsorChange(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  >
-                    <option value="">-- Select Sponsor --</option>
-                    {sponsors.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Reference</label>
-                  <input
-                    type="text"
-                    value={formData.reference}
-                    onChange={e => setFormData({ ...formData, reference: e.target.value })}
-                    placeholder="External ref"
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Terms</label>
-                  <select
-                    value={formData.terms}
-                    onChange={e => setFormData({ ...formData, terms: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  >
-                    <option value="COD">COD</option>
-                    <option value="Net 7">Net 7</option>
-                    <option value="Net 15">Net 15</option>
-                    <option value="Net 30">Net 30</option>
-                    <option value="Net 60">Net 60</option>
-                  </select>
                 </div>
               </div>
 
@@ -1340,12 +1336,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-3 py-2 text-left w-8">#</th>
-                        <th className="px-3 py-2 text-left">Description</th>
-                        <th className="px-3 py-2 text-left w-32">Course Fee</th>
-                        <th className="px-3 py-2 text-left w-32">Tax Cat</th>
-                        <th className="px-3 py-2 text-right w-20">Qty</th>
-                        <th className="px-3 py-2 text-right w-28">Unit Price</th>
-                        <th className="px-3 py-2 text-right w-28">Amount</th>
+                        <th className="px-3 py-2 text-left">Course Fee</th>
+                        <th className="px-3 py-2 text-left w-50" >Description</th>
+                        <th className="px-3 py-2 text-right w-25">Tax Category</th>
+                        <th className="px-3 py-2 text-right w-25">Qty</th>
+                        <th className="px-3 py-2 text-right w-25">Unit Price</th>
+                        <th className="px-3 py-2 text-right w-25">Amount</th>
                         <th className="px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -1360,7 +1356,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         formData.lines.map((line, idx) => (
                           <tr key={line.id || idx} className="border-t">
                             <td className="px-3 py-2 text-gray-400">{line.lineNumber}</td>
+                           
                             <td className="px-3 py-2">
+                              <select
+                                value={line.courseFeeId || ''}
+                                onChange={e => handleApplyCourseFee(idx, e.target.value)}
+                                className="w-full px-3 py-1 border rounded text-xs"
+                              >
+                                <option value="">-- Select --</option>
+                                {courseFees.map(cf => (
+                                  <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
+                                ))}
+                              </select>
+                            </td>
+                             <td className="px-3 py-2">
                               <input
                                 type="text"
                                 value={line.description}
@@ -1368,18 +1377,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 placeholder="Description"
                                 className="w-full px-2 py-1 border rounded"
                               />
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={line.courseFeeId || ''}
-                                onChange={e => handleApplyCourseFee(idx, e.target.value)}
-                                className="w-full px-2 py-1 border rounded text-xs"
-                              >
-                                <option value="">-- Select --</option>
-                                {courseFees.map(cf => (
-                                  <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
-                                ))}
-                              </select>
                             </td>
                             <td className="px-3 py-2">
                               <select
@@ -1463,15 +1460,15 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               </div>
 
-              {/* Notes */}
+              {/* Reference */}
               <div>
-                <label className="text-xs font-medium text-gray-500">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  rows={2}
+                <label className="text-xs font-medium text-gray-500">Reference</label>
+                <input
+                  type="text"
+                  value={formData.reference}
+                  onChange={e => setFormData({ ...formData, reference: e.target.value })}
+                  placeholder="External ref"
                   className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                  placeholder="Invoice notes or memo..."
                 />
               </div>
             </div>
