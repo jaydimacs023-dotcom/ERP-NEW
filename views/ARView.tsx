@@ -1,6 +1,6 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
 import { AccountingService } from '../accountingService';
 import {
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock,
@@ -22,7 +22,7 @@ interface ARViewProps {
   bankAccounts: BankAccount[];
   batches: Batch[];
   qualifications: Qualification[];
-  taxCategories: TaxCategory[]; // available tax categories for selection
+  taxCategories: TaxCategoryEntry[]; // available tax categories for selection
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onUpdateInvoice?: (entryId: string, entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onApproveInvoice?: (entryId: string, comment?: string) => void;
@@ -517,8 +517,11 @@ const ARView: React.FC<ARViewProps> = ({
     }
   };
 
-  // helper mirroring computeAmounts logic; extracts VAT based on code or rate
-  const extractVat = (amount: number, cat?: TaxCategory) => {
+  // helper that calculates output VAT using the prescribed formula for special tax codes:
+  //   VATGOODS/VATSERV → amount/1.12 * 12%
+  //   NVGOODS/NVSERV/EXMPTGOODS/EXMPTSERV/ZEROGOODS/ZEROSERV → amount/1.12 * 0%
+  // for any other category, fall back to the normal rate/rate‑inclusive logic.
+  const extractVat = (amount: number, cat?: TaxCategoryEntry) => {
     if (!cat) return 0;
     const code = (cat.code || '').toUpperCase();
     let rateOverride: number | undefined;

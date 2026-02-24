@@ -373,15 +373,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // categories identically for output VAT computation.  For all other
   // categories we fall back to the previous inclusive/exclusive logic.
 
-  const extractVat = (amount: number, cat?: TaxCategory): number => {
+  const extractVat = (amount: number, cat?: TaxCategoryEntry): number => {
     if (!cat) return 0;
     const code = (cat.code || '').toUpperCase();
     let rateOverride: number | undefined;
     if (/^(VATGOODS|VATSERV)$/.test(code)) {
-      // standard VAT categories are taxed at 12%
+      // use prescribed formula: line amount is assumed inclusive
+      // vat = amount / 1.12 * 12%
       rateOverride = 0.12;
     } else if (/^(NVGOODS|NVSERV|EXMPTGOODS|EXMPTSERV|ZEROGOODS|ZEROSERV)$/.test(code)) {
-      // non-vatable, exempt, and zero‑rated lines carry 0% output VAT
+      // these categories are treated as 0% vat using the same base formula
       rateOverride = 0;
     }
     if (rateOverride !== undefined) {

@@ -1,4 +1,18 @@
-﻿// File intentionally left blank (RecurringInvoicesView removed)
+﻿import React, { useState, useMemo } from 'react';
+import { RecurringInvoice, RecurringInvoiceLineItem, Customer, ChartOfAccount, Item, RecurrenceFrequency, TaxCategoryEntry } from '../types';
+
+interface RecurringInvoicesViewProps {
+  orgId: string;
+  currency: string;
+  recurringInvoices: RecurringInvoice[];
+  recurringInvoiceHistory: RecurringInvoice[];
+  customers: Customer[];
+  accounts: ChartOfAccount[];
+  items: Item[];
+  taxCategories: TaxCategoryEntry[];
+  onCreateRecurringInvoice: (invoice: RecurringInvoice) => void;
+  onUpdateRecurringInvoice: (invoice: RecurringInvoice) => void;
+  onDeleteRecurringInvoice: (id: string) => void;
   onRunRecurringInvoice: (id: string) => void;
   onNotify: (type: 'success' | 'error' | 'warning', message: string) => void;
 }
@@ -107,6 +121,34 @@ export default function RecurringInvoicesView({
     return `${amount < 0 ? '-' : ''}${symbol}${formatted}`;
   };
 
+  // helper that applies the required output‑VAT formula per tax category codes.
+  // for VATGOODS/VATSERV use: amount / 1.12 * 12%
+  // for NVGOODS/NVSERV/EXMPTGOODS/EXMPTSERV/ZEROGOODS/ZEROSERV use: amount / 1.12 * 0%
+  // otherwise fall back to existing rate/isInclusive logic.
+  const getVatForAmount = (amount: number, taxCategoryId?: string) => {
+    if (!taxCategoryId) return 0;
+    const cat = taxCategories.find(tc => tc.id === taxCategoryId);
+    if (!cat) return 0;
+    const code = (cat.code || '').toUpperCase();
+    let rateOverride: number | undefined;
+    if (/^(VATGOODS|VATSERV)$/.test(code)) {
+      rateOverride = 0.12;
+    } else if (/^(NVGOODS|NVSERV|EXMPTGOODS|EXMPTSERV|ZEROGOODS|ZEROSERV)$/.test(code)) {
+      rateOverride = 0;
+    }
+    if (rateOverride !== undefined) {
+      return Math.round((amount / 1.12 * rateOverride) * 100) / 100;
+    }
+    if (typeof cat.rate === 'number') {
+      const r = cat.rate > 1 ? cat.rate / 100 : cat.rate;
+      if (cat.isInclusive) {
+        return Math.round((amount / (1 + r) * r) * 100) / 100;
+      }
+      return Math.round(amount * r * 100) / 100;
+    }
+    return 0;
+  };
+
   // Calculate totals from line items
   const calculateTotals = useMemo(() => {
     let subtotal = 0;
@@ -116,11 +158,11 @@ export default function RecurringInvoicesView({
       subtotal += lineTotal;
       const item = items.find(i => i.id === line.itemId);
       if (item?.taxCategoryId) {
-        vatAmount += lineTotal * 0.12; // VAT 12%
+        vatAmount += getVatForAmount(lineTotal, item.taxCategoryId);
       }
     });
     return { subtotal, vatAmount, total: subtotal + vatAmount };
-  }, [lineItems, items]);
+  }, [lineItems, items, taxCategories]);
 
   // Add line item
   const handleAddLineItem = () => {
