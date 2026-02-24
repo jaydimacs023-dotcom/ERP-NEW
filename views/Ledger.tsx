@@ -86,7 +86,7 @@ const Ledger: React.FC<LedgerProps> = ({
                     <td className="px-8 py-6 whitespace-nowrap align-top">
                       <div className="text-sm font-semibold text-gray-700">{entry.date}</div>
                       <div className="text-xs text-[#F47721] font-mono font-semibold mt-1 uppercase tracking-tighter">
-                        {entry.glEntryNumber || entry.reference}
+                        {(entry.glEntryNumber || entry.reference)?.trim()}
                       </div>
                       {entry.glEntryNumber && entry.reference && (
                         <div className="text-[10px] text-gray-400 font-medium mt-0.5">Ref: {entry.reference}</div>

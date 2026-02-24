@@ -560,6 +560,23 @@ export default function App() {
     setActiveTab(getDefaultTab(user.role));
   };
 
+  // helper to produce the next sequential GL reference (GL00000001 style)
+  const generateNextGlRef = (): string => {
+    const orgJournalEntries = journalEntries.filter(e => e.orgId === currentOrgId && e.glEntryNumber);
+    const seqs = orgJournalEntries
+      .map(e => (e.glEntryNumber || '').trim())
+      .map(n => {
+        // take the last numeric group so entries like "GL - 2026 -00012" become "00012"
+        const m = n.match(/(\d+)$/);
+        return m ? m[1] : '';
+      })
+      .map(s => parseInt(s, 10))
+      .filter(n => !isNaN(n));
+    const max = seqs.length > 0 ? Math.max(...seqs) : 0;
+    const next = max + 1;
+    return `GL${String(next).padStart(8, '0')}`;
+  };
+
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const fullEntry = {
       ...entry,
@@ -569,6 +586,12 @@ export default function App() {
       createdBy: currentUser?.id || 'system',
       createdAt: new Date().toISOString()
     } as JournalEntry;
+
+    // assign GL ref if missing
+    if (!fullEntry.glEntryNumber) {
+      fullEntry.glEntryNumber = generateNextGlRef();
+      fullEntry.reference = fullEntry.reference || fullEntry.glEntryNumber;
+    }
 
     try {
       console.info('[App] Posting journal entry:', fullEntry.id, fullEntry.sourceType);
@@ -655,7 +678,7 @@ export default function App() {
   const handleViewJournal = (journalEntryId: string) => {
     const entry = journalEntries.find(e => e.id === journalEntryId);
     if (entry) {
-      setLedgerSearchTerm(entry.glEntryNumber || entry.reference);
+      setLedgerSearchTerm((entry.glEntryNumber || entry.reference)?.trim() || '');
       setActiveTab('ledger');
     }
   };
@@ -2583,15 +2606,8 @@ export default function App() {
     const jeId = crypto.randomUUID();
 
     // ── Generate sequential GL reference number scoped to organization ──
-    const orgJournalEntries = journalEntries.filter(je => je.orgId === currentOrgId);
-    const existingGlNumbers = orgJournalEntries
-      .map(je => je.glEntryNumber)
-      .filter((n): n is string => !!n && n.startsWith('GL'))
-      .map(n => parseInt(n.replace('GL', ''), 10))
-      .filter(n => !isNaN(n));
-
-    const nextSeq = existingGlNumbers.length > 0 ? Math.max(...existingGlNumbers) + 1 : 1;
-    const glRef = `GL${String(nextSeq).padStart(8, '0')} `;
+    // reuse helper for consistent sequential format
+    const glRef = generateNextGlRef();
 
     // ── Find GL accounts ───────────────────────────────────────────────────
     const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
@@ -3323,12 +3339,8 @@ export default function App() {
       // Generate GL Entry Number when approving
       let updatePayload: any = { status: status as any };
       if (status === 'APPROVED' && existing && !existing.glEntryNumber) {
-        const year = new Date().getFullYear();
-        // Count all entries with GL numbers (from both journal entries and POs)
-        const postedJournals = journalEntries.filter(e => e.status === 'POSTED' && e.glEntryNumber);
-        const approvedPOs = purchaseOrders.filter(p => p.glEntryNumber);
-        const nextNum = postedJournals.length + approvedPOs.length + 1;
-        const glEntryNumber = `GL - ${year} -${String(nextNum).padStart(5, '0')} `;
+        // use unified sequential reference
+        const glEntryNumber = generateNextGlRef();
         updatePayload.glEntryNumber = glEntryNumber;
         updatePayload.approvedBy = currentUser?.id;
         updatePayload.approvedAt = new Date().toISOString();
@@ -3802,6 +3814,7 @@ export default function App() {
               accounts={filteredAccounts}
               currentUser={currentUser}
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              sponsors={sponsors.filter(sp => sp.orgId === currentOrgId && !sp.isDeleted)}
               batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
               entries={activeJournalEntries}

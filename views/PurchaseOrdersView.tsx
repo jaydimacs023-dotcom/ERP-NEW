@@ -178,7 +178,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     </td>
                     <td className="px-6 py-6">
                       <div className="text-xs font-mono font-bold text-emerald-600">
-                        {po.glEntryNumber || <span className="text-gray-300 italic font-normal">—</span>}
+                        {(po.glEntryNumber || '').trim() || <span className="text-gray-300 italic font-normal">—</span>}
                       </div>
                     </td>
                     <td className="px-6 py-6">

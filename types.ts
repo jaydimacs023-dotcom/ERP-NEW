@@ -320,7 +320,7 @@ export interface PurchaseOrder extends BaseEntity {
   vendorId: string;
   date: string;
   reference: string;
-  glEntryNumber?: string; // Generated when APPROVED - GL transaction reference (e.g., GL-2026-00001)
+  glEntryNumber?: string; // Generated when APPROVED - GL transaction reference (e.g., GL00000001)
   status: PurchaseOrderStatus;
   lines: PurchaseOrderLine[];
   totalAmount: number;
@@ -871,7 +871,7 @@ export interface JournalEntry extends BaseEntity {
   date: string;
   description: string;
   reference: string;
-  glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL-2026-00001)
+  glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL00000001)
   status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;

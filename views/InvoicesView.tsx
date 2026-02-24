@@ -1071,7 +1071,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           {inv.journalEntryId ? (
                             (() => {
                               const je = journalEntries.find(j => j.id === inv.journalEntryId);
-                              const glNum = je?.glEntryNumber || je?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`;
+                              const glNum = (je?.glEntryNumber || je?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim();
                               return <span className="text-xs font-medium text-gray-600">{glNum}</span>;
                             })()
                           ) : (
@@ -1232,7 +1232,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     {editingInvoice?.journalEntryId ? (
                       (() => {
                         const je = journalEntries.find(j => j.id === editingInvoice.journalEntryId);
-                        const glNum = je?.glEntryNumber || je?.reference || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`;
+                        const glNum = (je?.glEntryNumber || je?.reference || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`).trim();
                         return (
                           <button
                             onClick={() => onViewJournal && onViewJournal(editingInvoice.journalEntryId!)}
