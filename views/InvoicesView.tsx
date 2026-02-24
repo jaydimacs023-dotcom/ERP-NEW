@@ -362,17 +362,42 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // that as the base so manual adjustments (e.g. import or override) are
   // respected.
   //
-  // Once we have the base, the tax category determines how we split it:
+  // VAT is now always computed using a unified formula for special tax
+  // category codes (VATGOODS, VATSERV, NVGOODS, NVSERV, EXMPTGOODS,
+  // EXMPTSERV, ZEROGOODS, ZEROSERV).  The formula is:
   //
-  // * exclusive (isInclusive=false): base = net; VAT is computed on it and
-  //   gross = net + vat
-  // * inclusive (isInclusive=true): base = gross; net is derived by removing
-  //   the tax portion and vat = gross - net
+  //     vat = amount ÷ 1.12 × rate
   //
-  // The resulting `grossAmount` is written back into the line along with
-  // `netAmount` and `vatAmount`.  Totals are calculated separately:
-  // `subtotal` sums all net amounts, `vatAmount` sums the tax lines, and
-  // `grandTotal` sums gross amounts.
+  // with rate 12% for the first six codes and 0% for the zero‑rated ones.
+  // This reflects the user's request to treat non‑VAT, exempt, and regular
+  // categories identically for output VAT computation.  For all other
+  // categories we fall back to the previous inclusive/exclusive logic.
+
+  const extractVat = (amount: number, cat?: TaxCategory): number => {
+    if (!cat) return 0;
+    const code = (cat.code || '').toUpperCase();
+    let rateOverride: number | undefined;
+    if (/^(VATGOODS|VATSERV)$/.test(code)) {
+      // standard VAT categories are taxed at 12%
+      rateOverride = 0.12;
+    } else if (/^(NVGOODS|NVSERV|EXMPTGOODS|EXMPTSERV|ZEROGOODS|ZEROSERV)$/.test(code)) {
+      // non-vatable, exempt, and zero‑rated lines carry 0% output VAT
+      rateOverride = 0;
+    }
+    if (rateOverride !== undefined) {
+      return Math.round((amount / 1.12 * rateOverride) * 100) / 100;
+    }
+    // non‑special categories: use existing rate based logic
+    if (typeof cat.rate === 'number') {
+      const r = cat.rate > 1 ? cat.rate / 100 : cat.rate;
+      if (cat.isInclusive) {
+        return Math.round((amount / (1 + r) * r) * 100) / 100;
+      }
+      return Math.round(amount * r * 100) / 100;
+    }
+    return 0;
+  };
+
   const computeAmounts = (line: InvoiceLine) => {
     const qty = line.quantity || 0;
     const price = line.unitPrice || 0;
@@ -388,27 +413,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
     if (line.taxCategoryId) {
       const cat = localTaxCats.find(c => c.id === line.taxCategoryId);
-      if (cat && cat.taxType === 'VAT' && typeof cat.rate === 'number') {
-        // The database may store percent rates (e.g. 12) or decimals (0.12).
-        // Normalize so we always work with a fraction.
-        const rate = cat.rate > 1 ? cat.rate / 100 : cat.rate;
-        const isInclusive = cat.isInclusive;
-
-        if (isInclusive) {
-          // For inclusive tax categories the user-entered amount represents
-          // the gross price.  We calculate VAT simply as rate × gross, then
-          // derive the net by subtracting the VAT portion.  (This matches the
-          // behaviour described by the user: 39 720 gross at 12% -> VAT
-          // 4 766.40 and net 34 953.60.)
-          grossAmount = base;
-          vatAmount = Math.round(grossAmount * rate * 100) / 100;
-          netAmount = Math.round((grossAmount - vatAmount) * 100) / 100;
-        } else {
-          // Exclusive VAT: base is the net amount, as before.
-          netAmount = base;
-          vatAmount = Math.round(netAmount * rate * 100) / 100;
-          grossAmount = Math.round((netAmount + vatAmount) * 100) / 100;
-        }
+      if (cat) {
+        vatAmount = extractVat(base, cat);
+        netAmount = Math.round((base - vatAmount) * 100) / 100;
+        grossAmount = base;
       }
     }
     return { netAmount, vatAmount, grossAmount };

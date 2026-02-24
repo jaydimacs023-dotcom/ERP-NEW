@@ -1,6 +1,6 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
 import { AccountingService } from '../accountingService';
 import {
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock,
@@ -79,7 +79,7 @@ const ARView: React.FC<ARViewProps> = ({
     { itemId: '', qty: 1, price: 0, taxCategoryId: '' }
   ]);
   // tax categories available for invoice modal
-  const [localTaxCats, setLocalTaxCats] = useState<TaxCategory[]>(taxCategories);
+  const [localTaxCats, setLocalTaxCats] = useState<TaxCategoryEntry[]>(taxCategories as TaxCategoryEntry[]);
 
   // Get batches filtered by selected sponsor (only show batches with sponsorId matching recipientId)
   const sponsoredBatches = useMemo(() => {
@@ -517,23 +517,49 @@ const ARView: React.FC<ARViewProps> = ({
     }
   };
 
-  const totalInvoiceNet = useMemo(() => invoiceLines.reduce((sum, l) => sum + (l.qty * l.price), 0), [invoiceLines]);
+  // helper mirroring computeAmounts logic; extracts VAT based on code or rate
+  const extractVat = (amount: number, cat?: TaxCategory) => {
+    if (!cat) return 0;
+    const code = (cat.code || '').toUpperCase();
+    let rateOverride: number | undefined;
+    if (/^(VATGOODS|VATSERV)$/.test(code)) {
+      rateOverride = 0.12;
+    } else if (/^(NVGOODS|NVSERV|EXMPTGOODS|EXMPTSERV|ZEROGOODS|ZEROSERV)$/.test(code)) {
+      rateOverride = 0;
+    }
+    if (rateOverride !== undefined) {
+      return Math.round((amount / 1.12 * rateOverride) * 100) / 100;
+    }
+    if (typeof cat.rate === 'number') {
+      const r = cat.rate > 1 ? cat.rate / 100 : cat.rate;
+      if (cat.isInclusive) {
+        return Math.round((amount / (1 + r) * r) * 100) / 100;
+      }
+      return Math.round(amount * r * 100) / 100;
+    }
+    return 0;
+  };
+
+  const totalInvoiceNet = useMemo(() => invoiceLines.reduce((sum, l) => {
+    const cat = localTaxCats.find(tc => tc.id === l.taxCategoryId);
+    const amt = l.qty * l.price;
+    const vat = extractVat(amt, cat);
+    return sum + (amt - vat);
+  }, 0), [invoiceLines, localTaxCats]);
 
   const vatableSales = useMemo(() => invoiceLines.reduce((sum, l) => {
     const cat = localTaxCats.find(tc => tc.id === l.taxCategoryId);
-    if (cat && cat.taxType === 'VAT' && cat.rate) {
-      return sum + (l.qty * l.price);
-    }
-    return sum;
+    const amt = l.qty * l.price;
+    const vat = extractVat(amt, cat);
+    return sum + (amt - vat);
   }, 0), [invoiceLines, localTaxCats]);
 
   const totalVat = useMemo(() => {
     return invoiceLines.reduce((sum, l) => {
       const cat = localTaxCats.find(tc => tc.id === l.taxCategoryId);
-      if (cat && cat.taxType === 'VAT' && cat.rate) {
-        return sum + (l.qty * l.price * (cat.rate / 100));
-      }
-      return sum;
+      const amt = l.qty * l.price;
+      const vatLine = extractVat(amt, cat);
+      return sum + vatLine;
     }, 0);
   }, [invoiceLines, localTaxCats]);
   const grossInvoiceAmount = totalInvoiceNet + totalVat;

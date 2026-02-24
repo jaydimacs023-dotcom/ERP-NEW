@@ -133,11 +133,15 @@ describe('InvoicesView tax category dropdown', () => {
     expect(screen.getByText(/Grand Total:/i).nextSibling).toHaveTextContent('100');
   });
 
-  it('uses gross when category is inclusive and computes VAT as rate × gross', () => {
-    // the price is quoted VAT‑inclusive; VAT is simply a percentage of that
-    vi.spyOn(SupabaseDataService.prototype, 'fetchTaxCategories').mockResolvedValue([
-      { id: 'tc_vs', orgId: 'org1', code: 'VatServ', description: 'Service VAT', taxType: 'VAT', rate: 0.12, isInclusive: true, outputAccountId: '', createdAt: '' }
-    ]);
+  it('computes VAT correctly for inclusive categories (VATGOODS or VATSERV)', () => {
+    // inclusive tax categories should extract VAT from the gross amount using
+    // the formula: (gross ÷ (1 + rate)) × rate.  behaviour must be identical
+    // whether the code is "VATGOODS" or "VatServ".
+    const cats = [
+      { id: 'tc_vs', orgId: 'org1', code: 'VatServ', description: 'Service VAT', taxType: 'VAT', rate: 0.12, isInclusive: true, outputAccountId: '', createdAt: '' },
+      { id: 'tc_g', orgId: 'org1', code: 'VATGOODS', description: 'Goods VAT', taxType: 'VAT', rate: 0.12, isInclusive: true, outputAccountId: '', createdAt: '' }
+    ];
+    vi.spyOn(SupabaseDataService.prototype, 'fetchTaxCategories').mockResolvedValue(cats);
     render(<InvoicesView {...baseProps} taxCategories={[]} />);
     fireEvent.click(screen.getByText(/New Invoice/i));
     fireEvent.click(screen.getByText(/Add Line/i));
@@ -150,12 +154,49 @@ describe('InvoicesView tax category dropdown', () => {
     fireEvent.change(price2, { target: { value: '3972' } });
 
     const gross = 10 * 3972;          // 39,720
-    const expectedVat = Math.round(gross * 0.12 * 100) / 100; // 4,766.4
-    const expectedNet = Math.round((gross - expectedVat) * 100) / 100; // 34,953.6
+    const expectedVat = Math.round((gross / 1.12 * 0.12) * 100) / 100; // 4,251.43
+    const expectedNet = Math.round((gross - expectedVat) * 100) / 100; // 35,468.57
 
     expect(screen.getByText(/Subtotal:/i).nextSibling).toHaveTextContent(expectedNet.toString());
     expect(screen.getByText(/VAT:/i).nextSibling).toHaveTextContent(expectedVat.toString());
     expect(screen.getByText(/Grand Total:/i).nextSibling).toHaveTextContent(gross.toString());
+
+    // switch to the other category and ensure amounts remain unchanged
+    fireEvent.change(selects2[0], { target: { value: 'tc_g' } });
+    expect(screen.getByText(/Subtotal:/i).nextSibling).toHaveTextContent(expectedNet.toString());
+    expect(screen.getByText(/VAT:/i).nextSibling).toHaveTextContent(expectedVat.toString());
+    expect(screen.getByText(/Grand Total:/i).nextSibling).toHaveTextContent(gross.toString());
+  });
+
+  it('applies same extraction formula to NV, EXMPT and handles zero rate', () => {
+    vi.spyOn(SupabaseDataService.prototype, 'fetchTaxCategories').mockResolvedValue([
+      { id: 'tc_nv', orgId: 'org1', code: 'NVGOODS', description: 'Non‑VAT Goods', taxType: 'VAT', rate: 0.12, isInclusive: true, outputAccountId: '', createdAt: '' },
+      { id: 'tc_ex', orgId: 'org1', code: 'EXMPTGOODS', description: 'Exempt Goods', taxType: 'VAT', rate: 0.12, isInclusive: true, outputAccountId: '', createdAt: '' },
+      { id: 'tc_z', orgId: 'org1', code: 'ZEROGOODS', description: 'Zero‑rate Goods', taxType: 'VAT', rate: 0, isInclusive: true, outputAccountId: '', createdAt: '' }
+    ]);
+    render(<InvoicesView {...baseProps} taxCategories={[]} />);
+    fireEvent.click(screen.getByText(/New Invoice/i));
+    fireEvent.click(screen.getByText(/Add Line/i));
+
+    const selects = screen.getAllByRole('combobox');
+    const qty = screen.getByDisplayValue('1');
+    const price = screen.getByDisplayValue('0');
+    fireEvent.change(qty, { target: { value: '5' } });
+    fireEvent.change(price, { target: { value: '112' } });
+    const gross = 5 * 112; // 560
+    const vat12 = Math.round((gross / 1.12 * 0.12) * 100) / 100; // 60
+
+    // NV category
+    fireEvent.change(selects[0], { target: { value: 'tc_nv' } });
+    expect(screen.getByText(/VAT:/i).nextSibling).toHaveTextContent(vat12.toString());
+
+    // EXMPT category should behave same
+    fireEvent.change(selects[0], { target: { value: 'tc_ex' } });
+    expect(screen.getByText(/VAT:/i).nextSibling).toHaveTextContent(vat12.toString());
+
+    // Zero rate results in 0 VAT
+    fireEvent.change(selects[0], { target: { value: 'tc_z' } });
+    expect(screen.getByText(/VAT:/i).nextSibling).toHaveTextContent('0');
   });
 
   it('fetches and displays categories when prop is empty', async () => {
