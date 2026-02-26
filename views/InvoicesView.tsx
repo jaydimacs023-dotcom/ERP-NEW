@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
@@ -31,6 +31,7 @@ interface InvoicesViewProps {
   journalEntries?: JournalEntry[];
   onAddStudentLedgerEntry?: (entry: StudentLedger) => void; // For AR subsidiary ledger
   onViewJournal?: (journalEntryId: string) => void;
+  organization?: Organization;
   orgId: string;
   taxCategories: TaxCategoryEntry[];
 }
@@ -40,6 +41,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
+  organization,
   orgId,
   taxCategories
 }) => {
@@ -732,18 +734,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       .replace(/'/g, '&#39;');
 
   const buildInvoiceA4Html = (invoice: Invoice): string => {
-    const lineRows = (invoice.lines || []).map((line, idx) => `
-      <tr>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${idx + 1}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(line.description)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(line.quantity)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.unitPrice || 0))}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.amount || 0))}</td>
-      </tr>
-    `).join('');
-
     const billedTo = invoice.sponsorId ? getSponsorName(invoice.sponsorId) : getStudentName(invoice.studentId);
+    const billAddress = invoice.sponsorId
+      ? (sponsors.find(s => s.id === invoice.sponsorId)?.address || '-')
+      : (() => {
+        const s = students.find(st => st.id === invoice.studentId);
+        return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
+      })();
     const glRef = getInvoiceGlRef(invoice);
+    const orgName = organization?.name || 'Tenant Organization';
+    const logoUrl = organization?.logoUrl || '';
 
     return `<!doctype html>
 <html>
@@ -757,6 +757,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; }
       .muted { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }
+      .band { background:#d8ebf6; font-weight:700; }
       .totals { margin-left:auto; width:300px; font-size:12px; }
       .totals div { display:flex; justify-content:space-between; padding:4px 0; }
       .totals .grand { font-weight:700; border-top:1px solid #d1d5db; margin-top:4px; padding-top:6px; }
@@ -764,34 +765,77 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   </head>
   <body>
     <div class="page">
-      <h2 style="margin:0;">INVOICE</h2>
-      <div class="muted" style="margin-top:4px;">Document No: ${escapeHtml(invoice.invoiceNo)}</div>
-      <div class="muted">GL Ref: ${escapeHtml(glRef)}</div>
-
-      <div style="display:flex;justify-content:space-between;margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
-          <div class="muted">Bill To</div>
-          <div style="font-weight:600;">${escapeHtml(billedTo)}</div>
-          <div class="muted">Batch: ${escapeHtml(getBatchCode(invoice.batchId))}</div>
+          ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Tenant logo" style="max-width:300px;max-height:90px;object-fit:contain;" />` : `<div style="font-size:28px;font-weight:800;">${escapeHtml(orgName)}</div>`}
+          <div style="margin-top:8px;font-size:13px;">${escapeHtml(orgName)}</div>
         </div>
-        <div style="text-align:right;">
-          <div class="muted">Invoice Date: ${escapeHtml(invoice.invoiceDate)}</div>
-          <div class="muted">Due Date: ${escapeHtml(invoice.dueDate)}</div>
-          <div class="muted">Terms: ${escapeHtml(invoice.terms || '-')}</div>
+        <div style="text-align:left;min-width:310px;">
+          <div style="font-size:44px;font-weight:700;line-height:1;margin-bottom:8px;">Invoice</div>
+          <table style="font-size:14px;">
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;">Reference No.:</td><td style="padding:2px 0;text-align:right;">${escapeHtml(invoice.invoiceNo)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;">Date:</td><td style="padding:2px 0;text-align:right;">${escapeHtml(invoice.invoiceDate)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;">Due Date:</td><td style="padding:2px 0;text-align:right;">${escapeHtml(invoice.dueDate)}</td></tr>
+          </table>
         </div>
       </div>
+      <div style="margin-top:6px;font-size:13px;white-space:pre-line;">${escapeHtml(organization?.taxId || '')}</div>
 
-      <table style="margin-top:16px;">
+      <table style="margin-top:18px;">
         <thead>
-          <tr style="background:#f9fafb;">
-            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;">#</th>
-            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;">Description</th>
-            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Qty</th>
-            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Unit Price</th>
-            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Amount</th>
+          <tr class="band">
+            <th style="padding:4px;text-align:left;">BILL TO:</th>
+            <th style="padding:4px;text-align:left;">SHIP TO:</th>
           </tr>
         </thead>
-        <tbody>${lineRows}</tbody>
+        <tbody>
+          <tr>
+            <td style="padding:6px 4px;vertical-align:top;white-space:pre-line;">${escapeHtml(`${billedTo}\n${billAddress}`)}</td>
+            <td style="padding:6px 4px;vertical-align:top;white-space:pre-line;">${escapeHtml(`${billedTo}\n${billAddress}`)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table style="margin-top:14px;">
+        <thead>
+          <tr class="band">
+            <th style="padding:4px;text-align:left;">CUSTOMER REF. NBR.</th>
+            <th style="padding:4px;text-align:left;">TERMS</th>
+            <th style="padding:4px;text-align:left;">CONTACT</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:4px;">${escapeHtml(glRef)}</td>
+            <td style="padding:4px;">${escapeHtml(invoice.terms || '-')}</td>
+            <td style="padding:4px;">${escapeHtml(invoice.sponsorId ? (sponsors.find(s => s.id === invoice.sponsorId)?.contactPerson || '-') : (students.find(s => s.id === invoice.studentId)?.contactNumber || '-'))}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table style="margin-top:8px;">
+        <thead>
+          <tr class="band">
+            <th style="padding:6px;text-align:left;">NO.</th>
+            <th style="padding:6px;text-align:left;">ITEM</th>
+            <th style="padding:6px;text-align:right;">QTY.</th>
+            <th style="padding:6px;text-align:right;">UOM</th>
+            <th style="padding:6px;text-align:right;">UNIT PRICE</th>
+            <th style="padding:6px;text-align:right;">DISC.</th>
+            <th style="padding:6px;text-align:right;">EXTENDED PRICE</th>
+          </tr>
+        </thead>
+        <tbody>${(invoice.lines || []).map((line, idx) => `
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${idx + 1}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(line.description)}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(line.quantity || 0)}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">EA</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.unitPrice || 0))}</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">0%</td>
+            <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.amount || 0))}</td>
+          </tr>
+        `).join('')}</tbody>
       </table>
 
       <div class="totals">
@@ -1824,36 +1868,79 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-2xl font-bold tracking-wide">INVOICE</h2>
-                    <p className="text-gray-500 mt-1">Document No: {printingInvoice.invoiceNo}</p>
-                    <p className="text-gray-500">GL Ref: {getInvoiceGlRef(printingInvoice)}</p>
+                    {organization?.logoUrl ? (
+                      <img src={organization.logoUrl} alt="Tenant logo" className="max-w-[300px] max-h-[90px] object-contain" />
+                    ) : (
+                      <h2 className="text-2xl font-bold tracking-wide">{organization?.name || 'Tenant Organization'}</h2>
+                    )}
+                    <p className="mt-2 text-[13px]">{organization?.name || 'Tenant Organization'}</p>
+                    {organization?.taxId && <p className="text-gray-600">{organization.taxId}</p>}
                   </div>
-                  <div className="text-right text-gray-600">
-                    <p>Invoice Date: {printingInvoice.invoiceDate}</p>
-                    <p>Due Date: {printingInvoice.dueDate}</p>
-                    <p>Terms: {printingInvoice.terms || '-'}</p>
+                  <div className="min-w-[300px]">
+                    <h2 className="text-5xl font-bold leading-none mb-2">Invoice</h2>
+                    <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
+                      <p className="font-semibold">Reference No.:</p><p className="text-right">{printingInvoice.invoiceNo}</p>
+                      <p className="font-semibold">Date:</p><p className="text-right">{printingInvoice.invoiceDate}</p>
+                      <p className="font-semibold">Due Date:</p><p className="text-right">{printingInvoice.dueDate}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mt-8">
-                  <div>
-                    <p className="text-gray-500 uppercase text-[11px] tracking-wide">Bill To</p>
-                    <p className="font-semibold text-[13px] mt-1">
-                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}
-                    </p>
-                    <p className="text-gray-500">Batch: {getBatchCode(printingInvoice.batchId)}</p>
+                <div className="mt-8 border border-[#d8ebf6]">
+                  <div className="grid grid-cols-2 bg-[#d8ebf6] text-[13px] font-semibold">
+                    <div className="px-2 py-1">BILL TO:</div>
+                    <div className="px-2 py-1">SHIP TO:</div>
+                  </div>
+                  <div className="grid grid-cols-2 text-[13px]">
+                    <div className="px-2 py-2 whitespace-pre-line">
+                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
+                      {printingInvoice.sponsorId
+                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                        : (() => {
+                          const s = students.find(st => st.id === printingInvoice.studentId);
+                          return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
+                        })()}
+                    </div>
+                    <div className="px-2 py-2 whitespace-pre-line">
+                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
+                      {printingInvoice.sponsorId
+                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                        : (() => {
+                          const s = students.find(st => st.id === printingInvoice.studentId);
+                          return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
+                        })()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 border border-[#d8ebf6]">
+                  <div className="grid grid-cols-3 bg-[#d8ebf6] text-[13px] font-semibold">
+                    <div className="px-2 py-1">CUSTOMER REF. NBR.</div>
+                    <div className="px-2 py-1">TERMS</div>
+                    <div className="px-2 py-1">CONTACT</div>
+                  </div>
+                  <div className="grid grid-cols-3 text-[13px]">
+                    <div className="px-2 py-1">{getInvoiceGlRef(printingInvoice)}</div>
+                    <div className="px-2 py-1">{printingInvoice.terms || '-'}</div>
+                    <div className="px-2 py-1">
+                      {printingInvoice.sponsorId
+                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.contactPerson || '-')
+                        : (students.find(s => s.id === printingInvoice.studentId)?.contactNumber || '-')}
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[#d8ebf6]">
                       <tr>
-                        <th className="px-3 py-2 text-left">#</th>
-                        <th className="px-3 py-2 text-left">Description</th>
-                        <th className="px-3 py-2 text-right">Qty</th>
-                        <th className="px-3 py-2 text-right">Unit Price</th>
-                        <th className="px-3 py-2 text-right">Amount</th>
+                        <th className="px-3 py-2 text-left">NO.</th>
+                        <th className="px-3 py-2 text-left">ITEM</th>
+                        <th className="px-3 py-2 text-right">QTY.</th>
+                        <th className="px-3 py-2 text-right">UOM</th>
+                        <th className="px-3 py-2 text-right">UNIT PRICE</th>
+                        <th className="px-3 py-2 text-right">DISC.</th>
+                        <th className="px-3 py-2 text-right">EXTENDED PRICE</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1862,7 +1949,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           <td className="px-3 py-2">{idx + 1}</td>
                           <td className="px-3 py-2">{line.description}</td>
                           <td className="px-3 py-2 text-right">{line.quantity}</td>
+                          <td className="px-3 py-2 text-right">EA</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(line.unitPrice || 0)}</td>
+                          <td className="px-3 py-2 text-right">0%</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(line.amount || 0)}</td>
                         </tr>
                       ))}

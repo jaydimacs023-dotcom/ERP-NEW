@@ -3995,6 +3995,7 @@ export default function App() {
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
             journalEntries={activeJournalEntries}
             onViewJournal={handleViewJournal}
+            organization={currentOrg}
             orgId={currentOrgId}
             taxCategories={taxCategories}
           />}
