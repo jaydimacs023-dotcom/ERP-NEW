@@ -45,10 +45,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'LIST' | 'FORM'>('LIST');
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false); // Generate from enrollments wizard
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
   const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -241,6 +243,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const handleView = (invoice: Invoice) => {
     setViewingInvoice(invoice);
     setShowViewModal(true);
+  };
+
+  const handlePrintPreview = (invoice: Invoice) => {
+    setPrintingInvoice(invoice);
+    setShowPrintModal(true);
   };
 
   // Handle sponsor change - auto-fill EWT rate
@@ -706,6 +713,114 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return s ? `${s.lastName}, ${s.firstName}` : '-';
   };
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
+  const getInvoiceGlRef = (invoice: Invoice) => {
+    if (invoice.glEntryNumber?.trim()) return invoice.glEntryNumber.trim();
+    if (invoice.journalEntryId) {
+      const je = journalEntries.find(j => j.id === invoice.journalEntryId);
+      const glNum = (je?.glEntryNumber || je?.reference || '').trim();
+      if (glNum) return glNum;
+    }
+    return '-';
+  };
+
+  const escapeHtml = (value: any): string =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const buildInvoiceA4Html = (invoice: Invoice): string => {
+    const lineRows = (invoice.lines || []).map((line, idx) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${idx + 1}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(line.description)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(line.quantity)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.unitPrice || 0))}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${escapeHtml(formatCurrency(line.amount || 0))}</td>
+      </tr>
+    `).join('');
+
+    const billedTo = invoice.sponsorId ? getSponsorName(invoice.sponsorId) : getStudentName(invoice.studentId);
+    const glRef = getInvoiceGlRef(invoice);
+
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Invoice ${escapeHtml(invoice.invoiceNo)}</title>
+    <style>
+      @page { size: A4; margin: 16mm; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+      .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; }
+      .muted { color:#6b7280; font-size:12px; }
+      table { width:100%; border-collapse: collapse; font-size:12px; }
+      .totals { margin-left:auto; width:300px; font-size:12px; }
+      .totals div { display:flex; justify-content:space-between; padding:4px 0; }
+      .totals .grand { font-weight:700; border-top:1px solid #d1d5db; margin-top:4px; padding-top:6px; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h2 style="margin:0;">INVOICE</h2>
+      <div class="muted" style="margin-top:4px;">Document No: ${escapeHtml(invoice.invoiceNo)}</div>
+      <div class="muted">GL Ref: ${escapeHtml(glRef)}</div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:20px;">
+        <div>
+          <div class="muted">Bill To</div>
+          <div style="font-weight:600;">${escapeHtml(billedTo)}</div>
+          <div class="muted">Batch: ${escapeHtml(getBatchCode(invoice.batchId))}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="muted">Invoice Date: ${escapeHtml(invoice.invoiceDate)}</div>
+          <div class="muted">Due Date: ${escapeHtml(invoice.dueDate)}</div>
+          <div class="muted">Terms: ${escapeHtml(invoice.terms || '-')}</div>
+        </div>
+      </div>
+
+      <table style="margin-top:16px;">
+        <thead>
+          <tr style="background:#f9fafb;">
+            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;">#</th>
+            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;">Description</th>
+            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Qty</th>
+            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Unit Price</th>
+            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${lineRows}</tbody>
+      </table>
+
+      <div class="totals">
+        <div><span class="muted">Subtotal</span><strong>${escapeHtml(formatCurrency(invoice.subtotal || 0))}</strong></div>
+        <div><span class="muted">VAT</span><strong>${escapeHtml(formatCurrency(invoice.vatAmount || 0))}</strong></div>
+        <div class="grand"><span>Grand Total</span><span>${escapeHtml(formatCurrency(invoice.grandTotal || 0))}</span></div>
+        <div><span class="muted">Net Amount Due</span><strong>${escapeHtml(formatCurrency(invoice.netAmountDue || 0))}</strong></div>
+        <div><span class="muted">Amount Paid</span><strong>${escapeHtml(formatCurrency(invoice.amountPaid || 0))}</strong></div>
+        <div class="grand"><span>Balance Due</span><span>${escapeHtml(formatCurrency(invoice.balanceDue || 0))}</span></div>
+      </div>
+
+      ${invoice.notes ? `<div style="margin-top:20px;"><div class="muted">Notes</div><div>${escapeHtml(invoice.notes)}</div></div>` : ''}
+    </div>
+  </body>
+</html>`;
+  };
+
+  const handleDownloadA4 = (invoice: Invoice) => {
+    const html = buildInvoiceA4Html(invoice);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${invoice.invoiceNo || 'invoice'}-A4.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Revenue accounts for line items
   const revenueAccounts = useMemo(() =>
@@ -1109,6 +1224,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                             <button onClick={() => handleView(inv)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="View">
                               <Eye size={16} />
                             </button>
+                            <button onClick={() => handlePrintPreview(inv)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Print A4">
+                              <Printer size={16} />
+                            </button>
                             {inv.status === 'DRAFT' && (
                               <>
                                 <button onClick={() => handlePost(inv)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Approve">
@@ -1250,6 +1368,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
               {/* Bill To */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Reference */}
+              <div>
+                <label className="text-xs font-medium text-gray-500">External Reference</label>
+                <input
+                  type="text"
+                  value={formData.reference}
+                  onChange={e => setFormData({ ...formData, reference: e.target.value })}
+                  placeholder="QRM-00000 or P.O. Number"
+                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                />
+              </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Terms</label>
                   <select
@@ -1470,17 +1599,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               </div>
 
-              {/* Reference */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">Reference</label>
-                <input
-                  type="text"
-                  value={formData.reference}
-                  onChange={e => setFormData({ ...formData, reference: e.target.value })}
-                  placeholder="External ref"
-                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                />
-              </div>
+  
             </div>
 
             <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
@@ -1503,7 +1622,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
                   style={{ backgroundColor: '#10B981' }}
                 >
-                  <CheckCircle size={18} />
+                  <CheckCircle size={18} /> Approve
                 </button>
               )}
             </div>
@@ -1545,6 +1664,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <p className="text-sm text-gray-500">{viewingInvoice.invoiceDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePrintPreview(viewingInvoice)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    title="Open A4 Print View"
+                  >
+                    <Printer size={15} />
+                    Print A4
+                  </button>
                   {getStatusBadge(viewingInvoice.status)}
                   <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-200 rounded">
                     <X size={20} />
@@ -1671,6 +1798,100 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
           </div>
         )}
+      {showPrintModal && printingInvoice && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">A4 Invoice Preview</h3>
+                <p className="text-sm text-gray-500">{printingInvoice.invoiceNo}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownloadA4(printingInvoice)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  <Download size={15} />
+                  Export A4 HTML
+                </button>
+                <button onClick={() => setShowPrintModal(false)} className="p-1 hover:bg-gray-200 rounded">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto bg-gray-200 p-6">
+              <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-2xl font-bold tracking-wide">INVOICE</h2>
+                    <p className="text-gray-500 mt-1">Document No: {printingInvoice.invoiceNo}</p>
+                    <p className="text-gray-500">GL Ref: {getInvoiceGlRef(printingInvoice)}</p>
+                  </div>
+                  <div className="text-right text-gray-600">
+                    <p>Invoice Date: {printingInvoice.invoiceDate}</p>
+                    <p>Due Date: {printingInvoice.dueDate}</p>
+                    <p>Terms: {printingInvoice.terms || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 mt-8">
+                  <div>
+                    <p className="text-gray-500 uppercase text-[11px] tracking-wide">Bill To</p>
+                    <p className="font-semibold text-[13px] mt-1">
+                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}
+                    </p>
+                    <p className="text-gray-500">Batch: {getBatchCode(printingInvoice.batchId)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">#</th>
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-right">Qty</th>
+                        <th className="px-3 py-2 text-right">Unit Price</th>
+                        <th className="px-3 py-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(printingInvoice.lines || []).map((line, idx) => (
+                        <tr key={line.id || idx} className="border-t border-gray-100">
+                          <td className="px-3 py-2">{idx + 1}</td>
+                          <td className="px-3 py-2">{line.description}</td>
+                          <td className="px-3 py-2 text-right">{line.quantity}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(line.unitPrice || 0)}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(line.amount || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <div className="w-[320px] space-y-1">
+                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(printingInvoice.subtotal || 0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(printingInvoice.vatAmount || 0)}</span></div>
+                    <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(printingInvoice.grandTotal || 0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(printingInvoice.netAmountDue || 0)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(printingInvoice.amountPaid || 0)}</span></div>
+                    <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(printingInvoice.balanceDue || 0)}</span></div>
+                  </div>
+                </div>
+
+                {printingInvoice.notes && (
+                  <div className="mt-8">
+                    <p className="text-gray-500 uppercase text-[11px] tracking-wide">Notes</p>
+                    <p className="mt-1">{printingInvoice.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Void Modal */}
       {
