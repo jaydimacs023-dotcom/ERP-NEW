@@ -1194,23 +1194,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* sponsor on left */}
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">Sponsor</label>
-                    <select
-                      value={formData.sponsorId}
-                      onChange={e => handleSponsorChange(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                    >
-                      <option value="">-- Select Sponsor --</option>
-                      {sponsors.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  
                   {/* batch in center */}
                   <div>
-                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items.</p>
+                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items. *</p>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
@@ -1222,6 +1209,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       ))}
                     </select>
                     
+                  </div>
+                  {/* sponsor on left */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-500">Sponsor *</label>
+                    <select
+                      value={formData.sponsorId}
+                      onChange={e => handleSponsorChange(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    >
+                      <option value="">-- Auto-filled if Batch is selected --</option>
+                      {sponsors.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
                   </div>
                   {/* dates on right */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1264,7 +1265,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500">Transaction Description</label>
+                  <label className="text-xs font-medium text-gray-500">Transaction Description *</label>
                   <input
                     value={formData.notes}
                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
@@ -1294,7 +1295,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <input
                         value={formData.glEntryNumber || ''}
                         onChange={e => setFormData({ ...formData, glEntryNumber: e.target.value })}
-                        placeholder="Optional GL reference"
+                        placeholder="Generated GL Reference"
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
                       />
                     )}
