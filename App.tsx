@@ -378,8 +378,70 @@ export default function App() {
         setBankReconciliations(data.bankReconciliations);
         setRecurringJournalEntries(data.recurringJournalEntries || []);
         setAccounts(data.accounts);
-        setJournalEntries(data.journalEntries);
+        // backfill glEntryNumber for any rows that came from the server
+        // before the column existed.  If reference already contains a GL
+        // formatted string we'll use that so the generator can see it later.
+        let normalizedEntries = (data.journalEntries || []).map((e: any) => {
+          if (!e.glEntryNumber) {
+            const ref = (e.reference || '').trim();
+            if (/^GL\d+$/i.test(ref)) {
+              // previously backfilled pattern entries
+              return { ...e, glEntryNumber: ref };
+            }
+            // if there's some other reference value (e.g. GUID) treat as missing
+            // so we will allocate a proper sequential number below
+          }
+          return e;
+        });
+
+        // Assign sequential numbers to any entries that still lack a valid
+        // GL reference (either column missing or reference not matching pattern).
+        const missing = normalizedEntries.filter(e => !e.glEntryNumber);
+        if (missing.length > 0) {
+          const updates: Promise<any>[] = [];
+          missing.forEach(e => {
+            const newGl = generateNextGlRef();
+            updates.push(
+              dataService.updateJournalEntry(e.id, { glEntryNumber: newGl, reference: newGl })
+                .then(updated => {
+                  e.glEntryNumber = updated.glEntryNumber;
+                  e.reference = updated.reference;
+                })
+                .catch(err => console.warn('[App] failed to backfill GL for entry', e.id, err))
+            );
+            // also update local copy immediately so UI shows something
+            e.glEntryNumber = newGl;
+            e.reference = newGl;
+          });
+          Promise.all(updates).then(() => console.info('[App] backfilled missing GL numbers'));
+        }
+
+        setJournalEntries(normalizedEntries);
         setJournalLines(data.journalLines);
+
+        // backfill invoice records with glEntryNumber from their journal entries
+        // and persist the backfill so refreshes do not lose the linkage.
+        const invoiceGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
+        let normalizedInvoices: any[] = (data.invoices || []).map((inv: any) => {
+          if (!inv.glEntryNumber && inv.journalEntryId) {
+            const je = normalizedEntries.find(e => e.id === inv.journalEntryId);
+            if (je && je.glEntryNumber) {
+              invoiceGlBackfills.push({ id: inv.id, glEntryNumber: je.glEntryNumber });
+              return { ...inv, glEntryNumber: je.glEntryNumber };
+            }
+          }
+          return inv;
+        });
+        if (invoiceGlBackfills.length > 0) {
+          Promise.all(
+            invoiceGlBackfills.map((inv: any) => {
+              return dataService.updateInvoice(inv.id, { glEntryNumber: inv.glEntryNumber });
+            })
+          )
+            .then(() => console.info('[App] backfilled missing invoice GL references'))
+            .catch(err => console.warn('[App] failed to backfill invoice GL references', err));
+        }
+        setInvoices(normalizedInvoices);
 
         // Debug: Log journal data to help diagnose AR invoice issue
         console.info('[App] Loaded journal data:', {
@@ -415,7 +477,6 @@ export default function App() {
         setReorderPoints(data.reorderPoints || []);
         setEnrollments(data.enrollments || []);
         setAlumniReports(data.alumniReports || []);
-        setInvoices(data.invoices || []);
 
         // Load Course Fees
         setCourseFees(data.courseFees || []);
@@ -562,9 +623,21 @@ export default function App() {
 
   // helper to produce the next sequential GL reference (GL00000001 style)
   const generateNextGlRef = (): string => {
-    const orgJournalEntries = journalEntries.filter(e => e.orgId === currentOrgId && e.glEntryNumber);
+    // look at any existing journal entries that have already been assigned
+    // a GL number; fall back to references that look like a GL pattern if the
+    // dedicated `glEntryNumber` property is missing (migrated data, old rows,
+    // etc.). this prevents duplicates after a reload when the column was
+    // previously absent.
+    const orgJournalEntries = journalEntries.filter(e => e.orgId === currentOrgId);
     const seqs = orgJournalEntries
-      .map(e => (e.glEntryNumber || '').trim())
+      .map(e => {
+        const val = (e.glEntryNumber || '').trim();
+        if (val) return val;
+        // fallback to reference if it starts with GL followed by digits
+        const ref = (e.reference || '').trim();
+        const m = ref.match(/^GL(\d+)$/i);
+        return m ? ref : '';
+      })
       .map(n => {
         // take the last numeric group so entries like "GL - 2026 -00012" become "00012"
         const m = n.match(/(\d+)$/);
@@ -599,6 +672,13 @@ export default function App() {
 
       const savedEntry = await dataService.createJournalEntry(fullEntry);
 
+      // if the database did not yet have the gl_entry_number column the value
+      // will be dropped on round‑trip; copy it back so the UI and subsequent
+      // generators continue to work until the column is added.
+      if (!savedEntry.glEntryNumber && fullEntry.glEntryNumber) {
+        savedEntry.glEntryNumber = fullEntry.glEntryNumber;
+      }
+
       // Update lines with the actual saved entry ID (UUID generated by Supabase)
       const linesWithActualId = lines.map(line => ({
         ...line,
@@ -625,10 +705,10 @@ export default function App() {
       return savedEntry;
     } catch (error) {
       console.error('[App] Error posting journal entry:', error);
-      // Fallback to memory storage
-      setJournalEntries(prev => [...prev, fullEntry]);
-      setJournalLines(prev => [...prev, ...lines]);
+      // Notify user that GL posting failed and invoice should not be marked as posted
+      handleNotify('error', 'Failed to post journal entry to GL; invoice remains unposted.');
 
+      // Audit the failure for diagnostics
       AuditService.post(
         currentOrgId,
         currentUser?.id || 'system',
@@ -636,9 +716,11 @@ export default function App() {
         'JOURNAL_ENTRY',
         fullEntry.id,
         fullEntry.id,
-        `Posted ${fullEntry.sourceType}: ${fullEntry.description} (${lines.length} lines)`
+        `Failed to post ${fullEntry.sourceType}: ${fullEntry.description}`
       );
-      return fullEntry;
+
+      // indicate to caller that posting did not succeed
+      return null;
     }
   };
 
@@ -2585,7 +2667,17 @@ export default function App() {
       if (invoice.status === 'OPEN' && !invoice.journalEntryId) {
         const postingResult = await postInvoiceToGL(invoice);
         if (postingResult) {
-          invoice = { ...invoice, journalEntryId: postingResult.jeId };
+          invoice = {
+            ...invoice,
+            journalEntryId: postingResult.jeId,
+            glEntryNumber: postingResult.glRef,
+            postedBy: currentUser?.id || 'system',
+            postedAt: postingResult.now
+          };
+        } else {
+          // posting failed – don't mark the invoice as open
+          invoice.status = 'DRAFT';
+          handleNotify('warning', 'Invoice saved as draft because GL posting failed. Please try posting again later.');
         }
       }
 
@@ -2606,8 +2698,9 @@ export default function App() {
     const jeId = crypto.randomUUID();
 
     // ── Generate sequential GL reference number scoped to organization ──
-    // reuse helper for consistent sequential format
-    const glRef = generateNextGlRef();
+    // if the invoice already contains a reference (entered by user) use it,
+    // otherwise allocate a new sequential value.
+    const glRef = (invoice.glEntryNumber || '').trim() || generateNextGlRef();
 
     // ── Find GL accounts ───────────────────────────────────────────────────
     const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
@@ -2734,7 +2827,13 @@ export default function App() {
         const postingResult = await postInvoiceToGL(invoice);
         if (postingResult) {
           const { jeId, glRef, now } = postingResult;
-          invoice = { ...invoice, journalEntryId: jeId };
+          invoice = {
+            ...invoice,
+            journalEntryId: jeId,
+            glEntryNumber: glRef,
+            postedBy: currentUser?.id || 'system',
+            postedAt: now
+          };
 
           // ── Subsidiary Ledger entries ───────────────────────────────────────
           // Walk-in student invoice → debit student ledger
@@ -2779,12 +2878,16 @@ export default function App() {
           }
 
           handleNotify('success', `Invoice ${invoice.invoiceNo} approved and posted to GL as ${glRef} `);
+        } else {
+          // posting failed
+          handleNotify('error', 'Unable to post invoice to GL; it remains in draft status.');
+          invoice.status = existing?.status || 'DRAFT';
         }
       }
 
       // ── Persist the invoice update ──────────────────────────────────────────
       const updated = await dataService.updateInvoice(invoice.id, invoice);
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...updated, journalEntryId: invoice.journalEntryId, updatedAt: new Date().toISOString() } : i));
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...updated, journalEntryId: invoice.journalEntryId, glEntryNumber: invoice.glEntryNumber, updatedAt: new Date().toISOString() } : i));
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoice.id, invoice.invoiceNo, existing, invoice);
       if (invoice.status !== 'OPEN' || existing?.status === 'OPEN') {

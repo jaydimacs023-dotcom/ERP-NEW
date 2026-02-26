@@ -107,6 +107,13 @@ export class SupabaseDataService implements IDataService {
     return results;
   }
 
+  private extractMissingColumnFromSchemaError(errorText: string): string | null {
+    // PostgREST schema-cache error format:
+    // "Could not find the 'description' column of 'journal_lines' in the schema cache"
+    const match = errorText.match(/Could not find the '([^']+)' column of 'journal_lines'/i);
+    return match?.[1] || null;
+  }
+
   async getInitialData(): Promise<InitialData> {
     console.info("[Supabase] ☁️ Fetching data from Supabase...");
 
@@ -3619,11 +3626,24 @@ export class SupabaseDataService implements IDataService {
 
       delete payload.id;
       const url = `${this.baseUrl}/journal_lines`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) break;
+
+        const errorText = await response.text();
+        const missingColumn = this.extractMissingColumnFromSchemaError(errorText);
+        if (response.status === 400 && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+          console.warn(`[Supabase] createJournalLine retrying without unknown column '${missingColumn}'`);
+          delete payload[missingColumn];
+          continue;
+        }
+        throw new Error(`Failed to create journal line: ${response.status} - ${errorText}`);
+      }
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to create journal line: ${response.status} - ${errorText}`);
@@ -3661,11 +3681,31 @@ export class SupabaseDataService implements IDataService {
       console.debug('[Supabase] Sample payload to send:', JSON.stringify(payloads[0]));
 
       const url = `${this.baseUrl}/journal_lines`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payloads)
-      });
+      let response: Response;
+      let sendPayloads = payloads;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(sendPayloads)
+        });
+        if (response.ok) break;
+
+        const errorText = await response.text();
+        const missingColumn = this.extractMissingColumnFromSchemaError(errorText);
+        if (response.status === 400 && missingColumn) {
+          console.warn(`[Supabase] createJournalLines retrying without unknown column '${missingColumn}'`);
+          sendPayloads = sendPayloads.map((p: any) => {
+            const next = { ...p };
+            delete next[missingColumn];
+            return next;
+          });
+          continue;
+        }
+
+        console.error('[Supabase] createJournalLines failed:', response.status, errorText);
+        throw new Error(`Failed to create journal lines: ${response.status} - ${errorText}`);
+      }
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[Supabase] createJournalLines failed:', response.status, errorText);

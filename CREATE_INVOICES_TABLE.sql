@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     terms VARCHAR(100),
     notes TEXT,
     journal_entry_id UUID,
+    gl_entry_number VARCHAR(100),
     
     -- Audit fields for posting/voiding
     posted_by UUID,
@@ -102,6 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_invoices_batch_id ON invoices(batch_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_invoice_date ON invoices(invoice_date);
 CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_gl_entry_number ON invoices(gl_entry_number);
 CREATE INDEX IF NOT EXISTS idx_invoices_not_deleted ON invoices(org_id) WHERE is_deleted = FALSE;
 
 -- Create indexes for invoice_lines

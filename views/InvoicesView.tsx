@@ -92,6 +92,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     notes: string;
     vatPricing: 'EXCLUSIVE' | 'INCLUSIVE' | 'EXEMPT';
     vatRate: number;
+    glEntryNumber?: string;
     lines: InvoiceLine[];
   }>({
     invoiceNo: '',
@@ -107,6 +108,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     notes: '',
     vatPricing: 'INCLUSIVE',
     vatRate: 0.12,
+    glEntryNumber: '',
     lines: []
   });
 
@@ -154,6 +156,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       terms: 'Net 30',
       vatPricing: 'INCLUSIVE',
       vatRate: 0.12,
+      glEntryNumber: '',
       lines: []
     });
     setEditingInvoice(null);
@@ -183,6 +186,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       notes: invoice.notes || '',
       vatPricing: invoice.vatPricing || 'INCLUSIVE',
       vatRate: invoice.vatRate || 0.12,
+      glEntryNumber: invoice.glEntryNumber || '',
       lines: invoice.lines || []
     });
     setViewMode('FORM');
@@ -662,6 +666,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const matchesSearch =
         inv.invoiceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.glEntryNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || inv.status === statusFilter;
@@ -1286,7 +1291,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         );
                       })()
                     ) : (
-                      <div className="px-3 py-2 text-sm text-gray-400 bg-gray-50 border rounded-lg text-center">—</div>
+                      <input
+                        value={formData.glEntryNumber || ''}
+                        onChange={e => setFormData({ ...formData, glEntryNumber: e.target.value })}
+                        placeholder="Optional GL reference"
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                      />
                     )}
                   </div>
                 </div>

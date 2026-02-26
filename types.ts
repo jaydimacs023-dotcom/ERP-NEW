@@ -718,6 +718,7 @@ export interface Invoice extends BaseEntity {
   terms?: string;              // Payment terms
   notes?: string;              // Invoice notes/memo
   journalEntryId?: string;     // FK to JournalEntry when posted
+  glEntryNumber?: string;      // GL transaction reference, may be user-specified before posting
 
   // Audit
   postedBy?: string;
@@ -871,7 +872,7 @@ export interface JournalEntry extends BaseEntity {
   date: string;
   description: string;
   reference: string;
-  glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL00000001)
+  glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL00000001). Stored in db column gl_entry_number.
   status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;

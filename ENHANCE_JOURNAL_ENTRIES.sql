@@ -11,6 +11,20 @@ ADD COLUMN IF NOT EXISTS source_ref UUID;
 ALTER TABLE journal_entries 
 ADD COLUMN IF NOT EXISTS deposit_id UUID REFERENCES bank_deposits(id) ON DELETE SET NULL;
 
+-- Add gl_entry_number column for sequential GL reference and backfill
+ALTER TABLE journal_entries
+  ADD COLUMN IF NOT EXISTS gl_entry_number TEXT;
+
+-- copy existing GL-style references into the new column so we can
+-- continue sequencing correctly after migration
+UPDATE journal_entries
+  SET gl_entry_number = reference
+  WHERE gl_entry_number IS NULL AND reference ~ '^GL\\d+$';
+
+-- unique index scoped by org
+CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_entries_gl_entry_number
+  ON journal_entries(org_id, gl_entry_number);
+
 -- Update source_type check constraint to include new values
 -- First drop the old constraint if it exists
 ALTER TABLE journal_entries 

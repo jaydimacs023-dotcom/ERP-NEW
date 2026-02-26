@@ -113,6 +113,8 @@ CREATE TABLE journal_entries (
   date DATE NOT NULL,
   description TEXT NOT NULL,
   reference TEXT NOT NULL,
+  -- new column to support persistent GL references
+  gl_entry_number TEXT,
   status TEXT CHECK (status IN ('DRAFT', 'POSTED', 'REVERSED')) DEFAULT 'DRAFT',
   source_type TEXT CHECK (source_type IN ('MANUAL', 'INVOICE', 'BILL', 'PAYMENT', 'COLLECTION', 'DEPRECIATION', 'TRANSFER', 'PURCHASE_ORDER', 'PAYROLL')) DEFAULT 'MANUAL',
   created_by UUID NOT NULL REFERENCES users(id),
@@ -604,6 +606,7 @@ CREATE INDEX idx_journal_entries_org_id ON journal_entries(org_id);
 CREATE INDEX idx_journal_entries_date ON journal_entries(org_id, date DESC);
 CREATE INDEX idx_journal_entries_status ON journal_entries(org_id, status);
 CREATE INDEX idx_journal_entries_source_type ON journal_entries(org_id, source_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_entries_gl_entry_number ON journal_entries(org_id, gl_entry_number);
 
 CREATE INDEX idx_journal_lines_journal_entry_id ON journal_lines(journal_entry_id);
 CREATE INDEX idx_journal_lines_account_id ON journal_lines(account_id);
