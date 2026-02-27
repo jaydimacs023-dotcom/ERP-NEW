@@ -650,11 +650,46 @@ export default function App() {
     return `GL${String(next).padStart(8, '0')}`;
   };
 
+  const resolvePostingPeriodId = (explicitPeriodId?: string, entryDate?: string): string => {
+    const orgPeriods = accountingPeriods.filter(p => p.orgId === currentOrgId && !p.isDeleted);
+    if (explicitPeriodId && orgPeriods.some(p => p.id === explicitPeriodId)) {
+      return explicitPeriodId;
+    }
+
+    const targetDate = new Date(entryDate || new Date().toISOString().split('T')[0]);
+    const dateMatched = orgPeriods.filter(p => {
+      const start = new Date(p.startDate);
+      const end = new Date(p.endDate);
+      return targetDate >= start && targetDate <= end;
+    });
+
+    const openMatched = dateMatched.find(p => p.status === 'OPEN');
+    if (openMatched) return openMatched.id;
+
+    const softMatched = dateMatched.find(p => p.status === 'SOFT_CLOSE');
+    if (softMatched) return softMatched.id;
+
+    const anyOpen = orgPeriods.find(p => p.status === 'OPEN');
+    if (anyOpen) return anyOpen.id;
+
+    const anySoft = orgPeriods.find(p => p.status === 'SOFT_CLOSE');
+    if (anySoft) return anySoft.id;
+
+    return '';
+  };
+
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
+    const resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
+    if (!resolvedPeriodId) {
+      handleNotify('error', 'Cannot post journal entry: no open accounting period found for this date.');
+      return null;
+    }
+
     const fullEntry = {
       ...entry,
       id: entry.id || `je - ${Date.now()} `,
       orgId: currentOrgId,
+      periodId: resolvedPeriodId,
       status: 'POSTED',
       createdBy: currentUser?.id || 'system',
       createdAt: new Date().toISOString()
@@ -3097,79 +3132,100 @@ export default function App() {
 
   // ===== Payment Application Handler (APPL) =====
   const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
-    // 1. Update Payment Application State
     const payment = payments.find(p => p.id === paymentId);
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!payment || !invoice) return;
 
-    const newApplication = {
-      id: `appl - ${Date.now()} `,
-      paymentId,
-      invoiceId,
-      amountApplied: amount,
-      isReversed: false,
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedPayment = {
-      ...payment,
-      applications: [...(payment.applications || []), newApplication],
-      totalApplied: (payment.totalApplied || 0) + amount,
-      customerDepositBalance: (payment.customerDepositBalance || 0) - amount
-    };
-    setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
-
-    // 2. Update Invoice Balance and Status
-    const newAmountPaid = (invoice.amountPaid || 0) + amount;
-    const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
-    const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
-    const updatedInvoice = {
-      ...invoice,
-      amountPaid: newAmountPaid,
-      balanceDue: newBalanceDue,
-      status: newStatus
-    };
-    setInvoices(prev => prev.map(i => i.id === invoiceId ? updatedInvoice : i));
-
-    // 3. Create GL Journal Entry for APPL
+    // 1. Create GL Journal Entry for APPL first so the application row can persist GL linkage.
     const coa = accounts.filter(a => a.orgId === currentOrgId);
     const depositsAcct = coa.find(a => a.code === '2000');
     const arAcct = coa.find(a => a.code === '1200');
-    if (depositsAcct && arAcct) {
-      const applEntry: Partial<JournalEntry> = {
-        orgId: currentOrgId,
-        periodId: invoice.periodId,
-        date: new Date().toISOString().split('T')[0],
-        description: `Payment Application to Invoice ${invoice.invoiceNo} `,
-        reference: `APPL - ${invoice.invoiceNo} -${Date.now()} `,
-        status: 'POSTED',
-        sourceType: 'APPLICATION',
-        sourceRef: invoiceId,
-        createdBy: currentUser?.id,
-        createdAt: new Date().toISOString()
-      };
-      const applLines: JournalLine[] = [
-        {
-          id: `jl - ${Date.now()} -1`,
-          journalEntryId: '', // will be set by handlePostJournal
-          orgId: currentOrgId,
-          accountId: depositsAcct.id,
-          debit: amount,
-          credit: 0,
-          description: 'Apply from Customer Deposits'
-        },
-        {
-          id: `jl - ${Date.now()} -2`,
-          journalEntryId: '',
-          orgId: currentOrgId,
-          accountId: arAcct.id,
-          debit: 0,
-          credit: amount,
-          description: 'Reduce Accounts Receivable'
-        }
-      ];
-      await handlePostJournal(applEntry, applLines);
+    if (!depositsAcct || !arAcct) {
+      handleNotify('error', 'Cannot apply payment: required GL accounts (2000/1200) are missing.');
+      return;
     }
+
+    const applicationId = `appl-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const applicationTs = new Date().toISOString();
+    const applEntry: Partial<JournalEntry> = {
+      orgId: currentOrgId,
+      periodId: invoice.periodId || '',
+      date: new Date().toISOString().split('T')[0],
+      description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+      // Leave reference blank so handlePostJournal auto-assigns sequential GL reference.
+      status: 'POSTED',
+      sourceType: 'APPLICATION',
+      sourceRef: applicationId,
+      createdBy: currentUser?.id,
+      createdAt: applicationTs
+    };
+    const applLines: JournalLine[] = [
+      {
+        id: `jl-${Date.now()}-1`,
+        journalEntryId: '',
+        orgId: currentOrgId,
+        accountId: depositsAcct.id,
+        debit: amount,
+        credit: 0,
+        description: 'Apply from Customer Deposits'
+      },
+      {
+        id: `jl-${Date.now()}-2`,
+        journalEntryId: '',
+        orgId: currentOrgId,
+        accountId: arAcct.id,
+        debit: 0,
+        credit: amount,
+        description: 'Reduce Accounts Receivable'
+      }
+    ];
+
+    const savedApplicationEntry = await handlePostJournal(applEntry, applLines);
+    if (!savedApplicationEntry) {
+      handleNotify('error', `Payment application to ${invoice.invoiceNo} failed: GL posting was not saved.`);
+      return;
+    }
+
+    const newApplication = {
+      id: applicationId,
+      paymentId,
+      invoiceId,
+      amountApplied: amount,
+      glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
+      journalEntryId: savedApplicationEntry.id,
+      isReversed: false,
+      createdAt: applicationTs,
+      updatedAt: applicationTs
+    };
+
+    // 2. Persist Payment application with GL reference linkage.
+    setPayments(prev => prev.map(p => {
+      if (p.id !== paymentId) return p;
+      return {
+        ...p,
+        applications: [...(p.applications || []), newApplication],
+        totalApplied: (p.totalApplied || 0) + amount,
+        customerDepositBalance: (p.customerDepositBalance || 0) - amount,
+        updatedAt: new Date().toISOString()
+      };
+    }));
+
+    // 3. Persist Invoice balance/status update.
+    setInvoices(prev => prev.map(i => {
+      if (i.id !== invoiceId) return i;
+      const newAmountPaid = (i.amountPaid || 0) + amount;
+      const newBalanceDue = Math.max((i.balanceDue || 0) - amount, 0);
+      const newStatus = newBalanceDue === 0 ? 'CLOSED' : i.status;
+      return {
+        ...i,
+        amountPaid: newAmountPaid,
+        balanceDue: newBalanceDue,
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      };
+    }));
+
+    handleNotify('success', `Applied ${invoice.invoiceNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
   };
 
   // ===== Payment Application Reversal Handler (RVRS) =====

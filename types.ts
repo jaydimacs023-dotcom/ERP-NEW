@@ -744,6 +744,8 @@ export interface PaymentApplication extends BaseEntity {
   paymentId: string;            // FK to Payment
   invoiceId: string;            // FK to Invoice
   amountApplied: number;        // Amount applied to this invoice
+  glReference?: string;         // Auto-generated GL reference (e.g., GL00000042)
+  journalEntryId?: string;      // FK to journal entry created by application
   isReversed: boolean;          // Whether application was reversed
   reversalReason?: string;      // Reason for reversal
   reversedAt?: string;          // When reversed

@@ -296,27 +296,35 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const handleBatchChange = (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
     if (!batch) {
-      setFormData(prev => ({ ...prev, batchId: '', lines: [] }));
+      setFormData(prev => ({ ...prev, batchId: '', sponsorId: '', studentId: '', lines: [] }));
       return;
     }
 
+    const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
+    const studentsInBatch = batchEnrollments
+      .map(e => students.find(s => s.id === e.studentId))
+      .filter((s): s is Student => !!s && !s.isDeleted);
+    const sponsorId = batch.sponsorId || '';
+
     // if there are already lines, do not override description/course fee/unit price/amount
     if (formData.lines.length > 0) {
-      setFormData(prev => ({ ...prev, batchId, sponsorId: batch.sponsorId || prev.sponsorId }));
+      setFormData(prev => ({
+        ...prev,
+        batchId,
+        sponsorId,
+        studentId: sponsorId ? '' : (studentsInBatch[0]?.id || prev.studentId || '')
+      }));
       return;
     }
 
     const qualificationFees = courseFees.filter(f => f.qualificationId === batch.qualificationId && f.isActive && !f.isDeleted);
 
     // Count students from enrollments
-    const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
     const studentCount = batchEnrollments.length || batch.studentIds?.length || 0;
-    const sponsorId = batch.sponsorId || '';
-
-    const sponsor = sponsors.find(s => s.id === (batch.sponsorId || formData.sponsorId));
 
     const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => {
-      const netAmount = Math.round(studentCount * (fee.amount || 0) * 100) / 100;
+      const qty = sponsorId ? studentCount : 1;
+      const netAmount = Math.round(qty * (fee.amount || 0) * 100) / 100;
       const vatAmount = 0;
       const grossAmount = netAmount; // initially no tax
 
@@ -326,7 +334,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         lineNumber: idx + 1,
         description: fee.feeName,
         courseFeeId: fee.id,
-        quantity: studentCount,
+        quantity: qty,
         unitPrice: fee.amount || 0,
         netAmount,
         vatAmount,
@@ -339,7 +347,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     setFormData(prev => ({
       ...prev,
       batchId,
-      sponsorId: sponsorId || prev.sponsorId,
+      sponsorId,
+      studentId: sponsorId ? '' : (studentsInBatch[0]?.id || ''),
       lines: newLines
     }));
   };
@@ -904,6 +913,34 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return sponsors.filter(s => unbilledEnrollmentsBySponsor.has(s.id) && !s.isDeleted);
   }, [sponsors, unbilledEnrollmentsBySponsor]);
 
+  // Batches already billed should not appear in New Invoice batch selection.
+  // Keep currently selected batch visible while editing its own invoice.
+  const selectableBatches = useMemo(() => {
+    const billedBatchIds = new Set(
+      invoices
+        .filter(inv => !!inv.batchId && inv.status !== 'VOIDED' && inv.id !== editingInvoice?.id)
+        .map(inv => inv.batchId as string)
+    );
+
+    return batches.filter(batch => !batch.isDeleted && !billedBatchIds.has(batch.id));
+  }, [batches, invoices, editingInvoice?.id]);
+
+  const batchStudentsForBilling = useMemo(() => {
+    if (!formData.batchId) return [] as Student[];
+    const enrolled = enrollments
+      .filter(e => e.batchId === formData.batchId && !e.isDeleted)
+      .map(e => students.find(s => s.id === e.studentId))
+      .filter((s): s is Student => !!s && !s.isDeleted);
+
+    if (enrolled.length > 0) return enrolled;
+
+    const batch = batches.find(b => b.id === formData.batchId);
+    if (!batch?.studentIds?.length) return [] as Student[];
+    return batch.studentIds
+      .map(id => students.find(s => s.id === id))
+      .filter((s): s is Student => !!s && !s.isDeleted);
+  }, [formData.batchId, enrollments, students, batches]);
+
   // Get unbilled enrollments for selected sponsor
   const unbilledEnrollmentsForSponsor = useMemo(() => {
     if (!selectedSponsorId) return [];
@@ -1359,14 +1396,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   
                   {/* batch in center */}
                   <div>
-                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items. *</p>
+                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items. Already billed batches are hidden.</p>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
                       className="mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 w-full"
                     >
                       <option value="">-- Select Batch --</option>
-                      {batches.map(b => (
+                      {selectableBatches.map(b => (
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
@@ -1374,7 +1411,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </div>
                   {/* sponsor on left */}
                   <div>
-                    <label className="text-xs font-medium text-gray-500">Sponsor *</label>
+                    <label className="text-xs font-medium text-gray-500">Sponsor</label>
                     <select
                       value={formData.sponsorId}
                       onChange={e => handleSponsorChange(e.target.value)}
@@ -1475,6 +1512,23 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Individual Student Option */}
+              {formData.batchId && !formData.sponsorId && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Select Student from Batch *</label>
+                  <select
+                    value={formData.studentId}
+                    onChange={e => setFormData({ ...formData, studentId: e.target.value, sponsorId: '' })}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  >
+                    <option value="">-- Select Student from Batch --</option>
+                    {batchStudentsForBilling.map(s => (
+                      <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Individual Student Option */}
               {!formData.batchId && (
@@ -1658,7 +1712,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
               >
                 <Save size={18} />
-                {editingInvoice ? 'Update Changes' : 'Save as Draft'}
+                Save as Draft
               </button>
               {(formData.status === 'DRAFT' || !editingInvoice) && (
                 <button
