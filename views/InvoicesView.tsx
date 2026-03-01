@@ -1388,7 +1388,30 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 )}
               </div>
             </div>
-
+            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+              <button
+                onClick={() => { resetForm(); }}
+                className="px-6 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                <Save size={18} />
+                Save as Draft
+              </button>
+              {(formData.status === 'DRAFT' || !editingInvoice) && (
+                <button
+                  onClick={handleApprove}
+                  className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
+                  style={{ backgroundColor: '#10B981' }}
+                >
+                  <CheckCircle size={18} /> Approve
+                </button>
+              )}
+            </div>
             <div className="flex-1 p-6 space-y-8">
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
@@ -1696,34 +1719,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   </div>
                 </div>
               </div>
-
-  
             </div>
 
-            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
-              <button
-                onClick={() => { resetForm(); }}
-                className="px-6 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                <Save size={18} />
-                Save as Draft
-              </button>
-              {(formData.status === 'DRAFT' || !editingInvoice) && (
-                <button
-                  onClick={handleApprove}
-                  className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
-                  style={{ backgroundColor: '#10B981' }}
-                >
-                  <CheckCircle size={18} /> Approve
-                </button>
-              )}
-            </div>
+            
           </div>
         </>
       )}
