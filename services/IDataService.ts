@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry
+  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -61,6 +61,8 @@ export interface InitialData {
   auditLogs: AuditLog[];
   purchaseOrders: PurchaseOrder[];
   paymentHistories: PaymentHistory[];
+  payments?: Payment[];
+  paymentApplications?: PaymentApplication[];
   fixedAssets: FixedAsset[];
   vendorTaxSettings?: any[];
   atcCategories?: any[];

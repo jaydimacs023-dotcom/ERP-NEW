@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
 import { AuditService } from './services/AuditService';
 import { config } from './config/app';
+import { generateUUID } from './utils/uuid';
 import { canAccess, canAccessGroup, MODULE_GROUPS, isSystemAdmin as checkSysAdmin, isTenantAdmin as checkTenantAdmin, getDefaultTab, hasFinanceAccess, hasARAccess, hasAPAccess, hasOperationsAccess } from './config/permissions';
 import { useNotifications } from './components/NotificationContext';
 
@@ -344,6 +345,7 @@ export default function App() {
 
   // Toast Notification State
   const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; message: string }>>([]);
+  const applyingPaymentKeysRef = useRef<Set<string>>(new Set());
   // Data Loading Logic
   useEffect(() => {
     async function loadData() {
@@ -460,7 +462,20 @@ export default function App() {
         setPayrollLines(data.payrollLines);
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
-        setPayments(data.paymentHistories);
+        const loadedPayments = (data.payments || []) as Payment[];
+        const loadedPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        const paymentsWithApplications = loadedPayments.map(payment => {
+          const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
+          const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
+          const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
+          return {
+            ...payment,
+            applications: apps,
+            totalApplied: payment.totalApplied ?? appliedTotal,
+            customerDepositBalance: payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0)
+          } as Payment;
+        });
+        setPayments(paymentsWithApplications);
         setFixedAssets(data.fixedAssets);
         setPayables(data.payables || []);
         setVendorTaxSettings(data.vendorTaxSettings || []);
@@ -3030,48 +3045,80 @@ export default function App() {
   };
 
   // ===== Payment CRUD Handlers =====
+  const resolvePaymentPostingAccounts = (payment: Payment) => {
+    const coa = accounts.filter(a => a.orgId === currentOrgId);
+    const byName = (patterns: string[]) => coa.find(a => {
+      const name = (a.name || '').toLowerCase();
+      return patterns.every(p => name.includes(p));
+    });
+
+    const selectedBank = bankAccounts.find(b => b.id === payment.bankAccountId && b.orgId === currentOrgId);
+    const cashAccount = selectedBank
+      ? coa.find(a => a.id === selectedBank.glAccountId)
+      : (
+        byName(['cash']) ||
+        byName(['bank']) ||
+        coa.find(a => a.code === '1000') ||
+        coa.find(a => a.code === '1010')
+      );
+
+    const customerDepositsAccount =
+      byName(['customer', 'deposit']) ||
+      byName(['advance', 'customer']) ||
+      byName(['unearned', 'revenue']) ||
+      coa.find(a => a.code === '2000');
+
+    const ewtReceivableAccount =
+      byName(['ewt', 'receivable']) ||
+      byName(['withholding', 'receivable']) ||
+      coa.find(a => a.code === '14200');
+
+    return { cashAccount, customerDepositsAccount, ewtReceivableAccount };
+  };
+
+  const resolveArAccountForInvoice = (payment: Payment, invoice: Invoice) => {
+    const coa = accounts.filter(a => a.orgId === currentOrgId);
+    const arFromInvoiceJournal = (() => {
+      if (!invoice.journalEntryId) return undefined;
+      const invoiceLines = journalLines.filter(l => l.journalEntryId === invoice.journalEntryId && l.orgId === currentOrgId);
+      if (!invoiceLines.length) return undefined;
+      const debitLines = invoiceLines.filter(l => (l.debit || 0) > 0);
+      for (const line of debitLines) {
+        const acct = coa.find(a => a.id === line.accountId);
+        if (acct && (acct.name || '').toLowerCase().includes('receivable')) return acct;
+      }
+      const maxDebitLine = debitLines.sort((a, b) => (b.debit || 0) - (a.debit || 0))[0];
+      return maxDebitLine ? coa.find(a => a.id === maxDebitLine.accountId) : undefined;
+    })();
+
+    if (arFromInvoiceJournal) return arFromInvoiceJournal;
+
+    const arByPayor = payment.sponsorId
+      ? coa.find(a => (a.name || '').toLowerCase().includes('receivable') && (a.name || '').toLowerCase().includes('sponsor'))
+      : coa.find(a => (a.name || '').toLowerCase().includes('receivable') && (a.name || '').toLowerCase().includes('student'));
+
+    return arByPayor || coa.find(a => (a.name || '').toLowerCase().includes('accounts receivable')) || coa.find(a => a.code === '1200');
+  };
+
   const handleAddPayment = async (payment: Payment) => {
     try {
       console.info('[App] Creating payment:', payment.paymentNo);
-      const paymentWithOrg = { ...payment, orgId: currentOrgId };
-      setPayments(prev => [...prev, paymentWithOrg]);
+      if (payment.orgId && payment.orgId !== currentOrgId) {
+        handleNotify('error', 'Cannot create payment for another organization.');
+        return;
+      }
 
-      // 3. Create GL_Journal collection entry
-      const collectionEntry: Partial<JournalEntry> = {
+      const paymentWithOrg = {
+        ...payment,
         orgId: currentOrgId,
-        periodId: '', // Default period
-        date: payment.paymentDate,
-        description: `Collection for Payment ${payment.paymentNo}`,
-        reference: payment.paymentNo,
-        status: 'POSTED',
-        sourceType: 'APPLICATION',
-        sourceRef: payment.id,
-        createdBy: currentUser?.id || 'system',
-        createdAt: new Date().toISOString()
+        createdBy: payment.createdBy || currentUser?.id || 'system',
+        updatedAt: new Date().toISOString()
       };
-      const collectionLines: JournalLine[] = [
-        {
-          id: `line - ${Date.now()} -1`,
-          journalEntryId: '', // Placeholder
-          orgId: currentOrgId,
-          accountId: payment.bankAccountId || '', // Collection account / Bank
-          debit: payment.amountReceived,
-          credit: 0,
-          description: `Payment received: ${payment.paymentNo} `
-        },
-        {
-          id: `line - ${Date.now()} -2`,
-          journalEntryId: '', // Placeholder
-          orgId: currentOrgId,
-          accountId: '', // AR account
-          debit: 0,
-          credit: payment.amountReceived,
-          description: `AR offset for payment: ${payment.paymentNo} `
-        }
-      ];
-      await handlePostJournal(collectionEntry, collectionLines);
 
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentWithOrg.id, payment.paymentNo);
+      const savedPayment = await dataService.createEntity('payments', paymentWithOrg);
+      setPayments(prev => [...prev, savedPayment as Payment]);
+
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, payment.paymentNo);
       handleNotify('success', `Payment ${payment.paymentNo} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payment:', error);
@@ -3083,7 +3130,18 @@ export default function App() {
     try {
       console.info('[App] Updating payment:', payment.id);
       const existing = payments.find(p => p.id === payment.id);
-      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...payment, updatedAt: new Date().toISOString() } : p));
+      if (!existing) {
+        handleNotify('error', 'Payment not found.');
+        return;
+      }
+      if (existing.orgId !== currentOrgId) {
+        handleNotify('error', 'Cross-organization payment update is not allowed.');
+        return;
+      }
+
+      const updates = { ...payment, orgId: currentOrgId, updatedAt: new Date().toISOString() };
+      const savedPayment = await dataService.updateEntity('payments', payment.id, updates);
+      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...(savedPayment as Payment) } : p));
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', payment.id, payment.paymentNo, existing, payment);
       handleNotify('success', `Payment ${payment.paymentNo} updated successfully`);
@@ -3093,10 +3151,139 @@ export default function App() {
     }
   };
 
+  const handlePostPayment = async (payment: Payment) => {
+    try {
+      const existing = payments.find(p => p.id === payment.id);
+      const postingTs = new Date().toISOString();
+      const paymentToPost: Payment = {
+        ...payment,
+        orgId: payment.orgId || currentOrgId,
+        status: 'POSTED',
+        postedAt: payment.postedAt || postingTs,
+        postedBy: payment.postedBy || currentUser?.id || 'system',
+        updatedAt: postingTs
+      };
+      if (paymentToPost.orgId !== currentOrgId || (existing && existing.orgId !== currentOrgId)) {
+        handleNotify('error', 'Cross-organization payment posting is not allowed.');
+        return;
+      }
+
+      // Skip GL if already posted before and linked.
+      if (existing?.journalEntryId) {
+        const savedPayment = await dataService.updateEntity('payments', paymentToPost.id, paymentToPost);
+        if (existing) {
+          setPayments(prev => prev.map(p => p.id === paymentToPost.id ? { ...p, ...(savedPayment as Payment) } : p));
+        } else {
+          setPayments(prev => [...prev, savedPayment as Payment]);
+        }
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentToPost.id, paymentToPost.paymentNo, existing, paymentToPost);
+        handleNotify('success', `Payment ${paymentToPost.paymentNo} posted successfully`);
+        return;
+      }
+
+      const { cashAccount, customerDepositsAccount, ewtReceivableAccount } = resolvePaymentPostingAccounts(paymentToPost);
+      const amountReceived = Number(paymentToPost.amountReceived ?? 0) || 0;
+      const ewtAmount = Number(paymentToPost.ewtAmountCertified ?? 0) || 0;
+
+      if (!cashAccount) {
+        handleNotify('error', 'Cannot post payment: cash/bank GL account not found.');
+        return;
+      }
+      if (!customerDepositsAccount) {
+        handleNotify('error', 'Cannot post payment: Customer Deposits account is not configured.');
+        return;
+      }
+      if (ewtAmount > 0 && !ewtReceivableAccount) {
+        handleNotify('error', 'Cannot post payment: EWT Receivable account is not configured (required when EWT Amount > 0).');
+        return;
+      }
+
+      const totalCredit = amountReceived + ewtAmount;
+      const paymentEntry: Partial<JournalEntry> = {
+        orgId: currentOrgId,
+        periodId: '',
+        date: paymentToPost.paymentDate,
+        description: `Payment ${paymentToPost.paymentNo} posted`,
+        reference: paymentToPost.paymentNo,
+        status: 'POSTED',
+        sourceType: 'PAYMENT',
+        sourceRef: paymentToPost.id,
+        createdBy: currentUser?.id || 'system',
+        createdAt: postingTs
+      };
+
+      const paymentLines: JournalLine[] = [
+        {
+          id: `jl-${Date.now()}-1`,
+          journalEntryId: '',
+          orgId: currentOrgId,
+          accountId: cashAccount.id,
+          debit: amountReceived,
+          credit: 0,
+          description: `Cash receipt for ${paymentToPost.paymentNo}`
+        },
+        ...(ewtAmount > 0 && ewtReceivableAccount ? [{
+          id: `jl-${Date.now()}-2`,
+          journalEntryId: '',
+          orgId: currentOrgId,
+          accountId: ewtReceivableAccount.id,
+          debit: ewtAmount,
+          credit: 0,
+          description: `EWT receivable for ${paymentToPost.paymentNo}`
+        }] : []),
+        {
+          id: `jl-${Date.now()}-3`,
+          journalEntryId: '',
+          orgId: currentOrgId,
+          accountId: customerDepositsAccount.id,
+          debit: 0,
+          credit: totalCredit,
+          description: `Customer deposits for ${paymentToPost.paymentNo}`
+        }
+      ];
+
+      const savedEntry = await handlePostJournal(paymentEntry, paymentLines);
+      if (!savedEntry) {
+        handleNotify('error', `Payment ${paymentToPost.paymentNo} posting failed because GL posting was not saved.`);
+        return;
+      }
+
+      const finalizedPayment = {
+        ...paymentToPost,
+        journalEntryId: savedEntry.id,
+        updatedAt: new Date().toISOString()
+      };
+      const savedPayment = existing
+        ? await dataService.updateEntity('payments', finalizedPayment.id, finalizedPayment)
+        : await dataService.createEntity('payments', finalizedPayment);
+      if (existing) {
+        setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...p, ...(savedPayment as Payment) } : p));
+      } else {
+        setPayments(prev => [...prev, savedPayment as Payment]);
+      }
+
+      if (existing) {
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', finalizedPayment.id, finalizedPayment.paymentNo, existing, finalizedPayment);
+      } else {
+        AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', finalizedPayment.id, finalizedPayment.paymentNo);
+      }
+      handleNotify('success', `Payment ${finalizedPayment.paymentNo} posted successfully`);
+    } catch (error) {
+      console.error('[App] Error posting payment:', error);
+      handleNotify('error', 'Failed to post payment.');
+    }
+  };
+
   const handleDeletePayment = async (id: string): Promise<boolean> => {
     try {
       console.info('[App] Deleting payment:', id);
       const existing = payments.find(p => p.id === id);
+      if (!existing) return false;
+      if (existing.orgId !== currentOrgId) {
+        handleNotify('error', 'Cross-organization payment delete is not allowed.');
+        return false;
+      }
+      await dataService.archiveEntity('payments', id, currentUser?.id || 'system');
       setPayments(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
 
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, existing?.paymentNo);
@@ -3113,6 +3300,10 @@ export default function App() {
     try {
       const payment = payments.find(p => p.id === id);
       if (payment) {
+        if (payment.orgId !== currentOrgId) {
+          handleNotify('error', 'Cross-organization payment void is not allowed.');
+          return;
+        }
         const voidedPayment = {
           ...payment,
           status: 'VOIDED' as const,
@@ -3120,6 +3311,7 @@ export default function App() {
           voidedBy: currentUser?.id,
           voidReason: reason
         };
+        await dataService.updateEntity('payments', id, voidedPayment);
         setPayments(prev => prev.map(p => p.id === id ? voidedPayment : p));
         AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', id, payment.paymentNo, payment, voidedPayment);
         handleNotify('success', `Payment ${payment.paymentNo} voided`);
@@ -3135,97 +3327,145 @@ export default function App() {
     const payment = payments.find(p => p.id === paymentId);
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!payment || !invoice) return;
-
-    // 1. Create GL Journal Entry for APPL first so the application row can persist GL linkage.
-    const coa = accounts.filter(a => a.orgId === currentOrgId);
-    const depositsAcct = coa.find(a => a.code === '2000');
-    const arAcct = coa.find(a => a.code === '1200');
-    if (!depositsAcct || !arAcct) {
-      handleNotify('error', 'Cannot apply payment: required GL accounts (2000/1200) are missing.');
+    if (payment.orgId !== currentOrgId || invoice.orgId !== currentOrgId) {
+      handleNotify('error', 'Cross-organization payment application is not allowed.');
       return;
     }
+    if (amount <= 0) {
+      handleNotify('error', 'Apply amount must be greater than zero.');
+      return;
+    }
+    const applyKey = `${paymentId}:${invoiceId}`;
+    if (applyingPaymentKeysRef.current.has(applyKey)) {
+      return;
+    }
+    const existingActiveApplication = (payment.applications || []).find(app => app.invoiceId === invoiceId && !app.isReversed);
+    if (existingActiveApplication) {
+      handleNotify('info', `Invoice ${invoice.invoiceNo} already has an active payment application.`);
+      return;
+    }
+    applyingPaymentKeysRef.current.add(applyKey);
 
-    const applicationId = `appl-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    const applicationTs = new Date().toISOString();
-    const applEntry: Partial<JournalEntry> = {
-      orgId: currentOrgId,
-      periodId: invoice.periodId || '',
-      date: new Date().toISOString().split('T')[0],
-      description: `Payment Application to Invoice ${invoice.invoiceNo}`,
-      // Leave reference blank so handlePostJournal auto-assigns sequential GL reference.
-      status: 'POSTED',
-      sourceType: 'APPLICATION',
-      sourceRef: applicationId,
-      createdBy: currentUser?.id,
-      createdAt: applicationTs
-    };
-    const applLines: JournalLine[] = [
-      {
-        id: `jl-${Date.now()}-1`,
-        journalEntryId: '',
-        orgId: currentOrgId,
-        accountId: depositsAcct.id,
-        debit: amount,
-        credit: 0,
-        description: 'Apply from Customer Deposits'
-      },
-      {
-        id: `jl-${Date.now()}-2`,
-        journalEntryId: '',
-        orgId: currentOrgId,
-        accountId: arAcct.id,
-        debit: 0,
-        credit: amount,
-        description: 'Reduce Accounts Receivable'
+    try {
+      // 1. Resolve GL accounts with org-aware dynamic mapping.
+      const { customerDepositsAccount } = resolvePaymentPostingAccounts(payment);
+      const arAcct = resolveArAccountForInvoice(payment, invoice);
+      const depositsAcct = customerDepositsAccount;
+      if (!depositsAcct || !arAcct) {
+        handleNotify('error', 'Cannot apply payment: required deposit/AR GL accounts are not configured.');
+        return;
       }
-    ];
 
-    const savedApplicationEntry = await handlePostJournal(applEntry, applLines);
-    if (!savedApplicationEntry) {
-      handleNotify('error', `Payment application to ${invoice.invoiceNo} failed: GL posting was not saved.`);
-      return;
-    }
+      const applicationId = generateUUID();
+      const applicationTs = new Date().toISOString();
 
-    const newApplication = {
-      id: applicationId,
-      paymentId,
-      invoiceId,
-      amountApplied: amount,
-      glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
-      journalEntryId: savedApplicationEntry.id,
-      isReversed: false,
-      createdAt: applicationTs,
-      updatedAt: applicationTs
-    };
+      // Persist application first to avoid duplicate GL posting on retries.
+      const newApplication = {
+        id: applicationId,
+        orgId: currentOrgId,
+        paymentId,
+        invoiceId,
+        amountApplied: amount,
+        isReversed: false,
+        createdAt: applicationTs,
+        updatedAt: applicationTs
+      };
+      const savedApplication = await dataService.createEntity('payment_applications', newApplication) as PaymentApplication;
 
-    // 2. Persist Payment application with GL reference linkage.
-    setPayments(prev => prev.map(p => {
-      if (p.id !== paymentId) return p;
-      return {
-        ...p,
-        applications: [...(p.applications || []), newApplication],
-        totalApplied: (p.totalApplied || 0) + amount,
-        customerDepositBalance: (p.customerDepositBalance || 0) - amount,
+      // Reuse an existing GL entry for this application id if present (idempotent)
+      let savedApplicationEntry = journalEntries.find(
+        je => je.sourceType === 'APPLICATION' && je.sourceRef === savedApplication.id && je.status === 'POSTED'
+      );
+      if (!savedApplicationEntry) {
+        const applEntry: Partial<JournalEntry> = {
+          orgId: currentOrgId,
+          periodId: invoice.periodId || '',
+          date: new Date().toISOString().split('T')[0],
+          description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+          status: 'POSTED',
+          sourceType: 'APPLICATION',
+          sourceRef: savedApplication.id,
+          createdBy: currentUser?.id,
+          createdAt: applicationTs
+        };
+        const applLines: JournalLine[] = [
+          {
+            id: `jl-${Date.now()}-1`,
+            journalEntryId: '',
+            orgId: currentOrgId,
+            accountId: depositsAcct.id,
+            debit: amount,
+            credit: 0,
+            description: 'Apply from Customer Deposits'
+          },
+          {
+            id: `jl-${Date.now()}-2`,
+            journalEntryId: '',
+            orgId: currentOrgId,
+            accountId: arAcct.id,
+            debit: 0,
+            credit: amount,
+            description: 'Reduce Accounts Receivable'
+          }
+        ];
+        const posted = await handlePostJournal(applEntry, applLines);
+        if (!posted) {
+          handleNotify('error', `Payment application to ${invoice.invoiceNo} saved, but GL posting failed.`);
+          return;
+        }
+        savedApplicationEntry = posted;
+      }
+
+      // Best-effort linkage update (auto-stripped if columns are missing in DB schema)
+      try {
+        await dataService.updateEntity('payment_applications', savedApplication.id, {
+          glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
+          journalEntryId: savedApplicationEntry.id,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (linkErr) {
+        console.warn('[App] Payment application GL linkage update skipped due schema mismatch:', linkErr);
+      }
+
+      // 2. Persist Payment application totals.
+      const updatedPayment = {
+        ...payment,
+        applications: [...(payment.applications || []), savedApplication],
+        totalApplied: (payment.totalApplied || 0) + amount,
+        customerDepositBalance: (payment.customerDepositBalance || 0) - amount,
         updatedAt: new Date().toISOString()
       };
-    }));
+      await dataService.updateEntity('payments', paymentId, {
+        totalApplied: updatedPayment.totalApplied,
+        customerDepositBalance: updatedPayment.customerDepositBalance,
+        updatedAt: updatedPayment.updatedAt
+      });
+      setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
-    // 3. Persist Invoice balance/status update.
-    setInvoices(prev => prev.map(i => {
-      if (i.id !== invoiceId) return i;
-      const newAmountPaid = (i.amountPaid || 0) + amount;
-      const newBalanceDue = Math.max((i.balanceDue || 0) - amount, 0);
-      const newStatus = newBalanceDue === 0 ? 'CLOSED' : i.status;
-      return {
-        ...i,
+      // 3. Persist Invoice balance/status update.
+      const newAmountPaid = (invoice.amountPaid || 0) + amount;
+      const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
+      const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
+      const updatedInvoice = await dataService.updateInvoice(invoiceId, {
         amountPaid: newAmountPaid,
         balanceDue: newBalanceDue,
         status: newStatus,
         updatedAt: new Date().toISOString()
-      };
-    }));
+      });
+      setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, ...(updatedInvoice as Invoice) } : i));
 
-    handleNotify('success', `Applied ${invoice.invoiceNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
+      handleNotify('success', `Applied ${invoice.invoiceNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('idx_unique_active_application') || msg.includes('duplicate key value')) {
+        handleNotify('info', `Invoice ${invoice.invoiceNo} already has an active application for this payment.`);
+        return;
+      }
+      console.error('[App] Error applying payment to invoice:', error);
+      handleNotify('error', `Failed to apply payment to ${invoice.invoiceNo}.`);
+    } finally {
+      applyingPaymentKeysRef.current.delete(applyKey);
+    }
   };
 
   // ===== Payment Application Reversal Handler (RVRS) =====
@@ -3233,10 +3473,18 @@ export default function App() {
     // 1. Update Payment Application State
     const payment = payments.find(p => p.id === paymentId);
     if (!payment) return;
+    if (payment.orgId !== currentOrgId) {
+      handleNotify('error', 'Cross-organization reversal is not allowed.');
+      return;
+    }
     const application = (payment.applications || []).find(app => app.id === applicationId);
     if (!application) return;
     const invoice = invoices.find(i => i.id === application.invoiceId);
     if (!invoice) return;
+    if (invoice.orgId !== currentOrgId) {
+      handleNotify('error', 'Cross-organization reversal is not allowed.');
+      return;
+    }
 
     // Mark application as reversed
     const updatedApplications = (payment.applications || []).map(app =>
@@ -3249,8 +3497,21 @@ export default function App() {
       ...payment,
       applications: updatedApplications,
       totalApplied: (payment.totalApplied || 0) - reversedAmount,
-      customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount
+      customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount,
+      updatedAt: new Date().toISOString()
     };
+    await dataService.updateEntity('payment_applications', applicationId, {
+      isReversed: true,
+      reversalReason: reason,
+      reversedAt: new Date().toISOString(),
+      reversedBy: currentUser?.id || 'system',
+      updatedAt: new Date().toISOString()
+    });
+    await dataService.updateEntity('payments', paymentId, {
+      totalApplied: updatedPayment.totalApplied,
+      customerDepositBalance: updatedPayment.customerDepositBalance,
+      updatedAt: updatedPayment.updatedAt
+    });
     setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
     // 2. Update Invoice Balance and Status
@@ -3261,14 +3522,21 @@ export default function App() {
       ...invoice,
       amountPaid: newAmountPaid,
       balanceDue: newBalanceDue,
-      status: newStatus
+      status: newStatus,
+      updatedAt: new Date().toISOString()
     };
+    await dataService.updateInvoice(invoice.id, {
+      amountPaid: newAmountPaid,
+      balanceDue: newBalanceDue,
+      status: newStatus,
+      updatedAt: updatedInvoice.updatedAt
+    });
     setInvoices(prev => prev.map(i => i.id === invoice.id ? updatedInvoice : i));
 
     // 3. Create GL Journal Entry for RVRS
-    const coa = accounts.filter(a => a.orgId === currentOrgId);
-    const arAcct = coa.find(a => a.code === '1200');
-    const depositsAcct = coa.find(a => a.code === '2000');
+    const { customerDepositsAccount } = resolvePaymentPostingAccounts(payment);
+    const arAcct = resolveArAccountForInvoice(payment, invoice);
+    const depositsAcct = customerDepositsAccount;
     if (arAcct && depositsAcct) {
       const rvrsEntry: Partial<JournalEntry> = {
         orgId: currentOrgId,
@@ -4064,6 +4332,7 @@ export default function App() {
             currency={currentOrg?.currency || 'PHP'}
             onAddPayment={handleAddPayment}
             onUpdatePayment={handleUpdatePayment}
+            onPostPayment={handlePostPayment}
             onDeletePayment={handleDeletePayment}
             onVoidPayment={handleVoidPayment}
             onApplyToInvoice={handleApplyToInvoice}

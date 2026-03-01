@@ -293,12 +293,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
 
     const payment = buildPayment('POSTED');
-    if (editingPayment) {
-      if (onPostPayment) onPostPayment(payment);
-      else onUpdatePayment(payment);
-    } else {
-      onAddPayment(payment);
-    }
+    if (onPostPayment) onPostPayment(payment);
+    else if (editingPayment) onUpdatePayment(payment);
+    else onAddPayment(payment);
     setEditingPayment(payment);
   };
 

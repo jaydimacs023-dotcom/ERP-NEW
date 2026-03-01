@@ -133,6 +133,7 @@ export class SupabaseDataService implements IDataService {
         'payroll_runs', 'payroll_lines', 'audit_logs', 'purchase_orders',
         'payment_histories', 'fixed_assets', 'vendor_tax_settings', 'atc_categories',
         'atc_items', 'atc_rates', 'payables', 'bills',
+        'payments', 'payment_applications',
         'warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions',
         'stock_adjustments', 'reorder_points', 'course_fees', 'alumni_employment_reports',
         'enrollments', 'invoices', 'invoice_lines', 'tax_categories'
@@ -150,6 +151,7 @@ export class SupabaseDataService implements IDataService {
         payrollRuns, payrollLines, auditLogs, purchaseOrders,
         paymentHistories, fixedAssets, vendorTaxSettings, atcCategories,
         atcItems, atcRates, payables, bills,
+        payments, paymentApplications,
         warehouseLocations, stockItems, inventoryLevels, inventoryTransactions,
         stockAdjustments, reorderPoints, courseFees, alumniReports,
         enrollments, invoices, invoice_lines, taxCategories
@@ -204,6 +206,8 @@ export class SupabaseDataService implements IDataService {
         auditLogs: this.snakeToCamel(auditLogs as any) || [],
         purchaseOrders: this.snakeToCamel(purchaseOrders as any) || [],
         paymentHistories: this.snakeToCamel(paymentHistories as any) || [],
+        payments: this.snakeToCamel(payments as any) || [],
+        paymentApplications: this.snakeToCamel(paymentApplications as any) || [],
         fixedAssets: this.snakeToCamel(fixedAssets as any) || [],
         vendorTaxSettings: this.snakeToCamel(vendorTaxSettings as any) || [],
         atcCategories: this.snakeToCamel(atcCategories as any) || [],
@@ -449,24 +453,39 @@ export class SupabaseDataService implements IDataService {
 
     try {
       const url = `${this.baseUrl}/${table}`;
-      console.debug(`[Supabase] 📝 Inserting into ${table}:`, data);
+      let payload = { ...data };
+      let retries = 0;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(data),
-      });
+      while (true) {
+        console.debug(`[Supabase] 📝 Inserting into ${table}:`, payload);
 
-      if (!response.ok) {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
+          console.info(`[Supabase] ✅ Inserted into ${table}:`, camelResult);
+          return camelResult as T;
+        }
+
         const error = await response.text();
+        const missingColumn = this.extractMissingColumnFromSchemaError(error)
+          || (error.match(/Could not find the '([^']+)' column of '[^']+'/i)?.[1] ?? null);
+
+        if (missingColumn && retries < 8 && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+          console.warn(`[Supabase] insertToSupabaseRaw retrying without unknown column '${missingColumn}'`);
+          delete payload[missingColumn];
+          retries += 1;
+          continue;
+        }
+
         console.error(`[Supabase] ❌ Insert failed: ${response.status} ${response.statusText}`, error);
         throw new Error(`Failed to insert into ${table}: ${error}`);
       }
-
-      const result = await response.json();
-      const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
-      console.info(`[Supabase] ✅ Inserted into ${table}:`, camelResult);
-      return camelResult as T;
     } catch (error) {
       console.error(`[Supabase] Network error inserting into ${table}:`, error);
       throw error;
@@ -485,30 +504,43 @@ export class SupabaseDataService implements IDataService {
 
     try {
       const url = `${this.baseUrl}/${table}?id=eq.${id}`;
-      console.debug(`[Supabase] ✏️ Updating ${table} (${id}):`, data);
+      let payload = { ...data };
+      let retries = 0;
 
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(data),
-      });
+      while (true) {
+        console.debug(`[Supabase] Updating ${table} (${id}):`, payload);
 
-      if (!response.ok) {
+        const response = await fetch(url, {
+          method: 'PATCH',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
+          console.info(`[Supabase] Updated ${table}:`, camelResult);
+          return camelResult as T;
+        }
+
         const error = await response.text();
-        console.error(`[Supabase] ❌ Update failed: ${response.status} ${response.statusText}`, error);
+        const missingColumn = this.extractMissingColumnFromSchemaError(error)
+          || (error.match(/Could not find the '([^']+)' column of '[^']+'/i)?.[1] ?? null);
+        if (missingColumn && retries < 8 && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+          console.warn(`[Supabase] updateInSupabaseRaw retrying without unknown column '${missingColumn}'`);
+          delete payload[missingColumn];
+          retries += 1;
+          continue;
+        }
+
+        console.error(`[Supabase] Update failed: ${response.status} ${response.statusText}`, error);
         throw new Error(`Failed to update ${table}: ${error}`);
       }
-
-      const result = await response.json();
-      const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
-      console.info(`[Supabase] ✅ Updated ${table}:`, camelResult);
-      return camelResult as T;
     } catch (error) {
       console.error(`[Supabase] Network error updating ${table}:`, error);
       throw error;
     }
   }
-
   /**
    * Filter object to only include valid columns for a given table
    * Removes fields that don't exist in Supabase schema
@@ -600,6 +632,21 @@ export class SupabaseDataService implements IDataService {
       ],
       tax_categories: [
         'id', 'org_id', 'code', 'description', 'tax_type', 'rate', 'is_inclusive', 'output_account_id', 'created_at', 'updated_at'
+      ],
+      payments: [
+        'id', 'org_id', 'payment_no', 'sponsor_id', 'student_id',
+        'payment_date', 'status', 'payment_method', 'ref_no', 'bank_account_id',
+        'check_number', 'check_date', 'amount_received', 'ewt_amount_certified',
+        'total_applied', 'customer_deposit_balance', 'journal_entry_id',
+        'voided_at', 'voided_by', 'void_reason', 'posted_at', 'posted_by',
+        'notes', 'created_at', 'created_by', 'updated_at', 'updated_by',
+        'is_deleted', 'deleted_at', 'deleted_by'
+      ],
+      payment_applications: [
+        'id', 'payment_id', 'invoice_id', 'amount_applied',
+        'is_reversed', 'reversal_reason', 'reversed_at', 'reversed_by',
+        'gl_reference', 'journal_entry_id',
+        'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
     };
 
