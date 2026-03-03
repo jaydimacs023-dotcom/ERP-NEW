@@ -2743,6 +2743,43 @@ export default function App() {
     }
   };
 
+  const resolveReceivableAccount = (params: { sponsorId?: string; studentId?: string; preferredAccountId?: string }) => {
+    const coa = filteredAccounts;
+    const byName = (patterns: string[]) => coa.find(a => {
+      const name = (a.name || '').toLowerCase();
+      return patterns.every(p => name.includes(p));
+    });
+
+    if (params.preferredAccountId) {
+      const preferred = coa.find(a => a.id === params.preferredAccountId);
+      if (preferred) return preferred;
+    }
+
+    if (params.sponsorId) {
+      return (
+        coa.find(a => a.code === '11110') ||
+        byName(['receivable', 'sponsor']) ||
+        byName(['accounts', 'receivable', 'sponsor']) ||
+        byName(['accounts', 'receivable']) ||
+        coa.find(a => a.code === '1200') ||
+        byName(['receivable'])
+      );
+    }
+
+    if (params.studentId) {
+      return (
+        coa.find(a => a.code === '11100') ||
+        byName(['receivable', 'student']) ||
+        byName(['accounts', 'receivable', 'student']) ||
+        byName(['accounts', 'receivable']) ||
+        coa.find(a => a.code === '1200') ||
+        byName(['receivable'])
+      );
+    }
+
+    return byName(['accounts', 'receivable']) || coa.find(a => a.code === '1200') || byName(['receivable']);
+  };
+
   const postInvoiceToGL = async (invoice: Invoice): Promise<{ jeId: string, glRef: string, now: string } | null> => {
     const now = new Date().toISOString();
     const jeId = crypto.randomUUID();
@@ -2754,10 +2791,12 @@ export default function App() {
 
     // ── Find GL accounts ───────────────────────────────────────────────────
     const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
-    const arAccountId =
-      (sponsor as any)?.arAccountId ||
-      filteredAccounts.find(a => a.code === '1200')?.id ||
-      filteredAccounts.find(a => (a.name || '').toLowerCase().includes('receivable'))?.id;
+    const arAccount = resolveReceivableAccount({
+      sponsorId: invoice.sponsorId,
+      studentId: invoice.studentId,
+      preferredAccountId: (sponsor as any)?.arAccountId
+    });
+    const arAccountId = arAccount?.id;
 
     const vatPayableId =
       filteredAccounts.find(a => a.code === '2200')?.id ||
@@ -2769,7 +2808,7 @@ export default function App() {
       filteredAccounts.find(a => /\bvat\b/i.test(a.name || ''))?.id;
 
     if (!arAccountId) {
-      handleNotify('error', 'Cannot post GL: Accounts Receivable account (1200) not found.');
+      handleNotify('error', 'Cannot post GL: Accounts Receivable account is not configured.');
       return null;
     } else if (invoice.vatAmount > 0 && !vatPayableId) {
       handleNotify('error', 'Cannot post GL: Output VAT account (2200) not found.');
@@ -3069,8 +3108,11 @@ export default function App() {
       coa.find(a => a.code === '2000');
 
     const ewtReceivableAccount =
+      byName(['creditable', 'withholding', 'tax']) ||
+      byName(['cwt', '2307']) ||
       byName(['ewt', 'receivable']) ||
       byName(['withholding', 'receivable']) ||
+      coa.find(a => a.code === '14001') ||
       coa.find(a => a.code === '14200');
 
     return { cashAccount, customerDepositsAccount, ewtReceivableAccount };
@@ -3079,25 +3121,52 @@ export default function App() {
   const resolveArAccountForInvoice = (payment: Payment, invoice: Invoice) => {
     const coa = accounts.filter(a => a.orgId === currentOrgId);
     const arFromInvoiceJournal = (() => {
-      if (!invoice.journalEntryId) return undefined;
-      const invoiceLines = journalLines.filter(l => l.journalEntryId === invoice.journalEntryId && l.orgId === currentOrgId);
+      const postedInvoiceEntry = invoice.journalEntryId
+        ? journalEntries.find(
+          je => je.id === invoice.journalEntryId && je.orgId === currentOrgId && je.status === 'POSTED'
+        )
+        : journalEntries.find(
+          je =>
+            je.orgId === currentOrgId &&
+            je.status === 'POSTED' &&
+            je.sourceType === 'INVOICE' &&
+            je.sourceRef === invoice.id
+        );
+      const invoiceEntry = postedInvoiceEntry || journalEntries.find(
+        je =>
+          je.orgId === currentOrgId &&
+          je.status === 'POSTED' &&
+          je.sourceType === 'INVOICE' &&
+          !!invoice.glEntryNumber &&
+          (je.glEntryNumber === invoice.glEntryNumber || je.reference === invoice.glEntryNumber)
+      );
+      if (!invoiceEntry) return undefined;
+
+      const invoiceLines = journalLines.filter(
+        l => l.journalEntryId === invoiceEntry.id && l.orgId === currentOrgId
+      );
       if (!invoiceLines.length) return undefined;
+
       const debitLines = invoiceLines.filter(l => (l.debit || 0) > 0);
-      for (const line of debitLines) {
-        const acct = coa.find(a => a.id === line.accountId);
-        if (acct && (acct.name || '').toLowerCase().includes('receivable')) return acct;
-      }
-      const maxDebitLine = debitLines.sort((a, b) => (b.debit || 0) - (a.debit || 0))[0];
-      return maxDebitLine ? coa.find(a => a.id === maxDebitLine.accountId) : undefined;
+      if (!debitLines.length) return undefined;
+
+      // Use the primary debit line from the posted invoice to guarantee consistency
+      // between invoice posting and payment-application credit.
+      const primaryDebitLine = debitLines.sort((a, b) => (b.debit || 0) - (a.debit || 0))[0];
+      return primaryDebitLine ? coa.find(a => a.id === primaryDebitLine.accountId) : undefined;
     })();
 
     if (arFromInvoiceJournal) return arFromInvoiceJournal;
 
-    const arByPayor = payment.sponsorId
-      ? coa.find(a => (a.name || '').toLowerCase().includes('receivable') && (a.name || '').toLowerCase().includes('sponsor'))
-      : coa.find(a => (a.name || '').toLowerCase().includes('receivable') && (a.name || '').toLowerCase().includes('student'));
+    const sponsor = (invoice.sponsorId || payment.sponsorId)
+      ? sponsors.find(s => s.id === (invoice.sponsorId || payment.sponsorId))
+      : null;
 
-    return arByPayor || coa.find(a => (a.name || '').toLowerCase().includes('accounts receivable')) || coa.find(a => a.code === '1200');
+    return resolveReceivableAccount({
+      sponsorId: invoice.sponsorId || payment.sponsorId,
+      studentId: invoice.studentId || payment.studentId,
+      preferredAccountId: (sponsor as any)?.arAccountId
+    });
   };
 
   const handleAddPayment = async (payment: Payment) => {
@@ -3194,7 +3263,7 @@ export default function App() {
         return;
       }
       if (ewtAmount > 0 && !ewtReceivableAccount) {
-        handleNotify('error', 'Cannot post payment: EWT Receivable account is not configured (required when EWT Amount > 0).');
+        handleNotify('error', 'Cannot post payment: Creditable Withholding Tax (CWT 2307) account is not configured (required when EWT Amount > 0).');
         return;
       }
 
@@ -3229,7 +3298,7 @@ export default function App() {
           accountId: ewtReceivableAccount.id,
           debit: ewtAmount,
           credit: 0,
-          description: `EWT receivable for ${paymentToPost.paymentNo}`
+          description: `Creditable Withholding Tax (CWT 2307) for ${paymentToPost.paymentNo}`
         }] : []),
         {
           id: `jl-${Date.now()}-3`,

@@ -230,7 +230,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const glImpactRows = [
     { account: getBankLabel(formData.bankAccountId), debit: formData.amountReceived, credit: 0 },
-    { account: 'EWT Receivable', debit: formData.ewtAmountCertified, credit: 0 },
+    { account: '14001 - Creditable Withholding Tax (CWT 2307)', debit: formData.ewtAmountCertified, credit: 0 },
     { account: payorType === 'SPONSOR' ? 'Accounts Receivable - Sponsors' : 'Accounts Receivable - Students', debit: 0, credit: baseTotalCredit }
   ];
 
@@ -631,8 +631,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 <span className="font-semibold">{payorType === 'SPONSOR' ? '11110 - AR Sponsors' : '11100 - AR Students'}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>EWT</span>
-                <span className="font-semibold">14200 - EWT Receivable</span>
+                <span>CWT (BIR 2307)</span>
+                <span className="font-semibold">14001 - Creditable Withholding Tax</span>
               </div>
             </div>
           </div>
