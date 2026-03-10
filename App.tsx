@@ -3090,16 +3090,21 @@ export default function App() {
       const name = (a.name || '').toLowerCase();
       return patterns.every(p => name.includes(p));
     });
+    const byCode = (codes: string[]) => coa.find(a => codes.includes(a.code || ''));
+    const byId = (id?: string) => (id ? coa.find(a => a.id === id) : undefined);
 
     const selectedBank = bankAccounts.find(b => b.id === payment.bankAccountId && b.orgId === currentOrgId);
-    const cashAccount = selectedBank
-      ? coa.find(a => a.id === selectedBank.glAccountId)
-      : (
-        byName(['cash']) ||
-        byName(['bank']) ||
-        coa.find(a => a.code === '1000') ||
-        coa.find(a => a.code === '1010')
-      );
+    const bankLinkedAccount = selectedBank?.glAccountId
+      ? coa.find(a => a.id === selectedBank.glAccountId) || coa.find(a => a.code === selectedBank.glAccountId)
+      : undefined;
+
+    const cashAccount = bankLinkedAccount ||
+      byId(payment.bankAccountId) ||
+      byName(['undeposited']) ||
+      byName(['cash', 'hand']) ||
+      byName(['cash']) ||
+      byName(['bank']) ||
+      byCode(['1000', '1010']);
 
     const customerDepositsAccount =
       byName(['customer', 'deposit']) ||
@@ -4398,6 +4403,7 @@ export default function App() {
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+            accounts={filteredAccounts}
             currency={currentOrg?.currency || 'PHP'}
             onAddPayment={handleAddPayment}
             onUpdatePayment={handleUpdatePayment}

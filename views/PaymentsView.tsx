@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount } from '../types';
+import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import {
   AlertTriangle,
@@ -24,6 +24,7 @@ interface PaymentsViewProps {
   students: Student[];
   invoices: Invoice[];
   bankAccounts: BankAccount[];
+  accounts: ChartOfAccount[];
   currency: string;
   onAddPayment: (payment: Payment) => void;
   onUpdatePayment: (payment: Payment) => void;
@@ -42,6 +43,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   students,
   invoices,
   bankAccounts,
+  accounts,
   currency,
   onAddPayment,
   onUpdatePayment,
@@ -107,6 +109,29 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const bank = bankAccounts.find(b => b.id === bankId);
     if (!bank) return '-';
     return `${bank.bankName} - ${bank.accountNumber}`;
+  };
+
+  const getCashGlAccount = (bankId?: string) => {
+    if (!bankId) return undefined;
+    const normalizedName = (name?: string) => (name || '').toLowerCase();
+    if (bankId === CASH_ON_HAND_UNDEPOSITED_ID) {
+      return accounts.find(a => normalizedName(a.name).includes('undeposited')) ||
+        accounts.find(a => normalizedName(a.name).includes('cash on hand')) ||
+        accounts.find(a => a.code === '1000');
+    }
+    const bank = bankAccounts.find(b => b.id === bankId);
+    if (bank?.glAccountId) {
+      return accounts.find(a => a.id === bank.glAccountId) ||
+        accounts.find(a => a.code === bank.glAccountId);
+    }
+    return accounts.find(a => a.id === bankId);
+  };
+
+  const getCashGlLabel = (bankId?: string) => {
+    const gl = getCashGlAccount(bankId);
+    if (!gl) return getBankLabel(bankId);
+    const code = gl.code ? `${gl.code} - ` : '';
+    return `${code}${gl.name}`;
   };
 
   const cashAccountOptions = useMemo(() => {
@@ -229,7 +254,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const availableToApply = Math.max((editingPayment?.customerDepositBalance ?? baseTotalCredit), 0);
 
   const glImpactRows = [
-    { account: getBankLabel(formData.bankAccountId), debit: formData.amountReceived, credit: 0 },
+    { account: getCashGlLabel(formData.bankAccountId), debit: formData.amountReceived, credit: 0 },
     { account: '14001 - Creditable Withholding Tax (CWT 2307)', debit: formData.ewtAmountCertified, credit: 0 },
     { account: payorType === 'SPONSOR' ? 'Accounts Receivable - Sponsors' : 'Accounts Receivable - Students', debit: 0, credit: baseTotalCredit }
   ];
@@ -583,7 +608,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
 
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              GL Debit Account: {getBankLabel(formData.bankAccountId)}
+              GL Debit Account: {getCashGlLabel(formData.bankAccountId)}
             </div>
           </div>
         </div>
@@ -624,7 +649,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="space-y-2 text-gray-700">
               <div className="flex items-center justify-between border-b pb-2">
                 <span>Cash Account</span>
-                <span className="font-semibold">{getBankLabel(formData.bankAccountId)}</span>
+                <span className="font-semibold">{getCashGlLabel(formData.bankAccountId)}</span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span>AR Clearing</span>
