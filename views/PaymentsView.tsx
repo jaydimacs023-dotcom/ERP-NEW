@@ -64,6 +64,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [showVoidModal, setShowVoidModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'apply' | 'register'>('info');
 
   const [formData, setFormData] = useState({
     paymentNo: '',
@@ -454,6 +455,37 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         </div>
       </div>
 
+      <div className="flex space-x-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('info')}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'info' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+          }`}
+          style={activeTab === 'info' ? { borderColor: brandColor, color: brandColor } : {}}
+        >
+          Payment Information and Details
+        </button>
+        <button
+          onClick={() => setActiveTab('apply')}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'apply' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+          }`}
+          style={activeTab === 'apply' ? { borderColor: brandColor, color: brandColor } : {}}
+        >
+          Apply Payment to Invoices
+        </button>
+        <button
+          onClick={() => setActiveTab('register')}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'register' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+          }`}
+          style={activeTab === 'register' ? { borderColor: brandColor, color: brandColor } : {}}
+        >
+          Payment Register
+        </button>
+      </div>
+
+      {activeTab === 'info' && (
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="space-y-4 xl:col-span-8">
           <div className="rounded-xl border bg-white p-4">
@@ -663,7 +695,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </div>
         </div>
       </div>
+      )}
 
+      {activeTab === 'apply' && (
       <div className="rounded-xl border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Apply Payment to Invoices</h3>
@@ -751,7 +785,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </table>
         </div>
       </div>
+      )}
 
+      {activeTab === 'register' && (
       <div className="rounded-xl border bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Payment Register</h3>
@@ -859,6 +895,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </table>
         </div>
       </div>
+      )}
 
       {showVoidModal && voidingPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

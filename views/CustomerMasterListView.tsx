@@ -243,8 +243,8 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tighter">Customer Master List</h2>
-                    <p className="text-sm text-slate-500 font-medium">Centralized registry for all billable entities and individuals.</p>
+                    <h2 className="text-xl font-semibold text-slate-900 tracking-tighter">Customer Master List</h2>
+                    <p className="text-sm italic text-slate-500 font-medium">Centralized registry for all billable entities and individuals.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex bg-slate-100 p-1 rounded-xl">

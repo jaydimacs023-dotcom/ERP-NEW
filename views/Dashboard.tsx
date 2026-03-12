@@ -701,7 +701,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
         <div className="no-print">
           <h2 className="text-xl font-semibold text-gray-800">Dashboard</h2>
-          <p className="text-sm text-gray-500">Financial overview and key performance indicators</p>
+          <p className="text-sm text-gray-500 italic">Financial overview and key performance indicators</p>
         </div>
         <button
           onClick={handlePrint}
