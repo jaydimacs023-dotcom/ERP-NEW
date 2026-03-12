@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { BankDeposit, BankDepositLine, BankDepositStatus, BankAccount, Payment } from '../types';
 import { generateUUID } from '../utils/uuid';
-import { 
-  Landmark, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye, 
+import {
+  Landmark, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Calendar, CheckCircle, Clock, XCircle, AlertTriangle, Receipt,
   ChevronDown, ChevronUp, DollarSign, CreditCard, Wallet, Ban,
   FileText, ArrowDownToLine, PlusCircle, MinusCircle
@@ -72,9 +72,9 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
     const depositedPaymentIds = new Set(
       deposits.flatMap(d => (d.lines || []).map(l => l.paymentId).filter(Boolean))
     );
-    return payments.filter(p => 
-      p.status === 'POSTED' && 
-      p.amountReceived > 0 && 
+    return payments.filter(p =>
+      p.status === 'POSTED' &&
+      p.amountReceived > 0 &&
       !depositedPaymentIds.has(p.id)
     );
   }, [deposits, payments]);
@@ -256,7 +256,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
   // Filter deposits
   const filteredDeposits = useMemo(() => {
     return deposits.filter(dep => {
-      const matchesSearch = 
+      const matchesSearch =
         dep.depositNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         dep.referenceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bankAccounts.find(b => b.id === dep.bankAccountId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -297,8 +297,8 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Bank Deposits</h2>
-          <p className="text-gray-500 text-sm">Manage deposit slips for collections and cash receipts</p>
+          <h2 className="text-xl font-semibold text-gray-800">Bank Deposits</h2>
+          <p className="text-gray-500 text-sm italic">Manage deposit slips for collections and cash receipts</p>
         </div>
         <button
           onClick={handleNew}
@@ -476,9 +476,9 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                           </>
                         )}
                         {dep.status === 'POSTED' && (
-                          <button 
-                            onClick={() => { setVoidingDeposit(dep); setShowVoidModal(true); }} 
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" 
+                          <button
+                            onClick={() => { setVoidingDeposit(dep); setShowVoidModal(true); }}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
                             title="Void"
                           >
                             <Ban size={16} />
@@ -534,7 +534,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Header fields */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -632,7 +632,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     </button>
                   </div>
                 </div>
-                
+
                 {formData.lines.length === 0 ? (
                   <p className="text-center text-gray-400 py-4">No check items added</p>
                 ) : (
@@ -763,7 +763,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
               {/* Bank Info */}
               <div className="grid grid-cols-2 gap-6">

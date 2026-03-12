@@ -1132,8 +1132,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Invoices</h2>
-              <p className="text-gray-500 text-sm">Manage AR invoices with EWT tracking</p>
+              <h2 className="text-xl font-semibold text-gray-800">Invoices</h2>
+              <p className="text-gray-500 text-sm italic">Manage AR invoices with EWT tracking</p>
             </div>
             <div className="flex items-center gap-3">
               {sponsorsWithUnbilledEnrollments.length > 0 && (
@@ -1416,7 +1416,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
+
                   {/* batch in center */}
                   <div>
                     <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items. Already billed batches are hidden.</p>
@@ -1430,7 +1430,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
-                    
+
                   </div>
                   {/* sponsor on left */}
                   <div>
@@ -1472,17 +1472,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
               {/* Bill To */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Reference */}
-              <div>
-                <label className="text-xs font-medium text-gray-500">External Reference</label>
-                <input
-                  type="text"
-                  value={formData.reference}
-                  onChange={e => setFormData({ ...formData, reference: e.target.value })}
-                  placeholder="QRM-00000 or P.O. Number"
-                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                />
-              </div>
+                {/* Reference */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500">External Reference</label>
+                  <input
+                    type="text"
+                    value={formData.reference}
+                    onChange={e => setFormData({ ...formData, reference: e.target.value })}
+                    placeholder="QRM-00000 or P.O. Number"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Terms</label>
                   <select
@@ -1616,7 +1616,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         formData.lines.map((line, idx) => (
                           <tr key={line.id || idx} className="border-t">
                             <td className="px-3 py-2 text-gray-400">{line.lineNumber}</td>
-                           
+
                             <td className="px-3 py-2">
                               <select
                                 value={line.courseFeeId || ''}
@@ -1629,7 +1629,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 ))}
                               </select>
                             </td>
-                             <td className="px-3 py-2">
+                            <td className="px-3 py-2">
                               <input
                                 type="text"
                                 value={line.description}
@@ -1721,7 +1721,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
             </div>
 
-            
+
           </div>
         </>
       )}

@@ -426,8 +426,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Payments and Applications</h2>
-          <p className="text-sm text-gray-500">New Payment & Application Worksheet</p>
+          <h2 className="text-xl  font-semibold text-gray-800">Payments and Applications</h2>
+          <p className="text-sm text-gray-500 italic">New Payment & Application Worksheet</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -458,27 +458,24 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       <div className="flex space-x-6 border-b border-gray-200">
         <button
           onClick={() => setActiveTab('info')}
-          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'info' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-          }`}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'info' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
           style={activeTab === 'info' ? { borderColor: brandColor, color: brandColor } : {}}
         >
           Payment Information and Details
         </button>
         <button
           onClick={() => setActiveTab('apply')}
-          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'apply' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-          }`}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'apply' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
           style={activeTab === 'apply' ? { borderColor: brandColor, color: brandColor } : {}}
         >
           Apply Payment to Invoices
         </button>
         <button
           onClick={() => setActiveTab('register')}
-          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'register' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-          }`}
+          className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'register' ? 'border-[#F47721] text-[#F47721]' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
           style={activeTab === 'register' ? { borderColor: brandColor, color: brandColor } : {}}
         >
           Payment Register
@@ -486,415 +483,414 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       </div>
 
       {activeTab === 'info' && (
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <div className="rounded-xl border bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Information</h3>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Payment No.</label>
-                <input
-                  value={formData.paymentNo}
-                  onChange={e => setFormData(prev => ({ ...prev, paymentNo: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder="Auto-generated"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Payment Date</label>
-                <div className="relative mt-1">
-                  <Calendar size={14} className="pointer-events-none absolute right-3 top-2.5 text-gray-400" />
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="space-y-4 xl:col-span-8">
+            <div className="rounded-xl border bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Information</h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Payment No.</label>
                   <input
-                    type="date"
-                    value={formData.paymentDate}
-                    onChange={e => setFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={formData.paymentNo}
+                    onChange={e => setFormData(prev => ({ ...prev, paymentNo: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="Auto-generated"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Payment Method</label>
-                <select
-                  value={formData.paymentMethod}
-                  onChange={e => setFormData(prev => ({ ...prev, paymentMethod: e.target.value as PaymentMethod }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                >
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="CHECK">Check</option>
-                  <option value="CASH">Cash</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
-                  <option value="EWALLET">E-Wallet</option>
-                  <option value="OFFSET">Offset</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Payor Type</label>
-                <div className="mt-2 flex gap-4 text-sm">
-                  <label className="inline-flex items-center gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Payment Date</label>
+                  <div className="relative mt-1">
+                    <Calendar size={14} className="pointer-events-none absolute right-3 top-2.5 text-gray-400" />
                     <input
-                      type="radio"
-                      checked={payorType === 'SPONSOR'}
-                      onChange={() => {
-                        setPayorType('SPONSOR');
-                        setFormData(prev => ({ ...prev, studentId: '' }));
-                      }}
+                      type="date"
+                      value={formData.paymentDate}
+                      onChange={e => setFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
+                      className="w-full rounded-lg border px-3 py-2 text-sm"
                     />
-                    Sponsor
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={payorType === 'STUDENT'}
-                      onChange={() => {
-                        setPayorType('STUDENT');
-                        setFormData(prev => ({ ...prev, sponsorId: '' }));
-                      }}
-                    />
-                    Student
-                  </label>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Payment Method</label>
+                  <select
+                    value={formData.paymentMethod}
+                    onChange={e => setFormData(prev => ({ ...prev, paymentMethod: e.target.value as PaymentMethod }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  >
+                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="CHECK">Check</option>
+                    <option value="CASH">Cash</option>
+                    <option value="CREDIT_CARD">Credit Card</option>
+                    <option value="EWALLET">E-Wallet</option>
+                    <option value="OFFSET">Offset</option>
+                  </select>
                 </div>
               </div>
-              <div className="md:col-span-2">
-                <label className="text-xs font-semibold text-gray-500">Payor Name</label>
-                {payorType === 'SPONSOR' ? (
-                  <select
-                    value={formData.sponsorId}
-                    onChange={e => setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }))}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Sponsor</option>
-                    {sponsors.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <select
-                    value={formData.studentId}
-                    onChange={e => setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }))}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Student</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
-                    ))}
-                  </select>
-                )}
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Payor Type</label>
+                  <div className="mt-2 flex gap-4 text-sm">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={payorType === 'SPONSOR'}
+                        onChange={() => {
+                          setPayorType('SPONSOR');
+                          setFormData(prev => ({ ...prev, studentId: '' }));
+                        }}
+                      />
+                      Sponsor
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={payorType === 'STUDENT'}
+                        onChange={() => {
+                          setPayorType('STUDENT');
+                          setFormData(prev => ({ ...prev, sponsorId: '' }));
+                        }}
+                      />
+                      Student
+                    </label>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-500">Payor Name</label>
+                  {payorType === 'SPONSOR' ? (
+                    <select
+                      value={formData.sponsorId}
+                      onChange={e => setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }))}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <option value="">Select Sponsor</option>
+                      {sponsors.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={formData.studentId}
+                      onChange={e => setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }))}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <option value="">Select Student</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                GL Credit (AR): {payorType === 'SPONSOR' ? '11110 - Accounts Receivable - Sponsors' : '11100 - Accounts Receivable - Students'}
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              GL Credit (AR): {payorType === 'SPONSOR' ? '11110 - Accounts Receivable - Sponsors' : '11100 - Accounts Receivable - Students'}
+            <div className="rounded-xl border bg-white p-4">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Details</h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Amount Received</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.amountReceived}
+                    onChange={e => setFormData(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">EWT Amount</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.ewtAmountCertified}
+                    onChange={e => setFormData(prev => ({ ...prev, ewtAmountCertified: parseFloat(e.target.value) || 0 }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Reference No.</label>
+                  <input
+                    value={formData.refNo}
+                    onChange={e => setFormData(prev => ({ ...prev, refNo: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="TRF / OR / Check Ref"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Cash Account</label>
+                  <select
+                    value={formData.bankAccountId}
+                    onChange={e => setFormData(prev => ({ ...prev, bankAccountId: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  >
+                    <option value="">Select Cash Account</option>
+                    {cashAccountOptions.map(account => (
+                      <option key={account.id} value={account.id}>{account.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                GL Debit Account: {getCashGlLabel(formData.bankAccountId)}
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl border bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Details</h3>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Amount Received</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.amountReceived}
-                  onChange={e => setFormData(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">EWT Amount</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.ewtAmountCertified}
-                  onChange={e => setFormData(prev => ({ ...prev, ewtAmountCertified: parseFloat(e.target.value) || 0 }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Reference No.</label>
-                <input
-                  value={formData.refNo}
-                  onChange={e => setFormData(prev => ({ ...prev, refNo: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder="TRF / OR / Check Ref"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Cash Account</label>
-                <select
-                  value={formData.bankAccountId}
-                  onChange={e => setFormData(prev => ({ ...prev, bankAccountId: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                >
-                  <option value="">Select Cash Account</option>
-                  {cashAccountOptions.map(account => (
-                    <option key={account.id} value={account.id}>{account.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              GL Debit Account: {getCashGlLabel(formData.bankAccountId)}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 xl:col-span-4">
-          <div className="rounded-xl border bg-white p-4">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-600">GL Impact (Auto-Generated)</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase text-gray-500">
-                  <th className="pb-2">Account</th>
-                  <th className="pb-2 text-right">Debit</th>
-                  <th className="pb-2 text-right">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {glImpactRows.map((row, index) => (
-                  <tr key={index} className="border-t text-gray-700">
-                    <td className="py-2">{row.account}</td>
-                    <td className="py-2 text-right">{row.debit ? formatCurrency(row.debit) : '-'}</td>
-                    <td className="py-2 text-right">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+          <div className="space-y-4 xl:col-span-4">
+            <div className="rounded-xl border bg-white p-4">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-600">GL Impact (Auto-Generated)</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase text-gray-500">
+                    <th className="pb-2">Account</th>
+                    <th className="pb-2 text-right">Debit</th>
+                    <th className="pb-2 text-right">Credit</th>
                   </tr>
-                ))}
-                <tr className="border-t font-bold">
-                  <td className="py-2">Total</td>
-                  <td className="py-2 text-right">{formatCurrency(baseTotalCredit)}</td>
-                  <td className="py-2 text-right">{formatCurrency(baseTotalCredit)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
-              Journal Entry Ready for Posting
+                </thead>
+                <tbody>
+                  {glImpactRows.map((row, index) => (
+                    <tr key={index} className="border-t text-gray-700">
+                      <td className="py-2">{row.account}</td>
+                      <td className="py-2 text-right">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                      <td className="py-2 text-right">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t font-bold">
+                    <td className="py-2">Total</td>
+                    <td className="py-2 text-right">{formatCurrency(baseTotalCredit)}</td>
+                    <td className="py-2 text-right">{formatCurrency(baseTotalCredit)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+                Journal Entry Ready for Posting
+              </div>
             </div>
-          </div>
 
-          <div className="rounded-xl border bg-white p-4 text-sm">
-            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-600">Account Mapping (Reference)</h3>
-            <div className="space-y-2 text-gray-700">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span>Cash Account</span>
-                <span className="font-semibold">{getCashGlLabel(formData.bankAccountId)}</span>
-              </div>
-              <div className="flex items-center justify-between border-b pb-2">
-                <span>AR Clearing</span>
-                <span className="font-semibold">{payorType === 'SPONSOR' ? '11110 - AR Sponsors' : '11100 - AR Students'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>CWT (BIR 2307)</span>
-                <span className="font-semibold">14001 - Creditable Withholding Tax</span>
+            <div className="rounded-xl border bg-white p-4 text-sm">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-600">Account Mapping (Reference)</h3>
+              <div className="space-y-2 text-gray-700">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span>Cash Account</span>
+                  <span className="font-semibold">{getCashGlLabel(formData.bankAccountId)}</span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span>AR Clearing</span>
+                  <span className="font-semibold">{payorType === 'SPONSOR' ? '11110 - AR Sponsors' : '11100 - AR Students'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>CWT (BIR 2307)</span>
+                  <span className="font-semibold">14001 - Creditable Withholding Tax</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
 
       {activeTab === 'apply' && (
-      <div className="rounded-xl border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Apply Payment to Invoices</h3>
-          <div className="text-sm text-gray-600">
-            Available to Apply: <span className="font-bold text-emerald-700">{formatCurrency(availableToApply)}</span>
+        <div className="rounded-xl border bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Apply Payment to Invoices</h3>
+            <div className="text-sm text-gray-600">
+              Available to Apply: <span className="font-bold text-emerald-700">{formatCurrency(availableToApply)}</span>
+            </div>
           </div>
-        </div>
 
-        {!editingPayment && (
-          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            Save Draft first to lock Payment No and enable application posting.
-          </div>
-        )}
+          {!editingPayment && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Save Draft first to lock Payment No and enable application posting.
+            </div>
+          )}
 
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-3 py-2 text-center">Tick</th>
-                <th className="px-3 py-2 text-left">Invoice No</th>
-                <th className="px-3 py-2 text-left">Billing Date</th>
-                <th className="px-3 py-2 text-right">Amount Due</th>
-                <th className="px-3 py-2 text-right">Amount Applied</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isFetchingOpenInvoices && (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">Fetching open invoices for selected payor...</td>
+                  <th className="px-3 py-2 text-center">Tick</th>
+                  <th className="px-3 py-2 text-left">Invoice No</th>
+                  <th className="px-3 py-2 text-left">Billing Date</th>
+                  <th className="px-3 py-2 text-right">Amount Due</th>
+                  <th className="px-3 py-2 text-right">Amount Applied</th>
                 </tr>
-              )}
-              {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
+              </thead>
+              <tbody>
+                {isFetchingOpenInvoices && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-gray-500">Fetching open invoices for selected payor...</td>
+                  </tr>
+                )}
+                {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No open invoices for selected payor.</td>
+                  </tr>
+                )}
+                {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
+                  <tr key={inv.id} className="border-t">
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        disabled={!editingPayment}
+                        checked={!!invoiceSelectionMap[inv.id]}
+                        onChange={e => handleInvoiceTick(inv, e.target.checked)}
+                      />
+                    </td>
+                    <td className="px-3 py-2 font-medium text-gray-800">{inv.invoiceNo}</td>
+                    <td className="px-3 py-2 text-gray-600">{inv.invoiceDate}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{formatCurrency(inv.balanceDue)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        disabled={!editingPayment || !invoiceSelectionMap[inv.id]}
+                        max={Math.min(inv.balanceDue, availableToApply)}
+                        value={invoiceApplyMap[inv.id] || ''}
+                        onChange={e => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
+                        }}
+                        className="w-36 rounded-lg border px-2 py-1 text-right"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No open invoices for selected payor.</td>
-                </tr>
-              )}
-              {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
-                <tr key={inv.id} className="border-t">
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      disabled={!editingPayment}
-                      checked={!!invoiceSelectionMap[inv.id]}
-                      onChange={e => handleInvoiceTick(inv, e.target.checked)}
-                    />
-                  </td>
-                  <td className="px-3 py-2 font-medium text-gray-800">{inv.invoiceNo}</td>
-                  <td className="px-3 py-2 text-gray-600">{inv.invoiceDate}</td>
-                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(inv.balanceDue)}</td>
+                  <td colSpan={3} className="px-3 py-2 font-semibold text-gray-700">Total Applied</td>
+                  <td className="px-3 py-2 text-right font-bold text-emerald-700">{formatCurrency(plannedAppliedTotal)}</td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      disabled={!editingPayment || !invoiceSelectionMap[inv.id]}
-                      max={Math.min(inv.balanceDue, availableToApply)}
-                      value={invoiceApplyMap[inv.id] || ''}
-                      onChange={e => {
-                        const value = parseFloat(e.target.value) || 0;
-                        setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
-                      }}
-                      className="w-36 rounded-lg border px-2 py-1 text-right"
-                    />
+                    <button
+                      onClick={applySelectedInvoices}
+                      disabled={!editingPayment || plannedAppliedTotal <= 0}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Apply to Invoice
+                      <ArrowRight size={14} />
+                    </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan={3} className="px-3 py-2 font-semibold text-gray-700">Total Applied</td>
-                <td className="px-3 py-2 text-right font-bold text-emerald-700">{formatCurrency(plannedAppliedTotal)}</td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    onClick={applySelectedInvoices}
-                    disabled={!editingPayment || plannedAppliedTotal <= 0}
-                    className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    Apply to Invoice
-                    <ArrowRight size={14} />
-                  </button>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </div>
-      </div>
       )}
 
       {activeTab === 'register' && (
-      <div className="rounded-xl border bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Payment Register</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search size={14} className="pointer-events-none absolute left-2 top-2.5 text-gray-400" />
-              <input
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search payments"
-                className="rounded-lg border py-2 pl-8 pr-3 text-sm"
-              />
+        <div className="rounded-xl border bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Payment Register</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="pointer-events-none absolute left-2 top-2.5 text-gray-400" />
+                <input
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Search payments"
+                  className="rounded-lg border py-2 pl-8 pr-3 text-sm"
+                />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
+                className="rounded-lg border px-3 py-2 text-sm"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="POSTED">Posted</option>
+                <option value="VOIDED">Voided</option>
+              </select>
             </div>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
-              className="rounded-lg border px-3 py-2 text-sm"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="POSTED">Posted</option>
-              <option value="VOIDED">Voided</option>
-            </select>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-3 py-2 text-left">Payment No.</th>
+                  <th className="px-3 py-2 text-left">Payor</th>
+                  <th className="px-3 py-2 text-left">Method</th>
+                  <th className="px-3 py-2 text-right">Received</th>
+                  <th className="px-3 py-2 text-right">Applied</th>
+                  <th className="px-3 py-2 text-right">Deposit Balance</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-6 text-center text-gray-500">No payments found.</td>
+                  </tr>
+                )}
+                {filteredPayments.map(payment => (
+                  <tr key={payment.id} className="border-t">
+                    <td className="px-3 py-2 font-medium text-gray-800">{payment.paymentNo}</td>
+                    <td className="px-3 py-2">
+                      <div className="inline-flex items-center gap-2">
+                        {payment.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
+                        {getPayorName(payment)}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="inline-flex items-center gap-1 text-gray-600">
+                        {getMethodIcon(payment.paymentMethod)}
+                        <span>{payment.paymentMethod}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700">{formatCurrency(payment.totalApplied)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-sky-700">{formatCurrency(payment.customerDepositBalance)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${payment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
+                          payment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
+                            'bg-gray-100 text-gray-700'
+                        }`}>
+                        {payment.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="inline-flex gap-2">
+                        <button
+                          onClick={() => loadPayment(payment)}
+                          className="rounded-lg border px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => onDeletePayment(payment.id)}
+                          className="rounded-lg border px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                        >
+                          Delete
+                        </button>
+                        {payment.status !== 'VOIDED' && (
+                          <button
+                            onClick={() => {
+                              setVoidingPayment(payment);
+                              setVoidReason('');
+                              setShowVoidModal(true);
+                            }}
+                            className="rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                          >
+                            Void
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Payment No.</th>
-                <th className="px-3 py-2 text-left">Payor</th>
-                <th className="px-3 py-2 text-left">Method</th>
-                <th className="px-3 py-2 text-right">Received</th>
-                <th className="px-3 py-2 text-right">Applied</th>
-                <th className="px-3 py-2 text-right">Deposit Balance</th>
-                <th className="px-3 py-2 text-center">Status</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPayments.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-gray-500">No payments found.</td>
-                </tr>
-              )}
-              {filteredPayments.map(payment => (
-                <tr key={payment.id} className="border-t">
-                  <td className="px-3 py-2 font-medium text-gray-800">{payment.paymentNo}</td>
-                  <td className="px-3 py-2">
-                    <div className="inline-flex items-center gap-2">
-                      {payment.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
-                      {getPayorName(payment)}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="inline-flex items-center gap-1 text-gray-600">
-                      {getMethodIcon(payment.paymentMethod)}
-                      <span>{payment.paymentMethod}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</td>
-                  <td className="px-3 py-2 text-right text-emerald-700">{formatCurrency(payment.totalApplied)}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-sky-700">{formatCurrency(payment.customerDepositBalance)}</td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      payment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
-                        payment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
-                          'bg-gray-100 text-gray-700'
-                    }`}>
-                      {payment.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="inline-flex gap-2">
-                      <button
-                        onClick={() => loadPayment(payment)}
-                        className="rounded-lg border px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                      >
-                        Load
-                      </button>
-                      <button
-                        onClick={() => onDeletePayment(payment.id)}
-                        className="rounded-lg border px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                      >
-                        Delete
-                      </button>
-                      {payment.status !== 'VOIDED' && (
-                        <button
-                          onClick={() => {
-                            setVoidingPayment(payment);
-                            setVoidReason('');
-                            setShowVoidModal(true);
-                          }}
-                          className="rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
-                        >
-                          Void
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
       )}
 
       {showVoidModal && voidingPayment && (

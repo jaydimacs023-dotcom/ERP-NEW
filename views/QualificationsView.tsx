@@ -169,10 +169,10 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           <div
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                : toast.type === 'error'
-                  ? 'bg-red-50 border border-red-200 text-red-800'
-                  : 'bg-orange-50 border border-orange-200 text-orange-800'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-orange-50 border border-orange-200 text-orange-800'
               }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
@@ -191,11 +191,10 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800 tracking-tight flex items-center gap-3">
-            <Award className="text-orange-500" size={28} />
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight flex items-center gap-3">
             Professional Qualifications
           </h2>
-          <p className="text-sm text-gray-500 font-normal">TESDA Registered Program Catalog (Training Regulations Compliance)</p>
+          <p className="text-sm text-gray-500 font-normal italic">TESDA Registered Program Catalog (Training Regulations Compliance)</p>
         </div>
         <button
           onClick={() => setShowModal(true)}

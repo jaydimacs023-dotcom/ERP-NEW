@@ -148,8 +148,8 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Alumni Tracer & Employment Reports</h2>
-                    <p className="text-sm text-gray-500 mt-1">Registry Oversight & Graduate Career Tracking</p>
+                    <h2 className="text-xl font-semibold text-gray-900 tracking-tight">Alumni Tracer & Employment Reports</h2>
+                    <p className="text-sm text-gray-500 mt-1 italic">Registry Oversight & Graduate Career Tracking</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
