@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine, Student, Batch } from '../types';
+import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../types';
 import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
 import { 
@@ -19,8 +19,6 @@ interface SponsorsViewProps {
   accounts?: ChartOfAccount[];
   entries?: JournalEntry[];
   lines?: JournalLine[];
-  students?: Student[];
-  batches?: Batch[];
   currency?: string;
   onAddSponsor: (sponsor: Sponsor) => void | Promise<void>;
   onUpdateSponsor: (sponsor: Sponsor) => void | Promise<void>;
@@ -28,9 +26,9 @@ interface SponsorsViewProps {
 }
 
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
-  sponsors, accounts = [], entries = [], lines = [], students = [], batches = [], currency = '₱', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
+  sponsors, accounts = [], entries = [], lines = [], currency = '₱', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
-    const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
+  const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
@@ -324,18 +322,6 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     </button>
                   </div>
                 </td>
-                    {showSOAFor && (
-                      <SponsorSOAView
-                        sponsor={showSOAFor}
-                        entries={entries}
-                        lines={lines}
-                        students={students}
-                        batches={batches}
-                        accounts={accounts}
-                        currency={currency}
-                        onClose={() => setShowSOAFor(null)}
-                      />
-                    )}
               </tr>
             )) : (
               <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sponsors registered in the system.</td></tr>
@@ -343,6 +329,16 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           </tbody>
         </table>
       </div>
+      {showSOAFor && (
+        <SponsorSOAView
+          sponsor={showSOAFor}
+          entries={entries}
+          lines={lines}
+          accounts={accounts}
+          currency={currency}
+          onClose={() => setShowSOAFor(null)}
+        />
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">

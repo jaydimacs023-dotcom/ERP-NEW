@@ -24,6 +24,12 @@ import TrainersView from './views/TrainersView';
 import BatchesView from './views/BatchesView';
 import LocationsView from './views/LocationsView';
 import SponsorsView from './views/SponsorsView';
+import SOAView from './views/SOAView';
+import ARAgingReportView from './views/ARAgingReportView';
+import ARWriteOffView from './views/ARWriteOffView';
+import ARCreditDebitMemoView from './views/ARCreditDebitMemoView';
+import ARCollectionReceiptView from './views/ARCollectionReceiptView';
+import ARCustomerLedgerView from './views/ARCustomerLedgerView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
@@ -4335,7 +4341,18 @@ export default function App() {
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={filteredLines} qualifications={qualifications} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
-          {activeTab === 'sponsors' && <SponsorsView sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddSponsor={handleAddSponsor} onUpdateSponsor={handleUpdateSponsor} onDeleteSponsor={handleDeleteSponsor} />}
+          {activeTab === 'sponsors' && (
+            <SponsorsView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              accounts={filteredAccounts}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              currency={currentOrg?.currency || 'USD'}
+              onAddSponsor={handleAddSponsor}
+              onUpdateSponsor={handleUpdateSponsor}
+              onDeleteSponsor={handleDeleteSponsor}
+            />
+          )}
           {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
 
@@ -4530,6 +4547,71 @@ export default function App() {
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'schema' && <SchemaManualView />}
           {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
+          {activeTab === 'soa' && (
+            <SOAView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+            />
+          )}
+          {activeTab === 'aging-report' && (
+            <ARAgingReportView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+            />
+          )}
+          {activeTab === 'write-off' && (
+            <ARWriteOffView
+              orgId={currentOrgId}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+              onPostJournal={handlePostJournal}
+              onNotify={handleNotify}
+            />
+          )}
+          {activeTab === 'credit-debit-memo' && (
+            <ARCreditDebitMemoView
+              orgId={currentOrgId}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+              onPostJournal={handlePostJournal}
+              onNotify={handleNotify}
+            />
+          )}
+          {activeTab === 'collection-receipt' && (
+            <ARCollectionReceiptView
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              currency={currentOrg?.currency || 'USD'}
+            />
+          )}
+          {activeTab === 'customer-ledger' && (
+            <ARCustomerLedgerView
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              currency={currentOrg?.currency || 'USD'}
+            />
+          )}
 
           {activeTab === 'customers' && (
             <CustomerMasterListView
@@ -4552,25 +4634,6 @@ export default function App() {
             />
           )}
 
-          {/* New AR Modules Placeholder Views */}
-          {['credit-debit-memo', 'write-off', 'aging-report', 'soa', 'customer-ledger', 'collection-receipt'].includes(activeTab) && (
-            <div className="h-full flex flex-col items-center justify-center p-10 text-center">
-              <div
-                className="w-24 h-24 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl animate-bounce"
-                style={{ backgroundColor: `${brandColor} 10`, color: brandColor }}
-              >
-                <Wrench size={40} />
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">
-                {activeTab.replace('-', ' ')} Module
-              </h2>
-              <div className="h-1 w-20 bg-slate-200 rounded-full mb-6 mx-auto" />
-              <p className="max-w-md text-slate-500 font-medium leading-relaxed">
-                This module is currently being optimized for the enhanced Accounts Receivable workflow.
-                Full functionality will be restored in the next system update.
-              </p>
-            </div>
-          )}
         </div>
       </main>
 
