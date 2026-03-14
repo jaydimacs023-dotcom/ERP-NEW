@@ -4110,6 +4110,7 @@ export default function App() {
               </NavSection>
 
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
+                <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -4667,7 +4668,7 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
+      className={`w-full text-left flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
       style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
     >
       <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'} `}>{icon}</div>
@@ -4692,7 +4693,7 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
         className="w-full flex items-center justify-between mb-4 px-4 group"
       >
         {!compact && (
-          <p className="text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-slate-700 transition-colors">
+          <p className="text-left text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-slate-700 transition-colors">
             {label}
           </p>
         )}
