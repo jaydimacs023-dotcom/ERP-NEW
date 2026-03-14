@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Employee } from '../types';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Users, Plus, Search, Filter, Mail, Phone, Briefcase, 
   ChevronRight, Trash2, X, Save, ShieldCheck, Landmark,
@@ -170,7 +171,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -252,9 +254,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default EmployeesView;
+

@@ -441,3 +441,4 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
 };
 
 export default WarehouseLocationsView;
+

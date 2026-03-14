@@ -1,8 +1,9 @@
-
+﻿
 import React, { useState, useMemo } from 'react';
 import {
     Sponsor, Student, Invoice, Enrollment, Batch, Qualification, ChartOfAccount, StudentDocument, User as UserType
 } from '../types';
+import ModalPortal from '../components/ModalPortal';
 import {
     Search, Users, Handshake, Mail, Phone, MapPin, Building,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -524,7 +525,8 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 
             {/* Sponsor Modal (Add/Edit) */}
             {showSponsorModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
+                <ModalPortal>
+<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200">
                         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-4">
@@ -708,11 +710,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         </form>
                     </div>
                 </div>
+</ModalPortal>
             )}
 
             {/* Student Modal (Add/Edit) */}
             {showStudentModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
+                <ModalPortal>
+<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200">
                         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-4">
@@ -896,11 +900,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         </form>
                     </div>
                 </div>
+</ModalPortal>
             )}
 
             {/* Student Detail Modal */}
             {selectedStudent && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
+                <ModalPortal>
+<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200">
                         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-6">
@@ -980,11 +986,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         </div>
                     </div>
                 </div>
+</ModalPortal>
             )}
 
             {/* Sponsor Detail Modal */}
             {selectedSponsor && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
+                <ModalPortal>
+<div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in duration-300 border border-slate-200">
                         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-6">
@@ -1046,7 +1054,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                             <div className="flex justify-between items-center">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Open Balance</span>
                                                 <span className="text-sm font-black text-rose-500">
-                                                    ₱{invoices.filter(i => i.sponsorId === selectedSponsor.id && i.status === 'OPEN')
+                                                    â‚±{invoices.filter(i => i.sponsorId === selectedSponsor.id && i.status === 'OPEN')
                                                         .reduce((acc, inv) => acc + inv.balanceDue, 0).toLocaleString()}
                                                 </span>
                                             </div>
@@ -1057,9 +1065,11 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         </div>
                     </div>
                 </div>
+</ModalPortal>
             )}
         </div>
     );
 };
 
 export default CustomerMasterListView;
+

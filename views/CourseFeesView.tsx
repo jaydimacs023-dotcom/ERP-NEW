@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount, TaxType } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   Search, Plus, DollarSign, Trash2, X, BookOpen, GraduationCap,
   Filter, Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
@@ -530,7 +531,8 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -745,11 +747,13 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Bulk Creation Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -772,7 +776,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     onClick={applyDefaultsToAll}
                     className="text-xs font-semibold text-[#F47721] hover:text-[#E06610] px-3 py-1 border border-[#F47721] rounded hover:bg-orange-100 transition-colors"
                   >
-                    Apply to All ↓
+                    Apply to All â†“
                   </button>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -939,6 +943,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Toast Notifications */}
@@ -977,3 +982,4 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 };
 
 export default CourseFeesView;
+

@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { AccountingService } from '../accountingService';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import {
   Calendar, Lock, Unlock, CheckCircle, AlertCircle, Clock,
   X, Plus, ChevronRight, FileText, BookOpen, RotateCcw,
@@ -600,13 +601,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                 {/* Closing Status */}
                 <div className="mt-3 flex gap-2">
                   <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.apClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                    AP {period.apClosed ? '✓' : '○'}
+                    AP {period.apClosed ? '?' : '?'}
                   </span>
                   <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.arClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                    AR {period.arClosed ? '✓' : '○'}
+                    AR {period.arClosed ? '?' : '?'}
                   </span>
                   <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.glClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                    GL {period.glClosed ? '✓' : '○'}
+                    GL {period.glClosed ? '?' : '?'}
                   </span>
                 </div>
               </div>
@@ -625,7 +626,8 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
 
       {/* Create Period Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -728,11 +730,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Closing Wizard Modal */}
       {showClosingWizard && selectedPeriod && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -844,11 +848,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Accrual Modal */}
       {showAccrualModal && selectedPeriod && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -934,9 +940,11 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default PeriodClosingView;
+

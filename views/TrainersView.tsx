@@ -2,6 +2,7 @@
 import { Trainer, Qualification } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, Filter, GraduationCap, Award, Mail, Phone, 
   Trash2, X, Info, ShieldCheck, CheckCircle, ChevronRight,
@@ -290,7 +291,8 @@ const TrainersView: React.FC<TrainersViewProps> = ({
 
       {/* Registration/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -378,11 +380,13 @@ const TrainersView: React.FC<TrainersViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Qualification Assignment Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div>
@@ -432,6 +436,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
@@ -465,3 +470,4 @@ const TrainersView: React.FC<TrainersViewProps> = ({
 };
 
 export default TrainersView;
+

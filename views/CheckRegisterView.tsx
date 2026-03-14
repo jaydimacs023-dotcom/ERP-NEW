@@ -30,7 +30,7 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
   vendors = [],
   payables = [],
   onNotify,
-  currency = '₱'
+  currency = '?'
 }) => {
   const [filters, setFilters] = useState<CheckRegisterFilter>({
     status: 'all',
@@ -269,19 +269,19 @@ const CheckRegisterView: React.FC<CheckRegisterViewProps> = ({
               onClick={() => toggleSort('checkDate')}
               className={`px-2 py-1 rounded transition-colors ${sortField === 'checkDate' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
-              Date {sortField === 'checkDate' && (sortDirection === 'asc' ? '↑' : '↓')}
+              Date {sortField === 'checkDate' && (sortDirection === 'asc' ? '?' : '?')}
             </button>
             <button 
               onClick={() => toggleSort('checkNumber')}
               className={`px-2 py-1 rounded transition-colors ${sortField === 'checkNumber' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
-              Number {sortField === 'checkNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+              Number {sortField === 'checkNumber' && (sortDirection === 'asc' ? '?' : '?')}
             </button>
             <button 
               onClick={() => toggleSort('amount')}
               className={`px-2 py-1 rounded transition-colors ${sortField === 'amount' ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100 '}`}
             >
-              Amount {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+              Amount {sortField === 'amount' && (sortDirection === 'asc' ? '?' : '?')}
             </button>
           </div>
         </div>
@@ -407,3 +407,4 @@ const SummaryCard: React.FC<{ label: string; value: string; subValue?: string; i
 };
 
 export default CheckRegisterView;
+

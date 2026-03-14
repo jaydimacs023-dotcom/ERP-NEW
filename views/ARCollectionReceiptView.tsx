@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Search, Printer, X } from 'lucide-react';
 import { BankAccount, JournalEntry, JournalLine, Sponsor, Student } from '../types';
 import { format } from 'date-fns';
+import ModalPortal from '../components/ModalPortal';
 
 interface ARCollectionReceiptViewProps {
   entries: JournalEntry[];
@@ -120,7 +121,8 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
       </div>
 
       {selected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:bg-white print:p-0">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:bg-white print:p-0">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl p-8 relative print:shadow-none print:border-none">
             <button onClick={() => setSelected(null)} className="absolute top-4 right-4 p-2 rounded hover:bg-gray-100 text-gray-400 print:hidden">
               <X size={18} />
@@ -176,9 +178,11 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default ARCollectionReceiptView;
+

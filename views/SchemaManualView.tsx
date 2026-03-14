@@ -1,4 +1,4 @@
-
+﻿
 import React from 'react';
 import { 
   Binary, Database, BookOpen, Layers, 
@@ -72,7 +72,7 @@ const SchemaManualView: React.FC = () => {
         {
           title: "Chart of Accounts (COA)",
           desc: "The foundational hierarchy for the general ledger.",
-          logic: "Balances are calculated recursively: Root Balance = Σ(Direct Balance + ΣChildren Balances). Leaf accounts prevent further nesting. Nominal accounts (Revenue/Expense) can be linked to Qualifications.",
+          logic: "Balances are calculated recursively: Root Balance = Î£(Direct Balance + Î£Children Balances). Leaf accounts prevent further nesting. Nominal accounts (Revenue/Expense) can be linked to Qualifications.",
           rows: [
             { field: 'code', type: 'String(10)', constraint: 'Unique/Org', desc: 'GL Code (e.g., 1000, 1101) following Standard PH Accounting Standards.' },
             { field: 'class', type: 'Enum', constraint: 'ClassGroup', desc: 'Asset, Liability, Equity, Revenue, Expense.' },
@@ -431,3 +431,4 @@ const SchemaCard: React.FC<SchemaCardProps> = ({ title, desc, rows, logic }) => 
 );
 
 export default SchemaManualView;
+

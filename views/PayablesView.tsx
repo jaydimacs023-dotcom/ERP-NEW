@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { AccountingService } from '../accountingService';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import {
   Search, Calculator, Building, Coins, AlertCircle, Calendar,
   X, Plus, FileText, Edit, Trash2, Eye, CheckCircle, Clock,
@@ -997,7 +998,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                         <div className="flex flex-col gap-1">
                           <span className="text-xs text-gray-600">{payable.billDate}</span>
                           <span className={`text-xs ${isOverdue ? 'text-rose-600 font-semibold' : 'text-gray-400'}`}>
-                            Due: {payable.dueDate} {isOverdue && '⚠️'}
+                            Due: {payable.dueDate} {isOverdue && '??'}
                           </span>
                         </div>
                       </td>
@@ -1395,7 +1396,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
       {/* Post to GL Modal */}
       {showPostGLModal && selectedPayable && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded shadow-md w-full max-w-lg p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
@@ -1446,11 +1448,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Payment Modal */}
       {showPaymentModal && selectedPayable && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -1574,11 +1578,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Delete Confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
@@ -1605,6 +1611,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -1641,7 +1648,8 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
   isEdit = false,
 }) => {
   return (
-    <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+    <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
       <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
@@ -1908,6 +1916,7 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
         </form>
       </div>
     </div>
+</ModalPortal>
   );
 };
 
@@ -1945,7 +1954,8 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   const remainingBalance = (payable.netPayable || payable.amount) - (payable.paidAmount || 0);
 
   return (
-    <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+    <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
       <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
@@ -2082,7 +2092,9 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
         </div>
       </div>
     </div>
+</ModalPortal>
   );
 };
 
 export default PayablesView;
+

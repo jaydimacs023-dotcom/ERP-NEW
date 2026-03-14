@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Location } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, MapPin, Trash2, X, Edit2, ShieldCheck, 
   Map, Building, Globe, ChevronRight, MoreVertical, Loader2,
@@ -256,7 +257,8 @@ const LocationsView: React.FC<LocationsViewProps> = ({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -332,6 +334,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
       {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
       <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
@@ -363,3 +366,4 @@ const LocationsView: React.FC<LocationsViewProps> = ({
 };
 
 export default LocationsView;
+

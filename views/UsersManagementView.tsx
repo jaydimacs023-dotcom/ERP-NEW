@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { User, Student, Trainer } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import { 
   UserCog, Search, Plus, Trash2, X, Shield, Users, 
   Key, Mail, Eye, EyeOff, ShieldCheck, UserCircle,
@@ -293,7 +294,8 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
       {/* Onboarding Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -465,9 +467,11 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default UsersManagementView;
+

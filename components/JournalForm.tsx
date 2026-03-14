@@ -6,6 +6,7 @@ import {
 } from '../types';
 import { AccountingService } from '../accountingService';
 import { X, Plus, Trash2, AlertCircle, Save, CheckCircle2, User, GraduationCap, Handshake, Layers, Box } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 interface JournalFormProps {
   accounts: ChartOfAccount[];
@@ -124,7 +125,8 @@ const JournalForm: React.FC<JournalFormProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[95%] overflow-hidden animate-in zoom-in duration-200 border border-slate-200 my-8">
         <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
@@ -260,6 +262,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

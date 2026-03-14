@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, FileText, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
 import {
@@ -351,3 +351,4 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
 };
 
 export default ARWriteOffView;
+

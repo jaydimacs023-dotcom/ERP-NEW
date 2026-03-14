@@ -196,3 +196,4 @@ const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) =
 };
 
 export default BrandingView;
+

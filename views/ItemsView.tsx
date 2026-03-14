@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory } from '../types';
 import { Search, Plus, Box, Trash2, X, Tag, CreditCard, ShieldCheck, Filter, Edit2, ChevronRight, Link as LinkIcon, AlertCircle, Percent, Info, Database, Layers } from 'lucide-react';
+import ModalPortal from '../components/ModalPortal';
 
 interface ItemsViewProps {
   items: NonStockItem[];
@@ -256,7 +257,8 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
 
       {/* Define Specification Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
+        <ModalPortal>
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-4">
@@ -405,9 +407,11 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default ItemsView;
+

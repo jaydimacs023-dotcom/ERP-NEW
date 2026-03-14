@@ -4,6 +4,7 @@ import {
   Vendor, ChartOfAccount, JournalEntry, JournalLine
 } from '../types';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import {
   Package, Plus, Search, Filter, ChevronDown, X, CheckCircle,
   Clock, XCircle, Eye, Edit, Trash2, AlertCircle, FileText,
@@ -575,7 +576,8 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -728,11 +730,13 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Detail Modal */}
       {showDetailModal && selectedGR && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -831,11 +835,13 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Delete Confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
@@ -862,9 +868,11 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default GoodsReceiptView;
+

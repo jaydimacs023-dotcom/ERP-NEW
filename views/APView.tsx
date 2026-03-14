@@ -5,6 +5,7 @@ import { AccountingService } from '../accountingService';
 import MatchingDashboard from './MatchingDashboard';
 import CheckRegisterView from './CheckRegisterView';
 import RecurringBillsView from './RecurringBillsView';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Truck, Plus, Filter, Search, FileText, ChevronRight, Clock, 
   X, Save, Trash2, AlertCircle, Calculator, Percent, History,
@@ -541,7 +542,8 @@ const APView: React.FC<APViewProps> = ({
 
       {/* Payment Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -608,11 +610,13 @@ const APView: React.FC<APViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Bill Registration Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -654,11 +658,13 @@ const APView: React.FC<APViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Journal Entry Details Modal */}
       {showJournalModal && selectedJournalId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded shadow-md max-w-2xl w-full max-h-96 overflow-auto">
             {(() => {
               const entry = entries.find(e => e.id === selectedJournalId);
@@ -737,6 +743,7 @@ const APView: React.FC<APViewProps> = ({
             })()}
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -775,3 +782,4 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
 };
 
 export default APView;
+

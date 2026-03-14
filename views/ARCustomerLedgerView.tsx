@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -242,3 +242,4 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
 };
 
 export default ARCustomerLedgerView;
+

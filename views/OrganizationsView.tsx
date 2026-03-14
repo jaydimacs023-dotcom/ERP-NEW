@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Organization } from '../types';
 import { Building2, Plus, Globe, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import ModalPortal from '../components/ModalPortal';
 
 interface OrganizationsViewProps {
   orgs: Organization[];
@@ -80,7 +81,8 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({ orgs, onAddOrg, o
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-tight">Onboard New Tenant</h3>
@@ -124,9 +126,11 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({ orgs, onAddOrg, o
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default OrganizationsView;
+

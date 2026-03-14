@@ -488,3 +488,4 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
 };
 
 export default StockItemsView;
+

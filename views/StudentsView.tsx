@@ -1,6 +1,7 @@
 ﻿
 import React, { useState, useRef, useMemo } from 'react';
 import { Student, StudentDocument, Batch, Qualification } from '../types';
+import ModalPortal from '../components/ModalPortal';
 import {
   Search, Plus, Filter, User, Calendar, Mail, Phone, FileText,
   Upload, CheckCircle, Clock, Trash2, X, Camera, RefreshCw,
@@ -630,7 +631,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
 
       {/* Batch Import Preview Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-4">
@@ -695,11 +697,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Manual Audit Modal (View Function) */}
       {auditStudent && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
             {/* Modal Header */}
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
@@ -867,11 +871,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Manual Registration Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col md:flex-row h-full max-h-[95vh]">
             <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
               <div className="flex justify-between items-center mb-8">
@@ -1071,11 +1077,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Edit Student Modal */}
       {showEditModal && editingStudent && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8">
             <div className="p-8 border-b bg-gradient-to-r from-amber-50 to-amber-100/50 flex justify-between items-center">
               <div className="flex items-center gap-4">
@@ -1363,11 +1371,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Camera Overlay */}
       {showCamera && (
-        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
           <div className="w-full max-w-md space-y-12">
             <div className="text-center">
               <h3 className="text-lg font-semibold text-white uppercase tracking-tight">Identity Capture</h3>
@@ -1392,6 +1402,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
@@ -1431,3 +1442,4 @@ const DataPoint: React.FC<{ label: string, value: string, isSpan2?: boolean }> =
 );
 
 export default StudentsView;
+

@@ -102,3 +102,4 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs }) => {
 };
 
 export default AuditTrail;
+

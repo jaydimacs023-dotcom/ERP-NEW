@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   AlertTriangle,
   ArrowRight,
@@ -894,7 +895,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       )}
 
       {showVoidModal && voidingPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
             <div className="flex items-center gap-3 border-b p-4">
               <div className="rounded-lg bg-rose-100 p-2">
@@ -944,9 +946,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default PaymentsView;
+

@@ -23,7 +23,7 @@ interface DashboardProps {
 
 const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [] }) => {
   const formatCurrency = (val: number) => {
-    const symbol = currency === 'USD' ? '$' : '₱';
+    const symbol = currency === 'USD' ? '$' : 'â‚±';
     const formatted = Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return `${val < 0 ? '-' : ''}${symbol}${formatted} `;
   };
@@ -268,7 +268,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                     <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Top 10 Total</span>
                     <span className="text-xl font-bold text-gray-800 mt-0.5">{formatCurrency(topDonorTotal)}</span>
                   </div>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="99%" height={260}>
                     <PieChart>
                       <Pie
                         data={receivablesByDonor}
@@ -370,7 +370,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
               </div>
 
               <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="99%" height={250}>
                   <BarChart data={collectionsPerMonth} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis
@@ -384,7 +384,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: '#64748B', fontSize: 12 }}
-                      tickFormatter={(val) => `${currency === 'USD' ? '$' : '₱'}${val / 1000}k`}
+                      tickFormatter={(val) => `${currency === 'USD' ? '$' : 'â‚±'}${val / 1000}k`}
                     />
                     <Tooltip
                       formatter={(value: number) => [formatCurrency(value), 'Collected']}
@@ -558,7 +558,7 @@ const RegistrarDashboard: React.FC<DashboardProps> = ({ students = [], batches =
             <TrendingUp size={20} className="text-blue-500" /> New Learner Registrations
           </h3>
           <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height={250}>
               <AreaChart data={enrollmentTrends}>
                 <defs>
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
@@ -585,7 +585,7 @@ const RegistrarDashboard: React.FC<DashboardProps> = ({ students = [], batches =
           </h3>
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 h-[250px]">
             <div className="w-full md:w-1/2 h-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="99%" height={250}>
                 <PieChart>
                   <Pie
                     data={batchesByStatus}
@@ -623,7 +623,7 @@ const RegistrarDashboard: React.FC<DashboardProps> = ({ students = [], batches =
           <Award size={20} className="text-indigo-500" /> Program Distribution (Top 8)
         </h3>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="99%" height={300}>
             <BarChart data={batchesByQual}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11 }} dy={10} />
@@ -740,7 +740,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           </div>
 
           <div className="h-[300px] w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
+            <ResponsiveContainer width="99%" height={300}>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -774,7 +774,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
           <div className="relative z-10">
             <h3 className="text-sm font-semibold text-gray-800 mb-4">Asset Distribution</h3>
             <div className="h-[200px] min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
+              <ResponsiveContainer width="99%" height={200}>
                 <BarChart data={classDistributionData} layout="vertical">
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" hide />
@@ -852,3 +852,4 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
 );
 
 export default Dashboard;
+

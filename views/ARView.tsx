@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
 import { AccountingService } from '../accountingService';
+import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock,
   MoreVertical, CreditCard, ChevronRight, X, User, Handshake,
@@ -518,9 +519,9 @@ const ARView: React.FC<ARViewProps> = ({
   };
 
   // helper that calculates output VAT using the prescribed formula for special tax codes:
-  //   VATGOODS/VATSERV → amount/1.12 * 12%
-  //   NVGOODS/NVSERV/EXMPTGOODS/EXMPTSERV/ZEROGOODS/ZEROSERV → amount/1.12 * 0%
-  // for any other category, fall back to the normal rate/rate‑inclusive logic.
+  //   VATGOODS/VATSERV â†’ amount/1.12 * 12%
+  //   NVGOODS/NVSERV/EXMPTGOODS/EXMPTSERV/ZEROGOODS/ZEROSERV â†’ amount/1.12 * 0%
+  // for any other category, fall back to the normal rate/rateâ€‘inclusive logic.
   const extractVat = (amount: number, cat?: TaxCategoryEntry) => {
     if (!cat) return 0;
     const code = (cat.code || '').toUpperCase();
@@ -668,7 +669,7 @@ const ARView: React.FC<ARViewProps> = ({
   const formatCurrency = (val: number) => `\u20B1 ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const formatDateMMDDYYYY = (d?: string | null) => {
-    if (!d) return '—';
+    if (!d) return 'â€”';
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return d as string;
     const mm = String(dt.getMonth() + 1).padStart(2, '0');
@@ -678,7 +679,7 @@ const ARView: React.FC<ARViewProps> = ({
   };
 
   const formatDateMMYYYY = (d?: string | null) => {
-    if (!d) return '—';
+    if (!d) return 'â€”';
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return d as string;
     const mm = String(dt.getMonth() + 1).padStart(2, '0');
@@ -689,7 +690,7 @@ const ARView: React.FC<ARViewProps> = ({
   // Returns a display-friendly Customer ID. For STUDENT contactType prefer the stored ULI (e.g. "STU-2024-00001");
   // when ULI is missing we generate a fallback in the required format: STU-<4digit-year>-<5digit-number>
   const getCustomerDisplayId = (contactType?: string, contactId?: string) => {
-    if (!contactId) return '—';
+    if (!contactId) return 'â€”';
 
     // STUDENT => prefer stored ULI; otherwise generate STU-<year>-<5digit>
     if (contactType === 'STUDENT') {
@@ -782,7 +783,7 @@ const ARView: React.FC<ARViewProps> = ({
         </button>
 
         <button
-          onClick={() => onNavigate ? onNavigate('credits') : onNotify('info', 'Credits & Discounts — not implemented')}
+          onClick={() => onNavigate ? onNavigate('credits') : onNotify('info', 'Credits & Discounts â€” not implemented')}
           className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
           title="Manage credit memos and discounts"
         >
@@ -801,7 +802,7 @@ const ARView: React.FC<ARViewProps> = ({
         </button>
 
         <button
-          onClick={() => onNavigate ? onNavigate('customer-details') : onNotify('info', 'Customer Details — not implemented')}
+          onClick={() => onNavigate ? onNavigate('customer-details') : onNotify('info', 'Customer Details â€” not implemented')}
           className="h-[200px] pt-6 px-6 pb-2 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-lg transition-all flex flex-col items-center justify-start text-center active:scale-95 w-full"
           title=" Customer Details"
         >
@@ -915,7 +916,7 @@ const ARView: React.FC<ARViewProps> = ({
                     <td className="px-3 py-4 text-xs text-gray-400">{/* placeholder for doc icon */}</td>
 
                     <td className="px-6 py-4 text-xs font-medium text-gray-700">{inv.sourceType || 'INVOICE'}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-gray-600">{inv.glEntryNumber || batch?.batchCode || (batch?.name || '—')}</td>
+                    <td className="px-6 py-4 text-xs font-mono text-gray-600">{inv.glEntryNumber || batch?.batchCode || (batch?.name || 'â€”')}</td>
                     <td className="px-6 py-4 text-xs font-mono font-semibold text-[#025959]">{inv.reference}</td>
 
                     <td className="px-6 py-4 text-xs">
@@ -938,7 +939,7 @@ const ARView: React.FC<ARViewProps> = ({
                     <td className="px-6 py-4 text-xs text-gray-700">{getCustomerDisplayId(contactType, contactId)}</td>
                     <td className="px-6 py-4 text-sm font-bold text-gray-800">{customerName}</td>
 
-                    <td className="px-6 py-4 text-xs text-gray-500 line-clamp-1">{inv.description || '—'}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500 line-clamp-1">{inv.description || 'â€”'}</td>
 
                     <td className="px-4 py-4 text-xs text-gray-500">{inv.currency || 'PHP'}</td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">{formatCurrency(arLine?.debit || 0)}</td>
@@ -1076,7 +1077,7 @@ const ARView: React.FC<ARViewProps> = ({
                 <tr key={group.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-sm font-mono font-bold text-[#025959]">{group.code}</td>
                   <td className="px-6 py-4 text-sm font-bold text-gray-800">{group.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{group.description || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{group.description || 'â€”'}</td>
                   <td className="px-6 py-4 text-center text-sm">
                     <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold">
                       {group.items.length} items
@@ -1114,7 +1115,8 @@ const ARView: React.FC<ARViewProps> = ({
 
       {/* Invoice Modal */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-[95%] lg:max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1189,7 +1191,7 @@ const ARView: React.FC<ARViewProps> = ({
                           <p className="text-sm font-semibold text-gray-800">{batch.batchCode || batch.name}</p>
                           <p className="text-xs text-gray-500">{qual?.name}</p>
                           <p className="text-xs text-gray-400 mt-1">{batch.studentIds?.length || 0} enrolled students</p>
-                          <p className="text-xs text-gray-400">{formatDateMMDDYYYY(batch.startDate)} → {formatDateMMDDYYYY(batch.endDate)}</p>
+                          <p className="text-xs text-gray-400">{formatDateMMDDYYYY(batch.startDate)} â†’ {formatDateMMDDYYYY(batch.endDate)}</p>
                         </div>
                       ) : null;
                     })()}
@@ -1243,7 +1245,7 @@ const ARView: React.FC<ARViewProps> = ({
                       <option value="">Select an item group to add...</option>
                       {itemGroups.filter(g => g.isActive).map(group => (
                         <option key={group.id} value={group.id}>
-                          {group.code} - {group.name} ({group.items.length} items, ₱{group.totalAmount.toLocaleString()})
+                          {group.code} - {group.name} ({group.items.length} items, â‚±{group.totalAmount.toLocaleString()})
                         </option>
                       ))}
                     </select>
@@ -1317,11 +1319,13 @@ const ARView: React.FC<ARViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Collection Modal */}
       {showCollectionModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1413,11 +1417,13 @@ const ARView: React.FC<ARViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Item Group Modal */}
       {showItemGroupModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1531,7 +1537,7 @@ const ARView: React.FC<ARViewProps> = ({
               <div className="p-4 bg-purple-50 rounded-md flex justify-between items-center">
                 <div>
                   <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Total Group Amount</p>
-                  <p className="text-xl font-mono font-semibold text-purple-700">₱ {itemGroupTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xl font-mono font-semibold text-purple-700">â‚± {itemGroupTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                 </div>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => { setShowItemGroupModal(false); resetItemGroupForm(); }} className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-800 transition-colors">
@@ -1545,11 +1551,13 @@ const ARView: React.FC<ARViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Approval/Review Modal */}
       {showApprovalModal && selectedInvoiceForApproval && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1690,11 +1698,13 @@ const ARView: React.FC<ARViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Comments History Modal */}
       {showCommentsModal && selectedInvoiceForApproval && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1751,6 +1761,7 @@ const ARView: React.FC<ARViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -1764,3 +1775,4 @@ const SummaryBox: React.FC<{ label: string, value: string, color: string }> = ({
 );
 
 export default ARView;
+

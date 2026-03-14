@@ -1,5 +1,6 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, Vendor, NonStockItem, TaxCategory } from '../types';
+import ModalPortal from '../components/ModalPortal';
 import { 
   FileStack, Plus, Search, Filter, X, Save, Trash2, 
   ChevronRight, ArrowUpRight, CheckCircle, Clock, AlertCircle,
@@ -233,7 +234,8 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
 
       {/* Initialize PO Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
+        <ModalPortal>
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-4">
@@ -422,9 +424,11 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default PurchaseOrdersView;
+

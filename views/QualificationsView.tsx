@@ -1,8 +1,9 @@
-
+﻿
 import React, { useState } from 'react';
 import { Qualification } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle,
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
@@ -384,7 +385,8 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
       {/* Registration Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -474,9 +476,11 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default QualificationsView;
+

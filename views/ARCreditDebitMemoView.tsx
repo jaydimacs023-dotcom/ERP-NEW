@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
 import {
@@ -359,3 +359,4 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
 };
 
 export default ARCreditDebitMemoView;
+

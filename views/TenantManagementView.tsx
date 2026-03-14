@@ -1,5 +1,6 @@
 ﻿
 import React, { useState, useMemo } from 'react';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Terminal, Building2, Plus, Globe, ShieldCheck, 
   CheckCircle2, AlertCircle, Calendar, CreditCard, 
@@ -239,7 +240,8 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200">
              <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-4">
@@ -296,6 +298,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
              </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -346,3 +349,4 @@ const StatsCard: React.FC<{ label: string, value: string, icon: React.ReactNode,
 );
 
 export default TenantManagementView;
+

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Calendar } from 'lucide-react';
 import { Sponsor, Student, JournalEntry, JournalLine, ChartOfAccount, AccountClass } from '../types';
 
@@ -125,3 +125,4 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
 };
 
 export default ARAgingReportView;
+

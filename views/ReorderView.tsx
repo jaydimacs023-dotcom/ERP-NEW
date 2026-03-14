@@ -1,6 +1,7 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, AlertTriangle, Zap, Truck, Target, Clock, ShieldCheck, FileText, Search, Package, ArrowRight, BarChart3 } from 'lucide-react';
 import { ReorderPoint, StockItem, InventoryLevel } from '../types';
+import ModalPortal from '../components/ModalPortal';
 
 interface ReorderViewProps {
   reorderPoints: ReorderPoint[];
@@ -293,7 +294,8 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-md w-full max-w-xl shadow-md border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-200">
             <header className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <div>
@@ -388,9 +390,11 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default ReorderView;
+

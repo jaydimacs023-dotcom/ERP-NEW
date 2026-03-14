@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { AccountingService } from '../accountingService';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Printer, Send, CheckCircle, Clock, XCircle,
   X, Plus, Search, Filter, ChevronDown, Eye, AlertCircle,
@@ -635,7 +636,8 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -769,11 +771,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Print Preview Modal */}
       {showPrintPreview && selectedCheck && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50 no-print">
               <div className="flex items-center gap-3">
@@ -854,11 +858,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Void Confirmation */}
       {confirmVoid && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded shadow-md w-full max-w-md p-6 animate-in zoom-in duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
@@ -885,11 +891,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded p-6 max-w-sm w-full shadow-md">
             <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Check?</h3>
             <p className="text-sm text-gray-600 mb-4">
@@ -911,11 +919,13 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Check Number Settings Modal */}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -996,6 +1006,7 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Print Styles */}
@@ -1023,3 +1034,4 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
 };
 
 export default CheckPrintingView;
+

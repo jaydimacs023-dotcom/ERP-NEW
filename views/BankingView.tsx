@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { BankAccount, TransactionSummary, ChartOfAccount, JournalLine, JournalEntry, AccountClass } from '../types';
 import { BankReconciliationService, ReconciliationResult } from '../services/BankReconciliationService';
+import ModalPortal from '../components/ModalPortal';
 import {
   Landmark, CreditCard, Wallet, ArrowRightLeft, History, Plus,
   X, Save, ShieldCheck, AlertCircle, ChevronRight,
@@ -211,7 +212,7 @@ const BankingView: React.FC<BankingViewProps> = ({
         );
 
         await onAddBankReconciliation(reconciliationRecord);
-        onNotify('success', `✅ Bank reconciliation locked and saved for ${reconcileAsOf}`);
+        onNotify('success', `? Bank reconciliation locked and saved for ${reconcileAsOf}`);
       } catch (error) {
         console.error('Error saving reconciliation:', error);
         onNotify('error', 'Failed to save reconciliation');
@@ -582,7 +583,8 @@ const BankingView: React.FC<BankingViewProps> = ({
 
       {/* Direct Entry Modal */}
       {showEntryModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -647,10 +649,12 @@ const BankingView: React.FC<BankingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {showTransferModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -714,10 +718,12 @@ const BankingView: React.FC<BankingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -780,10 +786,12 @@ const BankingView: React.FC<BankingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {showEditModal && editingBank && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-4">
@@ -851,9 +859,11 @@ const BankingView: React.FC<BankingViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default BankingView;
+

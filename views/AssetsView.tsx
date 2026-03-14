@@ -5,6 +5,7 @@ import {
   TrendingDown, DollarSign, Activity, ChevronRight, X, Save,
   AlertCircle, History, Info, BarChart3, Layers, Search, Tag, CheckCircle
 } from 'lucide-react';
+import ModalPortal from '../components/ModalPortal';
 
 interface Toast {
   id: string;
@@ -336,7 +337,8 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
       {/* Register Asset Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -440,11 +442,13 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Edit Accumulated Depreciation Modal */}
       {showEditModal && editingAsset && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -493,6 +497,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -513,3 +518,4 @@ const SummaryCard: React.FC<{ label: string, value: number, icon: React.ReactNod
 );
 
 export default AssetsView;
+

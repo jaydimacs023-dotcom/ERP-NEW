@@ -383,3 +383,4 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
 };
 
 export default InventoryTransactionsView;
+

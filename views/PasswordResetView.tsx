@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PasswordResetView - Password Reset UI for AT-ERP
  * 
  * Two modes:
@@ -197,7 +197,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
       {resetLink && (
         <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
           <p className="text-amber-400 text-sm font-medium mb-2">
-            🔧 Development Mode - Reset Link:
+            ðŸ”§ Development Mode - Reset Link:
           </p>
           <a
             href={resetLink}
@@ -315,7 +315,7 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
           <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
         )}
         {confirmPassword && newPassword === confirmPassword && (
-          <p className="mt-1 text-xs text-emerald-400">Passwords match ✓</p>
+          <p className="mt-1 text-xs text-emerald-400">Passwords match âœ“</p>
         )}
       </div>
 
@@ -443,3 +443,4 @@ const PasswordResetView: React.FC<PasswordResetViewProps> = ({ onBackToLogin, re
 };
 
 export default PasswordResetView;
+

@@ -538,3 +538,4 @@ const FinancialSection: React.FC<{ title: string, items: TransactionSummary[], t
 };
 
 export default Reports;
+

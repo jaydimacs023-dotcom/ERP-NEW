@@ -629,3 +629,4 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
 };
 
 export default StockAdjustmentsView;
+

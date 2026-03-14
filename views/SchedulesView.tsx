@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Trainer, TrainerSchedule, DaySlot, Location } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import { 
   CalendarClock, Search, Plus, Trash2, X, ChevronRight, 
   Clock, Timer, AlertCircle, CalendarDays, Check, MapPin,
@@ -294,7 +295,8 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col md:flex-row h-full max-h-[90vh]">
             
             <div className="flex-1 overflow-y-auto p-5 border-r border-gray-100 bg-white">
@@ -473,6 +475,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -487,3 +490,4 @@ const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.Rea
 );
 
 export default SchedulesView;
+

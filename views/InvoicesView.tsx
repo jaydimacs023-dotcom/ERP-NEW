@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Building2, User, Calendar, DollarSign, Percent, CheckCircle,
@@ -227,7 +228,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   }, [viewMode, orgId]);
 
   // whenever the list of tax categories changes, recompute net/vat/gross for existing lines
-  // but do NOT touch the visible amount – leave whatever the user entered intact
+  // but do NOT touch the visible amount â€“ leave whatever the user entered intact
   useEffect(() => {
     console.debug('[InvoicesView] localTaxCats changed', localTaxCats.length);
     if (viewMode === 'FORM' && formData.lines.length > 0 && localTaxCats.length > 0) {
@@ -372,15 +373,15 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     setFormData(prev => ({ ...prev, lines: [...prev.lines, newLine] }));
   };
 
-  // helper – calculate amounts based on selected tax category
+  // helper â€“ calculate amounts based on selected tax category
   //
   // The amount calculation always revolves around a *base* value which
-  // helper – calculate amounts based on selected tax category
+  // helper â€“ calculate amounts based on selected tax category
   //
   // The amount calculation always revolves around a *base* value which
   // originally represented the gross figure but we now display the net
   // amount in the invoice lines. By default the base is computed as quantity
-  // × unitPrice, but if an explicit `line.amount` value is present we treat
+  // Ã— unitPrice, but if an explicit `line.amount` value is present we treat
   // that as the base so manual adjustments (e.g. import or override) are
   // respected.
   //
@@ -388,10 +389,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // category codes (VATGOODS, VATSERV, NVGOODS, NVSERV, EXMPTGOODS,
   // EXMPTSERV, ZEROGOODS, ZEROSERV).  The formula is:
   //
-  //     vat = amount ÷ 1.12 × rate
+  //     vat = amount Ã· 1.12 Ã— rate
   //
-  // with rate 12% for the first six codes and 0% for the zero‑rated ones.
-  // This reflects the user's request to treat non‑VAT, exempt, and regular
+  // with rate 12% for the first six codes and 0% for the zeroâ€‘rated ones.
+  // This reflects the user's request to treat nonâ€‘VAT, exempt, and regular
   // categories identically for output VAT computation.  For all other
   // categories we fall back to the previous inclusive/exclusive logic.
 
@@ -410,7 +411,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     if (rateOverride !== undefined) {
       return Math.round((amount / 1.12 * rateOverride) * 100) / 100;
     }
-    // non‑special categories: use existing rate based logic
+    // nonâ€‘special categories: use existing rate based logic
     if (typeof cat.rate === 'number') {
       const r = cat.rate > 1 ? cat.rate / 100 : cat.rate;
       if (cat.isInclusive) {
@@ -451,7 +452,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const lines = [...prev.lines];
       lines[index] = { ...lines[index], [field]: value };
 
-      // when qty or unit price change, we may want to auto‑populate the amount
+      // when qty or unit price change, we may want to autoâ€‘populate the amount
       if ((field === 'quantity' || field === 'unitPrice')) {
         // only update the amount if the user hasn't already overridden it (i.e. it's zero)
         if (!lines[index].amount) {
@@ -467,7 +468,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         lines[index].netAmount = netAmount;
         lines[index].vatAmount = vatAmount;
         lines[index].grossAmount = grossAmount;
-        // do not touch `amount` when tax category changes – user value stays
+        // do not touch `amount` when tax category changes â€“ user value stays
         // if the user edited the amount directly we already set it above
       }
       return { ...prev, lines };
@@ -1285,7 +1286,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               return <span className="text-xs font-medium text-gray-600">{glNum}</span>;
                             })()
                           ) : (
-                            <span className="text-xs text-gray-400">—</span>
+                            <span className="text-xs text-gray-400">â€”</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{inv.invoiceDate}</td>
@@ -1376,7 +1377,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   onClick={resetForm}
                   className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 mb-1 transition-colors"
                 >
-                  ← Back to Invoices
+                  â† Back to Invoices
                 </button>
                 <h3 className="text-xl font-bold text-gray-800">
                   {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
@@ -1587,7 +1588,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
                 {viewMode === 'FORM' && localTaxCats.length === 0 && (
                   <div className="p-2 text-red-600 bg-red-100 text-xs">
-                    ⚠️ No tax categories loaded. Please ensure your organization has entries in the <code>tax_categories</code> table and that RLS policies permit access.
+                    âš ï¸ No tax categories loaded. Please ensure your organization has entries in the <code>tax_categories</code> table and that RLS policies permit access.
                   </div>
                 )}
 
@@ -1730,7 +1731,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
       {
         showViewModal && viewingInvoice && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
               {/* PAID Watermark Overlay */}
               {viewingInvoice.balanceDue === 0 && (
@@ -1893,9 +1895,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
             </div>
           </div>
+</ModalPortal>
         )}
       {showPrintModal && printingInvoice && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
               <div>
@@ -2032,12 +2036,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Void Modal */}
       {
         showVoidModal && voidingInvoice && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
               <div className="p-4 border-b flex items-center gap-3">
                 <div className="p-2 bg-rose-100 rounded-lg">
@@ -2075,12 +2081,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
             </div>
           </div>
+</ModalPortal>
         )}
 
       {/* Generate from Enrollments Modal */}
       {
         showGenerateModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b bg-purple-50">
@@ -2340,9 +2348,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
             </div>
           </div>
+</ModalPortal>
         )}
     </div>
   );
 };
 
 export default InvoicesView;
+

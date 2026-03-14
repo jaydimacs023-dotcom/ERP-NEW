@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Organization, AuditLog } from '../types';
 import { BackupRestoreService, BackupData, BackupMetadata } from '../services/BackupRestoreService';
+import ModalPortal from '../components/ModalPortal';
 
 interface BackupRestoreViewProps {
   organizations: Organization[];
@@ -324,7 +325,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
           <div className="space-y-3 pt-4 border-t border-gray-100">
             <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-              <p className="text-xs font-bold text-red-700">⚠️ Warning</p>
+              <p className="text-xs font-bold text-red-700">?? Warning</p>
               <p className="text-xs text-red-600 mt-1">
                 Restoring a backup will replace all current data for this organization. This action cannot be undone without another backup.
               </p>
@@ -355,7 +356,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
                   onClick={() => setSelectedBackup(null)}
                   className="text-xs text-gray-500 hover:text-gray-700 font-semibold"
                 >
-                  ✕ Clear Selection
+                  ? Clear Selection
                 </button>
               </div>
             )}
@@ -383,7 +384,8 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
       {/* Restore Confirmation Dialog */}
       {showRestoreConfirm && selectedBackup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded shadow-md max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3 text-red-600">
               <AlertCircle size={24} />
@@ -433,6 +435,7 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Backup History */}
@@ -564,12 +567,12 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
           Best Practices
         </h4>
         <ul className="space-y-2 text-sm text-gray-700">
-          <li>✓ Create backups before making major changes (data migrations, period closings, etc.)</li>
-          <li>✓ Schedule regular backups (daily/weekly) for disaster recovery</li>
-          <li>✓ Store backups in multiple locations (cloud storage, external drives)</li>
-          <li>✓ Test restore procedures periodically to ensure data integrity</li>
-          <li>✓ Use descriptive backup names to easily identify important snapshots</li>
-          <li>✓ Keep at least 3 recent backups at all times</li>
+          <li>? Create backups before making major changes (data migrations, period closings, etc.)</li>
+          <li>? Schedule regular backups (daily/weekly) for disaster recovery</li>
+          <li>? Store backups in multiple locations (cloud storage, external drives)</li>
+          <li>? Test restore procedures periodically to ensure data integrity</li>
+          <li>? Use descriptive backup names to easily identify important snapshots</li>
+          <li>? Keep at least 3 recent backups at all times</li>
         </ul>
       </div>
     </div>
@@ -577,3 +580,4 @@ const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 };
 
 export default BackupRestoreView;
+

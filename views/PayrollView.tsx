@@ -5,6 +5,7 @@ import { AccountingService } from '../accountingService';
 import { TaxBracketService } from '../services/TaxBracketService';
 import { ContributionService } from '../services/ContributionService';
 import { PayrollCalculationService } from '../services/PayrollCalculationService';
+import ModalPortal from '../components/ModalPortal';
 import {
    UserCheck, Plus, Search, Calendar, ChevronRight, X, Play,
    ShieldCheck, Calculator, AlertCircle, TrendingUp, DollarSign,
@@ -227,7 +228,8 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
          {/* Payroll Run Details Modal (Employee List) */}
          {viewingRunId && viewingRun && (
-            <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+            <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
                <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col h-[80vh]">
                   <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                      <div className="flex items-center gap-4">
@@ -288,11 +290,13 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                   </div>
                </div>
             </div>
+</ModalPortal>
          )}
 
          {/* Detailed Individual Paystub Modal */}
          {viewingPaystub && (
-            <div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
+            <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] overflow-y-auto">
                <div className="bg-white rounded-md shadow-md w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-200 my-8 flex flex-col no-print">
                   <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
                      <div className="flex items-center gap-4">
@@ -452,10 +456,12 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                   </div>
                </div>
             </div>
+</ModalPortal>
          )}
 
          {showModal && (
-            <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] overflow-y-auto">
+            <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
                <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
                   <div className="p-8 border-b flex justify-between items-center bg-gray-50 shrink-0">
                      <div className="flex items-center gap-4">
@@ -557,6 +563,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                   </div>
                </div>
             </div>
+</ModalPortal>
          )}
       </div>
    );
@@ -600,3 +607,4 @@ const EarningsRow: React.FC<{ label: string, value: number, isDeduction?: boolea
 );
 
 export default PayrollView;
+

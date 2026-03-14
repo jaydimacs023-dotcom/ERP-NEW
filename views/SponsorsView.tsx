@@ -2,6 +2,7 @@
 import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../types';
 import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
   Building, Filter, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
@@ -26,7 +27,7 @@ interface SponsorsViewProps {
 }
 
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
-  sponsors, accounts = [], entries = [], lines = [], currency = '₱', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
+  sponsors, accounts = [], entries = [], lines = [], currency = '?', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
   const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -341,7 +342,8 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -525,6 +527,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Toast Notifications moved to bottom */}
@@ -564,3 +567,4 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
 };
 
 export default SponsorsView;
+

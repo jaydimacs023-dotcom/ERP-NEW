@@ -1,6 +1,7 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { Vendor, VendorType, VendorStatus, ChartOfAccount, JournalLine, AccountClass } from '../types';
 import EmptyState from '../components/EmptyState';
+import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
   Edit, AlertCircle, MapPin, Building, Filter, Link as LinkIcon,
@@ -589,7 +590,8 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
       {/* Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -616,11 +618,13 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Edit Modal */}
       {showEditModal && editingVendor && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -640,11 +644,13 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* View Modal */}
       {showViewModal && viewingVendor && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
@@ -755,9 +761,11 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default VendorsView;
+

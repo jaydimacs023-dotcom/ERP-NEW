@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Sponsor, JournalEntry, JournalLine, ChartOfAccount } from '../types';
 import { Search, FileText } from 'lucide-react';
 import SponsorSOAView from './SponsorSOAView';
@@ -108,3 +108,4 @@ const SOAView: React.FC<SOAViewProps> = ({ sponsors, entries, lines, accounts, c
 };
 
 export default SOAView;
+

@@ -1,5 +1,6 @@
 ﻿
 import React, { useState, useRef, useMemo } from 'react';
+import ModalPortal from '../components/ModalPortal';
 import { 
   User, ShieldCheck, Clock, FileText, Upload, CheckCircle2, 
   AlertCircle, MapPin, Camera, X, Globe,
@@ -486,7 +487,8 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
       {/* Camera Overlay */}
       {showCamera && (
-        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
           <div className="w-full max-w-md space-y-12 text-white">
              <div className="text-center">
                 <h3 className="text-lg font-semibold uppercase tracking-tight">Biometric Verification</h3>
@@ -505,6 +507,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
              </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -515,3 +518,4 @@ const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void,
 );
 
 export default StudentPortalView;
+

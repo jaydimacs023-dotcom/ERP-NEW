@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   Search, Plus, Layers, Award, GraduationCap, Users, Calendar,
   Trash2, X, CheckCircle, Clock, MoreVertical, Edit2, AlertCircle,
@@ -216,7 +217,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     }
   };
 
-  // Commence Training - PLANNED → ONGOING (requires ≥5 students)
+  // Commence Training - PLANNED ? ONGOING (requires =5 students)
   const [isCommencing, setIsCommencing] = useState<string | null>(null);
 
   const handleCommenceTraining = async (batch: Batch) => {
@@ -432,7 +433,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       )}
                       {batch.status === 'COMPLETED' && (
                         <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded">
-                          ✓ Completed
+                          ? Completed
                         </span>
                       )}
                     </td>
@@ -471,7 +472,8 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col md:flex-row h-full max-h-[85vh]">
             <div className="flex-1 overflow-y-auto border-r p-8">
               <div className="flex items-center justify-between mb-8">
@@ -696,11 +698,13 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Batch Detail View Modal */}
       {viewingBatch && (
-        <div className="fixed inset-0 bg-gray-800/70 backdrop-blur-sm flex items-center justify-center p-4 z-[80] overflow-y-auto">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/70 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="bg-gradient-to-r from-[#F47721] to-purple-600 px-5 py-8 text-white relative overflow-hidden">
               <div className="absolute top-0 right-0 opacity-10">
@@ -942,9 +946,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default BatchesView;
+

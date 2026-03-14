@@ -321,3 +321,4 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 };
 
 export default LoginView;
+

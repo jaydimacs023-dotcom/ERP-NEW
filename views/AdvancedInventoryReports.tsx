@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
   JournalLine
@@ -120,7 +120,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   <Clock className="text-[#F47721]" /> Lifespan Distribution
                </h3>
                <div className="h-[350px]">
-                 <ResponsiveContainer width="100%" height="100%">
+                 <ResponsiveContainer width="99%" height={350}>
                    <BarChart data={agingReport.slice(0, 10)}>
                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                      <XAxis dataKey="itemCode" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }} />
@@ -237,3 +237,4 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
 };
 
 export default AdvancedInventoryReports;
+

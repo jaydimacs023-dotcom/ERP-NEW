@@ -468,3 +468,4 @@ const FeatureHighlight: React.FC<{ icon: React.ReactNode, label: string }> = ({ 
 );
 
 export default SubscriptionView;
+

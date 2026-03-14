@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import ModalPortal from '../components/ModalPortal';
 import {
   ChartOfAccount,
   GoodsReceipt,
@@ -343,7 +344,7 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
           {/* Blockers (Critical - Prevents Payment) */}
           {result.blockers.length > 0 && (
             <DiscrepancySection
-              title="🛑 Critical Issues (Blocks Payment)"
+              title="?? Critical Issues (Blocks Payment)"
               discrepancies={result.blockers}
               variant="danger"
             />
@@ -352,7 +353,7 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
           {/* Warnings (Major - Needs Approval) */}
           {result.warnings.length > 0 && (
             <DiscrepancySection
-              title="⚠️ Warnings (Requires Approval)"
+              title="?? Warnings (Requires Approval)"
               discrepancies={result.warnings}
               variant="warning"
             />
@@ -361,7 +362,7 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
           {/* Info (Minor - FYI) */}
           {result.info.length > 0 && (
             <DiscrepancySection
-              title="ℹ️ Information (Minor)"
+              title="?? Information (Minor)"
               discrepancies={result.info}
               variant="info"
             />
@@ -414,7 +415,7 @@ const MatchResultCard: React.FC<MatchResultCardProps> = ({
           <div className="flex gap-2 pt-4 border-t border-gray-200">
             {result.canProceedToPayment ? (
               <button className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">
-                ✓ Ready for Payment
+                ? Ready for Payment
               </button>
             ) : (
               <>
@@ -478,7 +479,7 @@ const DiscrepancySection: React.FC<DiscrepancySectionProps> = ({
             )}
             {d.poValue !== undefined && d.grValue !== undefined && (
               <div className="text-xs mt-1">
-                PO: {d.poValue} → GR: {d.grValue}
+                PO: {d.poValue} ? GR: {d.grValue}
               </div>
             )}
           </div>
@@ -502,7 +503,8 @@ const ExceptionModal: React.FC<ExceptionModalProps> = ({
   onCancel
 }) => {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full space-y-4">
         <h3 className="text-lg font-bold">Request Exception</h3>
         <p className="text-sm text-gray-600">
@@ -532,7 +534,9 @@ const ExceptionModal: React.FC<ExceptionModalProps> = ({
         </div>
       </div>
     </div>
+</ModalPortal>
   );
 };
 
 export default MatchingDashboard;
+

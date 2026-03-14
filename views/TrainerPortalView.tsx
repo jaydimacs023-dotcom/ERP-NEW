@@ -302,3 +302,4 @@ const StatusItemPortal: React.FC<{ label: string, value: string, icon: React.Rea
 );
 
 export default TrainerPortalView;
+

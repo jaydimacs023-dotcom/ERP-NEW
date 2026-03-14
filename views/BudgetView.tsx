@@ -1,6 +1,7 @@
 ﻿
 import React, { useState, useMemo } from 'react';
 import { ChartOfAccount, TransactionSummary, AccountClass, Budget, BudgetLine } from '../types';
+import ModalPortal from '../components/ModalPortal';
 import { 
   PieChart, Plus, Target, TrendingUp, TrendingDown, 
   ChevronRight, AlertCircle, Save, X, Calculator,
@@ -201,7 +202,8 @@ const BudgetView: React.FC<BudgetViewProps> = ({
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col h-[85vh]">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                <div className="flex items-center gap-4">
@@ -279,6 +281,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
@@ -340,3 +343,4 @@ const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void,
 );
 
 export default BudgetView;
+

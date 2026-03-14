@@ -1,6 +1,7 @@
 ﻿import React, { useState, useMemo, useCallback } from 'react';
 import { ChartOfAccount, JournalEntry, JournalLine, AccountClass, Vendor, Student, Trainer, Employee, Batch, Qualification } from '../types';
 import { Download, Printer, Plus, Trash2, GripVertical, Filter, Columns, ArrowUpDown, Save, FolderOpen, Play, X, ChevronDown, ChevronRight, BarChart3, Table, PieChart, Calendar, Eye, EyeOff } from 'lucide-react';
+import ModalPortal from '../components/ModalPortal';
 
 // ===== Types =====
 export interface ReportColumn {
@@ -820,7 +821,8 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
       {/* Save Template Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded p-6 w-full max-w-md shadow-md">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Save Report Template</h3>
@@ -857,11 +859,13 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Load Template Modal */}
       {showLoadModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded p-6 w-full max-w-lg shadow-md max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Load Report Template</h3>
@@ -906,9 +910,11 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default CustomReportBuilder;
+

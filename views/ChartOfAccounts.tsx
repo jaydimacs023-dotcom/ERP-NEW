@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { ChartOfAccount, AccountClass, JournalLine, Qualification } from '../types';
 import { Plus, ChevronRight, ChevronDown, Edit2, Trash2, FolderPlus, FilePlus, AlertTriangle, ShieldCheck, X, Link, Award } from 'lucide-react';
+import ModalPortal from '../components/ModalPortal';
 
 interface ChartOfAccountsProps {
   accounts: ChartOfAccount[];
@@ -298,7 +299,8 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
       {/* Confirmation Modal */}
       {confirmation && (
-        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className={`p-6 flex flex-col items-center text-center ${confirmation.type === 'delete' ? 'bg-rose-50/30' : 'bg-amber-50/30'}`}>
               <div className={`w-16 h-16 rounded flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-[#F47721]'}`}>
@@ -370,11 +372,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Account Modal (Add/Edit) */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+        <ModalPortal>
+<div className="fixed inset-0 bg-gray-800/40 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <h3 className="text-lg font-semibold text-gray-900 uppercase">
@@ -461,9 +465,11 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             </form>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default ChartOfAccounts;
+

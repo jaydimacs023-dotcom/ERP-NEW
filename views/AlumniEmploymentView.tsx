@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification, Enrollment } from '../types';
+import ModalPortal from '../components/ModalPortal';
 import {
     Briefcase, Search, Plus, Filter, Download, ExternalLink,
     MapPin, Calendar, DollarSign, CheckCircle2, X, MoreVertical,
@@ -368,7 +369,8 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
 
             {/* Add/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+                <ModalPortal>
+<div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-100 flex flex-col h-full max-h-[90vh]">
                         <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0 z-10 shrink-0">
                             <div className="flex items-center gap-3">
@@ -541,9 +543,11 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                         </form>
                     </div>
                 </div>
+</ModalPortal>
             )}
         </div>
     );
 };
 
 export default AlumniEmploymentView;
+

@@ -227,3 +227,4 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
 };
 
 export default PaymentHistoryView;
+

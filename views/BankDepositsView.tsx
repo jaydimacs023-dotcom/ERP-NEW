@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { BankDeposit, BankDepositLine, BankDepositStatus, BankAccount, Payment } from '../types';
 import { generateUUID } from '../utils/uuid';
+import ModalPortal from '../components/ModalPortal';
 import {
   Landmark, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Calendar, CheckCircle, Clock, XCircle, AlertTriangle, Receipt,
@@ -524,7 +525,8 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
 
       {/* Deposit Form Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
               <h3 className="text-lg font-bold text-gray-800">
@@ -745,11 +747,13 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* View Deposit Modal */}
       {showViewModal && viewingDeposit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
               <div>
@@ -829,11 +833,13 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
 
       {/* Void Modal */}
       {showVoidModal && voidingDeposit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <ModalPortal>
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-4 border-b flex items-center gap-3">
               <div className="p-2 bg-rose-100 rounded-lg">
@@ -871,9 +877,11 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
             </div>
           </div>
         </div>
+</ModalPortal>
       )}
     </div>
   );
 };
 
 export default BankDepositsView;
+
