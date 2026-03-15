@@ -3986,13 +3986,16 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6">
-        <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-500/20 animate-pulse">
-          <Building2 size={40} />
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-8">
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-5xl font-black tracking-tight" style={{ color: '#F47721' }}>
+            Accoun<span className="text-white">Tech</span>
+          </h1>
+          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-500">Enterprise Resource Planning</p>
         </div>
         <div className="flex items-center gap-3">
-          <Loader2 className="animate-spin text-indigo-400" size={24} />
-          <span className="text-sm font-black uppercase tracking-[0.3em]">Initializing Ledger Architecture</span>
+          <Loader2 className="animate-spin" size={20} style={{ color: '#F47721' }} />
+          <span className="text-xs font-bold uppercase tracking-[0.3em] text-slate-400">Initializing Ledger Architecture</span>
         </div>
       </div>
     );
