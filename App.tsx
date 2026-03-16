@@ -3209,64 +3209,39 @@ export default function App() {
     return `PAY-${year}-${String(next).padStart(5, '0')}`;
   };
 
-  const isDuplicateKeyError = (error: any): boolean => {
-    if (!error) return false;
-    const errorStr = JSON.stringify(error).toLowerCase();
-    return errorStr.includes('23505') || errorStr.includes('duplicate key') || (error?.code === '23505');
-  };
-
   const handleAddPayment = async (payment: Payment) => {
     try {
       console.info('[App] Creating payment:', payment.paymentNo);
-      if (payment.orgId && payment.orgId !== currentOrgId) {
+      
+      // CRITICAL: Validate that payment.orgId matches current org
+      // This prevents any cross-org data pollution
+      if (!payment.orgId || payment.orgId !== currentOrgId) {
+        console.error('[App] Payment orgId mismatch:', { 
+          paymentOrgId: payment.orgId, 
+          currentOrgId,
+          match: payment.orgId === currentOrgId
+        });
         handleNotify('error', 'Cannot create payment for another organization.');
         return;
       }
 
       const paymentToCreate = {
         ...payment,
-        orgId: currentOrgId,
+        // orgId is already set by PaymentsView - do not override
         createdBy: payment.createdBy || currentUser?.id || 'system',
         updatedAt: new Date().toISOString()
+        // Note: paymentNo will be server-generated atomically by payments-write edge function
       };
 
       console.debug('[App] Payment object before save:', paymentToCreate);
       const savedPayment = await dataService.createEntity('payments', paymentToCreate);
       setPayments(prev => [...prev, savedPayment as Payment]);
 
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, paymentToCreate.paymentNo);
-      handleNotify('success', `Payment ${paymentToCreate.paymentNo} created successfully`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, (savedPayment as Payment).paymentNo);
+      handleNotify('success', `Payment ${(savedPayment as Payment).paymentNo} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payment:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-
-      // Check if this is a duplicate key constraint error
-      if (isDuplicateKeyError(error)) {
-        console.warn('[App] Duplicate payment number detected, generating new one...');
-        const nextPaymentNo = getNextPaymentNo();
-        const retryPayment = {
-          ...payment,
-          paymentNo: nextPaymentNo,
-          orgId: currentOrgId,
-          createdBy: payment.createdBy || currentUser?.id || 'system',
-          updatedAt: new Date().toISOString()
-        };
-        try {
-          console.info('[App] Retry creating payment with:', nextPaymentNo);
-          const savedPayment = await dataService.createEntity('payments', retryPayment);
-          setPayments(prev => [...prev, savedPayment as Payment]);
-          AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, retryPayment.paymentNo);
-          handleNotify('success', `Payment ${retryPayment.paymentNo} created successfully`);
-          return;
-        } catch (retryError) {
-          console.error('[App] Retry create payment failed:', retryError);
-          const retryMsg = retryError instanceof Error ? retryError.message : String(retryError);
-          handleNotify('error', `Failed to create payment (retry): ${retryMsg}`);
-          return;
-        }
-      }
-
-      console.error('[App] Error details:', errorMsg);
       handleNotify('error', `Failed to create payment: ${errorMsg}`);
     }
   };
@@ -4487,6 +4462,7 @@ export default function App() {
             taxCategories={taxCategories}
           />}
           {activeTab === 'payments' && <PaymentsView
+            currentOrgId={currentOrgId}
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}

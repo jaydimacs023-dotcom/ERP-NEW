@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 interface PaymentsViewProps {
+  currentOrgId: string;  // Current organization for org_id separation
   payments: Payment[];
   sponsors: Sponsor[];
   students: Student[];
@@ -40,9 +41,10 @@ interface PaymentsViewProps {
 }
 
 type PayorType = 'SPONSOR' | 'STUDENT';
-type ViewMode = 'list' | 'create-payment' | 'apply-payment';
+type ViewMode = 'list' | 'create-payment' | 'apply-payment' | 'payment-details';
 
 const PaymentsView: React.FC<PaymentsViewProps> = ({
+  currentOrgId,
   payments,
   sponsors,
   students,
@@ -98,7 +100,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   });
 
   const selectedPayorId = payorType === 'SPONSOR' ? formData.sponsorId : formData.studentId;
-  const isReadOnly = editingPayment?.status === 'OPEN' || editingPayment?.status === 'CLOSED';
+  // Read-only for posted/voided payments when viewing, or for payments with certain statuses
+  const isReadOnly = editingPayment && (editingPayment.status === 'POSTED' || editingPayment.status === 'VOIDED' || editingPayment.status === 'OPEN' || editingPayment.status === 'CLOSED');
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -161,6 +164,80 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return `${code}${gl.name}`;
   };
 
+  // Resolve GL accounts for payment posting
+  const resolvePaymentGlAccounts = () => {
+    const normalizedName = (name?: string) => (name || '').toLowerCase();
+    const byName = (patterns: string[], acctList?: ChartOfAccount[]) => {
+      const acctSet = acctList || accounts;
+      return acctSet.find(a => {
+        const name = normalizedName(a.name);
+        return patterns.every(p => name.includes(p));
+      });
+    };
+    const byCode = (codes: string[], acctList?: ChartOfAccount[]) => {
+      const acctSet = acctList || accounts;
+      return acctSet.find(a => codes.includes(a.code || ''));
+    };
+
+    const cashAccount = getCashGlAccount(formData.bankAccountId);
+    const customerDepositsAccount =
+      byName(['customer', 'deposit']) ||
+      byName(['advance', 'customer']) ||
+      byName(['unearned', 'revenue']) ||
+      byCode(['2000']);
+
+    const ewtReceivableAccount =
+      byName(['creditable', 'withholding', 'tax']) ||
+      byName(['cwt', '2307']) ||
+      byName(['ewt', 'receivable']) ||
+      byName(['withholding', 'receivable']) ||
+      byCode(['14001', '14200']);
+
+    return { cashAccount, customerDepositsAccount, ewtReceivableAccount };
+  };
+
+  // Calculate GL lines for GL Review
+  const calculatePaymentGlLines = () => {
+    const { cashAccount, customerDepositsAccount, ewtReceivableAccount } = resolvePaymentGlAccounts();
+    const amountReceived = Number(formData.amountReceived ?? 0) || 0;
+    const ewtAmount = Number(formData.ewtAmountCertified ?? 0) || 0;
+    const totalCredit = amountReceived + ewtAmount;
+
+    const lines: Array<{ account?: ChartOfAccount; description: string; debit: number; credit: number }> = [];
+
+    // Cash account debit
+    if (cashAccount) {
+      lines.push({
+        account: cashAccount,
+        description: `Cash receipt for ${formData.paymentNo}`,
+        debit: amountReceived,
+        credit: 0
+      });
+    }
+
+    // EWT receivable debit
+    if (ewtAmount > 0 && ewtReceivableAccount) {
+      lines.push({
+        account: ewtReceivableAccount,
+        description: `Creditable Withholding Tax (CWT 2307) for ${formData.paymentNo}`,
+        debit: ewtAmount,
+        credit: 0
+      });
+    }
+
+    // Customer deposits credit
+    if (customerDepositsAccount) {
+      lines.push({
+        account: customerDepositsAccount,
+        description: `Customer deposits for ${formData.paymentNo}`,
+        debit: 0,
+        credit: totalCredit
+      });
+    }
+
+    return lines;
+  };
+
   const cashAccountOptions = useMemo(() => {
     const base = [{ id: CASH_ON_HAND_UNDEPOSITED_ID, label: 'Cash on Hand - Undeposited Funds' }];
     const mappedBanks = bankAccounts.map(bank => ({
@@ -199,6 +276,57 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       amountReceived: 0,
       ewtAmountCertified: 0,
       notes: ''
+    });
+    setViewMode('create-payment');
+  };
+
+  // Load payment for editing/viewing if it's in draft status
+  const loadPaymentForEditing = (payment: Payment) => {
+    if (payment.status !== 'DRAFT') {
+      alert('Only Draft payments can be edited. Posted or Voided payments are read-only.');
+      return;
+    }
+    
+    setEditingPayment(payment);
+    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
+    setInvoiceApplyMap({});
+    setInvoiceSelectionMap({});
+    setFormData({
+      paymentNo: payment.paymentNo,
+      sponsorId: payment.sponsorId || '',
+      studentId: payment.studentId || '',
+      paymentDate: payment.paymentDate,
+      paymentMethod: payment.paymentMethod,
+      refNo: payment.refNo || '',
+      bankAccountId: payment.bankAccountId || defaultCashAccountId,
+      checkNumber: payment.checkNumber || '',
+      checkDate: payment.checkDate || '',
+      amountReceived: payment.amountReceived,
+      ewtAmountCertified: payment.ewtAmountCertified,
+      notes: payment.notes || ''
+    });
+    setViewMode('create-payment');
+  };
+
+  // Load payment for viewing in the payment interface (for all statuses)
+  const loadPaymentForViewing = (payment: Payment) => {
+    setEditingPayment(payment);
+    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
+    setInvoiceApplyMap({});
+    setInvoiceSelectionMap({});
+    setFormData({
+      paymentNo: payment.paymentNo,
+      sponsorId: payment.sponsorId || '',
+      studentId: payment.studentId || '',
+      paymentDate: payment.paymentDate,
+      paymentMethod: payment.paymentMethod,
+      refNo: payment.refNo || '',
+      bankAccountId: payment.bankAccountId || defaultCashAccountId,
+      checkNumber: payment.checkNumber || '',
+      checkDate: payment.checkDate || '',
+      amountReceived: payment.amountReceived,
+      ewtAmountCertified: payment.ewtAmountCertified,
+      notes: payment.notes || ''
     });
     setViewMode('create-payment');
   };
@@ -279,12 +407,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const availableToApply = Math.max((editingPayment?.customerDepositBalance ?? baseTotalCredit), 0);
 
   const glImpactRows = useMemo(() => {
-    return [
-      { account: getCashGlLabel(formData.bankAccountId), debit: formData.amountReceived, credit: 0 },
-      { account: '14001 - Creditable Withholding Tax (CWT 2307)', debit: formData.ewtAmountCertified, credit: 0 },
-      { account: '21010 - Customer Deposits', debit: 0, credit: baseTotalCredit }
-    ];
-  }, [formData.bankAccountId, formData.amountReceived, formData.ewtAmountCertified, baseTotalCredit]);
+    const glLines = calculatePaymentGlLines();
+    return glLines.map(line => ({
+      account: line.account?.code 
+        ? `${line.account.code} - ${line.account.name}`
+        : line.account?.name || 'Unknown Account',
+      debit: line.debit,
+      credit: line.credit
+    }));
+  }, [formData.bankAccountId, formData.amountReceived, formData.ewtAmountCertified, accounts]);
 
   const validateHeader = () => {
     if (!formData.paymentNo) return 'Payment number is required.';
@@ -301,6 +432,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     const payment: Partial<Payment> = {
       id: paymentId,
+      orgId: currentOrgId,  // Always include org_id for complete data separation
       paymentNo: formData.paymentNo,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
@@ -321,11 +453,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       updatedAt: new Date().toISOString(),
       postedAt: status === 'POSTED' ? (editingPayment?.postedAt || new Date().toISOString()) : editingPayment?.postedAt
     };
-
-    // Include orgId if editing an existing payment, otherwise let App.tsx add it
-    if (editingPayment?.orgId) {
-      payment.orgId = editingPayment.orgId;
-    }
 
     return payment as Payment;
   };
@@ -354,8 +481,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     // Post to GL when saving (Acumatica workflow)
     const payment = buildPayment('POSTED');
-    if (editingPayment) onUpdatePayment(payment);
-    else {
+    if (editingPayment) {
+      onUpdatePayment(payment);
+      // Call onPostPayment for existing draft payments being posted for the first time
+      if (editingPayment.status === 'DRAFT' && onPostPayment) {
+        onPostPayment(payment);
+      }
+    } else {
       onAddPayment(payment);
       if (onPostPayment) onPostPayment(payment);
     }
@@ -476,6 +608,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         <div className="rounded-xl border bg-white p-4">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Payment Register</h3>
+            <div className="ml-auto text-xs text-blue-600 italic">💡 Click on any <span className="underline">Draft payment</span> to edit</div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search size={14} className="pointer-events-none absolute left-2 top-2.5 text-gray-400" />
@@ -504,19 +637,21 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-3 py-2 text-left">Payment No.</th>
-                  <th className="px-3 py-2 text-left">Payor</th>
-                  <th className="px-3 py-2 text-left">Method</th>
-                  <th className="px-3 py-2 text-right">Received</th>
-                  <th className="px-3 py-2 text-right">Applied</th>
-                  <th className="px-3 py-2 text-right">Balance</th>
+                  <th className="px-3 py-2 text-left">GL Reference</th>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Sponsor/Student</th>
                   <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-left">Method</th>
+                  <th className="px-3 py-2 text-right">Amount Received</th>
+                  <th className="px-3 py-2 text-right">Amount Applied</th>
+                  <th className="px-3 py-2 text-right">Balance</th>
                   <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayments.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
+                    <td colSpan={10} className="px-3 py-6 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <FileText size={40} className="text-gray-300" />
                         <span>No payments found</span>
@@ -525,23 +660,45 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   </tr>
                 )}
                 {filteredPayments.map(payment => (
-                  <tr key={payment.id} className="border-t hover:bg-gray-50">
-                    <td className="px-3 py-2 font-medium text-gray-800">{payment.paymentNo}</td>
+                  <tr 
+                    key={payment.id} 
+                    className={`border-t ${
+                      payment.status === 'DRAFT'
+                        ? 'hover:bg-blue-50 transition-colors'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {/* Payment No. - Clickable to view in Payment Interface */}
+                    <td 
+                      className="px-3 py-2 font-medium cursor-pointer"
+                      onClick={() => loadPaymentForViewing(payment)}
+                    >
+                      <span className={`${
+                        payment.status === 'DRAFT' ? 'text-blue-600 underline' : 'text-blue-600 underline hover:text-blue-700'
+                      }`}>
+                        {payment.paymentNo}
+                      </span>
+                    </td>
+                    
+                    {/* GL Reference */}
+                    <td className="px-3 py-2 text-sm text-gray-600">
+                      {payment.glEntryNumber || (payment.status === 'DRAFT' ? '—' : 'Pending')}
+                    </td>
+                    
+                    {/* Date */}
+                    <td className="px-3 py-2">
+                      {new Date(payment.paymentDate).toLocaleDateString()}
+                    </td>
+                    
+                    {/* Sponsor/Student */}
                     <td className="px-3 py-2">
                       <div className="inline-flex items-center gap-2">
                         {payment.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
                         {getPayorName(payment)}
                       </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="inline-flex items-center gap-1 text-gray-600">
-                        {getMethodIcon(payment.paymentMethod)}
-                        <span>{payment.paymentMethod}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</td>
-                    <td className="px-3 py-2 text-right text-emerald-700">{formatCurrency(payment.totalApplied)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-sky-700">{formatCurrency(payment.customerDepositBalance)}</td>
+                    
+                    {/* Status */}
                     <td className="px-3 py-2 text-center">
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
                         payment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
@@ -551,8 +708,36 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         {payment.status === 'DRAFT' ? 'On Hold' : payment.status}
                       </span>
                     </td>
+                    
+                    {/* Method */}
+                    <td className="px-3 py-2">
+                      <div className="inline-flex items-center gap-1 text-gray-600">
+                        {getMethodIcon(payment.paymentMethod)}
+                        <span>{payment.paymentMethod}</span>
+                      </div>
+                    </td>
+                    
+                    {/* Amount Received */}
+                    <td className="px-3 py-2 text-right font-semibold">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</td>
+                    
+                    {/* Amount Applied */}
+                    <td className="px-3 py-2 text-right text-emerald-700">{formatCurrency(payment.totalApplied)}</td>
+                    
+                    {/* Balance */}
+                    <td className="px-3 py-2 text-right font-semibold text-sky-700">{formatCurrency(payment.customerDepositBalance)}</td>
+                    
+                    {/* Actions */}
                     <td className="px-3 py-2 text-right">
                       <div className="inline-flex gap-1">
+                        {payment.status === 'DRAFT' && (
+                          <button
+                            onClick={() => loadPaymentForEditing(payment)}
+                            className="rounded-lg border px-2 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                            title="Edit draft payment"
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           onClick={() => loadPaymentForApplication(payment)}
                           disabled={payment.status !== 'POSTED'}
@@ -663,8 +848,38 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
           <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
             <div>
-              <h3 className="text-xl font-bold text-gray-800">Record New Payment</h3>
-              <p className="text-sm text-gray-600 mt-1">Step 1 of 2: Record cash received, then apply invoices</p>
+              <h3 className="text-xl font-bold text-gray-800">
+                {editingPayment ? 'Edit Draft Payment' : 'Record New Payment'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {editingPayment 
+                  ? `Editing: ${editingPayment.paymentNo}` 
+                  : 'Step 1 of 2: Record cash received, then apply invoices'}
+              </p>
+            </div>
+            {/* Action Buttons - Top Right */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDraft}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 font-semibold hover:bg-gray-50 text-sm"
+              >
+                <Save size={16} />
+                {editingPayment ? 'Update Draft' : 'Save as Draft'}
+              </button>
+              <button
+                onClick={handleSavePayment}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm"
+                style={{ backgroundColor: brandColor }}
+              >
+                <CheckCircle size={16} />
+                {editingPayment ? 'Update & Post' : 'Post to GL'}
+              </button>
             </div>
           </div>
 
@@ -846,61 +1061,55 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               {/* GL Impact Summary */}
               <div className="space-y-4 xl:col-span-4">
                 <div className="rounded-xl border bg-white p-4">
-                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">GL Impact Preview</h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs uppercase text-gray-500">
-                        <th className="pb-2">Account</th>
-                        <th className="pb-2 text-right">Debit</th>
-                        <th className="pb-2 text-right">Credit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {glImpactRows.map((row, index) => (
-                        <tr key={index} className="border-t text-gray-700">
-                          <td className="py-2 text-xs">{row.account}</td>
-                          <td className="py-2 text-right text-xs">{row.debit ? formatCurrency(row.debit) : '-'}</td>
-                          <td className="py-2 text-right text-xs">{row.credit ? formatCurrency(row.credit) : '-'}</td>
-                        </tr>
-                      ))}
-                      <tr className="border-t font-bold text-gray-800">
-                        <td className="py-2 text-xs">Total</td>
-                        <td className="py-2 text-right text-xs">{formatCurrency(baseTotalCredit)}</td>
-                        <td className="py-2 text-right text-xs">{formatCurrency(baseTotalCredit)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
-                    ✓ Click "Post to GL" to create GL entries immediately, or "Save as Draft" to save without GL posting
-                  </div>
+                  <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-600">
+                    GL Journal Entry Preview
+                  </h3>
+                  
+                  {glImpactRows.length === 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                      ⚠️ Configure required GL accounts before posting this payment.
+                    </div>
+                  ) : (
+                    <>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase text-gray-500">
+                            <th className="pb-2">GL Account</th>
+                            <th className="pb-2 text-right">Debit</th>
+                            <th className="pb-2 text-right">Credit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {glImpactRows.map((row, index) => (
+                            <tr key={index} className="border-t text-gray-700">
+                              <td className="py-2 text-xs">{row.account}</td>
+                              <td className="py-2 text-right font-medium text-blue-600">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                              <td className="py-2 text-right font-medium text-green-600">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                            </tr>
+                          ))}
+                          <tr className="border-t-2 border-gray-300 font-bold text-gray-800">
+                            <td className="py-3 text-xs">Total</td>
+                            <td className="py-3 text-right text-xs text-blue-600">{formatCurrency(baseTotalCredit)}</td>
+                            <td className="py-3 text-right text-xs text-green-600">{formatCurrency(baseTotalCredit)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-700">
+                        <div className="mb-2">📋 GL Entry Details:</div>
+                        <ul className="space-y-1 pl-4 text-xs font-normal">
+                          <li>• Journal Entry Date: {new Date(formData.paymentDate).toLocaleDateString()}</li>
+                          <li>• Reference: {formData.paymentNo}</li>
+                          <li>• Total Debit = Total Credit (balanced entry)</li>
+                        </ul>
+                      </div>
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">
+                        ✓ Click "Post to GL" to create this journal entry, or "Save as Draft" to save without posting
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 border-t bg-gray-50 p-4">
-            <button
-              onClick={() => setViewMode('list')}
-              className="px-6 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveDraft}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-gray-700 bg-white border border-gray-300 font-semibold hover:bg-gray-50"
-            >
-              <Save size={18} />
-              Save as Draft
-            </button>
-            <button
-              onClick={handleSavePayment}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-white font-semibold"
-              style={{ backgroundColor: brandColor }}
-            >
-              <CheckCircle size={18} />
-              Post to GL
-            </button>
           </div>
         </div>
       </div>
@@ -923,18 +1132,38 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
           <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
-            <div>
-              <h3 className="text-xl font-bold text-gray-800">Apply Payment to Invoices</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Payment: <span className="font-semibold text-gray-900">{editingPayment.paymentNo}</span> | 
-                Payor: <span className="font-semibold text-gray-900">{getPayorName(editingPayment)}</span>
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-600">Available to Apply</div>
-              <div className="text-lg font-bold" style={{ color: brandColor }}>
-                {formatCurrency(availableToApply)}
+            <div className="flex items-center justify-between flex-1">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Apply Payment to Invoices</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Payment: <span className="font-semibold text-gray-900">{editingPayment.paymentNo}</span> | 
+                  Payor: <span className="font-semibold text-gray-900">{getPayorName(editingPayment)}</span>
+                </p>
               </div>
+              <div className="text-right mx-4">
+                <div className="text-xs text-gray-600">Available to Apply</div>
+                <div className="text-lg font-bold" style={{ color: brandColor }}>
+                  {formatCurrency(availableToApply)}
+                </div>
+              </div>
+            </div>
+            {/* Action Buttons - Top Right */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applySelectedInvoices}
+                disabled={plannedAppliedTotal <= 0}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                style={{ backgroundColor: brandColor }}
+              >
+                <CheckCircle size={16} />
+                Apply Selected
+              </button>
             </div>
           </div>
 
@@ -1001,24 +1230,229 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 border-t bg-gray-50 p-4">
-            <button
-              onClick={() => setViewMode('list')}
-              className="px-6 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={applySelectedInvoices}
-              disabled={plannedAppliedTotal <= 0}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: brandColor }}
-            >
-              <CheckCircle size={18} />
-              Apply Selected
-            </button>
+  // ===== VIEW: PAYMENT DETAILS =====
+  if (viewMode === 'payment-details' && editingPayment) {
+    const glLines = calculatePaymentGlLines();
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode('list')}
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft size={16} />
+            Back to Payment Register
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b" style={{ backgroundColor: `${brandColor}10` }}>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{editingPayment.paymentNo}</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {new Date(editingPayment.paymentDate).toLocaleDateString()} • {getPayorName(editingPayment)}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">Payment Status</div>
+                <div className="mt-2">
+                  <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                    editingPayment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
+                    editingPayment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {editingPayment.status === 'DRAFT' ? 'On Hold' : editingPayment.status}
+                  </span>
+                </div>
+              </div>
+              {/* Close Button - Top Right */}
+              <button
+                onClick={() => setViewMode('list')}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Payment Details */}
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Payment Details</h3>
+                <dl className="space-y-3">
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-600">Payment Number:</dt>
+                    <dd className="text-sm font-semibold text-gray-900">{editingPayment.paymentNo}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-600">Payment Date:</dt>
+                    <dd className="text-sm text-gray-900">{new Date(editingPayment.paymentDate).toLocaleDateString()}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-600">Payor:</dt>
+                    <dd className="text-sm text-gray-900">{getPayorName(editingPayment)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-600">Payment Method:</dt>
+                    <dd className="text-sm text-gray-900">{editingPayment.paymentMethod}</dd>
+                  </div>
+                  {editingPayment.refNo && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">Reference No.:</dt>
+                      <dd className="text-sm text-gray-900">{editingPayment.refNo}</dd>
+                    </div>
+                  )}
+                  {editingPayment.checkNumber && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">Check Number:</dt>
+                      <dd className="text-sm text-gray-900">{editingPayment.checkNumber}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+
+              {/* Amount Summary */}
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Amount Summary</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Amount Received:</span>
+                    <span className="font-semibold text-gray-900">{formatCurrency(editingPayment.amountReceived)}</span>
+                  </div>
+                  {editingPayment.ewtAmountCertified > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">EWT Amount Certified:</span>
+                      <span className="font-semibold text-gray-900">{formatCurrency(editingPayment.ewtAmountCertified)}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-3 flex justify-between">
+                    <span className="font-semibold text-gray-700">Total Received:</span>
+                    <span className="font-bold text-lg" style={{ color: brandColor }}>
+                      {formatCurrency(editingPayment.amountReceived + editingPayment.ewtAmountCertified)}
+                    </span>
+                  </div>
+                  <div className="pt-3 flex justify-between">
+                    <span className="text-sm text-gray-600">Amount Applied:</span>
+                    <span className="text-sm font-semibold text-emerald-700">{formatCurrency(editingPayment.totalApplied)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Unapplied Balance:</span>
+                    <span className="text-sm font-semibold text-sky-700">{formatCurrency(editingPayment.customerDepositBalance)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* GL Entry Details */}
+            {editingPayment.status === 'POSTED' && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">GL Entry Details</h3>
+                <div className="rounded-lg border bg-gray-50 p-4 space-y-3 mb-4">
+                  <div className="flex justify-between">
+                    <dt className="text-sm font-medium text-gray-600">GL Entry Number:</dt>
+                    <dd className="text-sm font-semibold text-blue-600">
+                      {editingPayment.glEntryNumber || '—'}
+                    </dd>
+                  </div>
+                  {editingPayment.postedAt && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">Posted Date:</dt>
+                      <dd className="text-sm text-gray-900">{new Date(editingPayment.postedAt).toLocaleDateString()}</dd>
+                    </div>
+                  )}
+                  {editingPayment.postedBy && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">Posted By:</dt>
+                      <dd className="text-sm text-gray-900">{editingPayment.postedBy}</dd>
+                    </div>
+                  )}
+                </div>
+
+                {/* GL Journal Lines */}
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100">
+                      <tr className="text-left text-xs uppercase font-semibold text-gray-600">
+                        <th className="px-4 py-2">GL Account</th>
+                        <th className="px-4 py-2 text-right">Debit</th>
+                        <th className="px-4 py-2 text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {glLines.map((line, index) => (
+                        <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
+                          <td className="px-4 py-2 text-xs">{line.account?.code || '—'} - {line.account?.name || 'Unknown'}</td>
+                          <td className="px-4 py-2 text-right font-medium text-blue-600">{line.debit ? formatCurrency(line.debit) : '-'}</td>
+                          <td className="px-4 py-2 text-right font-medium text-green-600">{line.credit ? formatCurrency(line.credit) : '-'}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t-2 border-gray-300 font-bold text-gray-800">
+                        <td className="px-4 py-2 text-xs">Total</td>
+                        <td className="px-4 py-2 text-right text-blue-600">{formatCurrency(editingPayment.amountReceived + editingPayment.ewtAmountCertified)}</td>
+                        <td className="px-4 py-2 text-right text-green-600">{formatCurrency(editingPayment.amountReceived + editingPayment.ewtAmountCertified)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {editingPayment.journalEntryId && onViewJournal && (
+                  <button
+                    onClick={() => onViewJournal(editingPayment.journalEntryId!)}
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    <ArrowRight size={16} />
+                    View Full GL Entry
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Payment Applications */}
+            {editingPayment.applications && editingPayment.applications.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Invoice Applications</h3>
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100">
+                      <tr className="text-left text-xs uppercase font-semibold text-gray-600">
+                        <th className="px-4 py-2">Invoice Number</th>
+                        <th className="px-4 py-2 text-right">Applied Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editingPayment.applications.map((app, index) => {
+                        const invoice = invoices.find(i => i.id === app.invoiceId);
+                        return (
+                          <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
+                            <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {editingPayment.notes && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Notes</h3>
+                <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4">{editingPayment.notes}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

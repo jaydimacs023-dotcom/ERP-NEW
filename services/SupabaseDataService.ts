@@ -1507,6 +1507,73 @@ export class SupabaseDataService implements IDataService {
   // ============================================================================
 
   async createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T> {
+    // For payments: generate unique payment number using atomic database function
+    // This prevents duplicate key errors from concurrent requests
+    if (table === 'payments') {
+      const payment = entity as any;
+      const orgId = payment.org_id || payment.orgId;
+      
+      console.log('[SupabaseDataService] Creating payment:', {
+        hasPaymentNo: !!payment.paymentNo,
+        paymentNo: payment.paymentNo,
+        orgId
+      });
+      
+      // Always regenerate payment number from database function to ensure uniqueness
+      // The paymentNo at this point is a temporary UI number, not the final one
+      if (orgId) {
+        try {
+          // Call RPC function via REST API
+          const headers = await this.getHeaders();
+          const rpcUrl = `${this.supabaseUrl}/rest/v1/rpc/get_next_payment_no`;
+          
+          console.log('[SupabaseDataService] Calling RPC:', { rpcUrl, orgId });
+          
+          const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ p_org_id: orgId })
+          });
+
+          console.log('[SupabaseDataService] RPC Response status:', response.status);
+
+          if (!response.ok) {
+            const errorBody = await response.text();
+            console.error(`[SupabaseDataService] RPC error (${response.status}):`, errorBody);
+            throw new Error(`RPC call failed: ${response.status} - ${errorBody}`);
+          }
+
+          let generatedPaymentNo: any;
+          try {
+            const responseText = await response.text();
+            console.log('[SupabaseDataService] RPC raw response:', responseText);
+            
+            // RPC returns plain text or JSON depending on Supabase config
+            generatedPaymentNo = responseText.startsWith('"') 
+              ? JSON.parse(responseText)  // Remove quotes if present
+              : responseText;
+          } catch (parseErr) {
+            console.error('[SupabaseDataService] Error parsing RPC response:', parseErr);
+            throw parseErr;
+          }
+          
+          if (generatedPaymentNo) {
+            payment.paymentNo = generatedPaymentNo;
+            payment.payment_no = generatedPaymentNo;
+            console.log('[SupabaseDataService] ✅ Generated payment_no:', generatedPaymentNo);
+          } else {
+            console.error('[SupabaseDataService] RPC returned empty/null:', generatedPaymentNo);
+            throw new Error('Failed to generate payment number - RPC returned: ' + generatedPaymentNo);
+          }
+        } catch (err) {
+          console.error('[SupabaseDataService] Failed to generate payment number via RPC:', err);
+          throw err;  // Don't silently fail - payment cannot be created without unique number
+        }
+      } else {
+        throw new Error('Missing orgId - cannot generate payment number');
+      }
+    }
+
     // Convert to snake_case and filter
     const snakeCaseEntity = this.camelToSnake(entity);
     const filteredEntity = this.filterToTableSchema(table, snakeCaseEntity);
@@ -1517,6 +1584,76 @@ export class SupabaseDataService implements IDataService {
     }
 
     return this.insertToSupabaseRaw(table, filteredEntity);
+  }
+
+  /**
+   * Create a payment using the edge function for atomic payment number generation
+   * This prevents duplicate key errors from concurrent requests
+   */
+  private async createPaymentViaEdgeFunction(payment: any): Promise<any> {
+    try {
+      const token = await this.getAuthToken();
+      const paymentsWriteUrl = `${this.supabaseUrl}/functions/v1/payments-write`;
+
+      const response = await fetch(paymentsWriteUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'create_payment',
+          orgId: payment.orgId || payment.org_id,  // Send org_id at root level for edge function
+          org_id: payment.orgId || payment.org_id,  // Also in snake_case
+          payment: this.camelToSnake(payment)
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMsg = `Edge function error: ${response.status}`;
+        try {
+          const jsonError = JSON.parse(errorBody);
+          errorMsg = jsonError.error || jsonError.message || errorMsg;
+        } catch {
+          errorMsg = errorBody || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Convert snake_case response back to camelCase
+      return this.snakeToCamel(result.payment);
+    } catch (error) {
+      console.error('[SupabaseDataService] Error creating payment via edge function:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get authentication token for edge function calls
+   */
+  private async getAuthToken(): Promise<string> {
+    try {
+      // Try to get token from localStorage where Supabase stores it
+      const authData = localStorage.getItem('sb-auth-token');
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        if (parsed?.access_token) {
+          return parsed.access_token;
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseDataService] Could not parse auth token from localStorage:', err);
+    }
+
+    // Fallback to anon key if no user token available
+    // (RLS policies may restrict access, so use the key provided at initialization)
+    return this.supabaseKey;
   }
 
   async updateEntity<T>(table: string, id: string, updates: Partial<T>): Promise<T> {
