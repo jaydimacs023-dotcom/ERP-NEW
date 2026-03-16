@@ -736,7 +736,7 @@ export interface Invoice extends BaseEntity {
 }
 
 // Payment - AR Payment/Collection from sponsors/students
-export type PaymentStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
+export type PaymentStatus = 'ON HOLD' | 'OPEN' | 'CLOSED' | 'VOIDED';
 export type PaymentMethod = 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'EWALLET' | 'OFFSET';
 
 export interface PaymentApplication extends BaseEntity {
@@ -782,6 +782,7 @@ export interface Payment extends BaseEntity {
   // Audit
   notes?: string;
   journalEntryId?: string;      // FK to JournalEntry when posted
+  glEntryNumber?: string;       // GL Reference number generated when posted
   postedBy?: string;
   postedAt?: string;
   voidedBy?: string;

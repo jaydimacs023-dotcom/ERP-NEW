@@ -421,7 +421,9 @@ export default function App() {
             e.glEntryNumber = newGl;
             e.reference = newGl;
           });
-          Promise.all(updates).then(() => console.info('[App] backfilled missing GL numbers'));
+          Promise.all(updates)
+            .then(() => console.info('[App] backfilled missing GL numbers'))
+            .catch(err => console.warn('[App] failed to backfill missing GL numbers:', err));
         }
 
         setJournalEntries(normalizedEntries);
@@ -468,7 +470,7 @@ export default function App() {
         setPayrollLines(data.payrollLines);
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
-        const loadedPayments = (data.payments || []) as Payment[];
+        const loadedPayments = (data.payments || []).filter(p => !p.isDeleted) as Payment[];
         const loadedPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
@@ -3180,6 +3182,39 @@ export default function App() {
     });
   };
 
+  const getNextPaymentNo = () => {
+    const year = new Date().getFullYear();
+    // Filter payments by: current org, current year, NOT deleted
+    const existingNums = payments
+      .filter(p => 
+        p.orgId === currentOrgId && 
+        !p.isDeleted && 
+        p.paymentNo?.startsWith(`PAY-${year}-`)
+      )
+      .map(p => {
+        const parts = p.paymentNo.split('-');
+        const n = parseInt(parts[2] || '0', 10);
+        return Number.isFinite(n) ? n : 0;
+      })
+      .filter(n => n > 0);
+    
+    const existingSet = new Set(existingNums);
+    let next = existingNums.length ? Math.max(...existingNums) + 1 : 1;
+    
+    // Ensure no duplicates in the set
+    while (existingSet.has(next)) {
+      next += 1;
+    }
+    
+    return `PAY-${year}-${String(next).padStart(5, '0')}`;
+  };
+
+  const isDuplicateKeyError = (error: any): boolean => {
+    if (!error) return false;
+    const errorStr = JSON.stringify(error).toLowerCase();
+    return errorStr.includes('23505') || errorStr.includes('duplicate key') || (error?.code === '23505');
+  };
+
   const handleAddPayment = async (payment: Payment) => {
     try {
       console.info('[App] Creating payment:', payment.paymentNo);
@@ -3188,21 +3223,51 @@ export default function App() {
         return;
       }
 
-      const paymentWithOrg = {
+      const paymentToCreate = {
         ...payment,
         orgId: currentOrgId,
         createdBy: payment.createdBy || currentUser?.id || 'system',
         updatedAt: new Date().toISOString()
       };
 
-      const savedPayment = await dataService.createEntity('payments', paymentWithOrg);
+      console.debug('[App] Payment object before save:', paymentToCreate);
+      const savedPayment = await dataService.createEntity('payments', paymentToCreate);
       setPayments(prev => [...prev, savedPayment as Payment]);
 
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, payment.paymentNo);
-      handleNotify('success', `Payment ${payment.paymentNo} created successfully`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, paymentToCreate.paymentNo);
+      handleNotify('success', `Payment ${paymentToCreate.paymentNo} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payment:', error);
-      handleNotify('error', 'Failed to create payment.');
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Check if this is a duplicate key constraint error
+      if (isDuplicateKeyError(error)) {
+        console.warn('[App] Duplicate payment number detected, generating new one...');
+        const nextPaymentNo = getNextPaymentNo();
+        const retryPayment = {
+          ...payment,
+          paymentNo: nextPaymentNo,
+          orgId: currentOrgId,
+          createdBy: payment.createdBy || currentUser?.id || 'system',
+          updatedAt: new Date().toISOString()
+        };
+        try {
+          console.info('[App] Retry creating payment with:', nextPaymentNo);
+          const savedPayment = await dataService.createEntity('payments', retryPayment);
+          setPayments(prev => [...prev, savedPayment as Payment]);
+          AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, retryPayment.paymentNo);
+          handleNotify('success', `Payment ${retryPayment.paymentNo} created successfully`);
+          return;
+        } catch (retryError) {
+          console.error('[App] Retry create payment failed:', retryError);
+          const retryMsg = retryError instanceof Error ? retryError.message : String(retryError);
+          handleNotify('error', `Failed to create payment (retry): ${retryMsg}`);
+          return;
+        }
+      }
+
+      console.error('[App] Error details:', errorMsg);
+      handleNotify('error', `Failed to create payment: ${errorMsg}`);
     }
   };
 
@@ -3331,6 +3396,9 @@ export default function App() {
       const finalizedPayment = {
         ...paymentToPost,
         journalEntryId: savedEntry.id,
+        glEntryNumber: savedEntry.glEntryNumber || generateNextGlRef(),
+        postedBy: currentUser?.id || 'system',
+        postedAt: postingTs,
         updatedAt: new Date().toISOString()
       };
       const savedPayment = existing
@@ -4433,6 +4501,7 @@ export default function App() {
             onVoidPayment={handleVoidPayment}
             onApplyToInvoice={handleApplyToInvoice}
             onReverseApplication={handleReverseApplication}
+            onViewJournal={handleViewJournal}
           />}
           {activeTab === 'bank-deposits' && <BankDepositsView
             deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)}

@@ -119,6 +119,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   const brandColor = '#F47721';
 
+  // Check if form should be read-only (invoice is approved and locked)
+  const isReadOnly = editingInvoice?.status === 'OPEN';
+
   // Generate next invoice number
   const generateInvoiceNo = () => {
     const year = new Date().getFullYear();
@@ -710,13 +713,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   const getStatusBadge = (status: InvoiceStatus) => {
-    const colors: Record<InvoiceStatus, string> = {
-      'DRAFT': 'text-gray-500',
-      'OPEN': 'text-blue-600',
-      'CLOSED': 'text-green-600',
-      'VOIDED': 'text-rose-600'
+    const badges: Record<InvoiceStatus, { bg: string; text: string; label: string; title?: string }> = {
+      'DRAFT': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'ON HOLD', title: 'Invoice saved as draft, pending approval' },
+      'OPEN': { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'OPEN' },
+      'CLOSED': { bg: 'bg-slate-100', text: 'text-slate-700', label: 'CLOSED' },
+      'VOIDED': { bg: 'bg-rose-100', text: 'text-rose-700', label: 'VOIDED' }
     };
-    return <span className={`text-xs font-bold uppercase tracking-wider ${colors[status]}`}>{status}</span>;
+    const badge = badges[status];
+    return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.bg} ${badge.text}`} title={badge.title || ''}>{badge.label}</span>;
   };
 
   const getSponsorName = (id?: string) => sponsors.find(s => s.id === id)?.name || '-';
@@ -1168,7 +1172,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <Clock size={20} className="text-gray-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Draft</p>
+                  <p className="text-xs text-gray-500">On Hold</p>
                   <p className="text-xl font-bold text-gray-800">{stats.draft.length}</p>
                 </div>
               </div>
@@ -1232,10 +1236,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
                 >
                   <option value="ALL">All Statuses</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="OPEN">Open</option>
-                  <option value="CLOSED">Closed</option>
-                  <option value="VOIDED">Voided</option>
+                  <option value="DRAFT">ON HOLD</option>
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="VOIDED">VOIDED</option>
                 </select>
               </div>
             </div>
@@ -1268,9 +1272,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   filteredInvoices.map(inv => (
                     <React.Fragment key={inv.id}>
                       <tr
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        className={`${inv.status === 'OPEN' ? 'bg-emerald-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors`}
                         onClick={() => handleEdit(inv)}
-                        title="Click to edit"
+                        title={inv.status === 'OPEN' ? 'Read-only: Invoice is approved and locked' : 'Click to edit'}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -1371,6 +1375,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         <>
           {/* New/Edit Invoice Page */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh]">
+            {/* Locked Indicator for Approved Invoices */}
+            {editingInvoice?.status === 'OPEN' && (
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center gap-2 text-amber-800">
+                <AlertTriangle size={18} />
+                <span className="font-medium">This invoice is approved and locked. GL entries have been posted. No further edits are allowed.</span>
+              </div>
+            )}
             <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
               <div>
                 <button
@@ -1380,7 +1391,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   â† Back to Invoices
                 </button>
                 <h3 className="text-xl font-bold text-gray-800">
-                  {editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+                  {editingInvoice?.status === 'OPEN' ? 'Invoice (Approved & Locked)' : editingInvoice ? 'Edit Invoice' : 'New Invoice'}
                 </h3>
                 {formData.invoiceNo && (
                   <p className="text-xl font-medium text-red-500 mt-0.5">
@@ -1396,21 +1407,29 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                <Save size={18} />
-                Save as Draft
-              </button>
-              {(formData.status === 'DRAFT' || !editingInvoice) && (
-                <button
-                  onClick={handleApprove}
-                  className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
-                  style={{ backgroundColor: '#10B981' }}
-                >
-                  <CheckCircle size={18} /> Approve
-                </button>
+              {editingInvoice?.status !== 'OPEN' && (
+                <>
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    <Save size={18} />
+                    Save as Draft
+                  </button>
+                  <button
+                    onClick={handleApprove}
+                    className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
+                    style={{ backgroundColor: '#10B981' }}
+                  >
+                    <CheckCircle size={18} /> Approve
+                  </button>
+                </>
+              )}
+              {editingInvoice?.status === 'OPEN' && (
+                <div className="flex items-center gap-2 px-6 py-2.5 text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 font-medium">
+                  <CheckCircle size={18} />
+                  <span>APPROVED & POSTED TO GL</span>
+                </div>
               )}
             </div>
             <div className="flex-1 p-6 space-y-8">
@@ -1424,7 +1443,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
-                      className="mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 w-full"
+                      disabled={isReadOnly}
+                      className="mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 w-full disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">-- Select Batch --</option>
                       {selectableBatches.map(b => (
@@ -1439,7 +1459,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <select
                       value={formData.sponsorId}
                       onChange={e => handleSponsorChange(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                      disabled={isReadOnly}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">-- Auto-filled if Batch is selected --</option>
                       {sponsors.map(s => (
@@ -1455,7 +1476,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         type="date"
                         value={formData.invoiceDate}
                         onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                        disabled={isReadOnly}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                     <div>
@@ -1464,7 +1486,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         type="date"
                         value={formData.dueDate}
                         onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                        disabled={isReadOnly}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -1480,8 +1503,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     type="text"
                     value={formData.reference}
                     onChange={e => setFormData({ ...formData, reference: e.target.value })}
+                    disabled={isReadOnly}
                     placeholder="QRM-00000 or P.O. Number"
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -1489,7 +1513,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <select
                     value={formData.terms}
                     onChange={e => setFormData({ ...formData, terms: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    disabled={isReadOnly}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="COD">COD</option>
                     <option value="Net 7">Net 7</option>
@@ -1503,35 +1528,47 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <input
                     value={formData.notes}
                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    disabled={isReadOnly}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="Invoice notes or memo..."
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500">GL Reference</label>
+                  <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                    GL Reference
+                    {editingInvoice?.status === 'OPEN' && (
+                      <span className="text-emerald-600 text-xs font-bold">✓ POSTED</span>
+                    )}
+                  </label>
                   <div className="mt-1">
-                    {editingInvoice?.journalEntryId ? (
+                    {editingInvoice?.journalEntryId || editingInvoice?.status === 'OPEN' ? (
                       (() => {
-                        const je = journalEntries.find(j => j.id === editingInvoice.journalEntryId);
-                        const glNum = (je?.glEntryNumber || je?.reference || `GL${editingInvoice.journalEntryId?.slice(-8).toUpperCase()}`).trim();
+                        const je = journalEntries.find(j => j.id === editingInvoice?.journalEntryId);
+                        const glNum = (editingInvoice?.glEntryNumber || je?.glEntryNumber || je?.reference || `GL${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`).trim();
                         return (
                           <button
-                            onClick={() => onViewJournal && onViewJournal(editingInvoice.journalEntryId!)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-mono font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors w-full justify-center"
+                            onClick={() => (editingInvoice?.journalEntryId || je?.id) && onViewJournal && onViewJournal(editingInvoice?.journalEntryId || je?.id!)}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-mono font-bold rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
                             title="Click to view GL Accounting Entries"
+                            style={{ cursor: 'pointer' }}
                           >
-                            <Receipt size={14} />
-                            {glNum}
+                            <Receipt size={16} />
+                            <span>{glNum}</span>
+                            <span className="text-xs text-emerald-600 ml-auto">→ View GL Entries</span>
                           </button>
                         );
                       })()
                     ) : (
-                      <input
-                        value={formData.glEntryNumber || ''}
-                        onChange={e => setFormData({ ...formData, glEntryNumber: e.target.value })}
-                        placeholder="Generated GL Reference"
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                      />
+                      <>
+                        <input
+                          value={formData.glEntryNumber || ''}
+                          onChange={e => setFormData({ ...formData, glEntryNumber: e.target.value })}
+                          disabled={isReadOnly}
+                          placeholder="Generated when invoice is approved"
+                          className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1544,7 +1581,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <select
                     value={formData.studentId}
                     onChange={e => setFormData({ ...formData, studentId: e.target.value, sponsorId: '' })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    disabled={isReadOnly}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="">-- Select Student from Batch --</option>
                     {batchStudentsForBilling.map(s => (
@@ -1561,8 +1599,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <select
                     value={formData.studentId}
                     onChange={e => setFormData({ ...formData, studentId: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                    disabled={!!formData.sponsorId}
+                    disabled={!!formData.sponsorId || isReadOnly}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="">-- Select Student --</option>
                     {students.map(s => (
@@ -1580,7 +1618,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <h4 className="font-medium text-gray-700">Line Items</h4>
                   <button
                     onClick={handleAddLine}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50"
+                    disabled={isReadOnly}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus size={16} /> Add Line
                   </button>
@@ -1622,7 +1661,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               <select
                                 value={line.courseFeeId || ''}
                                 onChange={e => handleApplyCourseFee(idx, e.target.value)}
-                                className="w-full px-3 py-1 rounded text-xs"
+                                disabled={isReadOnly}
+                                className="w-full px-3 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 <option value="">-- Select --</option>
                                 {courseFees.map(cf => (
@@ -1635,15 +1675,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 type="text"
                                 value={line.description}
                                 onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
+                                disabled={isReadOnly}
                                 placeholder="Description"
-                                className="w-full px-2 py-1 rounded"
+                                className="w-full px-2 py-1 rounded disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="px-3 py-2">
                               <select
                                 value={line.taxCategoryId || ''}
                                 onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
-                                className="w-full px-2 py-1 rounded text-xs"
+                                disabled={isReadOnly}
+                                className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 <option value="">-- None --</option>
                                 {localTaxCats.map(tc => (
@@ -1659,7 +1701,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="1"
                                 value={line.quantity}
                                 onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
-                                className="w-full px-2 py-1 rounded text-right"
+                                disabled={isReadOnly}
+                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -1669,7 +1712,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="0"
                                 value={line.unitPrice}
                                 onChange={e => handleUpdateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 rounded text-right"
+                                disabled={isReadOnly}
+                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="px-3 py-2 text-right font-medium">
@@ -1679,16 +1723,19 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 min="0"
                                 value={line.amount}
                                 onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
-                                className="w-full px-2 py-1 rounded text-right"
+                                disabled={isReadOnly}
+                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <button
-                                onClick={() => handleRemoveLine(idx)}
-                                className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              {!isReadOnly && (
+                                <button
+                                  onClick={() => handleRemoveLine(idx)}
+                                  className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))
