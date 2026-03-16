@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization } from '../types';
+import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
@@ -70,15 +71,30 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [filterStudentId, setFilterStudentId] = useState('ALL');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Drag-and-drop column ordering state
+
+  // Drag-and-drop column ordering state (registry table)
   const [columnOrder, setColumnOrder] = useState<string[]>([
-    'invoiceNo', 'status', 'glReference', 'payer', 'invoiceDate', 'totalAmount', 'balance'
+    'invoiceDate', 'invoiceNo', 'status', 'glReference', 'payer', 'totalAmount', 'balance'
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
 
-  // Column resize state
+  // Column resize state (registry table)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  // --- Line Items Table Drag/Resize/Order State ---
+  const [draggedLineIdx, setDraggedLineIdx] = useState<number | null>(null);
+  const [lineDropIdx, setLineDropIdx] = useState<number | null>(null);
+  const [lineColWidths, setLineColWidths] = useState<Record<string, number>>({});
+  const lineResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  // Column order and drag state for line items table
+  // Default: #, Course Fee, Description, Tax Category, Class, Qty, Unit Price, Amount, Actions
+  const defaultLineColOrder = [
+    'lineNumber', 'courseFeeId', 'description', 'taxCategoryId', 'classificationCode', 'quantity', 'unitPrice', 'amount', 'actions'
+  ];
+  const [lineColOrder, setLineColOrder] = useState<string[]>(defaultLineColOrder);
+  const [draggedLineColIdx, setDraggedLineColIdx] = useState<number | null>(null);
 
   // local copy of tax categories; we fetch from backend when form is active
   const [localTaxCats, setLocalTaxCats] = useState<TaxCategoryEntry[]>(taxCategories);
@@ -924,14 +940,24 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const exportToExcel = () => {
     const rows = getExportRows();
     if (rows.length === 0) { alert('No invoices to export.'); return; }
-    const cols = Object.keys(rows[0]);
+    // Use requested column order and labels
+    const exportOrder = [
+      { key: 'status', label: 'Status' },
+      { key: 'glReference', label: 'GL Reference No.' },
+      { key: 'payer', label: 'Sponsor/Student' },
+      { key: 'totalAmount', label: 'Grand Total' },
+      { key: 'balance', label: 'Balance' },
+    ];
+    const headers = exportOrder.map(col => col.label);
+    const keys = exportOrder.map(col => col.key);
     const esc = (v: any) => escapeHtml(v);
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td,th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px}th{background:#F47721;color:#fff;font-weight:bold}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
-    html += '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
+    // Use emerald for header, font style/size for data
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
-      cols.forEach(c => {
-        const val = (r as any)[c];
+      keys.forEach(k => {
+        const val = (r as any)[headerToExportKey(k)];
         const isNum = typeof val === 'number';
         html += `<td${isNum ? ' class="num"' : ''}>${esc(isNum ? val.toFixed(2) : val)}</td>`;
       });
@@ -948,6 +974,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  // Helper to map column key to export row key
+  function headerToExportKey(key: string | undefined) {
+    switch (key) {
+      case 'invoiceNo': return 'Invoice No.';
+      case 'status': return 'Status';
+      case 'glReference': return 'GL Ref.';
+      case 'payer': return 'Sponsor/Student';
+      case 'invoiceDate': return 'Date';
+      case 'totalAmount': return 'Grand Total';
+      case 'balance': return 'Balance';
+      default: return key || '';
+    }
+  }
 
   const exportToPdf = () => {
     const rows = getExportRows();
@@ -1399,8 +1439,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               )}
               <button
                 onClick={handleNew}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
-                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
               >
                 <Plus size={20} />
                 New Invoice
@@ -1416,8 +1455,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <Clock size={20} className="text-gray-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">On Hold</p>
-                  <p className="text-xl font-bold text-gray-800">{stats.draft.length}</p>
+                  <p className="text-xs font-semibold text-gray-400">On Hold</p>
+                  <p className="text-xl font-semibold text-gray-800">{stats.draft.length}</p>
                 </div>
               </div>
             </div>
@@ -1427,8 +1466,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <Send size={20} className="text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Open</p>
-                  <p className="text-xl font-bold text-blue-600">{stats.open.length}</p>
+                  <p className="text-xs font-semibold text-gray-400">Open</p>
+                  <p className="text-xl font-semibold text-blue-600">{stats.open.length}</p>
                 </div>
               </div>
             </div>
@@ -1438,23 +1477,24 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <CheckCircle size={20} className="text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Closed</p>
-                  <p className="text-xl font-bold text-green-600">{stats.closed.length}</p>
+                  <p className="text-xs font-semibold text-gray-400">Closed</p>
+                  <p className="text-xl font-semibold text-green-600">{stats.closed.length}</p>
                 </div>
               </div>
             </div>
             <div className="bg-white rounded-xl border p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${brandColor}20` }}>
-                  <DollarSign size={20} style={{ color: brandColor }} />
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <span className="text-orange-500 text-xl font-bold leading-none">₱</span>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Outstanding</p>
-                  <p className="text-lg font-bold" style={{ color: brandColor }}>{formatCurrency(stats.totalOutstanding)}</p>
+                  <p className="text-xs font-semibold text-gray-400">Outstanding</p>
+                  <p className="text-lg font-semibold text-black">
+                    <span className="mr-1">₱</span>{Number(stats.totalOutstanding).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* Filters */}
@@ -1750,66 +1790,53 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               ────────────────────────────────────────────────────────── */}
           {(() => {
             const baseColumns = [
-              // ── 1. Invoice No. ────────────────────────────
-              {
-                key: 'invoiceNo',
-                label: 'Invoice No.',
-                sortKey: 'invoiceNo',
-                width: 'w-40',
-                align: 'text-left' as const,
-                render: (inv: any) => (
-                  <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
-                ),
-              },
-              // ── 2. Status ─────────────────────────────────
-              {
-                key: 'status',
-                label: 'Status',
-                sortKey: 'status',
-                width: 'w-24',
-                align: 'text-left' as const,
-                render: (inv: any) => getStatusBadge(inv.status),
-              },
-              // ── 3. GL Ref. ────────────────────────────────
-              {
-                key: 'glReference',
-                label: 'GL Ref.',
-                sortKey: 'glReference',
-                width: 'w-32',
-                align: 'text-left' as const,
-                render: (inv: any) =>
-                  inv.journalEntryId ? (
-                    <span className="text-xs font-medium text-gray-600">
-                      {(journalEntries.find(j => j.id === inv.journalEntryId)?.glEntryNumber || journalEntries.find(j => j.id === inv.journalEntryId)?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim()}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  ),
-              },
-              // ── 4. Sponsor / Student ──────────────────────
-              {
-                key: 'payer',
-                label: 'Sponsor/Student',
-                sortKey: 'payer',
-                width: 'w-64',
-                align: 'text-left' as const,
-                render: (inv: any) => (
-                  <div className="flex items-center gap-2">
-                    {inv.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
-                    <span className="text-sm">{inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)}</span>
-                  </div>
-                ),
-              },
-              // ── 5. Date ───────────────────────────────────
+              // ── 1. Date ───────────────────────────────────
               {
                 key: 'invoiceDate',
                 label: 'Date',
                 sortKey: 'invoiceDate',
                 width: 'w-32',
                 align: 'text-left' as const,
-                render: (inv: any) => (
-                  <span className="text-sm text-gray-600">{inv.invoiceDate}</span>
-                ),
+                render: (inv: any) => inv.invoiceDate,
+              },
+              // ── 2. Invoice No. ────────────────────────────
+              {
+                key: 'invoiceNo',
+                label: 'Invoice No.',
+                sortKey: 'invoiceNo',
+                width: 'w-40',
+                align: 'text-left' as const,
+                render: (inv: any) => inv.invoiceNo,
+              },
+              // ── 3. Status ─────────────────────────────────
+              {
+                key: 'status',
+                label: 'Status',
+                sortKey: 'status',
+                width: 'w-24',
+                align: 'text-left' as const,
+                render: (inv: any) => inv.status,
+              },
+              // ── 4. GL Reference No. ───────────────────────
+              {
+                key: 'glReference',
+                label: 'GL Reference No.',
+                sortKey: 'glReference',
+                width: 'w-32',
+                align: 'text-left' as const,
+                render: (inv: any) =>
+                  inv.journalEntryId ?
+                    (journalEntries.find(j => j.id === inv.journalEntryId)?.glEntryNumber || journalEntries.find(j => j.id === inv.journalEntryId)?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim()
+                    : '—',
+              },
+              // ── 5. Sponsor/Student ───────────────────────
+              {
+                key: 'payer',
+                label: 'Sponsor/Student',
+                sortKey: 'payer',
+                width: 'w-64',
+                align: 'text-left' as const,
+                render: (inv: any) => inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId),
               },
               // ── 6. Grand Total ────────────────────────────
               {
@@ -1818,9 +1845,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'totalAmount',
                 width: 'w-32',
                 align: 'text-right' as const,
-                render: (inv: any) => (
-                  <span className="text-sm font-semibold">{formatCurrency(inv.grandTotal)}</span>
-                ),
+                render: (inv: any) => formatCurrency(inv.grandTotal),
               },
               // ── 7. Balance ────────────────────────────────
               {
@@ -1829,12 +1854,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'balance',
                 width: 'w-32',
                 align: 'text-right' as const,
-                render: (inv: any) =>
-                  inv.balanceDue > 0 ? (
-                    <span className="text-red-600 font-bold text-sm">{formatCurrency(inv.balanceDue)}</span>
-                  ) : (
-                    <span className="text-emerald-600 font-bold text-sm">PAID</span>
-                  ),
+                render: (inv: any) => inv.balanceDue > 0 ? formatCurrency(inv.balanceDue) : 'PAID',
               },
             ];
 
@@ -1874,9 +1894,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
             return (
               <div className="bg-white rounded-xl border overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr className="bg-slate-50 border-b border-gray-200">
+                <table className="w-full font-sans">
+                  <thead className="bg-emerald-600 border-b">
+                    <tr>
                       {registryColumns.map((col, idx) => (
                         <th
                           key={col.key}
@@ -1885,12 +1905,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           onDragEnd={handleDragEnd}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, idx)}
-                          className={`px-4 py-3 ${col.align} cursor-move ${draggedColumnIdx === idx ? 'bg-gray-100 border-dashed border-2 border-gray-300 opacity-50' : ''} group select-none transition-colors border-x border-transparent hover:bg-gray-100 hover:border-gray-200 relative`}
+                          className={`px-4 py-3 ${col.align} cursor-move font-semibold text-white ${draggedColumnIdx === idx ? 'bg-emerald-700 border-dashed border-2 border-emerald-300 opacity-50' : ''} group select-none transition-colors border-x border-transparent hover:bg-emerald-700 hover:border-emerald-200 relative`}
                           style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
                           title="Drag to reorder column"
                         >
                           <div
-                            className={`flex items-center ${col.align === 'text-right' ? 'justify-end' : ''} text-[11px] font-bold text-gray-500 uppercase tracking-wider ${col.sortKey ? 'cursor-pointer hover:text-gray-800' : ''}`}
+                            className={`flex items-center ${col.align === 'text-right' ? 'justify-end' : ''} text-[13px] font-bold text-white ${col.sortKey ? 'cursor-pointer hover:text-gray-100' : ''}`}
                             onClick={col.sortKey ? () => handleSort(col.sortKey) : undefined}
                           >
                             {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
@@ -1922,7 +1942,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                               document.body.style.cursor = 'col-resize';
                               document.body.style.userSelect = 'none';
                             }}
-                            className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-orange-400 transition-colors z-10"
+                            className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-emerald-400 transition-colors z-10"
                             title="Drag to resize column"
                             draggable={false}
                           />
@@ -1942,13 +1962,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       filteredInvoices.map(inv => (
                         <tr
                           key={inv.id}
-                          className={`${inv.status === 'OPEN' ? 'bg-emerald-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors`}
+                          className={`cursor-pointer transition-colors`}
                           onClick={() => handleEdit(inv)}
                           title={inv.status === 'OPEN' ? 'Read-only: Invoice is approved and locked' : 'Click to edit'}
                         >
                           {registryColumns.map(col => (
                             <td key={col.key} className={`px-4 py-3 ${col.align}`} style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}>
-                              {col.render(inv)}
+                              {col.key === 'invoiceDate' && inv.invoiceDate ? (
+                                <span className="font-medium text-gray-800">{format(new Date(inv.invoiceDate), 'MM-dd-yyyy')}</span>
+                              ) : (
+                                <span className="font-medium text-gray-800">{col.render(inv)}</span>
+                              )}
                             </td>
                           ))}
                         </tr>
@@ -2081,22 +2105,45 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
-
                   </div>
-                  {/* sponsor on left */}
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">Sponsor</label>
-                    <select
-                      value={formData.sponsorId}
-                      onChange={e => handleSponsorChange(e.target.value)}
-                      disabled={isReadOnly}
-                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <option value="">-- Auto-filled if Batch is selected --</option>
-                      {sponsors.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+                  {/* sponsor and student side by side */}
+                  <div className="flex gap-4 items-end">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-500">Sponsor</label>
+                      <select
+                        value={formData.sponsorId}
+                        onChange={e => {
+                          handleSponsorChange(e.target.value);
+                          if (e.target.value) setFormData(prev => ({ ...prev, studentId: '' }));
+                        }}
+                        disabled={!!formData.studentId || isReadOnly}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- Auto-filled if Batch is selected --</option>
+                        {sponsors.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-500">Student</label>
+                      <select
+                        value={formData.studentId}
+                        onChange={e => {
+                          setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }));
+                        }}
+                        disabled={!!formData.sponsorId || isReadOnly}
+                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- Select Student --</option>
+                        {(formData.batchId
+                          ? batchStudentsForBilling
+                          : students
+                        ).map(s => (
+                          <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   {/* dates on right */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2210,42 +2257,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               </div>
 
-              {/* Individual Student Option */}
-              {formData.batchId && !formData.sponsorId && (
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Select Student from Batch *</label>
-                  <select
-                    value={formData.studentId}
-                    onChange={e => setFormData({ ...formData, studentId: e.target.value, sponsorId: '' })}
-                    disabled={isReadOnly}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option value="">-- Select Student from Batch --</option>
-                    {batchStudentsForBilling.map(s => (
-                      <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
-              {/* Individual Student Option */}
-              {/* Individual Student Option */}
-              {!formData.batchId && (
-                <div>
-                  <label className="text-xs font-medium text-gray-500">Or Select Student (Individual Billing)</label>
-                  <select
-                    value={formData.studentId}
-                    onChange={e => setFormData({ ...formData, studentId: e.target.value })}
-                    disabled={!!formData.sponsorId || isReadOnly}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <option value="">-- Select Student --</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* Line Items */}
               <div>
@@ -2270,15 +2282,90 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-left w-8">#</th>
-                        <th className="px-3 py-2 text-left w-32">Class</th>
-                        <th className="px-3 py-2 text-left">Course Fee</th>
-                        <th className="px-3 py-2 text-left w-50" >Description</th>
-                        <th className="px-3 py-2 text-right w-25">Tax Category</th>
-                        <th className="px-3 py-2 text-right w-25">Qty</th>
-                        <th className="px-3 py-2 text-right w-25">Unit Price</th>
-                        <th className="px-3 py-2 text-right w-25">Amount</th>
-                        <th className="px-3 py-2 w-10"></th>
+                        {/* Column definitions for line items table */}
+                        {(() => {
+                          const lineColDefs = {
+                            lineNumber: { key: 'lineNumber', label: '#', align: 'text-left', width: 40 },
+                            classificationCode: { key: 'classificationCode', label: 'Class', align: 'text-left', width: 120 },
+                            courseFeeId: { key: 'courseFeeId', label: 'Course Fee', align: 'text-left', width: 120 },
+                            description: { key: 'description', label: 'Description', align: 'text-left', width: 180 },
+                            taxCategoryId: { key: 'taxCategoryId', label: 'Tax Category', align: 'text-right', width: 120 },
+                            quantity: { key: 'quantity', label: 'Qty', align: 'text-right', width: 80 },
+                            unitPrice: { key: 'unitPrice', label: 'Unit Price', align: 'text-right', width: 100 },
+                            amount: { key: 'amount', label: 'Amount', align: 'text-right', width: 100 },
+                            actions: { key: 'actions', label: '', align: 'text-center', width: 40 },
+                          };
+                          return lineColOrder.map((colKey, idx) => {
+                            const col = lineColDefs[colKey];
+                            return (
+                              <th
+                                key={col.key}
+                                className={`px-3 py-2 ${col.align} relative select-none ${draggedLineColIdx === idx ? 'bg-gray-100 border-dashed border-2 border-gray-300 opacity-50' : ''}`}
+                                style={lineColWidths[col.key] ? { width: lineColWidths[col.key], minWidth: lineColWidths[col.key] } : { minWidth: col.width, width: col.width }}
+                                draggable={!isReadOnly && col.key !== 'actions'}
+                                onDragStart={e => {
+                                  if (isReadOnly || col.key === 'actions') return;
+                                  setDraggedLineColIdx(idx);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragEnd={e => {
+                                  setDraggedLineColIdx(null);
+                                }}
+                                onDragOver={e => {
+                                  if (isReadOnly || col.key === 'actions') return;
+                                  e.preventDefault();
+                                }}
+                                onDrop={e => {
+                                  if (isReadOnly || col.key === 'actions' || draggedLineColIdx === null || draggedLineColIdx === idx) return;
+                                  e.preventDefault();
+                                  const newOrder = [...lineColOrder];
+                                  const [draggedKey] = newOrder.splice(draggedLineColIdx, 1);
+                                  newOrder.splice(idx, 0, draggedKey);
+                                  setLineColOrder(newOrder);
+                                  setDraggedLineColIdx(null);
+                                }}
+                                title={col.key !== 'actions' ? 'Drag to reorder column' : undefined}
+                              >
+                                <div className="flex items-center">
+                                  <span>{col.label}</span>
+                                  {/* Resize handle */}
+                                  {col.key !== 'actions' && (
+                                    <div
+                                      onMouseDown={e => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        const th = e.currentTarget.parentElement?.parentElement;
+                                        if (!th) return;
+                                        const startWidth = th.getBoundingClientRect().width;
+                                        lineResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                                        const onMouseMove = (ev: MouseEvent) => {
+                                          if (!lineResizeRef.current) return;
+                                          const diff = ev.clientX - lineResizeRef.current.startX;
+                                          const newWidth = Math.max(40, lineResizeRef.current.startWidth + diff);
+                                          setLineColWidths(prev => ({ ...prev, [lineResizeRef.current!.colKey]: newWidth }));
+                                        };
+                                        const onMouseUp = () => {
+                                          lineResizeRef.current = null;
+                                          document.removeEventListener('mousemove', onMouseMove);
+                                          document.removeEventListener('mouseup', onMouseUp);
+                                          document.body.style.cursor = '';
+                                          document.body.style.userSelect = '';
+                                        };
+                                        document.addEventListener('mousemove', onMouseMove);
+                                        document.addEventListener('mouseup', onMouseUp);
+                                        document.body.style.cursor = 'col-resize';
+                                        document.body.style.userSelect = 'none';
+                                      }}
+                                      className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-orange-400 transition-colors z-10"
+                                      title="Drag to resize column"
+                                      draggable={false}
+                                    />
+                                  )}
+                                </div>
+                              </th>
+                            );
+                          });
+                        })()}
                       </tr>
                     </thead>
                     <tbody>
@@ -2289,101 +2376,166 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           </td>
                         </tr>
                       ) : (
-                        formData.lines.map((line, idx) => (
-                          <tr key={line.id || idx} className="border-t">
-                            <td className="px-3 py-2 text-gray-400">{line.lineNumber}</td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={line.classificationCode || ''}
-                                onChange={e => handleUpdateLine(idx, 'classificationCode', e.target.value)}
-                                disabled={isReadOnly}
-                                placeholder="Class"
-                                className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={line.courseFeeId || ''}
-                                onChange={e => handleApplyCourseFee(idx, e.target.value)}
-                                disabled={isReadOnly}
-                                className="w-full px-3 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                              >
-                                <option value="">-- Select --</option>
-                                {courseFees.map(cf => (
-                                  <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={line.description}
-                                onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
-                                disabled={isReadOnly}
-                                placeholder="Description"
-                                className="w-full px-2 py-1 rounded disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={line.taxCategoryId || ''}
-                                onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
-                                disabled={isReadOnly}
-                                className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                              >
-                                <option value="">-- None --</option>
-                                {localTaxCats.map(tc => (
-                                  <option key={tc.id} value={tc.id}>
-                                    {tc.code || tc.description || tc.id} {tc.rate ? `(${tc.rate}%)` : ''}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                min="1"
-                                value={line.quantity}
-                                onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
-                                disabled={isReadOnly}
-                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={line.unitPrice}
-                                onChange={e => handleUpdateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                disabled={isReadOnly}
-                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right font-medium">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={line.amount}
-                                onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
-                                disabled={isReadOnly}
-                                className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              {!isReadOnly && (
-                                <button
-                                  onClick={() => handleRemoveLine(idx)}
-                                  className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))
+                        formData.lines.map((line, idx) => {
+                          const isDragging = draggedLineIdx === idx;
+                          const isDropTarget = lineDropIdx === idx && draggedLineIdx !== null && draggedLineIdx !== idx;
+                          // Render cells in the current column order
+                          const lineColDefs = {
+                            lineNumber: { key: 'lineNumber' },
+                            classificationCode: { key: 'classificationCode' },
+                            courseFeeId: { key: 'courseFeeId' },
+                            description: { key: 'description' },
+                            taxCategoryId: { key: 'taxCategoryId' },
+                            quantity: { key: 'quantity' },
+                            unitPrice: { key: 'unitPrice' },
+                            amount: { key: 'amount' },
+                            actions: { key: 'actions' },
+                          };
+                          return (
+                            <tr
+                              key={line.id || idx}
+                              className={`border-t ${isDragging ? 'opacity-40 bg-orange-100' : isDropTarget ? 'bg-orange-50 border-2 border-orange-400' : ''}`}
+                              draggable={!isReadOnly}
+                              onDragStart={e => {
+                                if (isReadOnly) return;
+                                setDraggedLineIdx(idx);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragEnd={e => {
+                                setDraggedLineIdx(null);
+                                setLineDropIdx(null);
+                              }}
+                              onDragOver={e => {
+                                if (isReadOnly) return;
+                                e.preventDefault();
+                                setLineDropIdx(idx);
+                              }}
+                              onDrop={e => {
+                                if (isReadOnly || draggedLineIdx === null || draggedLineIdx === idx) return;
+                                e.preventDefault();
+                                const newLines = [...formData.lines];
+                                const [dragged] = newLines.splice(draggedLineIdx, 1);
+                                newLines.splice(idx, 0, dragged);
+                                // Re-number lineNumber fields
+                                newLines.forEach((l, i) => l.lineNumber = i + 1);
+                                setFormData(prev => ({ ...prev, lines: newLines }));
+                                setDraggedLineIdx(null);
+                                setLineDropIdx(null);
+                              }}
+                              style={{ cursor: isReadOnly ? 'default' : 'move' }}
+                            >
+                              {lineColOrder.map(colKey => {
+                                switch (colKey) {
+                                  case 'lineNumber':
+                                    return <td key={colKey} className="px-3 py-2 text-gray-400" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>{line.lineNumber}</td>;
+                                  case 'classificationCode': {
+                                    // Find qualification code via courseFeeId
+                                    let qualCode = '';
+                                    if (line.courseFeeId) {
+                                      const fee = courseFees.find(f => f.id === line.courseFeeId);
+                                      if (fee) {
+                                        const qual = qualifications.find(q => q.id === fee.qualificationId);
+                                        qualCode = qual?.code || '';
+                                      }
+                                    }
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <span className="block text-xs text-gray-700 font-mono">{qualCode || <span className="text-gray-300">—</span>}</span>
+                                    </td>;
+                                  }
+                                  case 'courseFeeId':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <select
+                                        value={line.courseFeeId || ''}
+                                        onChange={e => handleApplyCourseFee(idx, e.target.value)}
+                                        disabled={isReadOnly}
+                                        className="w-full px-3 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                                      >
+                                        <option value="">-- Select --</option>
+                                        {courseFees.map(cf => (
+                                          <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
+                                        ))}
+                                      </select>
+                                    </td>;
+                                  case 'description':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <input
+                                        type="text"
+                                        value={line.description}
+                                        onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
+                                        disabled={isReadOnly}
+                                        placeholder="Description"
+                                        className="w-full px-2 py-1 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                      />
+                                    </td>;
+                                  case 'taxCategoryId':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <select
+                                        value={line.taxCategoryId || ''}
+                                        onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
+                                        disabled={isReadOnly}
+                                        className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                                      >
+                                        <option value="">-- None --</option>
+                                        {localTaxCats.map(tc => (
+                                          <option key={tc.id} value={tc.id}>
+                                            {tc.code || tc.description || tc.id} {tc.rate ? `(${tc.rate}%)` : ''}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>;
+                                  case 'quantity':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={line.quantity}
+                                        onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
+                                        disabled={isReadOnly}
+                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
+                                      />
+                                    </td>;
+                                  case 'unitPrice':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={line.unitPrice}
+                                        onChange={e => handleUpdateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                        disabled={isReadOnly}
+                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
+                                      />
+                                    </td>;
+                                  case 'amount':
+                                    return <td key={colKey} className="px-3 py-2 text-right font-medium" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={line.amount}
+                                        onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                        disabled={isReadOnly}
+                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
+                                      />
+                                    </td>;
+                                  case 'actions':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      {!isReadOnly && (
+                                        <button
+                                          onClick={() => handleRemoveLine(idx)}
+                                          className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      )}
+                                    </td>;
+                                  default:
+                                    return null;
+                                }
+                              })}
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
