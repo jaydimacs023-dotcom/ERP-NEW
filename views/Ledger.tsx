@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState } from 'react';
 import {
   ChartOfAccount, JournalEntry, JournalLine, Student,
@@ -69,8 +69,10 @@ const Ledger: React.FC<LedgerProps> = ({
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50/80">
               <tr>
-                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GL Entry # / Date</th>
                 <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Memo / Source</th>
+                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</th>
+                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GL Reference</th>
+                <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</th>
                 <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Account Detail</th>
                 <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Debit</th>
                 <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Credit</th>
@@ -83,9 +85,17 @@ const Ledger: React.FC<LedgerProps> = ({
                 const entryLines = lines.filter(l => l.journalEntryId === entry.id);
                 return (
                   <tr key={entry.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-8 py-6 align-top">
+                      <div className="text-xs text-gray-400 font-semibold uppercase flex items-center gap-1.5">
+                        <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                        {entry.sourceType}
+                      </div>
+                    </td>
                     <td className="px-8 py-6 whitespace-nowrap align-top">
                       <div className="text-sm font-semibold text-gray-700">{entry.date}</div>
-                      <div className="text-xs text-[#F47721] font-mono font-semibold mt-1 uppercase tracking-tighter">
+                    </td>
+                    <td className="px-8 py-6 align-top">
+                      <div className="text-xs text-[#F47721] font-mono font-semibold uppercase tracking-tighter">
                         {(entry.glEntryNumber || entry.reference)?.trim()}
                       </div>
                       {entry.glEntryNumber && entry.reference && (
@@ -93,11 +103,7 @@ const Ledger: React.FC<LedgerProps> = ({
                       )}
                     </td>
                     <td className="px-8 py-6 align-top">
-                      <div className="text-sm font-bold text-gray-800 line-clamp-1">{entry.description}</div>
-                      <div className="text-xs text-gray-400 font-semibold uppercase mt-1.5 flex items-center gap-1.5">
-                        <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
-                        {entry.sourceType}
-                      </div>
+                      <div className="text-sm font-bold text-gray-800 line-clamp-2">{entry.description}</div>
                     </td>
                     <td className="px-8 py-6">
                       <div className="space-y-2">

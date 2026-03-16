@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -38,6 +38,8 @@ interface PaymentsViewProps {
   onApplyToInvoice?: (paymentId: string, invoiceId: string, amount: number) => void;
   onReverseApplication?: (paymentId: string, applicationId: string, reason: string) => void;
   onViewJournal?: (journalEntryId: string) => void;
+  initialContext?: { viewMode: ViewMode; invoice?: Invoice };
+  onClearContext?: () => void;
 }
 
 type PayorType = 'SPONSOR' | 'STUDENT';
@@ -58,7 +60,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   onPostPayment,
   onVoidPayment,
   onApplyToInvoice,
-  onViewJournal
+  onViewJournal,
+  initialContext,
+  onClearContext
 }) => {
   const CASH_ON_HAND_UNDEPOSITED_ID = 'CASH_ON_HAND_UNDEPOSITED_FUNDS';
   const brandColor = '#F47721';
@@ -397,6 +401,33 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (latest) setEditingPayment(latest);
   }, [payments, editingPayment?.id]);
 
+  // Handle initial context for deep-linking (e.g. from InvoicesView)
+  useEffect(() => {
+    if (initialContext && initialContext.viewMode === 'create-payment' && initialContext.invoice) {
+      const inv = initialContext.invoice;
+      setEditingPayment(null);
+      setInvoiceApplyMap({});
+      setInvoiceSelectionMap({});
+      setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
+      setFormData({
+        paymentNo: generatePaymentNo(),
+        sponsorId: inv.sponsorId || '',
+        studentId: inv.studentId || '',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentMethod: 'BANK_TRANSFER',
+        refNo: '',
+        bankAccountId: defaultCashAccountId,
+        checkNumber: '',
+        checkDate: '',
+        amountReceived: inv.balanceDue,
+        ewtAmountCertified: 0,
+        notes: `Payment for Invoice ${inv.invoiceNo}`
+      });
+      setViewMode('create-payment');
+      if (onClearContext) onClearContext();
+    }
+  }, [initialContext, defaultCashAccountId, onClearContext]);
+
   const baseTotalCredit = formData.amountReceived + formData.ewtAmountCertified;
 
   const plannedAppliedTotal = useMemo(() => {
@@ -451,7 +482,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       notes: formData.notes || undefined,
       createdAt: editingPayment?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      postedAt: status === 'POSTED' ? (editingPayment?.postedAt || new Date().toISOString()) : editingPayment?.postedAt
+      postedAt: status === 'OPEN' ? (editingPayment?.postedAt || new Date().toISOString()) : editingPayment?.postedAt
     };
 
     return payment as Payment;
@@ -479,8 +510,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       return;
     }
 
-    // Post to GL when saving (Acumatica workflow)
-    const payment = buildPayment('POSTED');
+    // Approve and post to GL (Acumatica workflow)
+    const payment = buildPayment('OPEN');
     if (editingPayment) {
       onUpdatePayment(payment);
       // Call onPostPayment for existing draft payments being posted for the first time
@@ -572,7 +603,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payor.includes(searchTerm.toLowerCase()) ||
         (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'ALL' || pay.status === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || 
+        (statusFilter === 'OPEN' ? (pay.status === 'OPEN' || pay.status === 'POSTED') : pay.status === statusFilter);
       return matchesSearch && matchesStatus;
     });
   }, [payments, searchTerm, statusFilter, sponsors, students]);
@@ -626,7 +658,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               >
                 <option value="ALL">All Statuses</option>
                 <option value="DRAFT">On Hold</option>
-                <option value="POSTED">Posted</option>
+                <option value="OPEN">Open</option>
                 <option value="VOIDED">Voided</option>
               </select>
             </div>
@@ -701,11 +733,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     {/* Status */}
                     <td className="px-3 py-2 text-center">
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                        payment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
+                        payment.status === 'OPEN' ? 'bg-emerald-100 text-emerald-700' :
                         payment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
                         'bg-blue-100 text-blue-700'
                       }`}>
-                        {payment.status === 'DRAFT' ? 'On Hold' : payment.status}
+                        {payment.status === 'DRAFT' ? 'On Hold' : 
+                         (payment.status === 'OPEN' || payment.status === 'POSTED' ? 'Open' : payment.status)}
                       </span>
                     </td>
                     
@@ -740,7 +773,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         )}
                         <button
                           onClick={() => loadPaymentForApplication(payment)}
-                          disabled={payment.status !== 'POSTED'}
+                          disabled={payment.status !== 'OPEN' && payment.status !== 'POSTED'}
                           className="rounded-lg border px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Apply invoices to this payment"
                         >
@@ -865,21 +898,25 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSaveDraft}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 font-semibold hover:bg-gray-50 text-sm"
-              >
-                <Save size={16} />
-                {editingPayment ? 'Update Draft' : 'Save as Draft'}
-              </button>
-              <button
-                onClick={handleSavePayment}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm"
-                style={{ backgroundColor: brandColor }}
-              >
-                <CheckCircle size={16} />
-                {editingPayment ? 'Update & Post' : 'Post to GL'}
-              </button>
+              {!isReadOnly && (
+                <>
+                  <button
+                    onClick={handleSaveDraft}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 font-semibold hover:bg-gray-50 text-sm"
+                  >
+                    <Save size={16} />
+                    {editingPayment ? 'Update Draft' : 'Save as Draft'}
+                  </button>
+                  <button
+                    onClick={handleSavePayment}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    <CheckCircle size={16} />
+                    Approve
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1103,7 +1140,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         </ul>
                       </div>
                       <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">
-                        ✓ Click "Post to GL" to create this journal entry, or "Save as Draft" to save without posting
+                        ✓ Click "Approve" to create this journal entry and record payment
                       </div>
                     </>
                   )}
@@ -1265,7 +1302,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 <div className="text-xs text-gray-500 uppercase tracking-wide">Payment Status</div>
                 <div className="mt-2">
                   <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                    editingPayment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
+                    editingPayment.status === 'OPEN' || editingPayment.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
                     editingPayment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
                     'bg-blue-100 text-blue-700'
                   }`}>
@@ -1354,7 +1391,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
 
             {/* GL Entry Details */}
-            {editingPayment.status === 'POSTED' && (
+            {(editingPayment.status === 'OPEN' || editingPayment.status === 'POSTED') && (
               <div className="mt-6 pt-6 border-t">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">GL Entry Details</h3>
                 <div className="rounded-lg border bg-gray-50 p-4 space-y-3 mb-4">

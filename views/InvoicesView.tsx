@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -6,8 +6,9 @@ import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Building2, User, Calendar, DollarSign, Percent, CheckCircle,
   Clock, XCircle, AlertTriangle, Receipt, Download, Printer,
+  RotateCcw, MoreHorizontal, Scissors, CornerUpLeft,
   ChevronDown, ChevronUp, MoreVertical, Send, Ban, Wand2, Users,
-  GraduationCap, CheckSquare, Square, Calculator
+  GraduationCap, CheckSquare, Square, Calculator, FileSpreadsheet, ArrowUpDown
 } from 'lucide-react';
 
 
@@ -35,6 +36,7 @@ interface InvoicesViewProps {
   organization?: Organization;
   orgId: string;
   taxCategories: TaxCategoryEntry[];
+  onNavigate?: (tab: string, context?: any) => void;
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
@@ -44,7 +46,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   journalEntries = [],
   organization,
   orgId,
-  taxCategories
+  taxCategories,
+  onNavigate
 }) => {
   const [viewMode, setViewMode] = useState<'LIST' | 'FORM'>('LIST');
   const [showViewModal, setShowViewModal] = useState(false);
@@ -58,10 +61,33 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [voidReason, setVoidReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | 'none' }>({ key: 'invoiceDate', direction: 'desc' });
+  const [filterSponsorId, setFilterSponsorId] = useState('ALL');
+  const [filterStudentId, setFilterStudentId] = useState('ALL');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Drag-and-drop column ordering state
+  const [columnOrder, setColumnOrder] = useState<string[]>([
+    'invoiceNo', 'status', 'glReference', 'payer', 'invoiceDate', 'totalAmount', 'balance'
+  ]);
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+
+  // Column resize state
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
   // local copy of tax categories; we fetch from backend when form is active
   const [localTaxCats, setLocalTaxCats] = useState<TaxCategoryEntry[]>(taxCategories);
+
+  // Sponsor/Student (Payer) Custom Filter State
+  const [showPayerDropdown, setShowPayerDropdown] = useState(false);
+  const [payerFilterMode, setPayerFilterMode] = useState<'ALL' | 'CUSTOM'>('ALL');
+  const [payerSearchTerm, setPayerSearchTerm] = useState('');
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
 
 
   // Derived: Students in the batch for annex
@@ -691,10 +717,79 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         inv.glEntryNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchesStatus = statusFilter === 'ALL' || inv.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      
+      let matchesDate = true;
+      const today = new Date().toISOString().split('T')[0];
+      const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = inv.invoiceDate === today;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = inv.invoiceDate >= firstDayOfMonth && inv.invoiceDate <= today;
+      } else if (dateFilterMode === 'CUSTOM') {
+        matchesDate = (!dateFrom || inv.invoiceDate >= dateFrom) && 
+                      (!dateTo || inv.invoiceDate <= dateTo);
+      }
+      
+      // Sponsor/Student (Payer) filter
+      let matchesPayer = true;
+      if (payerFilterMode === 'CUSTOM' && payerSearchTerm.trim() !== '') {
+        let payerName = '';
+        if (inv.sponsorId) {
+          payerName = sponsors.find(s => s.id === inv.sponsorId)?.name || '';
+        } else if (inv.studentId) {
+          const st = students.find(s => s.id === inv.studentId);
+          payerName = st ? `${st.lastName}, ${st.firstName}` : '';
+        }
+        matchesPayer = payerName.toLowerCase().includes(payerSearchTerm.trim().toLowerCase());
+      } else {
+        const matchesSponsor = filterSponsorId === 'ALL' || inv.sponsorId === filterSponsorId;
+        const matchesStudent = filterStudentId === 'ALL' || inv.studentId === filterStudentId;
+        matchesPayer = matchesSponsor && matchesStudent;
+      }
+
+      return matchesSearch && matchesStatus && matchesDate && matchesPayer;
+    }).sort((a, b) => {
+      if (sortConfig.direction === 'none') return 0;
+      
+      const key = sortConfig.key;
+      let valA: any = (a as any)[key];
+      let valB: any = (b as any)[key];
+
+      // Handle specific keys that need derivation
+      if (key === 'payer') {
+        const payerA = a.sponsorId ? sponsors.find(s => s.id === a.sponsorId)?.name : students.find(s => s.id === a.studentId)?.lastName;
+        const payerB = b.sponsorId ? sponsors.find(s => s.id === b.sponsorId)?.name : students.find(s => s.id === b.studentId)?.lastName;
+        valA = payerA || '';
+        valB = payerB || '';
+      }
+
+      if (key === 'invoiceDate') {
+        valA = new Date(valA).getTime();
+        valB = new Date(valB).getTime();
+      }
+
+      if (key === 'totalAmount') {
+        valA = a.grandTotal;
+        valB = b.grandTotal;
+      }
+
+      if (key === 'balance') {
+        valA = a.balanceDue;
+        valB = b.balanceDue;
+      }
+
+      if (typeof valA === 'string') {
+        const comparison = valA.localeCompare(valB);
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+      }
+
+      const comparison = (valA || 0) - (valB || 0);
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [invoices, searchTerm, statusFilter, sponsors, students]);
+  }, [invoices, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, sortConfig, payerFilterMode, payerSearchTerm]);
 
   // Summary stats
   const stats = useMemo(() => {
@@ -706,6 +801,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     const totalEwt = invoices.filter(i => i.status !== 'VOIDED').reduce((sum, i) => sum + i.totalEwtAmount, 0);
     return { draft, open, closed, voided, totalOutstanding, totalEwt };
   }, [invoices]);
+
+  // Header Sort Toggle
+  const handleSort = (key: string) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig.key !== columnKey) return <ArrowUpDown size={12} className="ml-1 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    return sortConfig.direction === 'asc' 
+      ? <ChevronUp size={12} className="ml-1 text-blue-600" /> 
+      : <ChevronDown size={12} className="ml-1 text-blue-600" />;
+  };
 
   // Helpers
   const formatCurrency = (amount: number) => {
@@ -746,6 +856,93 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+
+  // ── Export helpers ──────────────────────────────────────────────
+  const getExportRows = () => {
+    const statusLabel = (s: InvoiceStatus) => {
+      const map: Record<InvoiceStatus, string> = { DRAFT: 'ON HOLD', OPEN: 'OPEN', CLOSED: 'CLOSED', VOIDED: 'VOIDED' };
+      return map[s] || s;
+    };
+    return filteredInvoices.map(inv => ({
+      'Invoice No.': inv.invoiceNo || '-',
+      'Status': statusLabel(inv.status),
+      'GL Ref.': getInvoiceGlRef(inv),
+      'Sponsor/Student': inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId),
+      'Date': inv.invoiceDate || '-',
+      'Grand Total': inv.grandTotal ?? 0,
+      'Balance': inv.balanceDue ?? 0,
+    }));
+  };
+
+  const exportToExcel = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { alert('No invoices to export.'); return; }
+    const cols = Object.keys(rows[0]);
+    const esc = (v: any) => escapeHtml(v);
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td,th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px}th{background:#F47721;color:#fff;font-weight:bold}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    html += '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
+    rows.forEach(r => {
+      html += '<tr>';
+      cols.forEach(c => {
+        const val = (r as any)[c];
+        const isNum = typeof val === 'number';
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(isNum ? val.toFixed(2) : val)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</table></body></html>';
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice_Registry_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPdf = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { alert('No invoices to export.'); return; }
+    const cols = Object.keys(rows[0]);
+    const esc = (v: any) => escapeHtml(v);
+    const orgName = organization?.name || 'Invoice Registry';
+    let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice Registry</title><style>
+      @page { size: landscape; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      h2 { margin:0 0 4px; font-size:18px; }
+      .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
+      table { width:100%; border-collapse:collapse; font-size:11px; }
+      th { background:#F47721; color:#fff; padding:8px 10px; text-align:left; font-weight:700; }
+      td { padding:7px 10px; border-bottom:1px solid #e5e7eb; }
+      tr:nth-child(even) { background:#f9fafb; }
+      .num { text-align:right; }
+      .footer { margin-top:16px; font-size:10px; color:#9ca3af; text-align:right; }
+    </style></head><body>`;
+    html += `<h2>${esc(orgName)}</h2>`;
+    html += `<div class="subtitle">Invoice Registry &mdash; Exported ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })} &mdash; ${rows.length} record(s)</div>`;
+    html += '<table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      cols.forEach(c => {
+        const val = (r as any)[c];
+        const isNum = typeof val === 'number';
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += `<div class="footer">Generated on ${new Date().toLocaleString('en-PH')}</div>`;
+    html += '</body></html>';
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => w.print(), 400);
+    }
+  };
 
   const buildInvoiceA4Html = (invoice: Invoice): string => {
     const billedTo = invoice.sponsorId ? getSponsorName(invoice.sponsorId) : getStudentName(invoice.studentId);
@@ -1138,7 +1335,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-800">Invoices</h2>
-              <p className="text-gray-500 text-sm italic">Manage AR invoices with EWT tracking</p>
+
             </div>
             <div className="flex items-center gap-3">
               {sponsorsWithUnbilledEnrollments.length > 0 && (
@@ -1214,224 +1411,610 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
           </div>
 
           {/* Filters */}
-          <div className="bg-white rounded-xl border p-4">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex-1 min-w-[200px]">
-                <div className="relative">
-                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search invoices..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-                  />
-                </div>
+          <div className="bg-white border-y px-4 py-2">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search Bar - Far Left */}
+              <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-64">
+                <Search size={14} className="text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Search invoices..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <Filter size={18} className="text-gray-400" />
+
+              {/* Status Filter */}
+              <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+                <span className="text-[13px] text-gray-500 mr-1">Status:</span>
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value as InvoiceStatus | 'ALL')}
-                  className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
                 >
-                  <option value="ALL">All Statuses</option>
+                  <option value="ALL">All</option>
                   <option value="DRAFT">ON HOLD</option>
                   <option value="OPEN">OPEN</option>
                   <option value="CLOSED">CLOSED</option>
                   <option value="VOIDED">VOIDED</option>
                 </select>
+                <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+              </div>
+
+              {/* Sponsor/Student Filter Dropdown */}
+              <div className="relative">
+                <div
+                  onClick={() => setShowPayerDropdown(!showPayerDropdown)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none max-w-[220px]"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1 truncate">Sponsor/Student:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate">
+                    {payerFilterMode === 'ALL' ? 'All' : payerFilterMode === 'CUSTOM' && payerSearchTerm ? `"${payerSearchTerm}"` : 'Custom...'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showPayerDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowPayerDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        <button
+                          onClick={() => { setSortConfig({ key: 'payer', direction: 'asc' }); setShowPayerDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-100 flex items-center gap-2 ${sortConfig.key === 'payer' && sortConfig.direction === 'asc' ? 'font-bold text-orange-600 bg-orange-50' : 'text-gray-700'}`}
+                        >
+                          <ChevronUp size={14} /> Sort Ascending
+                        </button>
+                        <button
+                          onClick={() => { setSortConfig({ key: 'payer', direction: 'desc' }); setShowPayerDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-100 flex items-center gap-2 ${sortConfig.key === 'payer' && sortConfig.direction === 'desc' ? 'font-bold text-orange-600 bg-orange-50' : 'text-gray-700'}`}
+                        >
+                          <ChevronDown size={14} /> Sort Descending
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-1">
+                        <button
+                          onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                        >
+                          Remove Quick Filter
+                        </button>
+                        <button
+                          onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-400 hover:bg-gray-100 cursor-not-allowed"
+                          disabled
+                        >
+                          Clear Filter
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-1">
+                        <button
+                          onClick={() => setPayerFilterMode('CUSTOM')}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${payerFilterMode === 'CUSTOM' ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {payerFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Equal to
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Type to search..."
+                            value={payerSearchTerm}
+                            onChange={(e) => {
+                              setPayerSearchTerm(e.target.value);
+                              if (payerFilterMode !== 'CUSTOM') setPayerFilterMode('CUSTOM');
+                            }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                          />
+                        </div>
+                        <div className="flex justify-end items-center gap-2 pt-1">
+                          <button
+                            onClick={() => setShowPayerDropdown(false)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Date Filter Dropdown */}
+              <div className="relative">
+                <div 
+                  onClick={() => setShowDateDropdown(!showDateDropdown)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                    {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showDateDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        <button 
+                          onClick={() => { setSortConfig({ key: 'invoiceDate', direction: 'asc' }); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-100 flex items-center gap-2 ${sortConfig.key === 'invoiceDate' && sortConfig.direction === 'asc' ? 'font-bold text-orange-600 bg-orange-50' : 'text-gray-700'}`}
+                        >
+                          <ChevronUp size={14} /> Sort Ascending
+                        </button>
+                        <button 
+                          onClick={() => { setSortConfig({ key: 'invoiceDate', direction: 'desc' }); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-gray-100 flex items-center gap-2 ${sortConfig.key === 'invoiceDate' && sortConfig.direction === 'desc' ? 'font-bold text-orange-600 bg-orange-50' : 'text-gray-700'}`}
+                        >
+                          <ChevronDown size={14} /> Sort Descending
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-1">
+                        <button 
+                          onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                        >
+                          Remove Quick Filter
+                        </button>
+                        <button 
+                          onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-400 hover:bg-gray-100 cursor-not-allowed"
+                          disabled
+                        >
+                          Clear Filter
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-1">
+                        <button 
+                          onClick={() => { setDateFilterMode('CUSTOM'); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'CUSTOM' ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                        </button>
+                        <button 
+                          onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'TODAY' ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                        </button>
+                        <button 
+                          onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'THIS_MONTH' ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => { setDateFrom(e.target.value); if(dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                          <input
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => { setDateTo(e.target.value); if(dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                          />
+                        </div>
+                        <div className="flex justify-end items-center gap-2 pt-1">
+                          <button 
+                            onClick={() => setShowDateDropdown(false)}
+                            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            onClick={() => { setShowDateDropdown(false); }}
+                            className="px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                          >
+                            OK
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Reset Button */}
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('ALL');
+                  setDateFilterMode('ALL');
+                  setDateFrom('');
+                  setDateTo('');
+                  setFilterSponsorId('ALL');
+                  setFilterStudentId('ALL');
+                }}
+                className="p-2 text-gray-400 hover:text-orange-500 transition-colors"
+                title="Clear all filters"
+              >
+                <RotateCcw size={16} />
+              </button>
+
+              {/* Export Dropdown */}
+              <div className="relative ml-auto">
+                <button
+                  onClick={() => setShowExportDropdown(!showExportDropdown)}
+                  className="flex items-center gap-1.5 h-9 px-3 bg-white text-gray-700 rounded border border-gray-200 hover:bg-gray-50 transition-colors text-[13px] font-semibold shadow-sm select-none"
+                  title="Export"
+                >
+                  <Download size={16} />
+                  <span>Export</span>
+                  <ChevronDown size={14} className="text-gray-400" />
+                </button>
+
+                {showExportDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)}></div>
+                    <div className="absolute top-full right-0 mt-1 w-44 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        <button
+                          onClick={() => {
+                            setShowExportDropdown(false);
+                            exportToExcel();
+                          }}
+                          className="w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2 rounded transition-colors"
+                        >
+                          <FileSpreadsheet size={16} className="text-emerald-600" />
+                          Export as Excel
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowExportDropdown(false);
+                            exportToPdf();
+                          }}
+                          className="w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 rounded transition-colors"
+                        >
+                          <FileText size={16} className="text-red-500" />
+                          Export as PDF
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
           {/* Invoice List */}
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GL Ref</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sponsor/Student</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Grand Total</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredInvoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
-                      <FileText size={40} className="mx-auto mb-2 text-gray-300" />
-                      No invoices found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredInvoices.map(inv => (
-                    <React.Fragment key={inv.id}>
-                      <tr
-                        className={`${inv.status === 'OPEN' ? 'bg-emerald-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors`}
-                        onClick={() => handleEdit(inv)}
-                        title={inv.status === 'OPEN' ? 'Read-only: Invoice is approved and locked' : 'Click to edit'}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {expandedRows.has(inv.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
+          {/* ──────────────────────────────────────────────────────────
+              COLUMN CONFIG — Reorder items below to rearrange columns.
+              Each entry drives BOTH the header and the data cell.
+              ────────────────────────────────────────────────────────── */}
+          {(() => {
+            const baseColumns = [
+              // ── 1. Invoice No. ────────────────────────────
+              {
+                key: 'invoiceNo',
+                label: 'Invoice No.',
+                sortKey: 'invoiceNo',
+                width: 'w-40',
+                align: 'text-left' as const,
+                render: (inv: any) => (
+                  <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
+                ),
+              },
+              // ── 2. Status ─────────────────────────────────
+              {
+                key: 'status',
+                label: 'Status',
+                sortKey: 'status',
+                width: 'w-24',
+                align: 'text-left' as const,
+                render: (inv: any) => getStatusBadge(inv.status),
+              },
+              // ── 3. GL Ref. ────────────────────────────────
+              {
+                key: 'glReference',
+                label: 'GL Ref.',
+                sortKey: 'glReference',
+                width: 'w-32',
+                align: 'text-left' as const,
+                render: (inv: any) =>
+                  inv.journalEntryId ? (
+                    <span className="text-xs font-medium text-gray-600">
+                      {(journalEntries.find(j => j.id === inv.journalEntryId)?.glEntryNumber || journalEntries.find(j => j.id === inv.journalEntryId)?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim()}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  ),
+              },
+              // ── 4. Sponsor / Student ──────────────────────
+              {
+                key: 'payer',
+                label: 'Sponsor/Student',
+                sortKey: 'payer',
+                width: 'w-64',
+                align: 'text-left' as const,
+                render: (inv: any) => (
+                  <div className="flex items-center gap-2">
+                    {inv.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
+                    <span className="text-sm">{inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)}</span>
+                  </div>
+                ),
+              },
+              // ── 5. Date ───────────────────────────────────
+              {
+                key: 'invoiceDate',
+                label: 'Date',
+                sortKey: 'invoiceDate',
+                width: 'w-32',
+                align: 'text-left' as const,
+                render: (inv: any) => (
+                  <span className="text-sm text-gray-600">{inv.invoiceDate}</span>
+                ),
+              },
+              // ── 6. Grand Total ────────────────────────────
+              {
+                key: 'totalAmount',
+                label: 'Grand Total',
+                sortKey: 'totalAmount',
+                width: 'w-32',
+                align: 'text-right' as const,
+                render: (inv: any) => (
+                  <span className="text-sm font-semibold">{formatCurrency(inv.grandTotal)}</span>
+                ),
+              },
+              // ── 7. Balance ────────────────────────────────
+              {
+                key: 'balance',
+                label: 'Balance',
+                sortKey: 'balance',
+                width: 'w-32',
+                align: 'text-right' as const,
+                render: (inv: any) =>
+                  inv.balanceDue > 0 ? (
+                    <span className="text-red-600 font-bold text-sm">{formatCurrency(inv.balanceDue)}</span>
+                  ) : (
+                    <span className="text-emerald-600 font-bold text-sm">PAID</span>
+                  ),
+              },
+            ];
+
+            const registryColumns = columnOrder.map(key => baseColumns.find(c => c.key === key)).filter(Boolean) as typeof baseColumns;
+
+            const handleDragStart = (e: React.DragEvent, index: number) => {
+              setDraggedColumnIdx(index);
+              e.dataTransfer.effectAllowed = 'move';
+              if (e.target instanceof HTMLElement) {
+                e.target.style.opacity = '0.5';
+              }
+            };
+
+            const handleDragEnd = (e: React.DragEvent) => {
+              setDraggedColumnIdx(null);
+              if (e.target instanceof HTMLElement) {
+                e.target.style.opacity = '1';
+              }
+            };
+
+            const handleDragOver = (e: React.DragEvent) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+              e.preventDefault();
+              if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+              
+              const newOrder = [...columnOrder];
+              const [draggedKey] = newOrder.splice(draggedColumnIdx, 1);
+              newOrder.splice(dropIndex, 0, draggedKey);
+              
+              setColumnOrder(newOrder);
+              setDraggedColumnIdx(null);
+            };
+
+            return (
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr className="bg-slate-50 border-b border-gray-200">
+                      {registryColumns.map((col, idx) => (
+                        <th
+                          key={col.key}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, idx)}
+                          className={`px-4 py-3 ${col.align} cursor-move ${draggedColumnIdx === idx ? 'bg-gray-100 border-dashed border-2 border-gray-300 opacity-50' : ''} group select-none transition-colors border-x border-transparent hover:bg-gray-100 hover:border-gray-200 relative`}
+                          style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                          title="Drag to reorder column"
+                        >
+                          <div
+                            className={`flex items-center ${col.align === 'text-right' ? 'justify-end' : ''} text-[11px] font-bold text-gray-500 uppercase tracking-wider ${col.sortKey ? 'cursor-pointer hover:text-gray-800' : ''}`}
+                            onClick={col.sortKey ? () => handleSort(col.sortKey) : undefined}
+                          >
+                            {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {inv.journalEntryId ? (
-                            (() => {
-                              const je = journalEntries.find(j => j.id === inv.journalEntryId);
-                              const glNum = (je?.glEntryNumber || je?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim();
-                              return <span className="text-xs font-medium text-gray-600">{glNum}</span>;
-                            })()
-                          ) : (
-                            <span className="text-xs text-gray-400">â€”</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{inv.invoiceDate}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {inv.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
-                            <span className="text-sm">{inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">{getStatusBadge(inv.status)}</td>
-                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(inv.grandTotal)}</td>
-                        <td className="px-4 py-3 text-right font-bold" style={{ color: inv.balanceDue > 0 ? brandColor : '#10B981' }}>
-                          {formatCurrency(inv.balanceDue)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => handleView(inv)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="View">
-                              <Eye size={16} />
-                            </button>
-                            <button onClick={() => handlePrintPreview(inv)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="Print A4">
-                              <Printer size={16} />
-                            </button>
-                            {inv.status === 'DRAFT' && (
-                              <>
-                                <button onClick={() => handlePost(inv)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Approve">
-                                  <CheckCircle size={16} />
-                                </button>
-                                <button onClick={() => onDeleteInvoice(inv.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Delete">
-                                  <Trash2 size={16} />
-                                </button>
-                              </>
-                            )}
-                            {inv.status === 'OPEN' && (
-                              <button
-                                onClick={() => { setVoidingInvoice(inv); setShowVoidModal(true); }}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                                title="Void"
-                              >
-                                <Ban size={16} />
-                              </button>
-                            )}
-                          </div>
+                          {/* Resize handle */}
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const th = e.currentTarget.parentElement;
+                              if (!th) return;
+                              const startWidth = th.getBoundingClientRect().width;
+                              resizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                              const onMouseMove = (ev: MouseEvent) => {
+                                if (!resizeRef.current) return;
+                                const diff = ev.clientX - resizeRef.current.startX;
+                                const newWidth = Math.max(60, resizeRef.current.startWidth + diff);
+                                setColumnWidths(prev => ({ ...prev, [resizeRef.current!.colKey]: newWidth }));
+                              };
+                              const onMouseUp = () => {
+                                resizeRef.current = null;
+                                document.removeEventListener('mousemove', onMouseMove);
+                                document.removeEventListener('mouseup', onMouseUp);
+                                document.body.style.cursor = '';
+                                document.body.style.userSelect = '';
+                              };
+                              document.addEventListener('mousemove', onMouseMove);
+                              document.addEventListener('mouseup', onMouseUp);
+                              document.body.style.cursor = 'col-resize';
+                              document.body.style.userSelect = 'none';
+                            }}
+                            className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-orange-400 transition-colors z-10"
+                            title="Drag to resize column"
+                            draggable={false}
+                          />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={registryColumns.length} className="px-4 py-12 text-center text-gray-500">
+                          <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                          No invoices found
                         </td>
                       </tr>
-                      {/* Expanded row with line details */}
-                      {expandedRows.has(inv.id) && inv.lines && inv.lines.length > 0 && (
-                        <tr>
-                          <td colSpan={9} className="bg-gray-50 px-8 py-4">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-gray-500">
-                                  <th className="text-left py-1">#</th>
-                                  <th className="text-left py-1">Description</th>
-                                  <th className="text-right py-1">Qty</th>
-                                  <th className="text-right py-1">Unit Price</th>
-                                  <th className="text-right py-1">Amount</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {inv.lines.map((line, idx) => (
-                                  <tr key={line.id || idx}>
-                                    <td className="py-1">{line.lineNumber}</td>
-                                    <td className="py-1">{line.description}</td>
-                                    <td className="py-1 text-right">{line.quantity}</td>
-                                    <td className="py-1 text-right">{formatCurrency(line.unitPrice)}</td>
-                                    <td className="py-1 text-right">{formatCurrency(line.amount)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </td>
+                    ) : (
+                      filteredInvoices.map(inv => (
+                        <tr
+                          key={inv.id}
+                          className={`${inv.status === 'OPEN' ? 'bg-emerald-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors`}
+                          onClick={() => handleEdit(inv)}
+                          title={inv.status === 'OPEN' ? 'Read-only: Invoice is approved and locked' : 'Click to edit'}
+                        >
+                          {registryColumns.map(col => (
+                            <td key={col.key} className={`px-4 py-3 ${col.align}`} style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}>
+                              {col.render(inv)}
+                            </td>
+                          ))}
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </>
       ) : (
         <>
           {/* New/Edit Invoice Page */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh]">
-            {/* Locked Indicator for Approved Invoices */}
-            {editingInvoice?.status === 'OPEN' && (
-              <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center gap-2 text-amber-800">
-                <AlertTriangle size={18} />
-                <span className="font-medium">This invoice is approved and locked. GL entries have been posted. No further edits are allowed.</span>
-              </div>
-            )}
+
             <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
               <div>
-                <button
-                  onClick={resetForm}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 mb-1 transition-colors"
-                >
-                  â† Back to Invoices
-                </button>
+
                 <h3 className="text-xl font-bold text-gray-800">
-                  {editingInvoice?.status === 'OPEN' ? 'Invoice (Approved & Locked)' : editingInvoice ? 'Edit Invoice' : 'New Invoice'}
+                  Invoice No: {formData.invoiceNo}
+                  {(formData.sponsorId || formData.studentId) && ` - ${formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId)}`}
                 </h3>
-                {formData.invoiceNo && (
-                  <p className="text-xl font-medium text-red-500 mt-0.5">
-                    Invoice No: <span className="text-gray-900">{formData.invoiceNo}</span>
-                  </p>
-                )}
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+            {/* Action Toolbar */}
+            <div className="flex items-center gap-2 px-4 py-2 border-b bg-white">
               <button
-                onClick={() => { resetForm(); }}
-                className="px-6 py-2.5 text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
+                title="Discard Changes and Close"
+                onClick={resetForm}
+                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               >
-                Cancel
+                <RotateCcw size={20} />
               </button>
               {editingInvoice?.status !== 'OPEN' && (
                 <>
                   <button
+                    title="Save as Draft"
                     onClick={handleSave}
-                    className="flex items-center gap-2 px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                    className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                   >
-                    <Save size={18} />
-                    Save as Draft
+                    <Save size={20} />
                   </button>
                   <button
+                    title="Approve"
                     onClick={handleApprove}
-                    className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
-                    style={{ backgroundColor: '#10B981' }}
+                    className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
                   >
-                    <CheckCircle size={18} /> Approve
+                    <CheckCircle size={20} />
                   </button>
                 </>
               )}
-              {editingInvoice?.status === 'OPEN' && (
-                <div className="flex items-center gap-2 px-6 py-2.5 text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 font-medium">
-                  <CheckCircle size={18} />
-                  <span>APPROVED & POSTED TO GL</span>
+              <button
+                title="Add New Record"
+                onClick={handleNew}
+                className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+              >
+                <Plus size={20} />
+              </button>
+              <button
+                title="Cancel"
+                onClick={resetForm}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="h-6 w-px bg-gray-200 mx-2" />
+              <button
+                title="Pay"
+                disabled={editingInvoice?.status !== 'OPEN'}
+                onClick={() => onNavigate?.('payments', { viewMode: 'create-payment', invoice: editingInvoice })}
+                className={`p-2 rounded-lg transition-colors font-black text-[10px] leading-none flex items-center justify-center ${editingInvoice?.status === 'OPEN' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-300 cursor-not-allowed'}`}
+                style={{ width: '36px', height: '36px' }}
+              >
+                PAY
+              </button>
+              <button
+                title="Print"
+                onClick={() => {
+                  if (editingInvoice) handlePrintPreview(editingInvoice);
+                  else alert('Please save the invoice before printing.');
+                }}
+                className="p-2 text-gray-500 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
+              >
+                <Printer size={20} />
+              </button>
+              <div className="relative group">
+                <button
+                  title="More Actions"
+                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+                <div className="absolute left-0 mt-1 w-48 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    {editingInvoice?.status === 'OPEN' && (
+                      <>
+                        <button onClick={() => alert('Write Off coming soon...')} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2">
+                          <Scissors size={16} /> Write Off
+                        </button>
+                        <button onClick={() => alert('Reversal coming soon...')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+                          <CornerUpLeft size={16} /> Reversal
+                        </button>
+                        <button onClick={() => { setVoidingInvoice(editingInvoice); setShowVoidModal(true); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                          <Ban size={16} /> Void Invoice
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
+
             <div className="flex-1 p-6 space-y-8">
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
@@ -1532,6 +2115,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="Invoice notes or memo..."
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Status</label>
+                  <div className="mt-1">
+                    {getStatusBadge(formData.status)}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
@@ -1766,10 +2355,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <span className="font-bold text-lg">{formatCurrency(formTotals.netAmountDue)}</span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-
+          </div>
+          </div>
           </div>
         </>
       )}
@@ -1779,623 +2366,623 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       {
         showViewModal && viewingInvoice && (
           <ModalPortal>
-<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
-              {/* PAID Watermark Overlay */}
-              {viewingInvoice.balanceDue === 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%) rotate(-20deg)',
-                    pointerEvents: 'none',
-                    opacity: 0.18,
-                    fontSize: '5rem',
-                    fontWeight: 900,
-                    color: '#10B981',
-                    zIndex: 30,
-                    textShadow: '2px 2px 8px #fff',
-                    letterSpacing: '0.2em',
-                    userSelect: 'none',
-                  }}
-                >
-                  PAID
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
+                {/* PAID Watermark Overlay */}
+                {viewingInvoice.balanceDue === 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%) rotate(-20deg)',
+                      pointerEvents: 'none',
+                      opacity: 0.18,
+                      fontSize: '5rem',
+                      fontWeight: 900,
+                      color: '#10B981',
+                      zIndex: 30,
+                      textShadow: '2px 2px 8px #fff',
+                      letterSpacing: '0.2em',
+                      userSelect: 'none',
+                    }}
+                  >
+                    PAID
+                  </div>
+                )}
+                <div className="flex items-center justify-between p-4 border-b">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Invoice {viewingInvoice.invoiceNo}</h3>
+                    <p className="text-sm text-gray-500">{viewingInvoice.invoiceDate}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handlePrintPreview(viewingInvoice)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      title="Open A4 Print View"
+                    >
+                      <Printer size={15} />
+                      Print A4
+                    </button>
+                    {getStatusBadge(viewingInvoice.status)}
+                    <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-200 rounded">
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
-              )}
+                <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
+                  {/* Bill To */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Bill To</p>
+                      <p className="font-medium text-gray-800">
+                        {viewingInvoice.sponsorId ? getSponsorName(viewingInvoice.sponsorId) : getStudentName(viewingInvoice.studentId)}
+                      </p>
+                      {viewingInvoice.batchId && (
+                        <p className="text-sm text-gray-500">Batch: {getBatchCode(viewingInvoice.batchId)}</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Due Date</p>
+                      <p className="font-medium text-gray-800">{viewingInvoice.dueDate}</p>
+                      {viewingInvoice.terms && (
+                        <p className="text-sm text-gray-500">Terms: {viewingInvoice.terms}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lines */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Description</th>
+                          <th className="px-4 py-2 text-right">Qty</th>
+                          <th className="px-4 py-2 text-right">Unit Price</th>
+                          <th className="px-4 py-2 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingInvoice.lines?.map((line, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-4 py-2">{line.description}</td>
+                            <td className="px-4 py-2 text-right">{line.quantity}</td>
+                            <td className="px-4 py-2 text-right">{formatCurrency(line.unitPrice)}</td>
+                            <td className="px-4 py-2 text-right">{formatCurrency(line.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex justify-end">
+                    <div className="w-72 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Subtotal:</span>
+                        <span className="font-medium">{formatCurrency(viewingInvoice.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">VAT:</span>
+                        <span>{formatCurrency(viewingInvoice.vatAmount)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-medium">Grand Total:</span>
+                        <span className="font-bold">{formatCurrency(viewingInvoice.grandTotal)}</span>
+                      </div>
+                      {viewingInvoice.isSubjectToEwt && (
+                        <div className="flex justify-between text-purple-600">
+                          <span>Less: EWT ({((viewingInvoice.ewtRate || 0) * 100).toFixed(0)}%):</span>
+                          <span>({formatCurrency(viewingInvoice.totalEwtAmount)})</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
+                        <span className="font-bold">Net Amount Due:</span>
+                        <span className="font-bold">{formatCurrency(viewingInvoice.netAmountDue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Less: Payments:</span>
+                        <span className="text-green-600">({formatCurrency(viewingInvoice.amountPaid)})</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 text-lg">
+                        <span className="font-bold">Balance Due:</span>
+                        <span className="font-bold" style={{ color: viewingInvoice.balanceDue > 0 ? brandColor : '#10B981' }}>
+                          {formatCurrency(viewingInvoice.balanceDue)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewingInvoice.notes && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
+                      <p className="text-sm text-gray-700">{viewingInvoice.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Annex: Student Breakdown for Sponsor/Batch Invoices */}
+                  {viewingInvoice.sponsorId && viewingInvoice.batchId && batchStudents?.length > 0 && (
+                    <div className="mt-10 print:break-before-page">
+                      <h4 className="text-lg font-bold text-gray-800 mb-2">Annex: Student Breakdown</h4>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-2 text-left">Student Name</th>
+                              <th className="px-4 py-2 text-left">Student ID</th>
+                              <th className="px-4 py-2 text-left">Course</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {batchStudents.map((student, idx) => (
+                              <tr key={student.id || idx} className="border-t">
+                                <td className="px-4 py-2">{student.name}</td>
+                                <td className="px-4 py-2">{student.studentNo}</td>
+                                <td className="px-4 py-2">{student.courseName}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </ModalPortal>
+        )}
+      {showPrintModal && printingInvoice && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">Invoice {viewingInvoice.invoiceNo}</h3>
-                  <p className="text-sm text-gray-500">{viewingInvoice.invoiceDate}</p>
+                  <h3 className="text-lg font-bold text-gray-800">A4 Invoice Preview</h3>
+                  <p className="text-sm text-gray-500">{printingInvoice.invoiceNo}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePrintPreview(viewingInvoice)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                    title="Open A4 Print View"
+                    onClick={() => handleDownloadA4(printingInvoice)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
-                    <Printer size={15} />
-                    Print A4
+                    <Download size={15} />
+                    Export A4 HTML
                   </button>
-                  {getStatusBadge(viewingInvoice.status)}
-                  <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-200 rounded">
+                  <button onClick={() => setShowPrintModal(false)} className="p-1 hover:bg-gray-200 rounded">
                     <X size={20} />
                   </button>
                 </div>
               </div>
-              <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
-                {/* Bill To */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Bill To</p>
-                    <p className="font-medium text-gray-800">
-                      {viewingInvoice.sponsorId ? getSponsorName(viewingInvoice.sponsorId) : getStudentName(viewingInvoice.studentId)}
-                    </p>
-                    {viewingInvoice.batchId && (
-                      <p className="text-sm text-gray-500">Batch: {getBatchCode(viewingInvoice.batchId)}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-gray-500 mb-1">Due Date</p>
-                    <p className="font-medium text-gray-800">{viewingInvoice.dueDate}</p>
-                    {viewingInvoice.terms && (
-                      <p className="text-sm text-gray-500">Terms: {viewingInvoice.terms}</p>
-                    )}
-                  </div>
-                </div>
 
-                {/* Lines */}
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Description</th>
-                        <th className="px-4 py-2 text-right">Qty</th>
-                        <th className="px-4 py-2 text-right">Unit Price</th>
-                        <th className="px-4 py-2 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {viewingInvoice.lines?.map((line, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="px-4 py-2">{line.description}</td>
-                          <td className="px-4 py-2 text-right">{line.quantity}</td>
-                          <td className="px-4 py-2 text-right">{formatCurrency(line.unitPrice)}</td>
-                          <td className="px-4 py-2 text-right">{formatCurrency(line.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Totals */}
-                <div className="flex justify-end">
-                  <div className="w-72 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Subtotal:</span>
-                      <span className="font-medium">{formatCurrency(viewingInvoice.subtotal)}</span>
+              <div className="flex-1 overflow-auto bg-gray-200 p-6">
+                <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      {organization?.logoUrl ? (
+                        <img src={organization.logoUrl} alt="Tenant logo" className="max-w-[300px] max-h-[90px] object-contain" />
+                      ) : (
+                        <h2 className="text-2xl font-bold tracking-wide">{organization?.name || 'Tenant Organization'}</h2>
+                      )}
+                      <p className="mt-2 text-[13px]">{organization?.name || 'Tenant Organization'}</p>
+                      {organization?.taxId && <p className="text-gray-600">{organization.taxId}</p>}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">VAT:</span>
-                      <span>{formatCurrency(viewingInvoice.vatAmount)}</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2">
-                      <span className="font-medium">Grand Total:</span>
-                      <span className="font-bold">{formatCurrency(viewingInvoice.grandTotal)}</span>
-                    </div>
-                    {viewingInvoice.isSubjectToEwt && (
-                      <div className="flex justify-between text-purple-600">
-                        <span>Less: EWT ({((viewingInvoice.ewtRate || 0) * 100).toFixed(0)}%):</span>
-                        <span>({formatCurrency(viewingInvoice.totalEwtAmount)})</span>
+                    <div className="min-w-[300px]">
+                      <h2 className="text-5xl font-bold leading-none mb-2">Invoice</h2>
+                      <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
+                        <p className="font-semibold">Reference No.:</p><p className="text-right">{printingInvoice.invoiceNo}</p>
+                        <p className="font-semibold">Date:</p><p className="text-right">{printingInvoice.invoiceDate}</p>
+                        <p className="font-semibold">Due Date:</p><p className="text-right">{printingInvoice.dueDate}</p>
                       </div>
-                    )}
-                    <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
-                      <span className="font-bold">Net Amount Due:</span>
-                      <span className="font-bold">{formatCurrency(viewingInvoice.netAmountDue)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Less: Payments:</span>
-                      <span className="text-green-600">({formatCurrency(viewingInvoice.amountPaid)})</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2 text-lg">
-                      <span className="font-bold">Balance Due:</span>
-                      <span className="font-bold" style={{ color: viewingInvoice.balanceDue > 0 ? brandColor : '#10B981' }}>
-                        {formatCurrency(viewingInvoice.balanceDue)}
-                      </span>
                     </div>
                   </div>
-                </div>
 
-                {viewingInvoice.notes && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
-                    <p className="text-sm text-gray-700">{viewingInvoice.notes}</p>
-                  </div>
-                )}
-
-                {/* Annex: Student Breakdown for Sponsor/Batch Invoices */}
-                {viewingInvoice.sponsorId && viewingInvoice.batchId && batchStudents?.length > 0 && (
-                  <div className="mt-10 print:break-before-page">
-                    <h4 className="text-lg font-bold text-gray-800 mb-2">Annex: Student Breakdown</h4>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left">Student Name</th>
-                            <th className="px-4 py-2 text-left">Student ID</th>
-                            <th className="px-4 py-2 text-left">Course</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {batchStudents.map((student, idx) => (
-                            <tr key={student.id || idx} className="border-t">
-                              <td className="px-4 py-2">{student.name}</td>
-                              <td className="px-4 py-2">{student.studentNo}</td>
-                              <td className="px-4 py-2">{student.courseName}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div className="mt-8 border border-[#d8ebf6]">
+                    <div className="grid grid-cols-2 bg-[#d8ebf6] text-[13px] font-semibold">
+                      <div className="px-2 py-1">BILL TO:</div>
+                      <div className="px-2 py-1">SHIP TO:</div>
+                    </div>
+                    <div className="grid grid-cols-2 text-[13px]">
+                      <div className="px-2 py-2 whitespace-pre-line">
+                        {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
+                        {printingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                          : (() => {
+                            const s = students.find(st => st.id === printingInvoice.studentId);
+                            return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
+                          })()}
+                      </div>
+                      <div className="px-2 py-2 whitespace-pre-line">
+                        {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
+                        {printingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                          : (() => {
+                            const s = students.find(st => st.id === printingInvoice.studentId);
+                            return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
+                          })()}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-</ModalPortal>
-        )}
-      {showPrintModal && printingInvoice && (
-        <ModalPortal>
-<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">A4 Invoice Preview</h3>
-                <p className="text-sm text-gray-500">{printingInvoice.invoiceNo}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleDownloadA4(printingInvoice)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  <Download size={15} />
-                  Export A4 HTML
-                </button>
-                <button onClick={() => setShowPrintModal(false)} className="p-1 hover:bg-gray-200 rounded">
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
 
-            <div className="flex-1 overflow-auto bg-gray-200 p-6">
-              <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800">
-                <div className="flex justify-between items-start">
-                  <div>
-                    {organization?.logoUrl ? (
-                      <img src={organization.logoUrl} alt="Tenant logo" className="max-w-[300px] max-h-[90px] object-contain" />
-                    ) : (
-                      <h2 className="text-2xl font-bold tracking-wide">{organization?.name || 'Tenant Organization'}</h2>
-                    )}
-                    <p className="mt-2 text-[13px]">{organization?.name || 'Tenant Organization'}</p>
-                    {organization?.taxId && <p className="text-gray-600">{organization.taxId}</p>}
-                  </div>
-                  <div className="min-w-[300px]">
-                    <h2 className="text-5xl font-bold leading-none mb-2">Invoice</h2>
-                    <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
-                      <p className="font-semibold">Reference No.:</p><p className="text-right">{printingInvoice.invoiceNo}</p>
-                      <p className="font-semibold">Date:</p><p className="text-right">{printingInvoice.invoiceDate}</p>
-                      <p className="font-semibold">Due Date:</p><p className="text-right">{printingInvoice.dueDate}</p>
+                  <div className="mt-4 border border-[#d8ebf6]">
+                    <div className="grid grid-cols-3 bg-[#d8ebf6] text-[13px] font-semibold">
+                      <div className="px-2 py-1">CUSTOMER REF. NBR.</div>
+                      <div className="px-2 py-1">TERMS</div>
+                      <div className="px-2 py-1">CONTACT</div>
+                    </div>
+                    <div className="grid grid-cols-3 text-[13px]">
+                      <div className="px-2 py-1">{getInvoiceGlRef(printingInvoice)}</div>
+                      <div className="px-2 py-1">{printingInvoice.terms || '-'}</div>
+                      <div className="px-2 py-1">
+                        {printingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.contactPerson || '-')
+                          : (students.find(s => s.id === printingInvoice.studentId)?.contactNumber || '-')}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-8 border border-[#d8ebf6]">
-                  <div className="grid grid-cols-2 bg-[#d8ebf6] text-[13px] font-semibold">
-                    <div className="px-2 py-1">BILL TO:</div>
-                    <div className="px-2 py-1">SHIP TO:</div>
-                  </div>
-                  <div className="grid grid-cols-2 text-[13px]">
-                    <div className="px-2 py-2 whitespace-pre-line">
-                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
-                      {printingInvoice.sponsorId
-                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
-                        : (() => {
-                          const s = students.find(st => st.id === printingInvoice.studentId);
-                          return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
-                        })()}
-                    </div>
-                    <div className="px-2 py-2 whitespace-pre-line">
-                      {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
-                      {printingInvoice.sponsorId
-                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
-                        : (() => {
-                          const s = students.find(st => st.id === printingInvoice.studentId);
-                          return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
-                        })()}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 border border-[#d8ebf6]">
-                  <div className="grid grid-cols-3 bg-[#d8ebf6] text-[13px] font-semibold">
-                    <div className="px-2 py-1">CUSTOMER REF. NBR.</div>
-                    <div className="px-2 py-1">TERMS</div>
-                    <div className="px-2 py-1">CONTACT</div>
-                  </div>
-                  <div className="grid grid-cols-3 text-[13px]">
-                    <div className="px-2 py-1">{getInvoiceGlRef(printingInvoice)}</div>
-                    <div className="px-2 py-1">{printingInvoice.terms || '-'}</div>
-                    <div className="px-2 py-1">
-                      {printingInvoice.sponsorId
-                        ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.contactPerson || '-')
-                        : (students.find(s => s.id === printingInvoice.studentId)?.contactNumber || '-')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-[#d8ebf6]">
-                      <tr>
-                        <th className="px-3 py-2 text-left">NO.</th>
-                        <th className="px-3 py-2 text-left">ITEM</th>
-                        <th className="px-3 py-2 text-right">QTY.</th>
-                        <th className="px-3 py-2 text-right">UOM</th>
-                        <th className="px-3 py-2 text-right">UNIT PRICE</th>
-                        <th className="px-3 py-2 text-right">DISC.</th>
-                        <th className="px-3 py-2 text-right">EXTENDED PRICE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(printingInvoice.lines || []).map((line, idx) => (
-                        <tr key={line.id || idx} className="border-t border-gray-100">
-                          <td className="px-3 py-2">{idx + 1}</td>
-                          <td className="px-3 py-2">{line.description}</td>
-                          <td className="px-3 py-2 text-right">{line.quantity}</td>
-                          <td className="px-3 py-2 text-right">EA</td>
-                          <td className="px-3 py-2 text-right">{formatCurrency(line.unitPrice || 0)}</td>
-                          <td className="px-3 py-2 text-right">0%</td>
-                          <td className="px-3 py-2 text-right">{formatCurrency(line.amount || 0)}</td>
+                  <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-[#d8ebf6]">
+                        <tr>
+                          <th className="px-3 py-2 text-left">NO.</th>
+                          <th className="px-3 py-2 text-left">ITEM</th>
+                          <th className="px-3 py-2 text-right">QTY.</th>
+                          <th className="px-3 py-2 text-right">UOM</th>
+                          <th className="px-3 py-2 text-right">UNIT PRICE</th>
+                          <th className="px-3 py-2 text-right">DISC.</th>
+                          <th className="px-3 py-2 text-right">EXTENDED PRICE</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-6 flex justify-end">
-                  <div className="w-[320px] space-y-1">
-                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(printingInvoice.subtotal || 0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(printingInvoice.vatAmount || 0)}</span></div>
-                    <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(printingInvoice.grandTotal || 0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(printingInvoice.netAmountDue || 0)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(printingInvoice.amountPaid || 0)}</span></div>
-                    <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(printingInvoice.balanceDue || 0)}</span></div>
+                      </thead>
+                      <tbody>
+                        {(printingInvoice.lines || []).map((line, idx) => (
+                          <tr key={line.id || idx} className="border-t border-gray-100">
+                            <td className="px-3 py-2">{idx + 1}</td>
+                            <td className="px-3 py-2">{line.description}</td>
+                            <td className="px-3 py-2 text-right">{line.quantity}</td>
+                            <td className="px-3 py-2 text-right">EA</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(line.unitPrice || 0)}</td>
+                            <td className="px-3 py-2 text-right">0%</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(line.amount || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
 
-                {printingInvoice.notes && (
-                  <div className="mt-8">
-                    <p className="text-gray-500 uppercase text-[11px] tracking-wide">Notes</p>
-                    <p className="mt-1">{printingInvoice.notes}</p>
+                  <div className="mt-6 flex justify-end">
+                    <div className="w-[320px] space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(printingInvoice.subtotal || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(printingInvoice.vatAmount || 0)}</span></div>
+                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(printingInvoice.grandTotal || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(printingInvoice.netAmountDue || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(printingInvoice.amountPaid || 0)}</span></div>
+                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(printingInvoice.balanceDue || 0)}</span></div>
+                    </div>
                   </div>
-                )}
+
+                  {printingInvoice.notes && (
+                    <div className="mt-8">
+                      <p className="text-gray-500 uppercase text-[11px] tracking-wide">Notes</p>
+                      <p className="mt-1">{printingInvoice.notes}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-</ModalPortal>
-      )}
+            </div>
+          </ModalPortal>
+        )}
 
       {/* Void Modal */}
       {
         showVoidModal && voidingInvoice && (
           <ModalPortal>
-<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-              <div className="p-4 border-b flex items-center gap-3">
-                <div className="p-2 bg-rose-100 rounded-lg">
-                  <AlertTriangle size={20} className="text-rose-600" />
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                <div className="p-4 border-b flex items-center gap-3">
+                  <div className="p-2 bg-rose-100 rounded-lg">
+                    <AlertTriangle size={20} className="text-rose-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">Void Invoice</h3>
+                    <p className="text-sm text-gray-500">{voidingInvoice.invoiceNo}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-800">Void Invoice</h3>
-                  <p className="text-sm text-gray-500">{voidingInvoice.invoiceNo}</p>
+                <div className="p-4">
+                  <label className="text-sm font-medium text-gray-700">Reason for voiding *</label>
+                  <textarea
+                    value={voidReason}
+                    onChange={e => setVoidReason(e.target.value)}
+                    rows={3}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-200"
+                    placeholder="Enter reason..."
+                  />
                 </div>
-              </div>
-              <div className="p-4">
-                <label className="text-sm font-medium text-gray-700">Reason for voiding *</label>
-                <textarea
-                  value={voidReason}
-                  onChange={e => setVoidReason(e.target.value)}
-                  rows={3}
-                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-200"
-                  placeholder="Enter reason..."
-                />
-              </div>
-              <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
-                <button
-                  onClick={() => { setShowVoidModal(false); setVoidingInvoice(null); setVoidReason(''); }}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleVoid}
-                  disabled={!voidReason.trim()}
-                  className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50"
-                >
-                  Void Invoice
-                </button>
+                <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
+                  <button
+                    onClick={() => { setShowVoidModal(false); setVoidingInvoice(null); setVoidReason(''); }}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleVoid}
+                    disabled={!voidReason.trim()}
+                    className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50"
+                  >
+                    Void Invoice
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-</ModalPortal>
+          </ModalPortal>
         )}
 
       {/* Generate from Enrollments Modal */}
       {
         showGenerateModal && (
           <ModalPortal>
-<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b bg-purple-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Wand2 size={20} className="text-purple-600" />
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b bg-purple-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Wand2 size={20} className="text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-800">Generate Invoice from Enrollments</h3>
+                      <p className="text-sm text-gray-500">Select unbilled enrollments to create a draft invoice</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800">Generate Invoice from Enrollments</h3>
-                    <p className="text-sm text-gray-500">Select unbilled enrollments to create a draft invoice</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }}
-                  className="p-1 hover:bg-gray-200 rounded"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Step 1: Select Sponsor */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-                    <Building2 size={16} className="text-gray-400" />
-                    Step 1: Select Sponsor
-                  </label>
-                  <select
-                    value={selectedSponsorId}
-                    onChange={e => {
-                      setSelectedSponsorId(e.target.value);
-                      setSelectedEnrollmentIds(new Set());
-                    }}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                  <button
+                    onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }}
+                    className="p-1 hover:bg-gray-200 rounded"
                   >
-                    <option value="">-- Select a Sponsor --</option>
-                    {sponsorsWithUnbilledEnrollments.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({unbilledEnrollmentsBySponsor.get(s.id)?.length || 0} unbilled)
-                        {s.taxType === 'VAT' ? ' - VAT' : ''}
-                        {s.ewtRate ? ` - EWT ${(s.ewtRate * 100).toFixed(0)}%` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedSponsorId && (
-                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
-                      {(() => {
-                        const sponsor = sponsors.find(s => s.id === selectedSponsorId);
-                        return (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <span className={`w-2 h-2 rounded-full ${sponsor?.taxType === 'VAT' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                              Tax Type: {sponsor?.taxType || 'NON_VAT'}
-                            </span>
-                            {sponsor?.ewtRate && (
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Step 1: Select Sponsor */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                      <Building2 size={16} className="text-gray-400" />
+                      Step 1: Select Sponsor
+                    </label>
+                    <select
+                      value={selectedSponsorId}
+                      onChange={e => {
+                        setSelectedSponsorId(e.target.value);
+                        setSelectedEnrollmentIds(new Set());
+                      }}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                    >
+                      <option value="">-- Select a Sponsor --</option>
+                      {sponsorsWithUnbilledEnrollments.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({unbilledEnrollmentsBySponsor.get(s.id)?.length || 0} unbilled)
+                          {s.taxType === 'VAT' ? ' - VAT' : ''}
+                          {s.ewtRate ? ` - EWT ${(s.ewtRate * 100).toFixed(0)}%` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedSponsorId && (
+                      <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                        {(() => {
+                          const sponsor = sponsors.find(s => s.id === selectedSponsorId);
+                          return (
+                            <>
                               <span className="flex items-center gap-1">
-                                <Percent size={14} className="text-purple-500" />
-                                EWT Rate: {(sponsor.ewtRate * 100).toFixed(1)}%
+                                <span className={`w-2 h-2 rounded-full ${sponsor?.taxType === 'VAT' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                Tax Type: {sponsor?.taxType || 'NON_VAT'}
                               </span>
-                            )}
-                            {sponsor?.tin && (
-                              <span className="text-gray-400">TIN: {sponsor.tin}</span>
-                            )}
-                          </>
-                        );
-                      })()}
+                              {sponsor?.ewtRate && (
+                                <span className="flex items-center gap-1">
+                                  <Percent size={14} className="text-purple-500" />
+                                  EWT Rate: {(sponsor.ewtRate * 100).toFixed(1)}%
+                                </span>
+                              )}
+                              {sponsor?.tin && (
+                                <span className="text-gray-400">TIN: {sponsor.tin}</span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Invoice Dates */}
+                  {selectedSponsorId && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                          <Calendar size={16} className="text-gray-400" />
+                          Invoice Date
+                        </label>
+                        <input
+                          type="date"
+                          value={generateInvoiceDate}
+                          onChange={e => setGenerateInvoiceDate(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                          <Calendar size={16} className="text-gray-400" />
+                          Due Date
+                        </label>
+                        <input
+                          type="date"
+                          value={generateDueDate}
+                          onChange={e => setGenerateDueDate(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
+                        />
+                      </div>
                     </div>
                   )}
-                </div>
 
-                {/* Invoice Dates */}
-                {selectedSponsorId && (
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Step 2: Select Enrollments */}
+                  {selectedSponsorId && unbilledEnrollmentsForSponsor.length > 0 && (
                     <div>
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-                        <Calendar size={16} className="text-gray-400" />
-                        Invoice Date
-                      </label>
-                      <input
-                        type="date"
-                        value={generateInvoiceDate}
-                        onChange={e => setGenerateInvoiceDate(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-                        <Calendar size={16} className="text-gray-400" />
-                        Due Date
-                      </label>
-                      <input
-                        type="date"
-                        value={generateDueDate}
-                        onChange={e => setGenerateDueDate(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                  </div>
-                )}
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <Users size={16} className="text-gray-400" />
+                          Step 2: Select Enrollments to Bill
+                        </label>
+                        <button
+                          onClick={toggleAllEnrollments}
+                          className="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                        >
+                          {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length ? (
+                            <>
+                              <XCircle size={14} /> Deselect All
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle size={14} /> Select All ({unbilledEnrollmentsForSponsor.length})
+                            </>
+                          )}
+                        </button>
+                      </div>
 
-                {/* Step 2: Select Enrollments */}
-                {selectedSponsorId && unbilledEnrollmentsForSponsor.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <Users size={16} className="text-gray-400" />
-                        Step 2: Select Enrollments to Bill
-                      </label>
-                      <button
-                        onClick={toggleAllEnrollments}
-                        className="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1"
-                      >
-                        {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length ? (
-                          <>
-                            <XCircle size={14} /> Deselect All
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle size={14} /> Select All ({unbilledEnrollmentsForSponsor.length})
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left w-10">
-                              <button onClick={toggleAllEnrollments}>
-                                {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length
-                                  ? <CheckSquare size={18} className="text-purple-600" />
-                                  : <Square size={18} className="text-gray-400" />
-                                }
-                              </button>
-                            </th>
-                            <th className="px-3 py-2 text-left">Student</th>
-                            <th className="px-3 py-2 text-left">Batch</th>
-                            <th className="px-3 py-2 text-left">Qualification</th>
-                            <th className="px-3 py-2 text-right">Fee Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {unbilledEnrollmentsForSponsor.map(enrollment => {
-                            const student = students.find(s => s.id === enrollment.studentId);
-                            const batch = batches.find(b => b.id === enrollment.batchId);
-                            const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
-                            const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive);
-                            const feeAmount = courseFee?.amount || enrollment.totalFees || 0;
-                            const isSelected = selectedEnrollmentIds.has(enrollment.id);
-
-                            return (
-                              <tr
-                                key={enrollment.id}
-                                className={`cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-purple-50' : ''}`}
-                                onClick={() => toggleEnrollmentSelection(enrollment.id)}
-                              >
-                                <td className="px-3 py-2">
-                                  {isSelected
+                      <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left w-10">
+                                <button onClick={toggleAllEnrollments}>
+                                  {selectedEnrollmentIds.size === unbilledEnrollmentsForSponsor.length
                                     ? <CheckSquare size={18} className="text-purple-600" />
                                     : <Square size={18} className="text-gray-400" />
                                   }
-                                </td>
-                                <td className="px-3 py-2">
-                                  <div className="flex items-center gap-2">
-                                    <GraduationCap size={14} className="text-gray-400" />
-                                    <span className="font-medium">{student?.firstName} {student?.lastName}</span>
-                                  </div>
-                                  {student?.uli && <span className="text-xs text-gray-400 ml-5">{student.uli}</span>}
-                                </td>
-                                <td className="px-3 py-2 text-gray-600">{batch?.batchCode || '-'}</td>
-                                <td className="px-3 py-2 text-gray-600">{qualification?.name || '-'}</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(feeAmount)}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                                </button>
+                              </th>
+                              <th className="px-3 py-2 text-left">Student</th>
+                              <th className="px-3 py-2 text-left">Batch</th>
+                              <th className="px-3 py-2 text-left">Qualification</th>
+                              <th className="px-3 py-2 text-right">Fee Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {unbilledEnrollmentsForSponsor.map(enrollment => {
+                              const student = students.find(s => s.id === enrollment.studentId);
+                              const batch = batches.find(b => b.id === enrollment.batchId);
+                              const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
+                              const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive);
+                              const feeAmount = courseFee?.amount || enrollment.totalFees || 0;
+                              const isSelected = selectedEnrollmentIds.has(enrollment.id);
 
-                {/* Preview Totals */}
-                {selectedEnrollmentIds.size > 0 && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                      <Receipt size={16} />
-                      Invoice Preview
-                    </h4>
-
-                    {/* Preview Line Items */}
-                    <div className="mb-4 space-y-2">
-                      {generatePreviewTotals.lineItems.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-sm">
-                          <span className="text-gray-600">
-                            {item.description}
-                          </span>
-                          <span className="font-medium">{formatCurrency(item.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Totals */}
-                    <div className="border-t pt-3 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Subtotal:</span>
-                        <span className="font-medium">{formatCurrency(generatePreviewTotals.subtotal)}</span>
-                      </div>
-                      {generatePreviewTotals.vatAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Add: VAT (12%):</span>
-                          <span>{formatCurrency(generatePreviewTotals.vatAmount)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="font-medium">Grand Total:</span>
-                        <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.grandTotal)}</span>
-                      </div>
-
-                      <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
-                        <span className="font-bold">Net Amount Due:</span>
-                        <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.netAmountDue)}</span>
+                              return (
+                                <tr
+                                  key={enrollment.id}
+                                  className={`cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-purple-50' : ''}`}
+                                  onClick={() => toggleEnrollmentSelection(enrollment.id)}
+                                >
+                                  <td className="px-3 py-2">
+                                    {isSelected
+                                      ? <CheckSquare size={18} className="text-purple-600" />
+                                      : <Square size={18} className="text-gray-400" />
+                                    }
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <GraduationCap size={14} className="text-gray-400" />
+                                      <span className="font-medium">{student?.firstName} {student?.lastName}</span>
+                                    </div>
+                                    {student?.uli && <span className="text-xs text-gray-400 ml-5">{student.uli}</span>}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-600">{batch?.batchCode || '-'}</td>
+                                  <td className="px-3 py-2 text-gray-600">{qualification?.name || '-'}</td>
+                                  <td className="px-3 py-2 text-right font-medium">{formatCurrency(feeAmount)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              {/* Footer */}
-              <div className="flex items-center justify-between p-4 border-t bg-gray-50">
-                <div className="text-sm text-gray-500">
+                  {/* Preview Totals */}
                   {selectedEnrollmentIds.size > 0 && (
-                    <span className="flex items-center gap-2">
-                      <CheckCircle size={16} className="text-green-500" />
-                      {selectedEnrollmentIds.size} enrollment(s) selected
-                    </span>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                        <Receipt size={16} />
+                        Invoice Preview
+                      </h4>
+
+                      {/* Preview Line Items */}
+                      <div className="mb-4 space-y-2">
+                        {generatePreviewTotals.lineItems.map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              {item.description}
+                            </span>
+                            <span className="font-medium">{formatCurrency(item.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Totals */}
+                      <div className="border-t pt-3 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Subtotal:</span>
+                          <span className="font-medium">{formatCurrency(generatePreviewTotals.subtotal)}</span>
+                        </div>
+                        {generatePreviewTotals.vatAmount > 0 && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Add: VAT (12%):</span>
+                            <span>{formatCurrency(generatePreviewTotals.vatAmount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between border-t pt-2">
+                          <span className="font-medium">Grand Total:</span>
+                          <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.grandTotal)}</span>
+                        </div>
+
+                        <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
+                          <span className="font-bold">Net Amount Due:</span>
+                          <span className="font-bold text-lg">{formatCurrency(generatePreviewTotals.netAmountDue)}</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleGenerateInvoice}
-                    disabled={selectedEnrollmentIds.size === 0}
-                    className="flex items-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    style={{ backgroundColor: selectedEnrollmentIds.size > 0 ? brandColor : '#9CA3AF' }}
-                  >
-                    <Save size={18} />
-                    Generate Draft Invoice
-                  </button>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between p-4 border-t bg-gray-50">
+                  <div className="text-sm text-gray-500">
+                    {selectedEnrollmentIds.size > 0 && (
+                      <span className="flex items-center gap-2">
+                        <CheckCircle size={16} className="text-green-500" />
+                        {selectedEnrollmentIds.size} enrollment(s) selected
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setShowGenerateModal(false); resetGenerateModal(); }}
+                      className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleGenerateInvoice}
+                      disabled={selectedEnrollmentIds.size === 0}
+                      className="flex items-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      style={{ backgroundColor: selectedEnrollmentIds.size > 0 ? brandColor : '#9CA3AF' }}
+                    >
+                      <Save size={18} />
+                      Generate Draft Invoice
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-</ModalPortal>
+          </ModalPortal>
         )}
     </div>
   );

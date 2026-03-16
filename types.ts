@@ -736,7 +736,7 @@ export interface Invoice extends BaseEntity {
 }
 
 // Payment - AR Payment/Collection from sponsors/students
-export type PaymentStatus = 'ON HOLD' | 'OPEN' | 'CLOSED' | 'VOIDED';
+export type PaymentStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'VOIDED' | 'POSTED';
 export type PaymentMethod = 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'EWALLET' | 'OFFSET';
 
 export interface PaymentApplication extends BaseEntity {

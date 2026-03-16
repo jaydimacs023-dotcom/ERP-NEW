@@ -105,6 +105,7 @@ export default function App() {
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [navigationContext, setNavigationContext] = useState<any>(null);
 
   // Data service reference for CRUD operations
   const [dataService] = useState(() => DataServiceFactory.getService());
@@ -472,17 +473,40 @@ export default function App() {
         setPurchaseOrders(data.purchaseOrders);
         const loadedPayments = (data.payments || []).filter(p => !p.isDeleted) as Payment[];
         const loadedPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        // backfill payment records with glEntryNumber from their journal entries
+        const paymentGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
           const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
           const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
+          
+          let glEntryNumber = payment.glEntryNumber;
+          if (!glEntryNumber && payment.journalEntryId) {
+            const je = normalizedEntries.find(e => e.id === payment.journalEntryId);
+            if (je && je.glEntryNumber) {
+              glEntryNumber = je.glEntryNumber;
+              paymentGlBackfills.push({ id: payment.id, glEntryNumber: je.glEntryNumber });
+            }
+          }
+
           return {
             ...payment,
+            glEntryNumber,
             applications: apps,
             totalApplied: payment.totalApplied ?? appliedTotal,
             customerDepositBalance: payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0)
           } as Payment;
         });
+
+        if (paymentGlBackfills.length > 0) {
+          Promise.all(
+            paymentGlBackfills.map((p: any) => {
+              return dataService.updateEntity('payments', p.id, { glEntryNumber: p.glEntryNumber });
+            })
+          )
+            .then(() => console.info('[App] backfilled missing payment GL references'))
+            .catch(err => console.warn('[App] failed to backfill payment GL references', err));
+        }
         setPayments(paymentsWithApplications);
         setFixedAssets(data.fixedAssets);
         setPayables(data.payables || []);
@@ -823,9 +847,10 @@ export default function App() {
     }
   };
 
-  const navigateTo = (tab: string) => {
+  const navigateTo = (tab: string, context?: any) => {
     setActiveTab(tab);
     setLedgerSearchTerm('');
+    setNavigationContext(context);
   };
 
   const handleConvertToBill = (po: PurchaseOrder) => {
@@ -3275,46 +3300,46 @@ export default function App() {
     try {
       const existing = payments.find(p => p.id === payment.id);
       const postingTs = new Date().toISOString();
-      const paymentToPost: Payment = {
+      const paymentToApprove: Payment = {
         ...payment,
         orgId: payment.orgId || currentOrgId,
-        status: 'POSTED',
+        status: 'OPEN',
         postedAt: payment.postedAt || postingTs,
         postedBy: payment.postedBy || currentUser?.id || 'system',
         updatedAt: postingTs
       };
-      if (paymentToPost.orgId !== currentOrgId || (existing && existing.orgId !== currentOrgId)) {
-        handleNotify('error', 'Cross-organization payment posting is not allowed.');
+      if (paymentToApprove.orgId !== currentOrgId || (existing && existing.orgId !== currentOrgId)) {
+        handleNotify('error', 'Cross-organization payment approval is not allowed.');
         return;
       }
 
       // Skip GL if already posted before and linked.
       if (existing?.journalEntryId) {
-        const savedPayment = await dataService.updateEntity('payments', paymentToPost.id, paymentToPost);
+        const savedPayment = await dataService.updateEntity('payments', paymentToApprove.id, paymentToApprove);
         if (existing) {
-          setPayments(prev => prev.map(p => p.id === paymentToPost.id ? { ...p, ...(savedPayment as Payment) } : p));
+          setPayments(prev => prev.map(p => p.id === paymentToApprove.id ? { ...p, ...(savedPayment as Payment) } : p));
         } else {
           setPayments(prev => [...prev, savedPayment as Payment]);
         }
-        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentToPost.id, paymentToPost.paymentNo, existing, paymentToPost);
-        handleNotify('success', `Payment ${paymentToPost.paymentNo} posted successfully`);
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentToApprove.id, paymentToApprove.paymentNo, existing, paymentToApprove);
+        handleNotify('success', `Payment ${paymentToApprove.paymentNo} approved successfully`);
         return;
       }
 
-      const { cashAccount, customerDepositsAccount, ewtReceivableAccount } = resolvePaymentPostingAccounts(paymentToPost);
-      const amountReceived = Number(paymentToPost.amountReceived ?? 0) || 0;
-      const ewtAmount = Number(paymentToPost.ewtAmountCertified ?? 0) || 0;
+      const { cashAccount, customerDepositsAccount, ewtReceivableAccount } = resolvePaymentPostingAccounts(paymentToApprove);
+      const amountReceived = Number(paymentToApprove.amountReceived ?? 0) || 0;
+      const ewtAmount = Number(paymentToApprove.ewtAmountCertified ?? 0) || 0;
 
       if (!cashAccount) {
-        handleNotify('error', 'Cannot post payment: cash/bank GL account not found.');
+        handleNotify('error', 'Cannot approve payment: cash/bank GL account not found.');
         return;
       }
       if (!customerDepositsAccount) {
-        handleNotify('error', 'Cannot post payment: Customer Deposits account is not configured.');
+        handleNotify('error', 'Cannot approve payment: Customer Deposits account is not configured.');
         return;
       }
       if (ewtAmount > 0 && !ewtReceivableAccount) {
-        handleNotify('error', 'Cannot post payment: Creditable Withholding Tax (CWT 2307) account is not configured (required when EWT Amount > 0).');
+        handleNotify('error', 'Cannot approve payment: Creditable Withholding Tax (CWT 2307) account is not configured (required when EWT Amount > 0).');
         return;
       }
 
@@ -3322,12 +3347,12 @@ export default function App() {
       const paymentEntry: Partial<JournalEntry> = {
         orgId: currentOrgId,
         periodId: '',
-        date: paymentToPost.paymentDate,
-        description: `Payment ${paymentToPost.paymentNo} posted`,
-        reference: paymentToPost.paymentNo,
+        date: paymentToApprove.paymentDate,
+        description: `Payment ${paymentToApprove.paymentNo} approved`,
+        reference: paymentToApprove.paymentNo,
         status: 'POSTED',
         sourceType: 'PAYMENT',
-        sourceRef: paymentToPost.id,
+        sourceRef: paymentToApprove.id,
         createdBy: currentUser?.id || 'system',
         createdAt: postingTs
       };
@@ -3340,7 +3365,7 @@ export default function App() {
           accountId: cashAccount.id,
           debit: amountReceived,
           credit: 0,
-          description: `Cash receipt for ${paymentToPost.paymentNo}`
+          description: `Cash receipt for ${paymentToApprove.paymentNo}`
         },
         ...(ewtAmount > 0 && ewtReceivableAccount ? [{
           id: `jl-${Date.now()}-2`,
@@ -3349,7 +3374,7 @@ export default function App() {
           accountId: ewtReceivableAccount.id,
           debit: ewtAmount,
           credit: 0,
-          description: `Creditable Withholding Tax (CWT 2307) for ${paymentToPost.paymentNo}`
+          description: `Creditable Withholding Tax (CWT 2307) for ${paymentToApprove.paymentNo}`
         }] : []),
         {
           id: `jl-${Date.now()}-3`,
@@ -3358,18 +3383,18 @@ export default function App() {
           accountId: customerDepositsAccount.id,
           debit: 0,
           credit: totalCredit,
-          description: `Customer deposits for ${paymentToPost.paymentNo}`
+          description: `Customer deposits for ${paymentToApprove.paymentNo}`
         }
       ];
 
       const savedEntry = await handlePostJournal(paymentEntry, paymentLines);
       if (!savedEntry) {
-        handleNotify('error', `Payment ${paymentToPost.paymentNo} posting failed because GL posting was not saved.`);
+        handleNotify('error', `Payment ${paymentToApprove.paymentNo} approval failed because GL posting was not saved.`);
         return;
       }
 
       const finalizedPayment = {
-        ...paymentToPost,
+        ...paymentToApprove,
         journalEntryId: savedEntry.id,
         glEntryNumber: savedEntry.glEntryNumber || generateNextGlRef(),
         postedBy: currentUser?.id || 'system',
@@ -3380,9 +3405,9 @@ export default function App() {
         ? await dataService.updateEntity('payments', finalizedPayment.id, finalizedPayment)
         : await dataService.createEntity('payments', finalizedPayment);
       if (existing) {
-        setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...p, ...(savedPayment as Payment) } : p));
+        setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...finalizedPayment, ...(savedPayment as Payment) } : p));
       } else {
-        setPayments(prev => [...prev, savedPayment as Payment]);
+        setPayments(prev => [...prev, { ...finalizedPayment, ...(savedPayment as Payment) }]);
       }
 
       if (existing) {
@@ -3390,10 +3415,10 @@ export default function App() {
       } else {
         AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', finalizedPayment.id, finalizedPayment.paymentNo);
       }
-      handleNotify('success', `Payment ${finalizedPayment.paymentNo} posted successfully`);
+      handleNotify('success', `Payment ${finalizedPayment.paymentNo} approved successfully`);
     } catch (error) {
       console.error('[App] Error posting payment:', error);
-      handleNotify('error', 'Failed to post payment.');
+      handleNotify('error', 'Failed to approve payment.');
     }
   };
 
@@ -4457,6 +4482,7 @@ export default function App() {
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
             journalEntries={activeJournalEntries}
             onViewJournal={handleViewJournal}
+            onNavigate={navigateTo}
             organization={currentOrg}
             orgId={currentOrgId}
             taxCategories={taxCategories}
@@ -4478,6 +4504,8 @@ export default function App() {
             onApplyToInvoice={handleApplyToInvoice}
             onReverseApplication={handleReverseApplication}
             onViewJournal={handleViewJournal}
+            initialContext={navigationContext}
+            onClearContext={() => setNavigationContext(null)}
           />}
           {activeTab === 'bank-deposits' && <BankDepositsView
             deposits={bankDeposits.filter(d => d.orgId === currentOrgId && !d.isDeleted)}
