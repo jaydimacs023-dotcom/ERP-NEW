@@ -684,6 +684,7 @@ export interface InvoiceLine extends BaseEntity {
   amount: number;              // Same as grossAmount (for compatibility)
   taxCategoryId?: string;      // FK to TaxCategory
   glAccountId?: string;        // Revenue G/L account
+  classificationCode?: string; // Qualification Code (Class)
 }
 
 export interface Invoice extends BaseEntity {

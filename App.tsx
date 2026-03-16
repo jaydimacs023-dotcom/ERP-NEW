@@ -2897,6 +2897,7 @@ export default function App() {
           memo: line.description || `Revenue: ${glRef} Line ${idx + 1}`,
           contactId: invoice.sponsorId || invoice.studentId || undefined,
           contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+          classificationCode: line.classificationCode,
         } as JournalLine);
       }
     });

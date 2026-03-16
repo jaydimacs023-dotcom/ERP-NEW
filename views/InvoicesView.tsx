@@ -256,6 +256,34 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
   }, [viewMode, orgId]);
 
+  // Helper to get Classification Code (Class)
+  const getClassificationCode = (accountId?: string) => {
+    if (!accountId) return ''; // No account selected
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return '';
+
+    // If Revenue or Expense, use Batch Qualification Code or Student Qualification Code
+    if (account.accountClass === AccountClass.REVENUE || account.accountClass === AccountClass.EXPENSE) {
+      if (formData.batchId) {
+        const batch = batches.find(b => b.id === formData.batchId);
+        if (batch) {
+          const qual = qualifications.find(q => q.id === batch.qualificationId);
+          return qual?.code || '';
+        }
+      } else if (formData.studentId) {
+        const student = students.find(s => s.id === formData.studentId);
+        if (student && (student as any).qualificationId) {
+           const qual = qualifications.find(q => q.id === (student as any).qualificationId);
+           return qual?.code || '';
+        }
+      }
+      return ''; // Fallback if unable to find a qualification code for revenue/expense
+    } else {
+      // Asset, Liability, Equity
+      return '0000-0000';
+    }
+  };
+
   // whenever the list of tax categories changes, recompute net/vat/gross for existing lines
   // but do NOT touch the visible amount â€“ leave whatever the user entered intact
   useEffect(() => {
@@ -358,6 +386,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const vatAmount = 0;
       const grossAmount = netAmount; // initially no tax
 
+      // To evaluate classification correctly we temporarily patch the batchId into formData before evaluation although handleBatchChange does not wait
+      const code = (() => {
+         const account = accounts.find(a => a.id === fee.glAccountId);
+         if (!account) return '';
+         if (account.accountClass === AccountClass.REVENUE || account.accountClass === AccountClass.EXPENSE) {
+             const qual = qualifications.find(q => q.id === batch.qualificationId);
+             return qual?.code || '';
+         }
+         return '0000-0000';
+      })();
+
       return {
         id: generateUUID(),
         invoiceId: editingInvoice?.id || '',
@@ -370,7 +409,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         vatAmount,
         grossAmount,
         amount: netAmount,
-        glAccountId: fee.glAccountId
+        glAccountId: fee.glAccountId,
+        classificationCode: code
       };
     });
 
@@ -397,7 +437,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       vatAmount: 0,
       grossAmount: 0,
       amount: 0,
-      taxCategoryId: ''
+      taxCategoryId: '',
+      classificationCode: ''
     };
     setFormData(prev => ({ ...prev, lines: [...prev.lines, newLine] }));
   };
@@ -481,6 +522,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const lines = [...prev.lines];
       lines[index] = { ...lines[index], [field]: value };
 
+      // Auto-tag class when GL Account changes
+      if (field === 'glAccountId') {
+          lines[index].classificationCode = getClassificationCode(value as string);
+      }
+
       // when qty or unit price change, we may want to autoâ€‘populate the amount
       if ((field === 'quantity' || field === 'unitPrice')) {
         // only update the amount if the user hasn't already overridden it (i.e. it's zero)
@@ -538,7 +584,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         grossAmount,
         amount: netAmount,
         glAccountId: fee.glAccountId || updatedLines[index].glAccountId,
-        taxCategoryId: fee.taxCategoryId || updatedLines[index].taxCategoryId
+        taxCategoryId: fee.taxCategoryId || updatedLines[index].taxCategoryId,
+        classificationCode: getClassificationCode(fee.glAccountId || updatedLines[index].glAccountId)
       };
 
       setFormData(prev => ({ ...prev, lines: updatedLines }));
@@ -2182,6 +2229,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               )}
 
               {/* Individual Student Option */}
+              {/* Individual Student Option */}
               {!formData.batchId && (
                 <div>
                   <label className="text-xs font-medium text-gray-500">Or Select Student (Individual Billing)</label>
@@ -2199,8 +2247,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               )}
 
-
-
               {/* Line Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -2216,7 +2262,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
                 {viewMode === 'FORM' && localTaxCats.length === 0 && (
                   <div className="p-2 text-red-600 bg-red-100 text-xs">
-                    âš ï¸ No tax categories loaded. Please ensure your organization has entries in the <code>tax_categories</code> table and that RLS policies permit access.
+                    âš ï¸  No tax categories loaded. Please ensure your organization has entries in the <code>tax_categories</code> table and that RLS policies permit access.
                   </div>
                 )}
 
@@ -2225,6 +2271,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-3 py-2 text-left w-8">#</th>
+                        <th className="px-3 py-2 text-left w-32">Class</th>
                         <th className="px-3 py-2 text-left">Course Fee</th>
                         <th className="px-3 py-2 text-left w-50" >Description</th>
                         <th className="px-3 py-2 text-right w-25">Tax Category</th>
@@ -2237,7 +2284,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <tbody>
                       {formData.lines.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                          <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
                             No line items. Click "Add Line" to add items.
                           </td>
                         </tr>
@@ -2245,7 +2292,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         formData.lines.map((line, idx) => (
                           <tr key={line.id || idx} className="border-t">
                             <td className="px-3 py-2 text-gray-400">{line.lineNumber}</td>
-
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={line.classificationCode || ''}
+                                onChange={e => handleUpdateLine(idx, 'classificationCode', e.target.value)}
+                                disabled={isReadOnly}
+                                placeholder="Class"
+                                className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                              />
+                            </td>
                             <td className="px-3 py-2">
                               <select
                                 value={line.courseFeeId || ''}
@@ -2350,14 +2406,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <span className="font-bold text-lg">{formatCurrency(formTotals.grandTotal)}</span>
                   </div>
 
-                  <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
-                    <span className="font-bold">Net Amount Due:</span>
-                    <span className="font-bold text-lg">{formatCurrency(formTotals.netAmountDue)}</span>
                   </div>
                 </div>
-          </div>
-          </div>
-          </div>
+              </div>
+            </div>
         </>
       )}
 
@@ -2436,6 +2488,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-4 py-2 text-left">Class</th>
                           <th className="px-4 py-2 text-left">Description</th>
                           <th className="px-4 py-2 text-right">Qty</th>
                           <th className="px-4 py-2 text-right">Unit Price</th>
@@ -2445,6 +2498,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <tbody>
                         {viewingInvoice.lines?.map((line, idx) => (
                           <tr key={idx} className="border-t">
+                            <td className="px-4 py-2 text-xs text-gray-500">{line.classificationCode || 'None'}</td>
                             <td className="px-4 py-2">{line.description}</td>
                             <td className="px-4 py-2 text-right">{line.quantity}</td>
                             <td className="px-4 py-2 text-right">{formatCurrency(line.unitPrice)}</td>
