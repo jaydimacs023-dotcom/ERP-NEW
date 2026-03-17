@@ -4401,7 +4401,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handlePostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}

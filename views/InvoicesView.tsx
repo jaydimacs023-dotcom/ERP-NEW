@@ -919,7 +919,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: currency || 'PHP' }).format(amount);
   };
 
-  const getStatusBadge = (status: InvoiceStatus) => {
+  const getStatusBadge = (status: InvoiceStatus, className = '') => {
     const badges: Record<InvoiceStatus, { bg: string; text: string; label: string; title?: string }> = {
       'DRAFT': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'ON HOLD', title: 'Invoice saved as draft, pending approval' },
       'OPEN': { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'OPEN' },
@@ -927,7 +927,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       'VOIDED': { bg: 'bg-rose-100', text: 'text-rose-700', label: 'VOIDED' }
     };
     const badge = badges[status];
-    return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.bg} ${badge.text}`} title={badge.title || ''}>{badge.label}</span>;
+    return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.bg} ${badge.text} ${className}`} title={badge.title || ''}>{badge.label}</span>;
   };
 
   const getSponsorName = (id?: string) => sponsors.find(s => s.id === id)?.name || '-';
@@ -1854,7 +1854,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'status',
                 width: 'w-24',
                 align: 'text-left' as const,
-                render: (inv: any) => getStatusBadge(inv.status),
+                render: (inv: any) => getDisplayStatusLabel(inv.status),
               },
               // ── 4. GL Reference No. ───────────────────────
               {
@@ -2212,6 +2212,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
               {/* Bill To */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Invoice No. */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Invoice No.</label>
+                  <input
+                    type="text"
+                    value={formData.invoiceNo}
+                    readOnly
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 bg-gray-50 text-gray-900"
+                  />
+                </div>
                 {/* Reference */}
                 <div>
                   <label className="text-xs font-medium text-gray-500">External Reference</label>
@@ -2251,8 +2261,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500">Status</label>
-                  <div className="mt-1">
-                    {getStatusBadge(formData.status)}
+                  <div className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50">
+                    <span className="text-[13px] font-medium text-gray-700">
+                      {getDisplayStatusLabel(formData.status)}
+                    </span>
                   </div>
                 </div>
                 <div>
@@ -2270,13 +2282,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         return (
                           <button
                             onClick={() => (editingInvoice?.journalEntryId || je?.id) && onViewJournal && onViewJournal(editingInvoice?.journalEntryId || je?.id!)}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-mono font-bold rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 text-base font-normal rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
                             title="Click to view GL Accounting Entries"
                             style={{ cursor: 'pointer' }}
                           >
                             <Receipt size={16} />
                             <span>{glNum}</span>
-                            <span className="text-xs text-emerald-600 ml-auto">→ View GL Entries</span>
+                            <span className="text-base font-normal text-emerald-600 ml-auto">→ View GL Entries</span>
                           </button>
                         );
                       })()
