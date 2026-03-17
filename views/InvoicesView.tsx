@@ -459,6 +459,40 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     setFormData(prev => ({ ...prev, lines: [...prev.lines, newLine] }));
   };
 
+  const exportLineItemsToExcel = () => {
+    const columns = lineColOrder.map(colKey => {
+      switch (colKey) {
+        case 'lineNumber': return { label: '#', getter: (line: InvoiceLine) => line.lineNumber };
+        case 'classificationCode': return { label: 'Class', getter: (line: InvoiceLine) => line.classificationCode || '-' };
+        case 'courseFeeId': return { label: 'Course Fee', getter: (line: InvoiceLine) => courseFees.find(cf => cf.id === line.courseFeeId)?.feeName || (line.courseFeeId || '-') };
+        case 'description': return { label: 'Description', getter: (line: InvoiceLine) => line.description || '-' };
+        case 'taxCategoryId': return { label: 'Tax Category', getter: (line: InvoiceLine) => localTaxCats.find(tc => tc.id === line.taxCategoryId)?.description || (line.taxCategoryId || '-') };
+        case 'quantity': return { label: 'Qty', getter: (line: InvoiceLine) => line.quantity };
+        case 'unitPrice': return { label: 'Unit Price (₱)', getter: (line: InvoiceLine) => formatInputCurrency(line.unitPrice) };
+        case 'amount': return { label: 'Amount (₱)', getter: (line: InvoiceLine) => formatInputCurrency(line.amount) };
+        default: return null;
+      }
+    }).filter(Boolean) as { label: string; getter: (line: InvoiceLine) => any }[];
+    if (formData.lines.length === 0) { alert('No line items to export.'); return; }
+    const headers = columns.map(c => c.label);
+    const esc = (v: any) => escapeHtml(v);
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 8px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px;}th{padding:6px 8px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px;background:#059669;color:#fff;font-weight:700;}</style></head><body><table>';
+    html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
+    formData.lines.forEach(line => {
+      html += '<tr>' + columns.map(c => `<td>${esc(c.getter(line))}</td>`).join('') + '</tr>';
+    });
+    html += '</table></body></html>';
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice_LineItems_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // helper â€“ calculate amounts based on selected tax category
   //
   // The amount calculation always revolves around a *base* value which
@@ -920,46 +954,63 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+  const formatInputCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value ?? 0);
+  };
+
+  const parseInputCurrency = (value: string) => {
+    const cleaned = value.replace(/,/g, '').replace(/[₱\s]/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   // ── Export helpers ──────────────────────────────────────────────
+  const getDisplayStatusLabel = (s: InvoiceStatus) => {
+    const map: Record<InvoiceStatus, string> = { DRAFT: 'ON HOLD', OPEN: 'OPEN', CLOSED: 'CLOSED', VOIDED: 'VOIDED' };
+    return map[s] || s;
+  };
+
+  const getRegistryExportColumns = () => {
+    const allColumns = [
+      { key: 'invoiceDate', label: 'Date', value: (inv: Invoice) => inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-' },
+      { key: 'invoiceNo', label: 'Invoice No.', value: (inv: Invoice) => inv.invoiceNo || '-' },
+      { key: 'status', label: 'Status', value: (inv: Invoice) => getDisplayStatusLabel(inv.status) },
+      { key: 'glReference', label: 'GL Reference No.', value: (inv: Invoice) => getInvoiceGlRef(inv) },
+      { key: 'payer', label: 'Sponsor/Student', value: (inv: Invoice) => (inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)) },
+      { key: 'totalAmount', label: 'Grand Total', value: (inv: Invoice) => inv.grandTotal ?? 0 },
+      { key: 'balance', label: 'Balance', value: (inv: Invoice) => inv.balanceDue ?? 0 },
+    ];
+
+    const ordered = columnOrder.map(key => allColumns.find(c => c.key === key)).filter(Boolean) as typeof allColumns;
+    return ordered;
+  };
+
   const getExportRows = () => {
-    const statusLabel = (s: InvoiceStatus) => {
-      const map: Record<InvoiceStatus, string> = { DRAFT: 'ON HOLD', OPEN: 'OPEN', CLOSED: 'CLOSED', VOIDED: 'VOIDED' };
-      return map[s] || s;
-    };
-    return filteredInvoices.map(inv => ({
-      'Invoice No.': inv.invoiceNo || '-',
-      'Status': statusLabel(inv.status),
-      'GL Ref.': getInvoiceGlRef(inv),
-      'Sponsor/Student': inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId),
-      'Date': inv.invoiceDate || '-',
-      'Grand Total': inv.grandTotal ?? 0,
-      'Balance': inv.balanceDue ?? 0,
-    }));
+    const columns = getRegistryExportColumns();
+    return filteredInvoices.map(inv => {
+      const row: Record<string, any> = {};
+      columns.forEach(col => {
+        row[col.label] = col.value(inv);
+      });
+      return row;
+    });
   };
 
   const exportToExcel = () => {
     const rows = getExportRows();
     if (rows.length === 0) { alert('No invoices to export.'); return; }
-    // Use requested column order and labels
-    const exportOrder = [
-      { key: 'status', label: 'Status' },
-      { key: 'glReference', label: 'GL Reference No.' },
-      { key: 'payer', label: 'Sponsor/Student' },
-      { key: 'totalAmount', label: 'Grand Total' },
-      { key: 'balance', label: 'Balance' },
-    ];
-    const headers = exportOrder.map(col => col.label);
-    const keys = exportOrder.map(col => col.key);
+    const columns = getRegistryExportColumns();
+    const headers = columns.map(c => c.label);
     const esc = (v: any) => escapeHtml(v);
-    // Use emerald for header, font style/size for data
     let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
-      keys.forEach(k => {
-        const val = (r as any)[headerToExportKey(k)];
+      columns.forEach(col => {
+        const val = r[col.label];
         const isNum = typeof val === 'number';
-        html += `<td${isNum ? ' class="num"' : ''}>${esc(isNum ? val.toFixed(2) : val)}</td>`;
+        const value = isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val;
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(value)}</td>`;
       });
       html += '</tr>';
     });
@@ -975,24 +1026,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Helper to map column key to export row key
-  function headerToExportKey(key: string | undefined) {
-    switch (key) {
-      case 'invoiceNo': return 'Invoice No.';
-      case 'status': return 'Status';
-      case 'glReference': return 'GL Ref.';
-      case 'payer': return 'Sponsor/Student';
-      case 'invoiceDate': return 'Date';
-      case 'totalAmount': return 'Grand Total';
-      case 'balance': return 'Balance';
-      default: return key || '';
-    }
-  }
-
   const exportToPdf = () => {
     const rows = getExportRows();
     if (rows.length === 0) { alert('No invoices to export.'); return; }
-    const cols = Object.keys(rows[0]);
+    const columns = getRegistryExportColumns();
+    const cols = columns.map(c => c.label);
     const esc = (v: any) => escapeHtml(v);
     const orgName = organization?.name || 'Invoice Registry';
     let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice Registry</title><style>
@@ -1002,7 +1040,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       h2 { margin:0 0 4px; font-size:18px; }
       .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; font-size:11px; }
-      th { background:#F47721; color:#fff; padding:8px 10px; text-align:left; font-weight:700; }
+      th { background:#059669; color:#fff; padding:8px 10px; text-align:left; font-weight:700; }
       td { padding:7px 10px; border-bottom:1px solid #e5e7eb; }
       tr:nth-child(even) { background:#f9fafb; }
       .num { text-align:right; }
@@ -1014,9 +1052,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     rows.forEach(r => {
       html += '<tr>';
       cols.forEach(c => {
-        const val = (r as any)[c];
+        const val = r[c];
         const isNum = typeof val === 'number';
-        html += `<td${isNum ? ' class="num"' : ''}>${esc(isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val)}</td>`;
+        const value = isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val;
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(value)}</td>`;
       });
       html += '</tr>';
     });
@@ -1815,7 +1854,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'status',
                 width: 'w-24',
                 align: 'text-left' as const,
-                render: (inv: any) => inv.status,
+                render: (inv: any) => getStatusBadge(inv.status),
               },
               // ── 4. GL Reference No. ───────────────────────
               {
@@ -2263,13 +2302,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-700">Line Items</h4>
-                  <button
-                    onClick={handleAddLine}
-                    disabled={isReadOnly}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus size={16} /> Add Line
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={exportLineItemsToExcel}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition"
+                    >
+                      <FileSpreadsheet size={16} /> Export Line Items
+                    </button>
+                    <button
+                      onClick={handleAddLine}
+                      disabled={isReadOnly}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus size={16} /> Add Line
+                    </button>
+                  </div>
                 </div>
 
                 {viewMode === 'FORM' && localTaxCats.length === 0 && (
@@ -2279,7 +2326,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 )}
 
                 <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px' }}>
                     <thead className="bg-gray-50">
                       <tr>
                         {/* Column definitions for line items table */}
@@ -2291,10 +2338,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                             description: { key: 'description', label: 'Description', align: 'text-left', width: 180 },
                             taxCategoryId: { key: 'taxCategoryId', label: 'Tax Category', align: 'text-right', width: 120 },
                             quantity: { key: 'quantity', label: 'Qty', align: 'text-right', width: 80 },
-                            unitPrice: { key: 'unitPrice', label: 'Unit Price', align: 'text-right', width: 100 },
-                            amount: { key: 'amount', label: 'Amount', align: 'text-right', width: 100 },
+                            unitPrice: { key: 'unitPrice', label: 'Unit Price (₱)', align: 'text-right', width: 110 },
+                            amount: { key: 'amount', label: 'Amount (₱)', align: 'text-right', width: 110 },
                             actions: { key: 'actions', label: '', align: 'text-center', width: 40 },
                           };
+                          const lineCellStyle = { fontFamily: 'Arial, sans-serif', fontSize: '13px' };
                           return lineColOrder.map((colKey, idx) => {
                             const col = lineColDefs[colKey];
                             return (
@@ -2439,7 +2487,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                       }
                                     }
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
-                                      <span className="block text-xs text-gray-700 font-mono">{qualCode || <span className="text-gray-300">—</span>}</span>
+                                      <span className="block text-[13px] font-normal text-gray-700">{qualCode || <span className="text-gray-300">—</span>}</span>
                                     </td>;
                                   }
                                   case 'courseFeeId':
@@ -2448,11 +2496,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                         value={line.courseFeeId || ''}
                                         onChange={e => handleApplyCourseFee(idx, e.target.value)}
                                         disabled={isReadOnly}
-                                        className="w-full px-3 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="w-full px-3 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       >
                                         <option value="">-- Select --</option>
                                         {courseFees.map(cf => (
-                                          <option key={cf.id} value={cf.id}>{cf.feeCode} - {cf.feeName}</option>
+                                          <option key={cf.id} value={cf.id} style={{ fontFamily: 'Arial, sans-serif' }}>{cf.feeCode} - {cf.feeName}</option>
                                         ))}
                                       </select>
                                     </td>;
@@ -2464,7 +2512,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                         onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
                                         disabled={isReadOnly}
                                         placeholder="Description"
-                                        className="w-full px-2 py-1 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       />
                                     </td>;
                                   case 'taxCategoryId':
@@ -2473,7 +2521,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                         value={line.taxCategoryId || ''}
                                         onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
                                         disabled={isReadOnly}
-                                        className="w-full px-2 py-1 rounded text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       >
                                         <option value="">-- None --</option>
                                         {localTaxCats.map(tc => (
@@ -2491,32 +2539,34 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                         value={line.quantity}
                                         onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
                                         disabled={isReadOnly}
-                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       />
                                     </td>;
                                   case 'unitPrice':
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={line.unitPrice}
-                                        onChange={e => handleUpdateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                        disabled={isReadOnly}
-                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
-                                      />
+                                      <div className="flex items-center gap-1 justify-end">
+                                        <span className="text-[13px] font-normal text-gray-500">₱</span>
+                                        <input
+                                          type="text"
+                                          value={formatInputCurrency(line.unitPrice)}
+                                          onChange={e => handleUpdateLine(idx, 'unitPrice', parseInputCurrency(e.target.value))}
+                                          disabled={isReadOnly}
+                                          className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        />
+                                      </div>
                                     </td>;
                                   case 'amount':
-                                    return <td key={colKey} className="px-3 py-2 text-right font-medium" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={line.amount}
-                                        onChange={e => handleUpdateLine(idx, 'amount', parseFloat(e.target.value) || 0)}
-                                        disabled={isReadOnly}
-                                        className="w-full px-2 py-1 rounded text-right disabled:opacity-60 disabled:cursor-not-allowed"
-                                      />
+                                    return <td key={colKey} className="px-3 py-2 text-right" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <div className="flex items-center gap-1 justify-end">
+                                        <span className="text-[13px] font-normal text-gray-500">₱</span>
+                                        <input
+                                          type="text"
+                                          value={formatInputCurrency(line.amount)}
+                                          onChange={e => handleUpdateLine(idx, 'amount', parseInputCurrency(e.target.value))}
+                                          disabled={isReadOnly}
+                                          className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        />
+                                      </div>
                                     </td>;
                                   case 'actions':
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
@@ -3102,7 +3152,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                   </td>
                                   <td className="px-3 py-2 text-gray-600">{batch?.batchCode || '-'}</td>
                                   <td className="px-3 py-2 text-gray-600">{qualification?.name || '-'}</td>
-                                  <td className="px-3 py-2 text-right font-medium">{formatCurrency(feeAmount)}</td>
+                                  <td className="px-3 py-2 text-right">{formatCurrency(feeAmount)}</td>
                                 </tr>
                               );
                             })}
@@ -3195,4 +3245,5 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 };
 
 export default InvoicesView;
+
 
