@@ -32,7 +32,7 @@ const Ledger: React.FC<LedgerProps> = ({
   initialSearchTerm = ''
 }) => {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'POSTED' | 'REVERSED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ON_HOLD' | 'POSTED' | 'REVERSED'>('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
@@ -66,7 +66,7 @@ const Ledger: React.FC<LedgerProps> = ({
     const numericTerm = term.replace(/[, ]/g, '');
 
     return entries.filter(entry => {
-      const entryStatus = (entry.status || 'DRAFT') as JournalEntry['status'];
+      const entryStatus = (entry.status === 'DRAFT' ? 'ON_HOLD' : (entry.status || 'ON_HOLD')) as JournalEntry['status'] | 'ON_HOLD';
       const matchesStatus = statusFilter === 'ALL' || entryStatus === statusFilter;
 
       let matchesDate = true;
@@ -92,7 +92,7 @@ const Ledger: React.FC<LedgerProps> = ({
 
       const matchesOpenOnHoldDescription =
         hasLetters &&
-        (entryStatus === 'POSTED' || entryStatus === 'DRAFT') &&
+        (entryStatus === 'POSTED' || entryStatus === 'ON_HOLD') &&
         (entry.description || '').toLowerCase().includes(term);
 
       const total = entryTotals.get(entry.id) || 0;
@@ -118,7 +118,7 @@ const Ledger: React.FC<LedgerProps> = ({
         case 'glReference': return (entry.glEntryNumber || entry.reference || '').trim();
         case 'description': return entry.description || '';
         case 'total': return entryTotals.get(entry.id) || 0;
-        case 'status': return entry.status || 'DRAFT';
+        case 'status': return entry.status || 'ON_HOLD';
         case 'createdBy': return getCreatedByName(entry.createdBy) || '';
         case 'createdOn': return entry.createdAt || '';
         default: return (entry as any)[key] ?? '';
@@ -163,6 +163,7 @@ const Ledger: React.FC<LedgerProps> = ({
   const getDisplayStatusLabel = (status?: JournalEntry['status']) => {
     const map: Record<JournalEntry['status'], string> = {
       DRAFT: 'ON HOLD',
+      ON_HOLD: 'ON HOLD',
       POSTED: 'POSTED',
       REVERSED: 'REVERSED',
       REVISION_REQUESTED: 'REVISION REQUESTED'
@@ -184,7 +185,7 @@ const Ledger: React.FC<LedgerProps> = ({
     { key: 'glReference', label: 'GL Reference No.', value: (e: JournalEntry) => (e.glEntryNumber || e.reference || '-').trim() },
     { key: 'description', label: 'Description', value: (e: JournalEntry) => e.description || '-' },
     { key: 'total', label: 'Transaction Total', value: (e: JournalEntry) => entryTotals.get(e.id) || 0 },
-    { key: 'status', label: 'Status', value: (e: JournalEntry) => (e.status || 'DRAFT') },
+    { key: 'status', label: 'Status', value: (e: JournalEntry) => getDisplayStatusLabel(e.status || 'ON_HOLD') },
     { key: 'createdBy', label: 'Created By', value: (e: JournalEntry) => getCreatedByName(e.createdBy) },
     { key: 'createdOn', label: 'Created On', value: (e: JournalEntry) => formatEntryDate(e.createdAt) },
   ]);
@@ -316,7 +317,7 @@ const Ledger: React.FC<LedgerProps> = ({
               className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
             >
               <option value="ALL">All</option>
-              <option value="DRAFT">ON HOLD</option>
+              <option value="ON_HOLD">ON HOLD</option>
               <option value="POSTED">POSTED</option>
               <option value="REVERSED">REVERSED</option>
             </select>
@@ -575,7 +576,7 @@ const Ledger: React.FC<LedgerProps> = ({
             ) : (
               sortedEntries.map(entry => {
                 const controlTotal = entryTotals.get(entry.id) || 0;
-                const statusLabel = entry.status || 'DRAFT';
+                const statusLabel = entry.status || 'ON_HOLD';
 
                 const cells: Record<string, React.ReactNode> = {
                   source: (
@@ -718,7 +719,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                 entry.status === 'REVERSED' ? 'bg-rose-100 text-rose-600' :
                 'bg-blue-100 text-blue-700'
               }`}>
-                {entry.status || 'DRAFT'}
+                {getDisplayStatusLabel(entry.status || 'ON_HOLD')}
               </span>
             } />
             <DetailItem label="Created By" value={getCreatedByName(entry.createdBy)} />
@@ -785,7 +786,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                <button className="px-5 py-2.5 text-xs font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-all text-slate-600 uppercase tracking-wide shadow-sm" onClick={() => window.print()}>Print Voucher</button>
             </div>
             <div className="flex gap-4">
-               {entry.status === 'DRAFT' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
+               {(entry.status === 'DRAFT' || entry.status === 'ON_HOLD') && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
                   <button onClick={() => { onApprove?.(entry.id); onClose(); }} className="px-10 py-3 bg-[#F47721] text-white rounded-2xl text-sm font-bold shadow-xl shadow-orange-100 hover:bg-[#E06610] active:scale-95 transition-all">Authorize Posting</button>
                )}
                {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (

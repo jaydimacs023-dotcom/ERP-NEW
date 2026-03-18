@@ -141,7 +141,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
       unpaidAmount: unpaidPayables.reduce((sum, p) => sum + (p.netPayable || p.amount), 0),
       unpostedCount: unpostedPayables.length,
       journalCount: periodEntries.length,
-      draftEntries: periodEntries.filter(e => e.status === 'DRAFT').length,
+      draftEntries: periodEntries.filter(e => e.status === 'DRAFT' || e.status === 'ON_HOLD').length,
     };
   };
 

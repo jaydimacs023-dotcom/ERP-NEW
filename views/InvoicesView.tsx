@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser } from '../types';
 import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -18,6 +18,7 @@ interface InvoicesViewProps {
   invoices: Invoice[];
   sponsors: Sponsor[];
   students: Student[];
+  users: AppUser[];
   enrollments: Enrollment[];
   batches: Batch[];
   qualifications: Qualification[];
@@ -41,7 +42,7 @@ interface InvoicesViewProps {
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
-  invoices, sponsors, students, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
+  invoices, sponsors, students, users, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
@@ -74,7 +75,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // Drag-and-drop column ordering state (registry table)
   const [columnOrder, setColumnOrder] = useState<string[]>([
-    'invoiceDate', 'invoiceNo', 'status', 'glReference', 'payer', 'totalAmount', 'balance'
+    'invoiceDate', 'postPeriod', 'invoiceNo', 'status', 'glReference', 'payer', 'totalAmount', 'balance', 'createdBy', 'createdOn'
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
 
@@ -136,6 +137,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     batchId: string;
     invoiceDate: string;
     dueDate: string;
+    status: InvoiceStatus;
+    reference?: string;
+    terms?: string;
     notes: string;
     vatPricing: 'EXCLUSIVE' | 'INCLUSIVE' | 'EXEMPT';
     vatRate: number;
@@ -149,7 +153,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     batchId: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'DRAFT',
+    status: 'ON_HOLD',
     reference: '',
     terms: 'Net 30',
     notes: '',
@@ -201,7 +205,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       batchId: '',
       invoiceDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'DRAFT',
+      status: 'ON_HOLD',
       reference: '',
       terms: 'Net 30',
       vatPricing: 'INCLUSIVE',
@@ -222,6 +226,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // Open modal for editing
   const handleEdit = (invoice: Invoice) => {
     setEditingInvoice(invoice);
+    const normalizedStatus = invoice.status === 'DRAFT' ? 'ON_HOLD' : invoice.status;
     setFormData({
       invoiceNo: invoice.invoiceNo,
       sponsorId: invoice.sponsorId || '',
@@ -230,7 +235,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       batchId: invoice.batchId || '',
       invoiceDate: invoice.invoiceDate,
       dueDate: invoice.dueDate,
-      status: invoice.status,
+      status: normalizedStatus,
       reference: invoice.reference || '',
       terms: invoice.terms || '',
       notes: invoice.notes || '',
@@ -665,7 +670,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       batchId: formData.batchId || undefined,
       invoiceDate: formData.invoiceDate,
       dueDate: formData.dueDate,
-      status: formData.status,
+      status: formData.status === 'DRAFT' ? 'ON_HOLD' : formData.status,
       vatPricing: formData.vatPricing,
       vatRate: formData.vatRate,
       subtotal: totals.subtotal,
@@ -679,6 +684,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       terms: formData.terms || undefined,
       notes: formData.notes || undefined,
       lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
+      createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -730,6 +736,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       terms: formData.terms || undefined,
       notes: formData.notes || undefined,
       lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
+      createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       postedAt: new Date().toISOString()
@@ -815,7 +822,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'ALL' || inv.status === statusFilter;
+      const normalizedStatus = inv.status === 'DRAFT' ? 'ON_HOLD' : inv.status;
+      const matchesStatus = statusFilter === 'ALL' ||
+        (statusFilter === 'ON_HOLD' ? (normalizedStatus === 'ON_HOLD') : normalizedStatus === statusFilter);
       
       let matchesDate = true;
       const today = new Date().toISOString().split('T')[0];
@@ -868,6 +877,23 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         valB = new Date(valB).getTime();
       }
 
+      if (key === 'postPeriod') {
+        const dateA = new Date(a.invoiceDate);
+        const dateB = new Date(b.invoiceDate);
+        valA = Number.isNaN(dateA.getTime()) ? 0 : (dateA.getFullYear() * 100) + (dateA.getMonth() + 1);
+        valB = Number.isNaN(dateB.getTime()) ? 0 : (dateB.getFullYear() * 100) + (dateB.getMonth() + 1);
+      }
+
+      if (key === 'createdBy') {
+        valA = getCreatedByName(a.createdBy);
+        valB = getCreatedByName(b.createdBy);
+      }
+
+      if (key === 'createdOn') {
+        valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      }
+
       if (key === 'totalAmount') {
         valA = a.grandTotal;
         valB = b.grandTotal;
@@ -886,11 +912,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const comparison = (valA || 0) - (valB || 0);
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [invoices, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, sortConfig, payerFilterMode, payerSearchTerm]);
+  }, [invoices, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, users, sortConfig, payerFilterMode, payerSearchTerm]);
 
   // Summary stats
   const stats = useMemo(() => {
-    const draft = invoices.filter(i => i.status === 'DRAFT');
+    const draft = invoices.filter(i => i.status === 'DRAFT' || i.status === 'ON_HOLD');
     const open = invoices.filter(i => i.status === 'OPEN');
     const closed = invoices.filter(i => i.status === 'CLOSED');
     const voided = invoices.filter(i => i.status === 'VOIDED');
@@ -922,6 +948,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const getStatusBadge = (status: InvoiceStatus, className = '') => {
     const badges: Record<InvoiceStatus, { bg: string; text: string; label: string; title?: string }> = {
       'DRAFT': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'ON HOLD', title: 'Invoice saved as draft, pending approval' },
+      'ON_HOLD': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'ON HOLD', title: 'Invoice saved as draft, pending approval' },
       'OPEN': { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'OPEN' },
       'CLOSED': { bg: 'bg-slate-100', text: 'text-slate-700', label: 'CLOSED' },
       'VOIDED': { bg: 'bg-rose-100', text: 'text-rose-700', label: 'VOIDED' }
@@ -958,6 +985,29 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value ?? 0);
   };
 
+  const formatPostPeriod = (dateValue?: string) => {
+    if (!dateValue) return '';
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${month}-${year}`;
+  };
+
+  const formatCreatedOn = (value?: string) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return format(parsed, 'MM-dd-yyyy');
+  };
+
+  const getCreatedByName = (createdBy?: string) => {
+    if (!createdBy) return '-';
+    if (createdBy === 'system') return 'System';
+    const user = users.find(u => u.id === createdBy);
+    return user?.name || user?.email || createdBy;
+  };
+
   const parseInputCurrency = (value: string) => {
     const cleaned = value.replace(/,/g, '').replace(/[₱\s]/g, '');
     const parsed = parseFloat(cleaned);
@@ -966,19 +1016,22 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // ── Export helpers ──────────────────────────────────────────────
   const getDisplayStatusLabel = (s: InvoiceStatus) => {
-    const map: Record<InvoiceStatus, string> = { DRAFT: 'ON HOLD', OPEN: 'OPEN', CLOSED: 'CLOSED', VOIDED: 'VOIDED' };
+    const map: Record<InvoiceStatus, string> = { DRAFT: 'ON HOLD', ON_HOLD: 'ON HOLD', OPEN: 'OPEN', CLOSED: 'CLOSED', VOIDED: 'VOIDED' };
     return map[s] || s;
   };
 
   const getRegistryExportColumns = () => {
     const allColumns = [
       { key: 'invoiceDate', label: 'Date', value: (inv: Invoice) => inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-' },
+      { key: 'postPeriod', label: 'Post Period', value: (inv: Invoice) => formatPostPeriod(inv.invoiceDate) || '-' },
       { key: 'invoiceNo', label: 'Invoice No.', value: (inv: Invoice) => inv.invoiceNo || '-' },
       { key: 'status', label: 'Status', value: (inv: Invoice) => getDisplayStatusLabel(inv.status) },
       { key: 'glReference', label: 'GL Reference No.', value: (inv: Invoice) => getInvoiceGlRef(inv) },
       { key: 'payer', label: 'Sponsor/Student', value: (inv: Invoice) => (inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)) },
       { key: 'totalAmount', label: 'Grand Total', value: (inv: Invoice) => inv.grandTotal ?? 0 },
       { key: 'balance', label: 'Balance', value: (inv: Invoice) => inv.balanceDue ?? 0 },
+      { key: 'createdBy', label: 'Created By', value: (inv: Invoice) => getCreatedByName(inv.createdBy) },
+      { key: 'createdOn', label: 'Created On', value: (inv: Invoice) => formatCreatedOn(inv.createdAt) },
     ];
 
     const ordered = columnOrder.map(key => allColumns.find(c => c.key === key)).filter(Boolean) as typeof allColumns;
@@ -1414,7 +1467,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       sponsorId: selectedSponsorId,
       invoiceDate: generateInvoiceDate,
       dueDate: generateDueDate,
-      status: 'DRAFT',
+      status: 'ON_HOLD',
       vatPricing: vatPricing,
       vatRate: vatRate,
       subtotal,
@@ -1427,6 +1480,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       terms: 'Net 30',
       notes: `Generated from ${selectedEnrollmentIds.size} enrollment(s)`,
       lines: invoiceLines.map(l => ({ ...l, invoiceId })),
+      createdBy: undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -1560,7 +1614,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
                 >
                   <option value="ALL">All</option>
-                  <option value="DRAFT">ON HOLD</option>
+                  <option value="ON_HOLD">ON HOLD</option>
                   <option value="OPEN">OPEN</option>
                   <option value="CLOSED">CLOSED</option>
                   <option value="VOIDED">VOIDED</option>
@@ -1838,6 +1892,14 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 align: 'text-left' as const,
                 render: (inv: any) => inv.invoiceDate,
               },
+              {
+                key: 'postPeriod',
+                label: 'Post Period',
+                sortKey: 'postPeriod',
+                width: 'w-28',
+                align: 'text-left' as const,
+                render: (inv: any) => formatPostPeriod(inv.invoiceDate) || '-',
+              },
               // ── 2. Invoice No. ────────────────────────────
               {
                 key: 'invoiceNo',
@@ -1894,6 +1956,22 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 width: 'w-32',
                 align: 'text-right' as const,
                 render: (inv: any) => inv.balanceDue > 0 ? formatCurrency(inv.balanceDue) : 'PAID',
+              },
+              {
+                key: 'createdBy',
+                label: 'Created By',
+                sortKey: 'createdBy',
+                width: 'w-40',
+                align: 'text-left' as const,
+                render: (inv: any) => getCreatedByName(inv.createdBy),
+              },
+              {
+                key: 'createdOn',
+                label: 'Created On',
+                sortKey: 'createdOn',
+                width: 'w-32',
+                align: 'text-left' as const,
+                render: (inv: any) => formatCreatedOn(inv.createdAt),
               },
             ];
 
@@ -2185,7 +2263,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     </div>
                   </div>
                   {/* dates on right */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
                       <input
@@ -2204,6 +2282,15 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
                         disabled={isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Post Period</label>
+                      <input
+                        type="text"
+                        value={formatPostPeriod(formData.invoiceDate)}
+                        readOnly
+                        className="w-full mt-1 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 bg-orange-50 text-gray-900"
                       />
                     </div>
                   </div>

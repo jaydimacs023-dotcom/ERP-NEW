@@ -3701,6 +3701,9 @@ export class SupabaseDataService implements IDataService {
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
+      // Normalize app-specific statuses/types to DB constraints
+      if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
+      if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
 
       delete payload.id;
       const url = `${this.baseUrl}/journal_entries`;
@@ -3728,6 +3731,9 @@ export class SupabaseDataService implements IDataService {
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
+      // Normalize app-specific statuses/types to DB constraints
+      if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
+      if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
 
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
       const response = await fetch(url, {
@@ -4286,6 +4292,9 @@ export class SupabaseDataService implements IDataService {
     delete invoiceData.lines;
 
     const snakeCaseInvoice = this.camelToSnake(invoiceData);
+    if ((snakeCaseInvoice as any).status === 'on_hold' || (snakeCaseInvoice as any).status === 'ON_HOLD') {
+      (snakeCaseInvoice as any).status = 'DRAFT';
+    }
     const filteredInvoice = this.filterToTableSchema('invoices', snakeCaseInvoice, true);
 
     // Insert invoice
@@ -4318,6 +4327,9 @@ export class SupabaseDataService implements IDataService {
 
     // 1. Convert to snake_case for schema filtering
     const snakeCaseUpdates = this.camelToSnake(updates);
+    if ((snakeCaseUpdates as any).status === 'on_hold' || (snakeCaseUpdates as any).status === 'ON_HOLD') {
+      (snakeCaseUpdates as any).status = 'DRAFT';
+    }
 
     // 2. Filter to only valid table columns
     const filteredUpdates = this.filterToTableSchema('invoices', snakeCaseUpdates);

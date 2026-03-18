@@ -28,8 +28,8 @@ const JournalForm: React.FC<JournalFormProps> = ({
     date: new Date().toISOString().split('T')[0],
     description: '',
     reference: '',
-    sourceType: 'MANUAL',
-    status: 'DRAFT'
+    sourceType: 'JOURNAL',
+    status: 'ON_HOLD'
   });
 
   const [entry, setEntry] = useState<Partial<JournalEntry>>(buildEmptyEntry());
@@ -241,7 +241,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
           </button>
           <button
             title="Save as Draft"
-            onClick={() => finalizeSubmit('DRAFT')}
+            onClick={() => finalizeSubmit('ON_HOLD')}
             type="button"
             disabled={!canPost}
             className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"

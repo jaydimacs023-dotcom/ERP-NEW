@@ -665,7 +665,7 @@ export interface Enrollment extends BaseEntity {
 }
 
 // Invoice - AR Invoice for sponsors/students with EWT tracking
-export type InvoiceStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'VOIDED';
+export type InvoiceStatus = 'DRAFT' | 'ON_HOLD' | 'OPEN' | 'CLOSED' | 'VOIDED';
 
 
 export interface InvoiceLine extends BaseEntity {
@@ -877,10 +877,10 @@ export interface JournalEntry extends BaseEntity {
   description: string;
   reference: string;
   glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL00000001). Stored in db column gl_entry_number.
-  status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
+  status: 'DRAFT' | 'ON_HOLD' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;
-  sourceType: 'MANUAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT';
+  sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT';
   sourceRef?: string; // Unified reference to source document ID (Invoice ID, Payment ID, Deposit ID, etc.)
   // Enhanced audit fields
   postedBy?: string;

@@ -223,7 +223,7 @@ const ARView: React.FC<ARViewProps> = ({
     if (!status) return 'On Hold';
     const s = status.toUpperCase();
     if (s === 'REVERSED' || s === 'VOIDED') return 'Voided';
-    if (s === 'DRAFT' || s === 'REVISION_REQUESTED' || s === 'PENDING') return 'On Hold';
+    if (s === 'DRAFT' || s === 'ON_HOLD' || s === 'REVISION_REQUESTED' || s === 'PENDING') return 'On Hold';
     if (s === 'POSTED') {
       // posted entries are assumed "Open" (outstanding) unless explicitly closed
       return 'Open';
@@ -621,20 +621,20 @@ const ARView: React.FC<ARViewProps> = ({
       : `Sales Invoice: ${recipientName}`;
 
     if (editingInvoice && onUpdateInvoice) {
-      // Update existing invoice - restore to DRAFT status after revision
+      // Update existing invoice - restore to ON_HOLD status after revision
       onUpdateInvoice({
         id: entryId,
         date: invoiceDate,
         reference: invoiceRef,
         description,
         sourceType: 'INVOICE',
-        status: 'DRAFT',
+        status: 'ON_HOLD',
         reviewComments: editingInvoice.reviewComments // Preserve review comments
       }, finalizedLines);
       onNotify('success', 'Invoice updated and resubmitted for approval');
     } else {
       // Create new invoice
-      onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description, sourceType: 'INVOICE', status: 'DRAFT' }, finalizedLines);
+      onPostInvoice({ id: entryId, date: invoiceDate, reference: invoiceRef, description, sourceType: 'INVOICE', status: 'ON_HOLD' }, finalizedLines);
     }
 
     setShowInvoiceModal(false);
