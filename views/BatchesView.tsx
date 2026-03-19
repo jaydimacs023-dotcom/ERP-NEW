@@ -386,9 +386,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         <div className="flex gap-2">
           <button
             onClick={downloadCsv}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all shadow-sm text-xs font-semibold uppercase tracking-wide"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded hover:bg-gray-50 transition-all font-semibold text-sm"
           >
-            <Download size={16} /> Export CSV
+            <Download size={18} className="text-orange-600" /> Export CSV
           </button>
           <button
             onClick={() => { resetForm(); setShowModal(true); }}
