@@ -197,9 +197,9 @@ const JournalForm: React.FC<JournalFormProps> = ({
   const finalizeSubmit = (status: JournalEntry['status']) => {
     if (!canPost) return;
 
-    const entryId = `je-${Date.now()}`;
+    const entryId = entry.id || `je-${Date.now()}`;
     const finalizedLines: JournalLine[] = lines.map(l => ({
-      id: `l-${Math.random().toString(36).substr(2, 9)}`,
+      id: l.id || `l-${Math.random().toString(36).substr(2, 9)}`,
       journalEntryId: entryId,
       accountId: l.accountId!,
       debit: Number(l.debit) || 0,
@@ -211,7 +211,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
       itemId: l.itemId
     }));
 
-    onSubmit({ ...entry, id: entryId, status, createdAt: new Date().toISOString() }, finalizedLines);
+    onSubmit({ ...entry, id: entryId, status, createdAt: entry.createdAt || new Date().toISOString() }, finalizedLines);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

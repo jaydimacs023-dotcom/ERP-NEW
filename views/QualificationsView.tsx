@@ -164,31 +164,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
   return (
     <div className="space-y-6 relative">
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-              : toast.type === 'error'
-                ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-orange-50 border border-orange-200 text-orange-800'
-              }`}
-          >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
-            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-orange-500" />}
-            <span>{toast.message}</span>
-            <button
-              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-              className="ml-auto text-slate-400 hover:text-slate-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+      
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
@@ -382,6 +358,32 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           )}
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${toast.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : toast.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-orange-50 border border-orange-200 text-orange-800'
+              }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
+            {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-orange-500" />}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-auto text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
 
       {/* Registration Modal */}
       {showModal && (

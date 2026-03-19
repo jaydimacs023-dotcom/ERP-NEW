@@ -292,95 +292,95 @@ const TrainersView: React.FC<TrainersViewProps> = ({
       {/* Registration/Edit Modal */}
       {showModal && (
         <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 ${editingTrainer ? 'bg-amber-600' : 'bg-[#F47721]'} text-white rounded shadow-md`}>
-                  {editingTrainer ? <Edit2 size={20} /> : <GraduationCap size={20} />}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
-                  {editingTrainer ? 'Edit Trainer' : 'Register New Trainer'}
-                </h3>
-              </div>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
+                <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+                  <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+                    <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 ${editingTrainer ? 'bg-amber-600' : 'bg-[#F47721]'} text-white rounded shadow-md`}>
+                          {editingTrainer ? <Edit2 size={20} /> : <GraduationCap size={20} />}
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
+                          {editingTrainer ? 'Edit Trainer' : 'Register New Trainer'}
+                        </h3>
+                      </div>
+                      <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                        <X size={24} />
+                      </button>
+                    </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">First Name</label>
-                  <input required placeholder="Elena" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                    value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Middle Name</label>
-                  <input placeholder="Santos" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                    value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Name</label>
-                  <input required placeholder="Reyes" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                    value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
-                </div>
-              </div>
+                    <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">First Name</label>
+                          <input required placeholder="Elena" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                            value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Middle Name</label>
+                          <input placeholder="Santos" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                            value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Name</label>
+                          <input required placeholder="Reyes" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                            value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+                        </div>
+                      </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email Address</label>
-                <input required type="email" placeholder="trainer@institution.edu" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                  value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-              </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email Address</label>
+                        <input required type="email" placeholder="trainer@institution.edu" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact Number</label>
-                  <input placeholder="+63 9xx xxx xxxx" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                    value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact Number</label>
+                          <input placeholder="+63 9xx xxx xxxx" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                            value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Specialization</label>
+                          <input placeholder="e.g. IT, Automotive" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                            value={formData.specialization} onChange={e => setFormData({...formData, specialization: e.target.value})} />
+                        </div>
+                      </div>
+
+                      <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
+                        <ShieldCheck className="text-[#F47721] shrink-0" size={20} />
+                        <p className="text-xs text-orange-800 leading-relaxed font-medium">
+                          Trainer records are linked to the NTTC (National TVET Trainer Certificate) database for compliance verification during audit.
+                        </p>
+                      </div>
+
+                      <div className="pt-6 flex gap-3">
+                        <button 
+                          type="button" 
+                          onClick={() => { setShowModal(false); resetForm(); }} 
+                          disabled={isSubmitting}
+                          className="flex-1 py-3 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                        >
+                          Discard
+                        </button>
+                        <button 
+                          type="submit" 
+                          disabled={isSubmitting}
+                          className={`flex-1 py-3 ${editingTrainer ? 'bg-amber-600 shadow-amber-100' : 'bg-[#F47721] shadow-gray-100'} text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              {editingTrainer ? 'Updating...' : 'Creating...'}
+                            </>
+                          ) : (
+                            editingTrainer ? 'Update Trainer' : 'Submit Registration'
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Specialization</label>
-                  <input placeholder="e.g. IT, Automotive" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
-                    value={formData.specialization} onChange={e => setFormData({...formData, specialization: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                 <ShieldCheck className="text-[#F47721] shrink-0" size={20} />
-                 <p className="text-xs text-orange-800 leading-relaxed font-medium">
-                   Trainer records are linked to the NTTC (National TVET Trainer Certificate) database for compliance verification during audit.
-                 </p>
-              </div>
-
-              <div className="pt-6 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => { setShowModal(false); resetForm(); }} 
-                  disabled={isSubmitting}
-                  className="flex-1 py-3 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                >
-                  Discard
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className={`flex-1 py-3 ${editingTrainer ? 'bg-amber-600 shadow-amber-100' : 'bg-[#F47721] shadow-gray-100'} text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {editingTrainer ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    editingTrainer ? 'Update Trainer' : 'Submit Registration'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-</ModalPortal>
+        </ModalPortal>
       )}
 
       {/* Qualification Assignment Modal */}
