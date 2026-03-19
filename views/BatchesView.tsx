@@ -6,7 +6,7 @@ import {
   Search, Plus, Layers, Award, GraduationCap, Users, Calendar,
   Trash2, X, CheckCircle, Clock, MoreVertical, Edit2, AlertCircle,
   ChevronRight, Filter, LayoutGrid, List, Handshake, CalendarRange,
-  ShieldCheck, Timer, MapPin, Calculator, CalendarDays, Loader2, Play
+  ShieldCheck, Timer, MapPin, Calculator, CalendarDays, Loader2, Play, Download
 } from 'lucide-react';
 
 interface BatchesViewProps {
@@ -108,6 +108,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
   const [projection, setProjection] = useState<{ totalHours: number; calendarDays: number; trainingDays: number } | null>(null);
 
+  const eligibleTrainers = useMemo(() => {
+    if (!formData.qualificationId) return trainers;
+    return trainers.filter(t => Array.isArray(t.qualificationIds) && t.qualificationIds.includes(formData.qualificationId!));
+  }, [formData.qualificationId, trainers]);
+
   // Automated End Date Projection Logic with 8-Hour Rule
   useEffect(() => {
     if (formData.startDate && formData.qualificationId && formData.trainerId) {
@@ -204,6 +209,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   };
 
   const handleDelete = async (id: string) => {
+    const batch = batches.find(b => b.id === id);
+    if (!batch) return;
+    if (batch.status === BatchStatus.ONGOING) {
+      onNotify?.('error', 'Cannot delete an ongoing batch for security reasons.');
+      return;
+    }
     if (isDeleting) return;
     setIsDeleting(id);
     try {
@@ -288,26 +299,79 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   };
 
   const getStudentConflict = (studentId: string) => {
-    if (!formData.startDate || !formData.endDate) return null;
-
+    // If this student is already enrolled in any planned or ongoing batch (except current editing batch), conflict.
     return batches.find(b => {
-      // Skip current batch being edited
       if (editingBatch && b.id === editingBatch.id) return false;
-
-      // Only check PLANNED or ONGOING batches
       if (b.status !== BatchStatus.PLANNED && b.status !== BatchStatus.ONGOING) return false;
-
-      // Check if student is in this batch
       if (!b.studentIds || !b.studentIds.includes(studentId)) return false;
-
-      // Logic overlap: (StartA <= EndB) and (EndA >= StartB)
-      const bStart = b.startDate;
-      const bEnd = b.endDate;
-      const fStart = formData.startDate!;
-      const fEnd = formData.endDate!;
-
-      return (fStart <= bEnd) && (fEnd >= bStart);
+      return true;
     });
+  };
+
+  const downloadCsv = () => {
+    const headersSummary = ['Batch ID', 'Batch Code', 'Name', 'Year', 'Qualification', 'Trainer', 'Sponsor', 'Location', 'Status', 'Start Date', 'End Date', 'Students', 'Max Students'];
+    const headersQualification = ['Qualification', 'Batch Code', 'Student Name', 'Student Email'];
+
+    const summaryRows = batches.map(batch => {
+      const qual = qualifications.find(q => q.id === batch.qualificationId)?.name || 'Unknown';
+      const trainer = trainers.find(t => t.id === batch.trainerId);
+      const sponsor = sponsors.find(s => s.id === batch.sponsorId)?.name || 'Private';
+      const location = locations.find(l => l.id === batch.locationId)?.name || 'Remote';
+      return [
+        batch.id,
+        batch.batchCode || '',
+        batch.name,
+        batch.year.toString(),
+        qual,
+        trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unassigned',
+        sponsor,
+        batch.status,
+        batch.startDate,
+        batch.endDate,
+        (batch.studentIds?.length || 0).toString(),
+        (batch.maxStudents || 0).toString()
+      ];
+    });
+
+    const qualificationRows: string[][] = [];
+    batches.forEach(batch => {
+      const qualName = qualifications.find(q => q.id === batch.qualificationId)?.name || 'Unknown';
+      const batchCode = batch.batchCode || '';
+      (batch.studentIds || []).forEach(studentId => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+        qualificationRows.push([
+          qualName,
+          batchCode,
+          `${student.firstName} ${student.lastName}`,
+          student.email || ''
+        ]);
+      });
+    });
+
+    const escapeCSV = (value: string) => `"${String(value).replace(/"/g, '""')}"`;
+    const sectionToCsv = (heading: string, headers: string[], rows: string[][]) => {
+      const lines = [heading, headers.map(escapeCSV).join(',')];
+      rows.forEach(r => lines.push(r.map(escapeCSV).join(',')));
+      return lines.join('\n');
+    };
+
+    const csvContent = [
+      sectionToCsv('Batch Summary', headersSummary, summaryRows),
+      '\n\n',
+      sectionToCsv('Qualification Student Roster', headersQualification, qualificationRows)
+    ].join('');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `training-batches-${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    onNotify?.('success', 'Batch CSV exported successfully.');
   };
 
   return (
@@ -319,12 +383,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           </h2>
           <p className="text-sm text-gray-500 font-normal italic">Institutional program monitoring with hour-based compliance tracking.</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
-        >
-          <Plus size={18} /> Initialize Batch
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={downloadCsv}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 transition-all shadow-sm text-xs font-semibold uppercase tracking-wide"
+          >
+            <Download size={16} /> Export CSV
+          </button>
+          <button
+            onClick={() => { resetForm(); setShowModal(true); }}
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
+          >
+            <Plus size={18} /> Initialize Batch
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-md border shadow-sm">
@@ -448,9 +520,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         </button>
                         <button
                           onClick={() => handleDelete(batch.id)}
-                          disabled={isDeleting === batch.id}
-                          className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                          title="Delete Batch"
+                          disabled={batch.status === BatchStatus.ONGOING || isDeleting === batch.id}
+                          className={`p-2 rounded transition-colors ${batch.status === BatchStatus.ONGOING ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} disabled:opacity-50`}
+                          title={batch.status === BatchStatus.ONGOING ? 'Cannot delete ongoing batch' : 'Delete Batch'}
                         >
                           {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         </button>
@@ -524,7 +596,14 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <select
                       required
                       className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
-                      value={formData.qualificationId} onChange={e => setFormData({ ...formData, qualificationId: e.target.value })}
+                      value={formData.qualificationId} onChange={e => {
+                        const qualId = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          qualificationId: qualId,
+                          trainerId: (!qualId || !prev.trainerId) ? prev.trainerId : (trainers.find(t => t.id === prev.trainerId && t.qualificationIds?.includes(qualId)) ? prev.trainerId : '')
+                        }));
+                      }}
                     >
                       <option value="">Choose program...</option>
                       {qualifications.map(q => <option key={q.id} value={q.id}>{q.name} ({q.durationDays} Days)</option>)}
@@ -540,7 +619,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       value={formData.trainerId} onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
                     >
                       <option value="">Assign trainer...</option>
-                      {trainers.map(t => {
+                      {eligibleTrainers.length === 0 && formData.qualificationId ? (
+                        <option value="" disabled>No trainer assigned to this program</option>
+                      ) : null}
+                      {eligibleTrainers.map(t => {
                         const sch = schedules.find(s => s.trainerId === t.id);
                         const weeklyHrs = sch?.slots.reduce((acc, s) => acc + getSlotHours(s.startTime, s.endTime), 0) || 0;
                         return <option key={t.id} value={t.id}>{t.lastName}, {t.firstName} {weeklyHrs > 0 ? `(${weeklyHrs.toFixed(1)} hrs/wk)` : '(No Schedule)'}</option>;

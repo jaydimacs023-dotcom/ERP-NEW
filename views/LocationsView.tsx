@@ -1,6 +1,6 @@
 ﻿
 import React, { useState } from 'react';
-import { Location } from '../types';
+import { Batch, Location, TrainerSchedule } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -18,13 +18,15 @@ interface Toast {
 
 interface LocationsViewProps {
   locations: Location[];
+  batches: Batch[];
+  schedules: TrainerSchedule[];
   onAddLocation: (location: Location) => void | Promise<void>;
   onUpdateLocation: (location: Location) => void | Promise<void>;
   onDeleteLocation: (id: string) => void | Promise<boolean>;
 }
 
 const LocationsView: React.FC<LocationsViewProps> = ({ 
-  locations, onAddLocation, onUpdateLocation, onDeleteLocation 
+  locations, batches, schedules, onAddLocation, onUpdateLocation, onDeleteLocation 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -116,9 +118,18 @@ const LocationsView: React.FC<LocationsViewProps> = ({
   };
 
   const handleDelete = async (id: string) => {
+    const locationToDelete = locations.find(l => l.id === id);
+    const engagedBatch = batches.find(b => b.locationId === id && (b.status === 'PLANNED' || b.status === 'ONGOING'));
+    const engagedSchedule = schedules.find(s => s.locationId === id);
+
+    if (engagedBatch || engagedSchedule) {
+      const reason = engagedBatch ? `batch ${engagedBatch.name} (${engagedBatch.status.toLowerCase()})` : 'an active schedule';
+      showToast(`Cannot delete location "${locationToDelete?.name || 'Unknown'}" because it is in use by ${reason}.`, 'error');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this location? This action cannot be undone.')) return;
     
-    const locationToDelete = locations.find(l => l.id === id);
     setDeletingId(id);
     try {
       const result = await onDeleteLocation(id);
@@ -223,18 +234,28 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                       </button>
                       <button
                         onClick={() => handleDelete(loc.id)}
-                        disabled={deletingId === loc.id}
+                        disabled={
+                          deletingId === loc.id ||
+                          batches.some(b => b.locationId === loc.id && (b.status === 'PLANNED' || b.status === 'ONGOING')) ||
+                          schedules.some(s => s.locationId === loc.id)
+                        }
                         className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                        title="Delete Facility"
+                        title={
+                          batches.some(b => b.locationId === loc.id && (b.status === 'PLANNED' || b.status === 'ONGOING'))
+                            ? 'Cannot delete location while used by active batches.'
+                            : schedules.some(s => s.locationId === loc.id)
+                              ? 'Cannot delete location while used in schedules.'
+                              : 'Delete Facility'
+                        }
                       >
                         {deletingId === loc.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                       </button>
-                      <button
+                      {/* <button
                         className="p-2 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600 transition-colors"
                         title="Facility Info"
                       >
                         <ChevronRight size={16} />
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>

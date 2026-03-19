@@ -114,6 +114,64 @@ export class SupabaseDataService implements IDataService {
     return match?.[1] || null;
   }
 
+  private normalizeStudentDocumentsForDb(documents: any): any {
+    if (!documents) return [];
+    if (Array.isArray(documents)) {
+      return documents.map((doc: any) => {
+        if (!doc) return doc;
+        if (typeof doc === 'string') {
+          // Preserve JSON content if already valid JSON string
+          try {
+            JSON.parse(doc);
+            return doc;
+          } catch {
+            return doc;
+          }
+        }
+        // If object, store as JSON string to support TEXT[] field mapping
+        try {
+          return JSON.stringify(doc);
+        } catch {
+          return doc;
+        }
+      });
+    }
+
+    // For object stored as map, keep as array of JSON strings
+    if (typeof documents === 'object') {
+      return [JSON.stringify(documents)];
+    }
+
+    return documents;
+  }
+
+  private parseStudentDocumentsFromDb(documents: any): any[] {
+    if (!documents) return [];
+    if (Array.isArray(documents)) {
+      return documents.map((doc: any) => {
+        if (!doc) return doc;
+        if (typeof doc === 'string') {
+          try {
+            return JSON.parse(doc);
+          } catch {
+            // Fallback: support legacy strings as document name
+            return {
+              id: `doc-${Date.now()}`,
+              name: doc,
+              status: 'UPLOADED'
+            };
+          }
+        }
+        return doc;
+      });
+    }
+    // If single-object JSON, return as array
+    if (typeof documents === 'object') {
+      return [documents];
+    }
+    return [];
+  }
+
   async getInitialData(): Promise<InitialData> {
     console.info("[Supabase] ☁️ Fetching data from Supabase...");
 
@@ -182,10 +240,15 @@ export class SupabaseDataService implements IDataService {
         lines: this.snakeToCamel(journalLines as any).filter((line: any) => line.journalEntryId === entry.id)
       }));
 
+      const parsedStudents = (this.snakeToCamel(students as any) || []).map((s: any) => ({
+        ...s,
+        documents: this.parseStudentDocumentsFromDb(s.documents)
+      }));
+
       return {
         organizations: this.snakeToCamel(organizations as any) || [],
         users: this.snakeToCamel(users as any) || [],
-        students: this.snakeToCamel(students as any) || [],
+        students: parsedStudents,
         qualifications: this.snakeToCamel(qualifications as any) || [],
         trainers: this.snakeToCamel(trainers as any) || [],
         batches: this.snakeToCamel(batches as any) || [],
@@ -808,12 +871,10 @@ export class SupabaseDataService implements IDataService {
       console.warn('[Supabase] Warning: student missing org_id, using empty string');
     }
 
-    // Convert documents array (StudentDocument[] to text[])
-    // NOTE: In the current schema, students.documents is jsonb, so we should KEEP the full objects.
-    // The previous logic was stripping fileData and other fields.
-    if (snakeCaseStudent.documents && Array.isArray(snakeCaseStudent.documents)) {
-      // camelToSnake has already processed this since it's now deeply recursive
-      console.debug('[Supabase] Preserving documents array:', snakeCaseStudent.documents.length, 'items');
+    // Normalize documents array for storage in Supabase (supports TEXT[] and JSONB variations)
+    if (snakeCaseStudent.documents) {
+      snakeCaseStudent.documents = this.normalizeStudentDocumentsForDb(snakeCaseStudent.documents);
+      console.debug('[Supabase] Normalized student documents for DB storage:', snakeCaseStudent.documents.length, 'items');
     }
 
     // Filter to only valid columns AFTER converting to snake_case
@@ -844,7 +905,11 @@ export class SupabaseDataService implements IDataService {
 
     // Note: insertToSupabase will NOT apply camelToSnake again since data is already in snake_case
     // We need to call the API directly to avoid double-conversion
-    return this.insertToSupabaseRaw('students', filteredStudent);
+    const result = await this.insertToSupabaseRaw('students', filteredStudent);
+    return {
+      ...result,
+      documents: this.parseStudentDocumentsFromDb((result as any).documents)
+    };
   }
 
   async updateStudent(id: string, updates: Partial<any>): Promise<any> {
@@ -858,11 +923,10 @@ export class SupabaseDataService implements IDataService {
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();
 
-    // Convert StudentDocument[] to text[] for Supabase
-    // NOTE: In the current schema, students.documents is jsonb, so we should KEEP the full objects.
-    if (snakeCaseUpdates.documents && Array.isArray(snakeCaseUpdates.documents)) {
-      // camelToSnake has already processed this since it's now deeply recursive
-      console.debug('[Supabase] Preserving documents array for update');
+    // Normalize documents array for storage
+    if (snakeCaseUpdates.documents) {
+      snakeCaseUpdates.documents = this.normalizeStudentDocumentsForDb(snakeCaseUpdates.documents);
+      console.debug('[Supabase] Normalized student documents for update storage');
     }
 
     // Filter to only valid columns for students table
@@ -874,7 +938,11 @@ export class SupabaseDataService implements IDataService {
       data: filteredUpdates
     });
 
-    return this.updateInSupabaseRaw('students', id, filteredUpdates);
+    const result = await this.updateInSupabaseRaw('students', id, filteredUpdates);
+    return {
+      ...result,
+      documents: this.parseStudentDocumentsFromDb((result as any).documents)
+    };
   }
 
   async deleteStudent(id: string): Promise<void> {

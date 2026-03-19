@@ -1,6 +1,6 @@
 ﻿
 import React, { useState } from 'react';
-import { Qualification } from '../types';
+import { Batch, Qualification, Trainer } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -19,6 +19,8 @@ interface Toast {
 
 interface QualificationsViewProps {
   qualifications: Qualification[];
+  batches: Batch[];
+  trainers: Trainer[];
   onAddQualification: (qual: Qualification) => void | Promise<void>;
   onUpdateQualification: (qual: Qualification) => void | Promise<void>;
   onDeleteQualification: (id: string) => void | Promise<boolean>;
@@ -37,7 +39,7 @@ const SECTORS = [
   'Others'
 ];
 
-const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
+const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, batches, trainers, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showModal, setShowModal] = useState(false);
@@ -132,9 +134,18 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   };
 
   const handleDelete = async (id: string) => {
+    const qualToDelete = qualifications.find(q => q.id === id);
+    const engagedBatch = batches.find(b => b.qualificationId === id && (b.status === 'PLANNED' || b.status === 'ONGOING'));
+    const assignedTrainer = trainers.find(t => t.qualificationIds.includes(id));
+
+    if (engagedBatch || assignedTrainer) {
+      const details = engagedBatch ? `Batch ${engagedBatch.name} (${engagedBatch.status.toLowerCase()})` : `Trainer ${assignedTrainer?.firstName} ${assignedTrainer?.lastName}`;
+      showToast(`Cannot delete qualification "${qualToDelete?.name || 'Unknown'}" because it is in use by ${details}.`, 'error');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this qualification? This action cannot be undone.')) return;
 
-    const qualToDelete = qualifications.find(q => q.id === id);
     setDeletingId(id);
     try {
       const result = await onDeleteQualification(id);
@@ -269,9 +280,19 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       </button>
                       <button
                         onClick={() => handleDelete(qual.id)}
-                        disabled={deletingId === qual.id}
+                        disabled={
+                          deletingId === qual.id ||
+                          batches.some(b => b.qualificationId === qual.id && (b.status === 'PLANNED' || b.status === 'ONGOING')) ||
+                          trainers.some(t => t.qualificationIds.includes(qual.id))
+                        }
                         className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded transition-all disabled:opacity-50"
-                        title="Delete"
+                        title={
+                          batches.some(b => b.qualificationId === qual.id && (b.status === 'PLANNED' || b.status === 'ONGOING'))
+                            ? 'Cannot delete qualification while assigned to active batches.'
+                            : trainers.some(t => t.qualificationIds.includes(qual.id))
+                              ? 'Cannot delete qualification while trainers are assigned.'
+                              : 'Delete'
+                        }
                       >
                         {deletingId === qual.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                       </button>

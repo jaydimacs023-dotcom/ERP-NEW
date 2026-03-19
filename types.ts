@@ -199,7 +199,7 @@ export interface Student extends BaseEntity {
   guardian?: string;
   locationId?: string;
   sponsorId?: string;
-  documents?: string[];                    // Array of document names/IDs
+  documents?: StudentDocument[];            // Array of document metadata + fileData
   createdAt?: string;
   updatedAt?: string;
 }

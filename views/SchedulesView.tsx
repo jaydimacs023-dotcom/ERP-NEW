@@ -1,6 +1,6 @@
 ﻿
 import React, { useState, useMemo } from 'react';
-import { Trainer, TrainerSchedule, DaySlot, Location } from '../types';
+import { Batch, Trainer, TrainerSchedule, DaySlot, Location } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
@@ -17,6 +17,7 @@ interface Toast {
 }
 
 interface SchedulesViewProps {
+  batches: Batch[];
   schedules: TrainerSchedule[];
   trainers: Trainer[];
   locations: Location[];
@@ -37,7 +38,7 @@ const getSlotHours = (start: string, end: string) => {
 };
 
 const SchedulesView: React.FC<SchedulesViewProps> = ({ 
-  schedules, trainers, locations, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
+  batches, schedules, trainers, locations, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -133,11 +134,23 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this schedule? This action cannot be undone.')) return;
-    
+
     const scheduleToDelete = schedules.find(s => s.id === id);
-    const trainer = scheduleToDelete ? trainers.find(t => t.id === scheduleToDelete.trainerId) : null;
+    if (!scheduleToDelete) return;
+
+    const trainer = trainers.find(t => t.id === scheduleToDelete.trainerId);
     const trainerName = trainer ? `${trainer.firstName} ${trainer.lastName}` : 'Unknown';
-    
+
+    const engagedBatch = batches.find(b =>
+      b.trainerId === scheduleToDelete.trainerId &&
+      (b.status === 'PLANNED' || b.status === 'ONGOING')
+    );
+
+    if (engagedBatch) {
+      showToast(`Cannot delete schedule for ${trainerName}. Trainer is engaged in ${engagedBatch.status.toLowerCase()} batch ${engagedBatch.name}.`, 'error');
+      return;
+    }
+
     setDeletingId(id);
     try {
       const result = await onDeleteSchedule(id);
@@ -152,7 +165,6 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
       setDeletingId(null);
     }
   };
-
   const addSlot = () => {
     const current = formData.slots || [];
     const next = [...current.filter(s => s.dayIndex !== activeSlot.dayIndex), { ...activeSlot }].sort((a,b) => a.dayIndex - b.dayIndex);
@@ -270,9 +282,16 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                         </button>
                         <button
                           onClick={() => handleDelete(sch.id)}
-                          disabled={deletingId === sch.id}
+                          disabled={
+                            deletingId === sch.id ||
+                            !!batches.find(b => b.trainerId === sch.trainerId && (b.status === 'PLANNED' || b.status === 'ONGOING'))
+                          }
                           className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                          title="Delete Schedule"
+                          title={
+                            batches.find(b => b.trainerId === sch.trainerId && (b.status === 'PLANNED' || b.status === 'ONGOING'))
+                              ? 'Cannot delete schedule while trainer has planned or ongoing batch.'
+                              : 'Delete Schedule'
+                          }
                         >
                           {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         </button>

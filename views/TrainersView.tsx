@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Trainer, Qualification } from '../types';
+import { Batch, Trainer, Qualification, TrainerSchedule } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -18,6 +18,8 @@ interface Toast {
 interface TrainersViewProps {
   trainers: Trainer[];
   qualifications: Qualification[];
+  batches: Batch[];
+  schedules: TrainerSchedule[];
   onAddTrainer: (trainer: Trainer) => void | Promise<void>;
   onUpdateTrainer: (trainer: Trainer) => void | Promise<void>;
   onDeleteTrainer: (id: string) => void | Promise<boolean>;
@@ -26,6 +28,8 @@ interface TrainersViewProps {
 const TrainersView: React.FC<TrainersViewProps> = ({ 
   trainers, 
   qualifications, 
+  batches,
+  schedules,
   onAddTrainer, 
   onUpdateTrainer, 
   onDeleteTrainer 
@@ -142,9 +146,18 @@ const TrainersView: React.FC<TrainersViewProps> = ({
   };
 
   const handleDelete = async (id: string) => {
+    const trainerToDelete = trainers.find(t => t.id === id);
+    const engagedBatch = batches.find(b => b.trainerId === id && (b.status === 'PLANNED' || b.status === 'ONGOING'));
+    const engagedSchedule = schedules.find(s => s.trainerId === id);
+
+    if (engagedBatch || engagedSchedule) {
+      const reason = engagedBatch ? `batch ${engagedBatch.name} (${engagedBatch.status.toLowerCase()})` : 'a linked schedule';
+      showToast(`Cannot delete trainer "${trainerToDelete?.firstName} ${trainerToDelete?.lastName}" because they are engaged in ${reason}.`, 'error');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this trainer? This action cannot be undone.')) return;
     
-    const trainerToDelete = trainers.find(t => t.id === id);
     setDeletingId(id);
     try {
       const result = await onDeleteTrainer(id);
@@ -263,9 +276,19 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                     </button>
                     <button 
                       onClick={() => handleDelete(trainer.id)}
-                      disabled={deletingId === trainer.id}
+                      disabled={
+                        deletingId === trainer.id ||
+                        batches.some(b => b.trainerId === trainer.id && (b.status === 'PLANNED' || b.status === 'ONGOING')) ||
+                        schedules.some(s => s.trainerId === trainer.id)
+                      }
                       className="p-2 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50"
-                      title="Delete Trainer"
+                      title={
+                        batches.some(b => b.trainerId === trainer.id && (b.status === 'PLANNED' || b.status === 'ONGOING'))
+                          ? 'Cannot delete trainer while they are assigned to active batches.'
+                          : schedules.some(s => s.trainerId === trainer.id)
+                            ? 'Cannot delete trainer while they have active schedules.'
+                            : 'Delete Trainer'
+                      }
                     >
                       {deletingId === trainer.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>

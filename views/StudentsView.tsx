@@ -81,13 +81,15 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
   const csvInputRef = useRef<HTMLInputElement>(null);
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState<Partial<Student>>({
+  const defaultFormData: Partial<Student> = {
     uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
-    dateOfBirth: '', age: 0, birthRegion: '', birthProvince: '', birthCity: '',
+    dateOfBirth: '', birthRegion: '', birthProvince: '', birthCity: '',
     civilStatus: 'Single', educationalAttainment: 'College Graduate', nationality: 'Filipino',
     email: '', contactNumber: '', street: '', barangay: '', city: '', district: '',
     province: '', guardian: '',
-  });
+  };
+
+  const [formData, setFormData] = useState<Partial<Student>>(defaultFormData);
 
   // Optimized filtering with useMemo
   const filteredStudents = useMemo(() => {
@@ -341,13 +343,15 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       showToast(`Student ${formData.firstName} ${formData.lastName} registered successfully!`, 'success');
       setShowModal(false);
       // Reset form
-      setFormData({
-        uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
-        dateOfBirth: '', age: 0, birthRegion: '', birthProvince: '', birthCity: '',
-        civilStatus: 'Single', educationalAttainment: 'College Graduate', nationality: 'Filipino',
-        email: '', contactNumber: '', street: '', barangay: '', city: '', district: '',
-        province: '', guardian: '',
+      setFormData(defaultFormData);
+      setMandatoryDocStatuses({
+        'TOR (Transcript of Records)': 'PENDING',
+        'Birth Certificate': 'PENDING',
+        'Application Form': 'PENDING',
+        'Passport Size Photo': 'PENDING'
       });
+      setMandatoryDocFiles({});
+      setPhotoPreview(null);
     } catch (error) {
       showToast(`Failed to register student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
@@ -369,7 +373,18 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
           <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
             <FileSpreadsheet size={18} className="text-[#F47721]" /> MIS Batch
           </button>
-          <button onClick={() => { setShowModal(true); setPhotoPreview(null); }} className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg font-bold text-sm">
+          <button onClick={() => {
+            setFormData(defaultFormData);
+            setMandatoryDocStatuses({
+              'TOR (Transcript of Records)': 'PENDING',
+              'Birth Certificate': 'PENDING',
+              'Application Form': 'PENDING',
+              'Passport Size Photo': 'PENDING'
+            });
+            setMandatoryDocFiles({});
+            setPhotoPreview(null);
+            setShowModal(true);
+          }} className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg font-bold text-sm">
             <Plus size={18} /> Register Learner
           </button>
         </div>
@@ -502,9 +517,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 </td>
               </tr>
             ) : paginatedStudents.map(student => {
-              const pendingDocs = student.documents.filter(d => d.status === 'UPLOADED').length;
-              const verifiedDocs = student.documents.filter(d => d.status === 'VERIFIED').length;
-              const isCompliant = verifiedDocs === student.documents.length || student.isEnrollmentOverridden;
+              const pendingDocs = (student.documents || []).filter(d => d.status === 'UPLOADED').length;
+              const verifiedDocs = (student.documents || []).filter(d => d.status === 'VERIFIED').length;
+              const isCompliant = verifiedDocs === (student.documents || []).length || student.isEnrollmentOverridden;
 
               return (
                 <tr key={student.id} className="hover:bg-gray-50 transition-colors group">
@@ -1084,7 +1099,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       {showEditModal && editingStudent && (
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8">
+          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[95vh]">
             <div className="p-8 border-b bg-gradient-to-r from-amber-50 to-amber-100/50 flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-amber-600 text-white rounded shadow-sm shadow-amber-100"><RefreshCw size={24} /></div>
