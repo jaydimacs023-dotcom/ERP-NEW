@@ -359,11 +359,14 @@ export default function App() {
     const org = organizations.find(o => o.id === currentUser.orgId && !o.isDeleted);
     if (!org) return;
     if (org.subscriptionStatus === 'SUSPENDED') {
+      setSuspensionBanner('Your tenant organization has been suspended. Access restricted until reactivation.');
       setCurrentUser(null);
       setCurrentOrgId('');
       localStorage.removeItem('at_erp_session');
       handleNotify('error', 'Your tenant organization has been suspended. You have been logged out.');
       console.warn('[App] Logged out suspended organization user:', currentUser.email, currentUser.orgId);
+    } else {
+      setSuspensionBanner(null);
     }
   }, [currentUser, organizations, handleLogout]);
 
@@ -447,6 +450,7 @@ export default function App() {
 
   // Toast Notification State
   const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; message: string }>>([]);
+  const [suspensionBanner, setSuspensionBanner] = useState<string | null>(null);
   const applyingPaymentKeysRef = useRef<Set<string>>(new Set());
   // Data Loading Logic
   useEffect(() => {
@@ -762,11 +766,14 @@ export default function App() {
     }
 
     if (!isSystemAdmin && org?.subscriptionStatus === 'SUSPENDED') {
-      handleNotify('error', 'Access Denied: Your organization is suspended. Please contact support.');
+      const message = 'Access Denied: Your organization is suspended. Please contact support.';
+      handleNotify('error', message);
+      setSuspensionBanner(message);
       console.warn('[App] Login denied: organization suspended', user.email, user.orgId);
       return;
     }
 
+    setSuspensionBanner(null);
     setCurrentUser(user);
     setCurrentOrgId(user.orgId || ''); // Empty string for system admin if no org
     // Store session for persistence
@@ -1197,21 +1204,27 @@ export default function App() {
   };
 
   const handleUpdateOrganization = async (id: string, updates: Partial<Organization>) => {
+    const existing = organizations.find(o => o.id === id);
+    if (!existing) {
+      console.warn('[App] Organization not found for update:', id);
+      return;
+    }
+
+    const optimisticOrg = { ...existing, ...updates };
+    setOrganizations(prev => prev.map(o => o.id === id ? optimisticOrg : o));
+
     try {
-      console.info('[App] Updating organization:', id);
-      const existing = organizations.find(o => o.id === id);
-      const updated = await dataService.updateOrganization(id, updates);
-      setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updated } : o));
+      console.info('[App] Updating organization in datasource:', id, updates);
+      const updatedFromDb = await dataService.updateOrganization(id, updates);
+      const merged = { ...optimisticOrg, ...updatedFromDb };
+      setOrganizations(prev => prev.map(o => o.id === id ? merged : o));
 
-      // Audit: Organization updated
-      AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, { ...existing, ...updates });
-
+      AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, merged);
       handleNotify('success', 'Organization updated successfully');
     } catch (error) {
       console.error('[App] Error updating organization:', error);
-      handleNotify('error', 'Failed to update organization. Falling back to memory storage.');
-      // Fallback to memory storage
-      setOrganizations(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+      handleNotify('error', 'Failed to update organization. Reverting to previous state.');
+      setOrganizations(prev => prev.map(o => o.id === id ? existing : o));
     }
   };
 
@@ -4332,8 +4345,15 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      {suspensionBanner && (
+        <div className="fixed top-4 left-1/2 z-[9999] -translate-x-1/2 w-[min(90vw,720px)] rounded-lg border border-rose-300 bg-rose-50 text-rose-900 px-4 py-3 shadow-lg flex items-center gap-2">
+          <AlertCircle size={18} className="text-rose-600" />
+          <span className="text-sm font-semibold">{suspensionBanner}</span>
+          <button className="ml-auto text-rose-700 underline text-xs" onClick={() => setSuspensionBanner(null)}>Dismiss</button>
+        </div>
+      )}
       {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
+      <div className="fixed top-20 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
         {toasts.map(toast => (
           <div
             key={toast.id}
@@ -4860,7 +4880,7 @@ export default function App() {
               currency={currentOrg?.currency || 'USD'}
             />
           )}
-          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />}
           {activeTab === 'schema' && <SchemaManualView />}
           {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
           {activeTab === 'soa' && (

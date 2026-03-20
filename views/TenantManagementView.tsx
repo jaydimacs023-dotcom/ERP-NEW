@@ -14,7 +14,7 @@ import { generateUUID } from '../utils/uuid';
 interface TenantManagementViewProps {
   organizations: Organization[];
   onAddTenant: (org: Organization) => void;
-  onUpdateTenant: (org: Organization) => void;
+  onUpdateTenant: (id: string, updates: Partial<Organization>) => void;
 }
 
 const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizations, onAddTenant, onUpdateTenant }) => {
@@ -59,14 +59,16 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
   };
 
   const toggleStatus = (org: Organization) => {
-    const nextStatus: SubscriptionStatus = org.subscriptionStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    onUpdateTenant({ ...org, subscriptionStatus: nextStatus });
+    if (org.subscriptionStatus === 'ACTIVE') {
+      onUpdateTenant(org.id, { subscriptionStatus: 'SUSPENDED' });
+    } else if (org.subscriptionStatus === 'SUSPENDED') {
+      onUpdateTenant(org.id, { subscriptionStatus: 'ACTIVE' });
+    }
   };
 
   const handleVerifyPayment = (org: Organization) => {
     if (org.pendingPlanType) {
-      onUpdateTenant({
-        ...org,
+      onUpdateTenant(org.id, {
         planType: org.pendingPlanType,
         subscriptionStatus: 'ACTIVE',
         pendingPlanType: undefined,
@@ -224,7 +226,9 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                        )}
                        <button 
                         onClick={() => toggleStatus(org)}
-                        className={`p-2 rounded border border-gray-600 hover:border-gray-500 transition-all ${org.subscriptionStatus === 'ACTIVE' ? 'text-rose-500' : 'text-emerald-500'}`}
+                        className={`p-2 rounded border border-gray-600 transition-all ${org.subscriptionStatus === 'ACTIVE' ? 'text-rose-500 hover:border-rose-400' : org.subscriptionStatus === 'SUSPENDED' ? 'text-emerald-500 hover:border-emerald-400' : 'text-gray-400 cursor-not-allowed border-gray-500/70'}`}
+                        disabled={org.subscriptionStatus !== 'ACTIVE' && org.subscriptionStatus !== 'SUSPENDED'}
+                        title={org.subscriptionStatus === 'ACTIVE' ? 'Suspend tenant' : org.subscriptionStatus === 'SUSPENDED' ? 'Reactivate tenant' : 'Status cannot be toggled by this action'}
                        >
                           {org.subscriptionStatus === 'ACTIVE' ? <Pause size={16} /> : <Play size={16} />}
                        </button>

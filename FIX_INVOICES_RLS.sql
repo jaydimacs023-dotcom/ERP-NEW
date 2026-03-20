@@ -46,7 +46,9 @@ CREATE POLICY "invoice_lines_delete" ON invoice_lines FOR DELETE TO anon, authen
 -- 6. Ensure lookups work for parent tables
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "organizations_select_all" ON organizations;
+DROP POLICY IF EXISTS "organizations_update" ON organizations;
 CREATE POLICY "organizations_select_all" ON organizations FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "organizations_update" ON organizations FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "users_select_all" ON users;
@@ -55,7 +57,7 @@ CREATE POLICY "users_select_all" ON users FOR SELECT TO anon, authenticated USIN
 -- 7. Grant explicit permissions
 GRANT ALL ON invoices TO anon, authenticated;
 GRANT ALL ON invoice_lines TO anon, authenticated;
-GRANT SELECT ON organizations TO anon, authenticated;
+GRANT SELECT, UPDATE ON organizations TO anon, authenticated;
 GRANT SELECT ON users TO anon, authenticated;
 
 -- Verification:
