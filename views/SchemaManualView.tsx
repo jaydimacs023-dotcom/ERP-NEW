@@ -287,15 +287,12 @@ const SchemaManualView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-12 max-w-6xl mx-auto pb-24">
+    <div className="space-y-12 max-w mx-auto pb-24">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-slate-900 text-white rounded-3xl shadow-2xl shadow-indigo-200">
-              <Binary size={40} />
-            </div>
             <div>
-              <h1 className="text-4xl font-black text-slate-800 tracking-tight">Technical Data Manual</h1>
+              <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Technical Data Manual</h1>
               <p className="text-slate-500 font-medium italic">Comprehensive ERP Schema & Business Logic Reference (v4.1.0)</p>
             </div>
           </div>

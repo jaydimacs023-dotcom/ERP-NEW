@@ -20,7 +20,9 @@ interface TenantManagementViewProps {
 const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizations, onAddTenant, onUpdateTenant }) => {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
+  const [editedPlan, setEditedPlan] = useState<PlanType>('BASIC');
+
   // Provisioning Form State
   const [newOrgName, setNewOrgName] = useState('');
   const [currency, setCurrency] = useState('PHP');
@@ -77,6 +79,21 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
     }
   };
 
+  const openEditPlan = (org: Organization) => {
+    setEditingOrgId(org.id);
+    setEditedPlan(org.planType);
+  };
+
+  const saveEditedPlan = () => {
+    if (!editingOrgId) return;
+    onUpdateTenant(editingOrgId, { planType: editedPlan });
+    setEditingOrgId(null);
+  };
+
+  const closeEditPlan = () => {
+    setEditingOrgId(null);
+  };
+
   const getStatusColor = (status: SubscriptionStatus) => {
     switch (status) {
       case 'ACTIVE': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
@@ -89,20 +106,17 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
+    <div className="space-y-8 max-w mx-auto pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-rose-600 text-white rounded-lg shadow-lg">
-              <Terminal size={24} />
-            </div>
             <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Provisioning & Subscriptions</h1>
           </div>
           <p className="text-gray-500 font-medium italic">Developer Operations Console: Multi-Tenant Lifecycle Management</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-8 py-3 bg-gray-800 text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-700 transition-all shadow-md active:scale-95"
+          className="flex items-center gap-2 px-8 py-3 bg-amber-600 text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-700 transition-all shadow-md active:scale-95"
         >
           <Plus size={18} /> Provision New Tenant
         </button>
@@ -145,13 +159,13 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
          </div>
       </div>
 
-      <div className="bg-gray-900 rounded-md shadow-md border border-gray-700 overflow-hidden">
-        <div className="p-6 border-b border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-800/50">
+      <div className="bg-white rounded-md shadow-md overflow-hidden">
+        <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-300/50">
            <div className="relative w-full md:w-96">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input 
                 placeholder="Filter Tenant Ledger..." 
-                className="w-full pl-12 pr-4 py-2.5 bg-gray-700 border border-gray-600 rounded text-sm text-gray-200 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
+                className="w-full pl-12 pr-4 py-2.5 border border-gray-600 rounded text-sm text-gray-600 outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -159,7 +173,7 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
         </div>
 
         <table className="min-w-full text-left">
-           <thead className="bg-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-700">
+           <thead className="text-xs font-semibold text-white-500 uppercase tracking-wide border-b border-gray-300">
              <tr>
                <th className="px-8 py-5">Tenant Organization</th>
                <th className="px-8 py-5">Subscription Plan</th>
@@ -167,17 +181,17 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                <th className="px-8 py-5 text-right">Dev Actions</th>
              </tr>
            </thead>
-           <tbody className="divide-y divide-gray-700">
+           <tbody className="divide-y divide-gray-200">
              {filteredOrgs.map(org => (
-               <tr key={org.id} className="hover:bg-gray-800/50 transition-colors group">
+               <tr key={org.id} className="hover:bg-gray-600/50 transition-colors group">
                  <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded bg-gray-700 flex items-center justify-center text-gray-400 group-hover:text-rose-500 transition-colors border border-gray-600 shadow-sm">
+                       <div className="w-12 h-12 rounded bg-amber-600 flex items-center justify-center text-white group-hover:text-amber-200 transition-colors  shadow-sm">
                           <Building2 size={24} />
                        </div>
                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-gray-200 group-hover:text-white">{org.name}</div>
-                          <div className="text-xs font-mono font-bold text-gray-500 mt-1 tracking-tighter uppercase flex items-center gap-2 group-hover:text-gray-400 transition-colors">
+                          <div className="text-sm font-semibold text-gray-800 group-hover:text-white">{org.name}</div>
+                          <div className="text-xs font-mono font-bold text-gray-400 mt-1 tracking-tighter uppercase flex items-center gap-2 group-hover:text-gray-400 transition-colors">
                             {org.id}
                             <button 
                               type="button"
@@ -232,8 +246,13 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                        >
                           {org.subscriptionStatus === 'ACTIVE' ? <Pause size={16} /> : <Play size={16} />}
                        </button>
-                       <button className="p-2 rounded border border-gray-600 hover:border-gray-500 text-gray-400 transition-all">
-                          <MoreVertical size={16} />
+                       <button
+                         onClick={() => openEditPlan(org)}
+                         className="flex items-center gap-2 px-3 py-1.5 border border-gray-400 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-all"
+                         title="Edit subscription plan"
+                       >
+                         <CreditCard size={12} />
+                         Edit Plan
                        </button>
                     </div>
                  </td>
@@ -242,6 +261,40 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
            </tbody>
         </table>
       </div>
+
+      {editingOrgId && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-xl w-full max-w-md">
+              <div className="flex justify-between items-center p-4 border-b">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Edit Subscription Plan</p>
+                  <p className="text-xs text-gray-500">Update tenant plan and save.</p>
+                </div>
+                <button onClick={closeEditPlan} className="p-1 text-gray-500 hover:text-gray-700"><X size={18} /></button>
+              </div>
+              <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide font-semibold text-gray-500">New Plan</label>
+                  <select
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    value={editedPlan}
+                    onChange={(e) => setEditedPlan(e.target.value as PlanType)}
+                  >
+                    <option value="BASIC">Basic</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                    <option value="ENTERPRISE">Enterprise</option>
+                  </select>
+                </div>
+              </div>
+              <div className="p-4 border-t flex justify-end gap-2">
+                <button onClick={closeEditPlan} className="px-3 py-2 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-100">Cancel</button>
+                <button onClick={saveEditedPlan} className="px-3 py-2 text-sm rounded bg-rose-600 text-white hover:bg-rose-700">Save Plan</button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {showModal && (
         <ModalPortal>
