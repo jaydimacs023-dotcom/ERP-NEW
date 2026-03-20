@@ -4,14 +4,28 @@
 export class EmailSenderService {
   async sendVerificationEmail(email: string, token: string) {
     const link = `${window.location.origin}/?verify_email_token=${token}`;
-    // In production, send via real email API
     if (process.env.NODE_ENV === 'development') {
-      // eslint-disable-next-line no-console
       console.log(`[DEV] Verification email to ${email}: ${link}`);
       alert(`Verification link for ${email}:\n${link}`);
     } else {
       // TODO: Integrate with real email provider
     }
+  }
+
+  async sendPasswordResetEmail(email: string, name: string, resetLink: string) {
+    const subject = 'AT-ERP Password Reset';
+    const body = `Hi ${name},\n\nYou requested a password reset link. Click below:\n${resetLink}\n\nIf you did not request this, ignore this message.\n\nThanks,\nAT-ERP team`;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] Password reset email to ${email}: ${resetLink}`);
+      alert(`Password reset link for ${email}:\n${resetLink}`);
+      return true;
+    }
+
+    // Production: integrate with SendGrid/AWS SES/Mailgun/etc.
+    // Placeholder for now.
+    console.log(`[PROD] Send email to ${email} (subject: ${subject})`);
+    return true;
   }
 }
 

@@ -23,8 +23,16 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
     });
   }, [payments, organizations, searchTerm, filterStatus]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return '-';
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const formatCurrency = (amount?: number | null) => {
+    const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const getStatusColor = (status: string) => {
@@ -70,7 +78,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Collected</p>
-              <p className="text-lg font-mono font-bold text-[#025959] mt-2">USD {stats.paid.toLocaleString()}</p>
+              <p className="text-lg font-mono font-bold text-[#025959] mt-2">USD {formatCurrency(stats.paid)}</p>
             </div>
             <CheckCircle2 size={32} className="text-[#025959]/20" />
           </div>
@@ -80,7 +88,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Pending Collection</p>
-              <p className="text-lg font-semibold text-amber-600 mt-2">USD {stats.pending.toLocaleString()}</p>
+              <p className="text-lg font-semibold text-amber-600 mt-2">USD {formatCurrency(stats.pending)}</p>
             </div>
             <Calendar size={32} className="text-amber-200" />
           </div>
@@ -90,7 +98,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Overdue Amounts</p>
-              <p className="text-lg font-semibold text-rose-600 mt-2">USD {stats.overdue.toLocaleString()}</p>
+              <p className="text-lg font-semibold text-rose-600 mt-2">USD {formatCurrency(stats.overdue)}</p>
             </div>
             <AlertCircle size={32} className="text-rose-200" />
           </div>
@@ -162,7 +170,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                     </td>
                     <td className="px-8 py-6">
                       <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wide bg-gray-50 border-gray-200 text-gray-700">
-                        {payment.planType}
+                        {payment.planType?.toLowerCase() === 'endonela' ? 'Enterprise Plan' : payment.planType}
                       </span>
                     </td>
                     <td className="px-8 py-6">
@@ -171,7 +179,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                     <td className="px-8 py-6">
                       <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
                         <DollarSign size={14} className="text-gray-400" />
-                        {payment.amount.toLocaleString()}
+                        {formatCurrency(payment.amount)}
                       </p>
                     </td>
                     <td className="px-8 py-6">

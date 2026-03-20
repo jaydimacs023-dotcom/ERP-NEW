@@ -106,6 +106,25 @@ export class AuthService {
    * @param password - Plain text password
    * @returns Authenticated user and tokens, or null if authentication fails
    */
+  async checkSupabaseConnection(): Promise<boolean> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      console.warn('[Auth] Supabase credentials missing in config.');
+      return false;
+    }
+
+    try {
+      const res = await fetch(`${this.supabaseUrl}/rest/v1/users?select=id&limit=1`, { headers: this.getHeaders() });
+      if (!res.ok) {
+        console.error('[Auth] Supabase connection check failed with status', res.status);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[Auth] Supabase connection check error:', error);
+      return false;
+    }
+  }
+
   async login(email: string, password: string): Promise<{ user: User; token: string; tokens: TokenPair } | null> {
     // Handle Mock Login (for development/demo without Supabase)
     if (config.useMockData || !this.supabaseUrl || !this.supabaseKey) {
@@ -115,6 +134,13 @@ export class AuthService {
 
     // Handle Supabase Login with bcrypt verification
     try {
+      // Connection check
+      const connected = await this.checkSupabaseConnection();
+      if (!connected) {
+        console.error('[Auth] Supabase not connected. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+        return null;
+      }
+
       // Step 1: Fetch user by email
       const usersResponse = await fetch(
         `${this.supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=*`,
@@ -133,15 +159,41 @@ export class AuthService {
       }
 
       const dbUser = userData[0];
-      const storedPassword = dbUser.password_hash || dbUser.password || '';
 
-      // Step 2: Verify password with legacy support (handles bcrypt, base64, and plain text)
-      console.debug('[Auth] Verifying password for:', email);
+      if (!dbUser.is_active) {
+        console.error('[Auth] ❌ User account is inactive:', email);
+        return null;
+      }
+
+      const lockedUntil = dbUser.locked_until ? new Date(dbUser.locked_until).getTime() : 0;
+      if (lockedUntil > Date.now()) {
+        console.error('[Auth] ❌ User account is locked until:', dbUser.locked_until);
+        return null;
+      }
+
+      const storedPassword = dbUser.password_hash || dbUser.password || '';
+      if (!storedPassword) {
+        console.error('[Auth] ❌ No password hash found for user:', email);
+        return null;
+      }
+
+      console.debug('[Auth] Verifying password for:', email, { userId: dbUser.id, hashType: storedPassword.slice(0, 4) });
       const verification = await PasswordService.verifyWithLegacySupport(password, storedPassword);
 
       if (!verification.isValid) {
-        console.error('[Auth] ❌ Password verification failed for:', email);
+        console.error('[Auth] ❌ Password verification failed for:', email, 'stored password present? ', !!storedPassword);
         return null;
+      }
+
+      // Optional: update last_login_at and failed_login_attempts clear
+      try {
+        await fetch(`${this.supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(dbUser.id)}`, {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ last_login_at: new Date().toISOString(), failed_login_attempts: 0 })
+        });
+      } catch (err) {
+        console.warn('[Auth] Could not update last_login_at:', err);
       }
 
       // Step 3: Migrate legacy password to bcrypt if needed (automatic upgrade)

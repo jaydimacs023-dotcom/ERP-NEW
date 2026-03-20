@@ -359,57 +359,59 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex flex-col gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Student Information System</h2>
           <p className="text-sm text-gray-500 font-normal italic">Institutional Compliance & Enrollment Oversight (v4.0.1)</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={downloadTemplate} className="flex items-center gap-2 px-4 py-2.5 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide">
-            <Download size={16} /> Template
-          </button>
-          <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
-          <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
-            <FileSpreadsheet size={18} className="text-[#F47721]" /> MIS Batch
-          </button>
-          <button onClick={() => {
-            setFormData(defaultFormData);
-            setMandatoryDocStatuses({
-              'TOR (Transcript of Records)': 'PENDING',
-              'Birth Certificate': 'PENDING',
-              'Application Form': 'PENDING',
-              'Passport Size Photo': 'PENDING'
-            });
-            setMandatoryDocFiles({});
-            setPhotoPreview(null);
-            setShowModal(true);
-          }} className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg font-bold text-sm">
-            <Plus size={18} /> Register Learner
-          </button>
-        </div>
-      </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => { setViewMode('all'); setSelectedBatchId(null); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold transition-all border ${viewMode === 'all'
-            ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
-            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
-            }`}
-        >
-          <Users size={16} /> All Learners
-        </button>
-        <button
-          onClick={() => { setViewMode('batch'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded text-sm font-semibold transition-all border ${viewMode === 'batch'
-            ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
-            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
-            }`}
-        >
-          <Layers size={16} /> By Batch
-        </button>
+        <div className="flex flex-col md:flex-row justify-between gap-3 md:items-center">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setViewMode('all'); setSelectedBatchId(null); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold transition-all border ${viewMode === 'all'
+                ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
+                }`}
+            >
+              <Users size={14} /> All Learners
+            </button>
+            <button
+              onClick={() => { setViewMode('batch'); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold transition-all border ${viewMode === 'batch'
+                ? 'bg-[#F47721] text-white border-[#F47721] shadow-md'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-orange-200'
+                }`}
+            >
+              <Layers size={14} /> By Batch
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2.5 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide border border-gray-200 rounded-md bg-white h-10">
+              <Download size={14} /> Template
+            </button>
+            <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
+            <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2.5 bg-gray-100 text-gray-700 rounded border border-gray-200 text-xs font-semibold h-10">
+              <FileSpreadsheet size={14} className="text-[#F47721]" /> MIS Batch
+            </button>
+            <button onClick={() => {
+              setFormData(defaultFormData);
+              setMandatoryDocStatuses({
+                'TOR (Transcript of Records)': 'PENDING',
+                'Birth Certificate': 'PENDING',
+                'Application Form': 'PENDING',
+                'Passport Size Photo': 'PENDING'
+              });
+              setMandatoryDocFiles({});
+              setPhotoPreview(null);
+              setShowModal(true);
+            }} className="flex items-center gap-2 px-3 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-sm text-xs font-semibold h-10">
+              <Plus size={14} /> Register Learner
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Batch Selector Panel - only in batch mode */}

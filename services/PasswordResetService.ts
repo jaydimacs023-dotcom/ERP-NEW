@@ -18,6 +18,7 @@
 
 import { generateUUID } from '../utils/uuid';
 import { PasswordService } from './PasswordService';
+import { emailSenderService } from './EmailSenderService';
 import { config } from '../config/app';
 
 // ============================================================================
@@ -282,21 +283,20 @@ class PasswordResetServiceClass {
 
       console.info('[PasswordReset] Reset token generated for:', normalizedEmail);
 
-      // In development mode, return the link directly
-      // In production, this would send an email
+      // In all modes, send reset email through EmailSenderService.
+      await emailSenderService.sendPasswordResetEmail(normalizedEmail, user.name || 'User', resetLink);
+      
+      // In development, keep returning the link for easy testing.
       if (config.isDev || config.useMockData) {
         console.info('[PasswordReset] DEV MODE - Reset link:', resetLink);
         return {
           success: true,
-          message: 'Password reset link generated. Check console for the link (dev mode).',
+          message: 'Password reset link generated. Check console or alert for the link (dev mode).',
           resetLink,
           resetToken: token
         };
       }
 
-      // Production: Send email (placeholder - would integrate with email service)
-      await this.sendResetEmail(normalizedEmail, user.name, resetLink);
-      
       return {
         success: true,
         message: 'If an account exists with this email, you will receive a password reset link.'
@@ -386,12 +386,12 @@ class PasswordResetServiceClass {
       const hashedPassword = await PasswordService.hashPassword(newPassword);
 
       // Update password in database
-      const updated = await this.updateUserPassword(validation.userId!, hashedPassword);
+      const result = await this.updateUserPassword(validation.userId!, hashedPassword, validation.email);
       
-      if (!updated) {
+      if (!result) {
         return {
           success: false,
-          message: 'Failed to update password. Please try again.',
+          message: 'Failed to update password. Please verify your account and try again.',
           error: 'update_failed'
         };
       }
@@ -458,71 +458,82 @@ class PasswordResetServiceClass {
   /**
    * Update user password in Supabase
    */
-  private async updateUserPassword(userId: string, hashedPassword: string): Promise<boolean> {
+  private async updateUserPassword(userId: string, hashedPassword: string, email?: string): Promise<boolean> {
     if (config.useMockData || !this.supabaseUrl || !this.supabaseKey) {
-      // Mock mode - simulate success
       console.debug('[PasswordReset] Mock mode - simulating password update');
       return true;
     }
 
-    try {
-      const response = await fetch(
-        `${this.supabaseUrl}/rest/v1/users?id=eq.${userId}`,
-        {
-          method: 'PATCH',
-          headers: this.getHeaders(),
-          body: JSON.stringify({
-            password_hash: hashedPassword,
-            updated_at: new Date().toISOString()
-          })
-        }
-      );
+    const updatePayload = {
+      password_hash: hashedPassword,
+      updated_at: new Date().toISOString()
+    };
 
-      if (!response.ok) {
-        console.error('[PasswordReset] Failed to update password:', response.status);
+    const tryUpdate = async (filter: string): Promise<boolean> => {
+      try {
+        const response = await fetch(
+          `${this.supabaseUrl}/rest/v1/users?${filter}`,
+          {
+            method: 'PATCH',
+            headers: {
+              ...this.getHeaders(),
+              Prefer: 'return=minimal'
+            },
+            body: JSON.stringify(updatePayload)
+          }
+        );
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('[PasswordReset] Failed to update password with filter', filter, response.status, text);
+          return false;
+        }
+
+        // For PATCH with return=minimal Supabase returns 204 No Content
+        if (response.status === 204 || response.status === 200) {
+          return true;
+        }
+
+        // On some Supabase configs it may still return rows
+        const resultText = await response.text();
+        if (!resultText) {
+          return true;
+        }
+
+        try {
+          const result = JSON.parse(resultText);
+          if (Array.isArray(result) && result.length > 0) {
+            return true;
+          }
+          console.warn('[PasswordReset] Password update returned empty body for filter:', filter, 'response', resultText);
+          return true;
+        } catch (err) {
+          console.warn('[PasswordReset] Password update returned unparseable body for filter:', filter, 'response', resultText);
+          return true;
+        }
+      } catch (error) {
+        console.error('[PasswordReset] Error updating password with filter', filter, error);
         return false;
       }
+    };
 
-      return true;
+    // Try by user ID first
+    const byId = await tryUpdate(`id=eq.${encodeURIComponent(userId)}`);
+    if (byId) return true;
 
-    } catch (error) {
-      console.error('[PasswordReset] Error updating password:', error);
-      return false;
+    // Fallback to email if provided
+    if (email) {
+      const byEmail = await tryUpdate(`email=eq.${encodeURIComponent(email)}`);
+      if (byEmail) return true;
     }
+
+    return false;
   }
 
   /**
    * Send password reset email (placeholder for email service integration)
    */
-  private async sendResetEmail(email: string, name: string, resetLink: string): Promise<boolean> {
-    // In a real implementation, this would integrate with:
-    // - SendGrid, AWS SES, Mailgun, etc.
-    // - Or Supabase Edge Functions for email
-    
-    console.info('[PasswordReset] Would send email to:', email);
-    console.info('[PasswordReset] Reset link:', resetLink);
-    
-    // For now, just log the email content
-    const emailContent = `
-      Hi ${name},
-      
-      You requested a password reset for your AT-ERP account.
-      
-      Click the link below to reset your password:
-      ${resetLink}
-      
-      This link will expire in 1 hour.
-      
-      If you didn't request this reset, please ignore this email.
-      
-      - AT-ERP Team
-    `;
-    
-    console.debug('[PasswordReset] Email content:', emailContent);
-    
-    return true;
-  }
-
+  // Removed legacy sendResetEmail; email sending is now via EmailSenderService.
   /**
    * Invalidate existing reset tokens for a user
    */

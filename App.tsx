@@ -111,20 +111,104 @@ export default function App() {
   const [dataService] = useState(() => DataServiceFactory.getService());
 
 
-  // Check for password reset or email verification token in URL on mount
+  const [magicLinkMessage, setMagicLinkMessage] = useState<string>('');
+
+  // Check for password reset, email verification token or magic link callback in URL on mount
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const resetToken = urlParams.get('reset_token');
-    if (resetToken) {
-      setResetToken(resetToken);
-      setShowPasswordReset(true);
-      console.info('[App] Password reset token detected in URL');
-      return;
-    }
-    const verifyToken = urlParams.get('verify_email_token');
-    if (verifyToken) {
-      handleVerifyEmailToken(verifyToken);
-    }
+    const processUrlTokens = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const resetToken = urlParams.get('reset_token');
+      if (resetToken) {
+        setResetToken(resetToken);
+        setShowPasswordReset(true);
+        console.info('[App] Password reset token detected in URL');
+        return;
+      }
+
+      const verifyToken = urlParams.get('verify_email_token');
+      if (verifyToken) {
+        await handleVerifyEmailToken(verifyToken);
+      }
+
+      const accessToken = urlParams.get('access_token') || urlParams.get('token');
+      const refreshToken = urlParams.get('refresh_token');
+      if (accessToken) {
+        if (!config.supabase.url || !config.supabase.anonKey) {
+          setMagicLinkMessage('Supabase callback detected, but Supabase credentials are missing.');
+          return;
+        }
+
+        try {
+          // Fetch Supabase auth user from magic link token
+          const userRes = await fetch(`${config.supabase.url}/auth/v1/user`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+
+          if (!userRes.ok) {
+            const errorText = await userRes.text();
+            console.error('[App] Magic link user fetch failed:', userRes.status, errorText);
+            setMagicLinkMessage('Magic link token invalid or expired. Please request a new one.');
+            return;
+          }
+
+          const authUser = await userRes.json();
+          const email = authUser?.email;
+          if (!email) {
+            setMagicLinkMessage('Magic link returned no email. Try using app login instead.');
+            return;
+          }
+
+          // Lookup app user record by email
+          const appUserRes = await fetch(`${config.supabase.url}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=*`, {
+            headers: {
+              apikey: config.supabase.anonKey,
+              Authorization: `Bearer ${config.supabase.anonKey}`,
+              Prefer: 'return=representation'
+            }
+          });
+
+          if (!appUserRes.ok) {
+            const errorText = await appUserRes.text();
+            console.error('[App] App user query failed:', appUserRes.status, errorText);
+            setMagicLinkMessage('Logged in with magic link, but application user record could not be loaded.');
+            return;
+          }
+
+          const appUsers = await appUserRes.json();
+          if (!Array.isArray(appUsers) || appUsers.length === 0) {
+            setMagicLinkMessage(`No application user exists for ${email}. Please register first.`);
+            return;
+          }
+
+          const su = appUsers[0];
+          const user: User = {
+            id: su.id,
+            name: su.name || email.split('@')[0],
+            email: su.email,
+            role: su.role || 'ADMIN',
+            orgId: su.org_id || '',
+            studentId: su.student_id || undefined,
+            trainerId: su.trainer_id || undefined,
+            isEmailVerified: su.is_email_verified ?? true,
+          };
+
+          // Login using application-level handler
+          setCurrentUser(user);
+          setCurrentOrgId(user.orgId || '');
+          setActiveTab(getDefaultTab(user.role));
+          localStorage.setItem('at_erp_session', JSON.stringify({ user, token: accessToken }));
+          setMagicLinkMessage('Magic link login successful. Redirecting...');
+
+          // Clear query params to avoid repeated processing
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch (error) {
+          console.error('[App] Magic link processing error:', error);
+          setMagicLinkMessage('Magic link processing failed. Please try again.');
+        }
+      }
+    };
+
+    processUrlTokens();
   }, []);
 
   // Email verification handler
@@ -4185,15 +4269,18 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-8">
+        <style>{`@keyframes progressBar { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }`}</style>
         <div className="flex flex-col items-center gap-2">
           <h1 className="text-5xl font-black tracking-tight" style={{ color: '#F47721' }}>
             Accoun<span className="text-white">Tech</span>
           </h1>
           <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-500">Enterprise Resource Planning</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Loader2 className="animate-spin" size={20} style={{ color: '#F47721' }} />
-          <span className="text-xs font-bold uppercase tracking-[0.3em] text-slate-400">Initializing Ledger Architecture</span>
+        <div className="w-72">
+          <div className="h-2 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
+            <div className="h-full w-1/3 bg-gradient-to-r from-[#F47721] via-[#FCA311] to-[#F47721] animate-[progressBar_2.5s_linear_infinite]" />
+          </div>
+          <div className="mt-3 text-center text-xs uppercase font-semibold tracking-[0.2em] text-slate-400">Loading training architecture...</div>
         </div>
       </div>
     );
@@ -4257,7 +4344,7 @@ export default function App() {
           {sidebarOpen ? (
             <div className="flex flex-col items-center gap-3 w-full">
               <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
+                className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
                 style={{ backgroundColor: brandColor }}
               >
                 {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
@@ -4279,9 +4366,11 @@ export default function App() {
 
         <nav className="flex-1 overflow-y-auto py-8 px-4 scrollbar-hide">
           {/* Navigation Items (unchanged logic) */}
-          {currentUser.role === 'STUDENT' && (
-            <div className="mb-8">
-              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
+          {!isSysAdmin && (
+            <>
+              {currentUser.role === 'STUDENT' && (
+                <div className="mb-8">
+                  {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Learner Portal</p>}
               <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeTab === 'student-portal'} onClick={() => setActiveTab('student-portal')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
@@ -4426,6 +4515,8 @@ export default function App() {
               <NavItem icon={<UserCog size={20} />} label="Security/RBAC" active={activeTab === 'users'} onClick={() => navigateTo('users')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
+          )}
+            </>
           )}
 
           {isSysAdmin && (
