@@ -186,7 +186,14 @@ const TenantManagementView: React.FC<TenantManagementViewProps> = ({ organizatio
                <tr key={org.id} className="hover:bg-gray-600/50 transition-colors group">
                  <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded bg-amber-600 flex items-center justify-center text-white group-hover:text-amber-200 transition-colors  shadow-sm">
+                       <div
+                          className="w-12 h-12 rounded flex items-center justify-center text-white transition-colors shadow-sm"
+                          style={{
+                            backgroundColor: org.primaryColor ? `${org.primaryColor}20` : '#f59e0b33',
+                            border: `2px solid ${org.primaryColor || '#f59e0b'}`,
+                            color: org.primaryColor || '#f59e0b'
+                          }}
+                        >
                           <Building2 size={24} />
                        </div>
                        <div className="flex-1">

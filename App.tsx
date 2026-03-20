@@ -4382,7 +4382,10 @@ export default function App() {
             <div className="flex flex-col items-center gap-3 w-full">
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0"
-                style={{ backgroundColor: brandColor }}
+                style={{
+                  backgroundColor: brandColor,
+                  border: `2px solid ${currentOrg?.primaryColor || brandColor}`
+                }}
               >
                 {currentOrg?.logoUrl ? <img src={currentOrg.logoUrl} className="w-full h-full object-cover" /> : <Building2 size={24} />}
               </div>
@@ -4394,7 +4397,10 @@ export default function App() {
           ) : (
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center mx-auto text-white shadow-xl"
-              style={{ backgroundColor: brandColor }}
+              style={{
+                backgroundColor: brandColor,
+                border: `2px solid ${currentOrg?.primaryColor || brandColor}`
+              }}
             >
               <Building2 size={20} />
             </div>

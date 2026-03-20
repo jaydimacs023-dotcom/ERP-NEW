@@ -299,7 +299,7 @@ const SchemaManualView: React.FC = () => {
         </div>
         <button 
           onClick={handleExportCSV}
-          className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-2xl active:scale-95 border-b-4 border-slate-700"
+          className="flex items-center gap-3 px-8 py-4 bg-amber-600 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-2xl active:scale-95 border-b-4 border-slate-700"
         >
           <Download size={20} /> Export System Blueprint
         </button>

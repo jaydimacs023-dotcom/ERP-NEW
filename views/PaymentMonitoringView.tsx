@@ -159,7 +159,14 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                   <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#025959]/10 flex items-center justify-center text-[#025959]">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{
+                            backgroundColor: org?.primaryColor ? `${org.primaryColor}20` : '#02595920',
+                            border: `1px solid ${org?.primaryColor || '#025959'}`,
+                            color: org?.primaryColor || '#025959'
+                          }}
+                        >
                           <Building2 size={16} />
                         </div>
                         <div className="min-w-0">
@@ -170,7 +177,7 @@ const PaymentMonitoringView: React.FC<PaymentMonitoringViewProps> = ({ payments,
                     </td>
                     <td className="px-8 py-6">
                       <span className="inline-flex items-center px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wide bg-gray-50 border-gray-200 text-gray-700">
-                        {payment.planType?.toLowerCase() === 'endonela' ? 'Enterprise Plan' : payment.planType}
+                        {org?.planType || 'UNKNOWN'}
                       </span>
                     </td>
                     <td className="px-8 py-6">
