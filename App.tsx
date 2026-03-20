@@ -193,10 +193,7 @@ export default function App() {
           };
 
           // Login using application-level handler
-          setCurrentUser(user);
-          setCurrentOrgId(user.orgId || '');
-          setActiveTab(getDefaultTab(user.role));
-          localStorage.setItem('at_erp_session', JSON.stringify({ user, token: accessToken }));
+          handleLogin(user);
           setMagicLinkMessage('Magic link login successful. Redirecting...');
 
           // Clear query params to avoid repeated processing
@@ -355,6 +352,20 @@ export default function App() {
     setCurrentOrgId('');
     console.info('[App] User logged out - JWT tokens revoked');
   };
+
+  // If current user belongs to a suspended org, force logout and notify
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'SYSTEM_ADMIN') return;
+    const org = organizations.find(o => o.id === currentUser.orgId && !o.isDeleted);
+    if (!org) return;
+    if (org.subscriptionStatus === 'SUSPENDED') {
+      setCurrentUser(null);
+      setCurrentOrgId('');
+      localStorage.removeItem('at_erp_session');
+      handleNotify('error', 'Your tenant organization has been suspended. You have been logged out.');
+      console.warn('[App] Logged out suspended organization user:', currentUser.email, currentUser.orgId);
+    }
+  }, [currentUser, organizations, handleLogout]);
 
   // Master Data State
   const [students, setStudents] = useState<Student[]>([]);
@@ -740,13 +751,19 @@ export default function App() {
   };
 
   const handleLogin = (user: User) => {
-    // Validate that user has an organization, OR is a SYSTEM_ADMIN
-    const userHasOrg = user.orgId && organizations.some(o => o.id === user.orgId && !o.isDeleted);
     const isSystemAdmin = user.role === 'SYSTEM_ADMIN';
+    const org = organizations.find(o => o.id === user.orgId && !o.isDeleted);
+    const userHasOrg = !!org;
 
     if (!userHasOrg && !isSystemAdmin) {
       handleNotify('error', 'Access Denied: User must belong to an organization to login. Contact your system administrator.');
       console.warn('[App] Login denied: User has no valid organization and is not SYSTEM_ADMIN', user.email);
+      return;
+    }
+
+    if (!isSystemAdmin && org?.subscriptionStatus === 'SUSPENDED') {
+      handleNotify('error', 'Access Denied: Your organization is suspended. Please contact support.');
+      console.warn('[App] Login denied: organization suspended', user.email, user.orgId);
       return;
     }
 

@@ -350,6 +350,8 @@ export function getDefaultTab(role: UserRole | string | undefined): ModuleTab {
       return 'student-portal';
     case 'TRAINER':
       return 'trainer-portal';
+    case 'SYSTEM_ADMIN':
+      return 'tenant-mgmt';
     case 'AR_SPECIALIST':
       return 'dashboard';
     case 'AP_SPECIALIST':
