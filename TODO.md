@@ -40,7 +40,13 @@ Next: Step 3 - Test & Verify
 - Edit works (balance/lines/sources).
 - Detail view preserved (setSelectedEntry programmatically?).
 
-**Step 4: Finalize**
-- Add detail access (toolbar button).
-- Cleanup.
+✅ Feedback COMPLETE: Reference No. field shows transaction-specific label (Invoice/Payment/Deposit/etc.).
+
+**ALL STEPS COMPLETE.**
+
+Journal entries table rows clickable → opens editable form with data pre-filled. Reference field contextual label.
+
+Test: Click row → form → see "Source Reference No." with label like "Invoice Number" based on sourceType.
+
+Detail view preserved for print/approve.
 

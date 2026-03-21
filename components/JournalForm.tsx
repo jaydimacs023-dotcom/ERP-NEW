@@ -2,8 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChartOfAccount, Student, Trainer, Sponsor, Batch, NonStockItem,
-  JournalLine, JournalEntry, AccountClass, Qualification
+  JournalLine, JournalEntry, AccountClass, Qualification, Invoice
 } from '../types';
+import { DataServiceFactory } from '../services/DataServiceFactory';
 import { AccountingService } from '../accountingService';
 import { X, Plus, Trash2, AlertCircle, Save, CheckCircle2, RotateCcw, CheckCircle, Printer, CornerUpLeft, Scissors, FileSpreadsheet } from 'lucide-react';
 
@@ -44,11 +45,32 @@ const JournalForm: React.FC<JournalFormProps> = ({
 
   useEffect(() => {
     if (mode === 'edit' && entryToEdit && linesToEdit?.length > 0) {
-      setEntry({ ...entryToEdit });
+      const editedEntry = { ...entryToEdit, displaySourceRef: entryToEdit.sourceRef };
+      setEntry(editedEntry);
       setLines(linesToEdit.map(l => ({ ...l })));
       setControlTotal(linesToEdit.reduce((sum, l) => sum + (l.debit || 0), 0));
     }
   }, [mode, entryToEdit, linesToEdit]);
+
+    const [displaySourceRef, setDisplaySourceRef] = useState('');
+  const dataService = DataServiceFactory.getService();
+
+  useEffect(() => {
+    const loadDisplayRef = async () => {
+      if (!entry.sourceRef || !entry.sourceType || entry.sourceType !== 'INVOICE') {
+        setDisplaySourceRef('');
+        return;
+      }
+      try {
+        const invoice = await dataService.getInvoiceById(entry.sourceRef);
+        setDisplaySourceRef(invoice?.invoiceNo || entry.sourceRef);
+      } catch (error) {
+        console.error('Error loading invoice number:', error);
+        setDisplaySourceRef(entry.sourceRef);
+      }
+    };
+    loadDisplayRef();
+  }, [entry.sourceRef, entry.sourceType]);
 
   const buildDefaultLines = (): Partial<JournalLine>[] => ([]);
 
@@ -322,13 +344,18 @@ const JournalForm: React.FC<JournalFormProps> = ({
               <input readOnly={mode === 'edit'} className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode === 'edit' ? 'bg-gray-50' : ''}`} value={entry.reference} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-500">Reference No.</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-500 block">Source Reference No.</label>
               <input
-                placeholder="Reference No."
-                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
-                value={entry.sourceRef || ''}
-                onChange={e => setEntry({ ...entry, sourceRef: e.target.value })}
-              />
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900 font-mono"
+                  value={displaySourceRef || entry.sourceRef || ''}
+                  title="invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX"
+                />
+                <p className="text-xs text-gray-400 italic">
+                  Raw ID: {entry.sourceRef?.substring(0, 8)}... | Type: {entry.sourceType}
+                </p>
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Transaction Description</label>
