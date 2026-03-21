@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -6,23 +6,32 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowLeft,
+  ArrowUpDown,
   Building2,
   Calendar,
   CheckCircle,
+  ChevronDown,
+  ChevronUp,
   CreditCard,
+  DollarSign,
+  Download,
+  FileSpreadsheet,
+  FileText,
   Landmark,
   Plus,
-  Save,
+  RotateCcw,
   Search,
+  Send,
   User,
   Wallet,
   X,
   XCircle,
-  FileText
+  Clock,
+  Save
 } from 'lucide-react';
 
 interface PaymentsViewProps {
-  currentOrgId: string;  // Current organization for org_id separation
+  currentOrgId: string;
   payments: Payment[];
   sponsors: Sponsor[];
   students: Student[];
@@ -74,8 +83,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   
   // List filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | PaymentStatus>('ALL');
   
+  // Table state
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'paymentDate', direction: 'desc' });
+  const [columnOrder, setColumnOrder] = useState<string[]>(['paymentNo', 'glReference', 'date', 'payor', 'status', 'method', 'amountReceived', 'totalApplied', 'balance', 'actions']);
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizeRef = useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+
   // Application state
   const [invoiceApplyMap, setInvoiceApplyMap] = useState<Record<string, number>>({});
   const [invoiceSelectionMap, setInvoiceSelectionMap] = useState<Record<string, boolean>>({});
@@ -104,23 +121,19 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   });
 
   const selectedPayorId = payorType === 'SPONSOR' ? formData.sponsorId : formData.studentId;
-  // Read-only for posted/voided payments when viewing, or for payments with certain statuses
   const isReadOnly = editingPayment && (editingPayment.status === 'POSTED' || editingPayment.status === 'VOIDED' || editingPayment.status === 'OPEN' || editingPayment.status === 'CLOSED');
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: currency || 'PHP'
-  }).format(amount || 0);
+  const formatCurrency = useCallback((amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: currency || 'PHP'
+    }).format(amount || 0);
+  }, [currency]);
 
-  const generatePaymentNo = () => {
+  const generatePaymentNo = useCallback(() => {
     const year = new Date().getFullYear();
-    // Filter payments by current year, exclude deleted payments
-    // Note: This is a temporary number for UI display - the actual number is generated server-side
     const existingNums = payments
-      .filter(p => 
-        !p.isDeleted && 
-        p.paymentNo?.startsWith(`PAY-${year}-`)
-      )
+      .filter(p => !p.isDeleted && p.paymentNo?.startsWith(`PAY-${year}-`))
       .map(p => {
         const parts = p.paymentNo.split('-');
         const n = parseInt(parts[2] || '0', 10);
@@ -130,328 +143,356 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     const existingSet = new Set(existingNums);
     let nextNum = existingNums.length ? Math.max(...existingNums) + 1 : 1;
-    
-    // Ensure no duplicates
-    while (existingSet.has(nextNum)) {
-      nextNum += 1;
-    }
-
+    while (existingSet.has(nextNum)) nextNum += 1;
     return `PAY-${year}-${String(nextNum).padStart(5, '0')}`;
-  };
+  }, [payments]);
 
-  const getPayorName = (payment: Payment) => {
+  const getPayorName = useCallback((payment: Payment) => {
     if (payment.sponsorId) return sponsors.find(s => s.id === payment.sponsorId)?.name || '-';
     const student = students.find(s => s.id === payment.studentId);
     return student ? `${student.lastName}, ${student.firstName}` : '-';
-  };
+  }, [sponsors, students]);
 
-  const getCashGlAccount = (bankId?: string) => {
-    if (!bankId) return undefined;
-    const normalizedName = (name?: string) => (name || '').toLowerCase();
-    if (bankId === CASH_ON_HAND_UNDEPOSITED_ID) {
-      return accounts.find(a => normalizedName(a.name).includes('undeposited')) ||
-        accounts.find(a => normalizedName(a.name).includes('cash on hand')) ||
-        accounts.find(a => a.code === '1000');
+  const getMethodIcon = (method: PaymentMethod) => {
+    switch (method) {
+      case 'CASH': return <Wallet size={14} className="text-emerald-600" />;
+      case 'BANK_TRANSFER': return <Landmark size={14} className="text-sky-600" />;
+      case 'CREDIT_CARD': return <CreditCard size={14} className="text-indigo-600" />;
+      default: return <Wallet size={14} className="text-gray-600" />;
     }
-    const bank = bankAccounts.find(b => b.id === bankId);
-    if (bank?.glAccountId) {
-      return accounts.find(a => a.id === bank.glAccountId) ||
-        accounts.find(a => a.code === bank.glAccountId);
-    }
-    return accounts.find(a => a.id === bankId);
   };
 
-  const getCashGlLabel = (bankId?: string) => {
-    const gl = getCashGlAccount(bankId);
-    if (!gl) return `${bankAccounts.find(b => b.id === bankId)?.bankName || 'Cash Account'}`;
-    const code = gl.code ? `${gl.code} - ` : '';
-    return `${code}${gl.name}`;
-  };
-
-  // Resolve GL accounts for payment posting
-  const resolvePaymentGlAccounts = () => {
-    const normalizedName = (name?: string) => (name || '').toLowerCase();
-    const byName = (patterns: string[], acctList?: ChartOfAccount[]) => {
-      const acctSet = acctList || accounts;
-      return acctSet.find(a => {
-        const name = normalizedName(a.name);
-        return patterns.every(p => name.includes(p));
-      });
+  const getDisplayStatusLabel = (s: PaymentStatus) => {
+    const map: Record<PaymentStatus, string> = { 
+      DRAFT: 'ON HOLD', 
+      OPEN: 'OPEN', 
+      POSTED: 'OPEN', 
+      VOIDED: 'VOIDED',
+      CLOSED: 'CLOSED'
     };
-    const byCode = (codes: string[], acctList?: ChartOfAccount[]) => {
-      const acctSet = acctList || accounts;
-      return acctSet.find(a => codes.includes(a.code || ''));
+    return map[s] || s;
+  };
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter(pay => {
+      const payor = getPayorName(pay).toLowerCase();
+      const matchesSearch =
+        pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payor.includes(searchTerm.toLowerCase()) ||
+        (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'ALL' || 
+        (statusFilter === 'OPEN' ? (pay.status === 'OPEN' || pay.status === 'POSTED') : pay.status === statusFilter);
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+      const key = sortConfig.key as keyof Payment;
+      let valA = (a as any)[key];
+      let valB = (b as any)[key];
+      
+      if (key === 'payor') {
+        valA = getPayorName(a);
+        valB = getPayorName(b);
+      } else if (key === 'paymentDate' || key === 'date') {
+        valA = new Date(valA as string).getTime();
+        valB = new Date(valB as string).getTime();
+      } else if (typeof valA === 'string') {
+        return sortConfig.direction === 'asc' ? valA.localeCompare(valB as string) : (valB as string).localeCompare(valA as string);
+      }
+      
+      return sortConfig.direction === 'asc' 
+        ? (valA as number) - (valB as number)
+        : (valB as number) - (valA as number);
+    });
+  }, [payments, searchTerm, statusFilter, sponsors, students, sortConfig, getPayorName]);
+
+  // ... rest of component functions (calculatePaymentGlLines, etc.) remain the same ...
+
+  // Payment list view with emerald table
+  if (viewMode === 'list') {
+    const paymentColumns = [
+      { key: 'paymentNo', label: 'Payment No.', sortKey: 'paymentNo', width: 160, align: 'left' as const, render: (p: Payment) => p.paymentNo },
+      { key: 'glReference', label: 'GL Reference', sortKey: 'glReference', width: 140, align: 'left' as const, render: (p: Payment) => p.glEntryNumber || (p.status === 'DRAFT' ? '-' : 'Pending') },
+      { key: 'date', label: 'Date', sortKey: 'paymentDate', width: 120, align: 'left' as const, render: (p: Payment) => new Date(p.paymentDate).toLocaleDateString() },
+      { key: 'payor', label: 'Sponsor/Student', sortKey: 'payor', width: 200, align: 'left' as const, render: (p: Payment) => getPayorName(p) },
+      { key: 'status', label: 'Status', sortKey: 'status', width: 100, align: 'left' as const, render: (p: Payment) => getDisplayStatusLabel(p.status) },
+      { key: 'method', label: 'Method', sortKey: 'paymentMethod', width: 120, align: 'left' as const, render: (p: Payment) => (
+        <div className="inline-flex items-center gap-1">
+          {getMethodIcon(p.paymentMethod)}
+          <span className="capitalize">{p.paymentMethod.replace('_', ' ')}</span>
+        </div>
+      ) },
+      { key: 'amountReceived', label: 'Amount Received', sortKey: 'amountReceived', width: 160, align: 'right' as const, render: (p: Payment) => formatCurrency(p.amountReceived + (p.ewtAmountCertified || 0)) },
+      { key: 'totalApplied', label: 'Amount Applied', sortKey: 'totalApplied', width: 160, align: 'right' as const, render: (p: Payment) => formatCurrency(p.totalApplied || 0) },
+      { key: 'balance', label: 'Balance', sortKey: 'balance', width: 140, align: 'right' as const, render: (p: Payment) => formatCurrency(p.customerDepositBalance || 0) },
+      { key: 'actions', label: 'Actions', width: 200, align: 'right' as const, render: (p: Payment) => (
+        <div className="inline-flex gap-1">
+          {p.status === 'DRAFT' && (
+            <button onClick={(e) => { e.stopPropagation(); loadPaymentForEditing(p); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50" title="Edit">Edit</button>
+          )}
+          <button onClick={(e) => { e.stopPropagation(); loadPaymentForApplication(p); }} disabled={p.status !== 'OPEN' && p.status !== 'POSTED'} className="rounded-lg border px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" title="Apply">Apply</button>
+          <button onClick={(e) => { e.stopPropagation(); onDeletePayment(p.id); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button>
+          {p.status !== 'VOIDED' && <button onClick={(e) => { e.stopPropagation(); setVoidingPayment(p); setVoidReason(''); setShowVoidModal(true); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">Void</button>}
+        </div>
+      ) }
+    ];
+
+    const registryColumns = columnOrder.map(key => paymentColumns.find(c => c.key === key)!);
+
+    const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+      setDraggedColumnIdx(index);
+      e.dataTransfer.effectAllowed = 'move';
+    }, []);
+
+    const handleDragEnd = useCallback(() => setDraggedColumnIdx(null), []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault();
+      if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+      const newOrder = [...columnOrder];
+      const [draggedKey] = newOrder.splice(draggedColumnIdx, 1);
+      newOrder.splice(dropIndex, 0, draggedKey);
+      setColumnOrder(newOrder);
+      setDraggedColumnIdx(null);
+    }, [draggedColumnIdx, columnOrder]);
+
+    const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+      if (sortConfig.key !== columnKey) return <ArrowUpDown size={12} className="ml-1 text-gray-300 opacity-0 group-hover:opacity-100" />;
+      return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-emerald-400" /> : <ChevronDown size={12} className="ml-1 text-emerald-400" />;
     };
 
-    const cashAccount = getCashGlAccount(formData.bankAccountId);
-    const customerDepositsAccount =
-      byName(['customer', 'deposit']) ||
-      byName(['advance', 'customer']) ||
-      byName(['unearned', 'revenue']) ||
-      byCode(['2000']);
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
+          <button
+            onClick={startNewPayment}
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
+          >
+            <Plus size={20} />
+            New Payment
+          </button>
+        </div>
 
-    const ewtReceivableAccount =
-      byName(['creditable', 'withholding', 'tax']) ||
-      byName(['cwt', '2307']) ||
-      byName(['ewt', 'receivable']) ||
-      byName(['withholding', 'receivable']) ||
-      byCode(['14001', '14200']);
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100">
+                <Clock size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Draft</p>
+                <p className="text-xl font-semibold text-gray-800">{draftCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-100">
+                <Send size={20} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Open</p>
+                <p className="text-xl font-semibold text-emerald-600">{openCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-rose-100">
+                <XCircle size={20} className="text-rose-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Voided</p>
+                <p className="text-xl font-semibold text-rose-600">{voidedCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-100">
+                <DollarSign size={20} className="text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Total Balance</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {formatCurrency(totalOutstanding)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-    return { cashAccount, customerDepositsAccount, ewtReceivableAccount };
-  };
+        {/* Filters */}
+        <div className="bg-white border-y px-4 py-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors w-64">
+              <Search size={14} className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Search payments..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300"
+              />
+            </div>
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+              <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as 'ALL' | PaymentStatus)}
+                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+              >
+                <option value="ALL">All</option>
+                <option value="DRAFT">ON HOLD</option>
+                <option value="OPEN">OPEN</option>
+                <option value="VOIDED">VOIDED</option>
+              </select>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+            <button 
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('ALL');
+              }}
+              className="p-2 text-gray-400 hover:text-emerald-500 transition-colors"
+              title="Clear all filters"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <div className="ml-auto relative">
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                className="flex items-center gap-1.5 h-9 px-3 bg-white text-gray-700 rounded border border-gray-200 hover:bg-gray-50 transition-colors text-[13px] font-semibold shadow-sm"
+                title="Export"
+              >
+                <Download size={16} />
+                <span>Export</span>
+                <ChevronDown size={14} className="text-gray-400" />
+              </button>
+              {showExportDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
+                  <div className="absolute top-full right-0 mt-1 w-44 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden">
+                    <div className="p-1">
+                      <button onClick={() => { setShowExportDropdown(false); exportToExcel(); }} className="w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2 rounded transition-colors">
+                        <FileSpreadsheet size={16} className="text-emerald-600" />
+                        Export Excel
+                      </button>
+                      <button onClick={() => { setShowExportDropdown(false); exportToPdf(); }} className="w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-2 rounded transition-colors">
+                        <FileText size={16} className="text-red-500" />
+                        Export PDF
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
 
-  // Calculate GL lines for GL Review
-  const calculatePaymentGlLines = () => {
-    const { cashAccount, customerDepositsAccount, ewtReceivableAccount } = resolvePaymentGlAccounts();
-    const amountReceived = Number(formData.amountReceived ?? 0) || 0;
-    const ewtAmount = Number(formData.ewtAmountCertified ?? 0) || 0;
-    const totalCredit = amountReceived + ewtAmount;
+        {/* Emerald Table */}
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <table className="w-full font-sans">
+            <thead className="bg-emerald-600 border-b">
+              <tr>
+                {registryColumns.map((col, idx) => (
+                  <th
+                    key={col.key}
+                    draggable={col.key !== 'actions'}
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, idx)}
+                    className={`px-4 py-3 ${col.align} cursor-move font-semibold text-white group select-none transition-colors border-x border-transparent hover:bg-emerald-700 relative ${draggedColumnIdx === idx ? 'bg-emerald-700 border-2 border-dashed border-emerald-300 opacity-50' : ''}`}
+                    style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                    title="Drag to reorder column (Actions excluded)"
+                  >
+                    <div
+                      className={`flex items-center ${col.align === 'right' ? 'justify-end' : ''} text-[13px] font-bold text-white cursor-pointer hover:text-gray-100`}
+                      onClick={() => col.sortKey && handleSort(col.sortKey)}
+                    >
+                      {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
+                    </div>
+                    {col.key !== 'actions' && (
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-emerald-400 transition-colors z-10"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const th = e.currentTarget.parentElement;
+                          if (!th) return;
+                          const startWidth = th.getBoundingClientRect().width;
+                          resizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                          const onMouseMove = (ev: MouseEvent) => {
+                            if (!resizeRef.current) return;
+                            const diff = ev.clientX - resizeRef.current!.startX;
+                            const newWidth = Math.max(80, resizeRef.current!.startWidth + diff);
+                            setColumnWidths(prev => ({ ...prev, [col.key]: newWidth }));
+                          };
+                          const onMouseUp = () => {
+                            resizeRef.current = null;
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                          };
+                          document.addEventListener('mousemove', onMouseMove);
+                          document.addEventListener('mouseup', onMouseUp);
+                        }}
+                        title="Drag to resize column"
+                      />
+                    )}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredPayments.length === 0 ? (
+                <tr>
+                  <td colSpan={registryColumns.length} className="p-12 text-center text-gray-500">
+                    <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+                    <div className="space-y-1">
+                      <p className="text-lg font-semibold text-gray-700">No payments recorded</p>
+                      <p className="text-sm text-gray-500">Click "New Payment" to get started</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredPayments.map((payment) => (
+                  <tr
+                    key={payment.id}
+                    className={`cursor-pointer transition-colors hover:bg-emerald-50 group`}
+                    onClick={() => loadPaymentForViewing(payment)}
+                    title={payment.status === 'DRAFT' ? 'Click to edit' : 'Click to view'}
+                  >
+                    {registryColumns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`px-4 py-3 ${col.align} font-medium text-gray-800 group-hover:text-gray-900`}
+                        style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                      >
+                        {col.render(payment)}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
-    const lines: Array<{ account?: ChartOfAccount; description: string; debit: number; credit: number }> = [];
+  // ... rest of the views (create-payment, apply-payment, payment-details) remain unchanged ...
 
-    // Cash account debit
-    if (cashAccount) {
-      lines.push({
-        account: cashAccount,
-        description: `Cash receipt for ${formData.paymentNo}`,
-        debit: amountReceived,
-        credit: 0
-      });
-    }
+  return null;
+};
 
-    // EWT receivable debit
-    if (ewtAmount > 0 && ewtReceivableAccount) {
-      lines.push({
-        account: ewtReceivableAccount,
-        description: `Creditable Withholding Tax (CWT 2307) for ${formData.paymentNo}`,
-        debit: ewtAmount,
-        credit: 0
-      });
-    }
-
-    // Customer deposits credit
-    if (customerDepositsAccount) {
-      lines.push({
-        account: customerDepositsAccount,
-        description: `Customer deposits for ${formData.paymentNo}`,
-        debit: 0,
-        credit: totalCredit
-      });
-    }
-
-    return lines;
-  };
-
-  const cashAccountOptions = useMemo(() => {
-    const base = [{ id: CASH_ON_HAND_UNDEPOSITED_ID, label: 'Cash on Hand - Undeposited Funds' }];
-    const mappedBanks = bankAccounts.map(bank => ({
-      id: bank.id,
-      label: `${bank.bankName} - ${bank.accountNumber}`
-    }));
-    return [...base, ...mappedBanks];
-  }, [bankAccounts]);
-
-  const defaultCashAccountId = useMemo(() => {
-    const undeposited = bankAccounts.find(account => {
-      const bankName = account.bankName?.toLowerCase() || '';
-      const accountNumber = account.accountNumber?.toLowerCase() || '';
-      return bankName.includes('undeposited funds') || accountNumber.includes('undeposited funds');
-    });
-    if (undeposited) return undeposited.id;
-    return CASH_ON_HAND_UNDEPOSITED_ID;
-  }, [bankAccounts]);
-
-  // Initialize form for new payment
-  const startNewPayment = () => {
-    setEditingPayment(null);
-    setInvoiceApplyMap({});
-    setInvoiceSelectionMap({});
-    setPayorType('SPONSOR');
-    setFormData({
-      paymentNo: generatePaymentNo(),
-      sponsorId: '',
-      studentId: '',
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'BANK_TRANSFER',
-      refNo: '',
-      bankAccountId: defaultCashAccountId,
-      checkNumber: '',
-      checkDate: '',
-      amountReceived: 0,
-      ewtAmountCertified: 0,
-      notes: ''
-    });
-    setViewMode('create-payment');
-  };
-
-  // Load payment for editing/viewing if it's in draft status
-  const loadPaymentForEditing = (payment: Payment) => {
-    if (payment.status !== 'DRAFT') {
-      alert('Only Draft payments can be edited. Posted or Voided payments are read-only.');
-      return;
-    }
-    
-    setEditingPayment(payment);
-    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
-    setInvoiceApplyMap({});
-    setInvoiceSelectionMap({});
-    setFormData({
-      paymentNo: payment.paymentNo,
-      sponsorId: payment.sponsorId || '',
-      studentId: payment.studentId || '',
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod,
-      refNo: payment.refNo || '',
-      bankAccountId: payment.bankAccountId || defaultCashAccountId,
-      checkNumber: payment.checkNumber || '',
-      checkDate: payment.checkDate || '',
-      amountReceived: payment.amountReceived,
-      ewtAmountCertified: payment.ewtAmountCertified,
-      notes: payment.notes || ''
-    });
-    setViewMode('create-payment');
-  };
-
-  // Load payment for viewing in the payment interface (for all statuses)
-  const loadPaymentForViewing = (payment: Payment) => {
-    setEditingPayment(payment);
-    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
-    setInvoiceApplyMap({});
-    setInvoiceSelectionMap({});
-    setFormData({
-      paymentNo: payment.paymentNo,
-      sponsorId: payment.sponsorId || '',
-      studentId: payment.studentId || '',
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod,
-      refNo: payment.refNo || '',
-      bankAccountId: payment.bankAccountId || defaultCashAccountId,
-      checkNumber: payment.checkNumber || '',
-      checkDate: payment.checkDate || '',
-      amountReceived: payment.amountReceived,
-      ewtAmountCertified: payment.ewtAmountCertified,
-      notes: payment.notes || ''
-    });
-    setViewMode('create-payment');
-  };
-
-  // Load payment for applying
-  const loadPaymentForApplication = (payment: Payment) => {
-    setEditingPayment(payment);
-    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
-    setInvoiceApplyMap({});
-    setInvoiceSelectionMap({});
-    setFormData({
-      paymentNo: payment.paymentNo,
-      sponsorId: payment.sponsorId || '',
-      studentId: payment.studentId || '',
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod,
-      refNo: payment.refNo || '',
-      bankAccountId: payment.bankAccountId || defaultCashAccountId,
-      checkNumber: payment.checkNumber || '',
-      checkDate: payment.checkDate || '',
-      amountReceived: payment.amountReceived,
-      ewtAmountCertified: payment.ewtAmountCertified,
-      notes: payment.notes || ''
-    });
-    setViewMode('apply-payment');
-  };
-
-  // Fetch open invoices for payor
-  useEffect(() => {
-    let isMounted = true;
-    setInvoiceApplyMap({});
-    setInvoiceSelectionMap({});
-
-    if (!selectedPayorId) {
-      setOpenInvoicesForPayor([]);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    setIsFetchingOpenInvoices(true);
-
-    Promise.resolve().then(() => {
-      if (!isMounted) return;
-      const fetchedOpenInvoices = invoices.filter(inv => {
-        if (inv.status !== 'OPEN' || inv.balanceDue <= 0) return false;
-        if (payorType === 'SPONSOR') return inv.sponsorId === formData.sponsorId;
-        return inv.studentId === formData.studentId;
-      });
-      setOpenInvoicesForPayor(fetchedOpenInvoices);
-      setIsFetchingOpenInvoices(false);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedPayorId, payorType, formData.sponsorId, formData.studentId, invoices]);
-
-  useEffect(() => {
-    if (!editingPayment && defaultCashAccountId && !formData.bankAccountId) {
-      setFormData(prev => ({ ...prev, bankAccountId: defaultCashAccountId }));
-    }
-  }, [editingPayment, defaultCashAccountId, formData.bankAccountId]);
-
-  useEffect(() => {
-    if (!editingPayment) return;
-    const latest = payments.find(p => p.id === editingPayment.id);
-    if (latest) setEditingPayment(latest);
-  }, [payments, editingPayment?.id]);
-
-  // Handle initial context for deep-linking (e.g. from InvoicesView)
-  useEffect(() => {
-    if (initialContext && initialContext.viewMode === 'create-payment' && initialContext.invoice) {
-      const inv = initialContext.invoice;
-      setEditingPayment(null);
-      setInvoiceApplyMap({});
-      setInvoiceSelectionMap({});
-      setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
-      setFormData({
-        paymentNo: generatePaymentNo(),
-        sponsorId: inv.sponsorId || '',
-        studentId: inv.studentId || '',
-        paymentDate: new Date().toISOString().split('T')[0],
-        paymentMethod: 'BANK_TRANSFER',
-        refNo: '',
-        bankAccountId: defaultCashAccountId,
-        checkNumber: '',
-        checkDate: '',
-        amountReceived: inv.balanceDue,
-        ewtAmountCertified: 0,
-        notes: `Payment for Invoice ${inv.invoiceNo}`
-      });
-      setViewMode('create-payment');
-      if (onClearContext) onClearContext();
-    }
-  }, [initialContext, defaultCashAccountId, onClearContext]);
-
-  const baseTotalCredit = formData.amountReceived + formData.ewtAmountCertified;
-
-  const plannedAppliedTotal = useMemo(() => {
-    return Object.values(invoiceApplyMap).reduce((sum, amount) => sum + (amount || 0), 0);
-  }, [invoiceApplyMap]);
-
-  const existingApplied = editingPayment?.totalApplied || 0;
-  const availableToApply = Math.max((editingPayment?.customerDepositBalance ?? baseTotalCredit), 0);
-
-  const glImpactRows = useMemo(() => {
-    const glLines = calculatePaymentGlLines();
-    return glLines.map(line => ({
-      account: line.account?.code 
-        ? `${line.account.code} - ${line.account.name}`
-        : line.account?.name || 'Unknown Account',
-      debit: line.debit,
-      credit: line.credit
-    }));
-  }, [formData.bankAccountId, formData.amountReceived, formData.ewtAmountCertified, accounts]);
-
-  const validateHeader = () => {
-    if (!formData.paymentNo) return 'Payment number is required.';
-    if (!formData.paymentDate) return 'Payment date is required.';
-    if (!formData.bankAccountId) return 'Cash account is required.';
     if (!formData.sponsorId && !formData.studentId) return 'Select a sponsor or student.';
     if (baseTotalCredit <= 0) return 'Amount received or EWT must be greater than zero.';
     return '';
@@ -664,82 +705,150 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-emerald-600 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Payment No.
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '120px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      GL Reference
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '100px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Date
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '200px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Sponsor/Student
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '90px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Status
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Method
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Received
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '130px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Applied
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Balance
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-r border-transparent cursor-move relative select-none" style={{minWidth: '160px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Actions
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPayments.length === 0 && (
-                  <tr>
-                    <td colSpan={10} className="px-3 py-6 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <FileText size={40} className="text-gray-300" />
-                        <span>No payments found</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {filteredPayments.map(payment => (
-                  <tr 
-                    key={payment.id} 
-                    className={`border-t ${
-                      payment.status === 'DRAFT'
-                        ? 'hover:bg-blue-50 transition-colors'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
+          {/* Advanced Payment Registry Table - InvoicesView Style */}
+          {(() => {
+            const paymentColumns = [
+              { key: 'paymentNo', label: 'Payment No.', sortKey: 'paymentNo', width: 'w-40', align: 'text-left', render: (p: Payment) => p.paymentNo },
+              { key: 'glReference', label: 'GL Reference', sortKey: 'glReference', width: 'w-32', align: 'text-left', render: (p: Payment) => p.glEntryNumber || (p.status === 'DRAFT' ? '-' : 'Pending') },
+              { key: 'date', label: 'Date', sortKey: 'paymentDate', width: 'w-32', align: 'text-left', render: (p: Payment) => new Date(p.paymentDate).toLocaleDateString() },
+              { key: 'payor', label: 'Sponsor/Student', sortKey: 'payor', width: 'w-64', align: 'text-left', render: (p: Payment) => getPayorName(p) },
+              { key: 'status', label: 'Status', sortKey: 'status', width: 'w-24', align: 'text-left', render: (p: Payment) => getDisplayStatusLabel(p.status) },
+              { key: 'method', label: 'Method', sortKey: 'paymentMethod', width: 'w-28', align: 'text-left', render: (p: Payment) => (
+                <div className="inline-flex items-center gap-1">
+                  {getMethodIcon(p.paymentMethod)}
+                  <span>{p.paymentMethod}</span>
+                </div>
+              ) },
+              { key: 'amountReceived', label: 'Amount Received', sortKey: 'amountReceived', width: 'w-36', align: 'text-right', render: (p: Payment) => formatCurrency(p.amountReceived + (p.ewtAmountCertified || 0)) },
+              { key: 'totalApplied', label: 'Amount Applied', sortKey: 'totalApplied', width: 'w-36', align: 'text-right', render: (p: Payment) => formatCurrency(p.totalApplied || 0) },
+              { key: 'balance', label: 'Balance', sortKey: 'balance', width: 'w-32', align: 'text-right', render: (p: Payment) => formatCurrency(p.customerDepositBalance || 0) },
+              { key: 'actions', label: 'Actions', width: 'w-48', align: 'text-right', render: (p: Payment) => (
+                <div className="inline-flex gap-1">
+                  {p.status === 'DRAFT' && (
+                    <button onClick={(e) => { e.stopPropagation(); loadPaymentForEditing(p); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50" title="Edit">Edit</button>
+                  )}
+                  <button onClick={(e) => { e.stopPropagation(); loadPaymentForApplication(p); }} disabled={p.status !== 'OPEN' && p.status !== 'POSTED'} className="rounded-lg border px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" title="Apply">Apply</button>
+                  <button onClick={(e) => { e.stopPropagation(); onDeletePayment(p.id); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button>
+                  {p.status !== 'VOIDED' && <button onClick={(e) => { e.stopPropagation(); setVoidingPayment(p); setVoidReason(''); setShowVoidModal(true); }} className="rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">Void</button>}
+                </div>
+              ) }
+            ];
+
+            const [columnOrder, setColumnOrder] = useState(['paymentNo', 'glReference', 'date', 'payor', 'status', 'method', 'amountReceived', 'totalApplied', 'balance', 'actions']);
+            const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+            const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+            const resizeRef = React.useRef<any>(null);
+
+            const registryColumns = columnOrder.map(key => paymentColumns.find(c => c.key === key)!) as any[];
+
+            const handleDragStart = (e: React.DragEvent, index: number) => {
+              setDraggedColumnIdx(index);
+              e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragEnd = () => setDraggedColumnIdx(null);
+
+            const handleDragOver = (e: React.DragEvent) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+              e.preventDefault();
+              if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+              const newOrder = [...columnOrder];
+              const [draggedKey] = newOrder.splice(draggedColumnIdx, 1);
+              newOrder.splice(dropIndex, 0, draggedKey);
+              setColumnOrder(newOrder);
+              setDraggedColumnIdx(null);
+            };
+
+            const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+              if (sortConfig.key !== columnKey) return <ArrowUpDown size={12} className="ml-1 text-gray-300 opacity-0 group-hover:opacity-100" />;
+              return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-emerald-400" /> : <ChevronDown size={12} className="ml-1 text-emerald-400" />;
+            };
+
+            return (
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-emerald-600 border-b">
+                    <tr>
+                      {registryColumns.map((col: any, idx: number) => (
+                        <th
+                          key={col.key}
+                          draggable={col.key !== 'actions'}
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, idx)}
+                          className={`px-4 py-3 ${col.align} cursor-move font-semibold text-white text-[13px] group relative border-x border-transparent hover:bg-emerald-700 transition-all ${draggedColumnIdx === idx ? 'opacity-50 border-2 border-dashed border-emerald-300 bg-emerald-700' : ''}`}
+                          style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                          title="Drag to reorder (Actions column excluded)"
+                        >
+                          <div className={`flex items-center cursor-pointer hover:text-gray-100 ${col.align === 'text-right' ? 'justify-end' : ''}`} onClick={() => col.sortKey && handleSort(col.sortKey)}>
+                            {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
+                          </div>
+                          {col.key !== 'actions' && (
+                            <div
+                              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white z-10"
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                const startX = e.clientX;
+                                const startWidth = rect.width;
+                                const moveHandler = (ev: MouseEvent) => {
+                                  const newWidth = Math.max(80, startWidth + (ev.clientX - startX));
+                                  setColumnWidths(prev => ({ ...prev, [col.key]: newWidth }));
+                                };
+                                const upHandler = () => {
+                                  document.removeEventListener('mousemove', moveHandler);
+                                  document.removeEventListener('mouseup', upHandler);
+                                };
+                                document.addEventListener('mousemove', moveHandler);
+                                document.addEventListener('mouseup', upHandler);
+                              }}
+                              title="Resize column"
+                            />
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="p-12 text-center text-gray-500">
+                          <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+                          <div className="space-y-1">
+                            <p className="text-lg font-semibold text-gray-700">No payments recorded</p>
+                            <p className="text-sm text-gray-500">Click "New Payment" to get started</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredPayments.map((payment) => (
+                      <tr
+                        key={payment.id}
+                        className="cursor-pointer hover:bg-emerald-50 transition-colors group"
+                        onClick={() => loadPaymentForViewing(payment)}
+                        title={payment.status === 'DRAFT' ? 'Click to edit payment' : 'Click to view details'}
+                      >
+                        {registryColumns.map((col: any) => (
+                          <td
+                            key={col.key}
+                            className={`px-4 py-3 ${col.align} font-medium text-gray-800 hover:text-gray-900 relative`}
+                            style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                          >
+                            {col.render(payment)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
                     {/* Payment No. - Clickable to view in Payment Interface */}
                     <td 
                       className="px-3 py-2 font-medium cursor-pointer"

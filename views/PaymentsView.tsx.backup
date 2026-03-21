@@ -666,58 +666,18 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-emerald-600 border-b">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Payment No.
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '120px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      GL Reference
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '100px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Date
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '200px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Sponsor/Student
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '90px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Status
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Method
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Received
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '130px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Applied
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Balance
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-r border-transparent cursor-move relative select-none" style={{minWidth: '160px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Actions
-                    </div>
-                  </th>
+                  <th className="px-3 py-2 text-left">Payment No.</th>
+                  <th className="px-3 py-2 text-left">GL Reference</th>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Sponsor/Student</th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-left">Method</th>
+                  <th className="px-3 py-2 text-right">Amount Received</th>
+                  <th className="px-3 py-2 text-right">Amount Applied</th>
+                  <th className="px-3 py-2 text-right">Balance</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>

@@ -46,7 +46,7 @@ const Ledger: React.FC<LedgerProps> = ({
 
   // Column ordering and resize state
   const [columnOrder, setColumnOrder] = useState<string[]>([
-    'source', 'date', 'glReference', 'description', 'total', 'status', 'createdBy', 'createdOn'
+    'source', 'date', 'glReference', 'postPeriod', 'description', 'total', 'status', 'createdBy', 'createdOn'
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
@@ -118,6 +118,7 @@ const Ledger: React.FC<LedgerProps> = ({
         case 'source': return entry.sourceType || '';
         case 'date': return entry.date || '';
         case 'glReference': return (entry.glEntryNumber || entry.reference || '').trim();
+        case 'postPeriod': return entry.date ? formatPeriod(entry.date) : '';
         case 'description': return entry.description || '';
         case 'total': return entryTotals.get(entry.id) || 0;
         case 'status': return entry.status || 'ON_HOLD';
@@ -153,6 +154,13 @@ const Ledger: React.FC<LedgerProps> = ({
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return format(parsed, 'MM-dd-yyyy');
+  };
+
+  const formatPeriod = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return `${format(d, 'MM')}-${format(d, 'yyyy')}`;
   };
 
   const getCreatedByName = (createdBy?: string) => {
@@ -483,10 +491,11 @@ const Ledger: React.FC<LedgerProps> = ({
             <tr>
               {(() => {
                 const columns = {
-                  source: { key: 'source', label: 'Memo / Source', align: 'text-left', width: 160, sortKey: 'source' },
+                  source: { key: 'source', label: 'Transaction Type', align: 'text-left', width: 160, sortKey: 'source' },
                   date: { key: 'date', label: 'Date', align: 'text-left', width: 110, sortKey: 'date' },
                   glReference: { key: 'glReference', label: 'GL Reference No.', align: 'text-left', width: 170, sortKey: 'glReference' },
-                  description: { key: 'description', label: 'Description', align: 'text-left', width: 220, sortKey: 'description' },
+                  postPeriod: { key: 'postPeriod', label: 'Post Period', align: 'text-left', width: 130, sortKey: 'postPeriod' },
+                  description: { key: 'description', label: 'Description', align: 'text-left', width: 180, sortKey: 'description' },
                   total: { key: 'total', label: 'Transaction Total', align: 'text-right', width: 150, sortKey: 'total' },
                   status: { key: 'status', label: 'Status', align: 'text-center', width: 120, sortKey: 'status' },
                   createdBy: { key: 'createdBy', label: 'Created By', align: 'text-left', width: 170, sortKey: 'createdBy' },
@@ -597,6 +606,7 @@ const Ledger: React.FC<LedgerProps> = ({
                       {(entry.glEntryNumber || entry.reference)?.trim() || '—'}
                     </span>
                   ),
+                  postPeriod: <span className="font-medium text-gray-600">{formatPeriod(entry.date)}</span>,
                   description: <span className="font-medium text-gray-800 line-clamp-2">{entry.description}</span>,
                   total: (
                     <span className="font-medium text-gray-800">

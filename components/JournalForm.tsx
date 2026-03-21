@@ -87,7 +87,9 @@ const JournalForm: React.FC<JournalFormProps> = ({
   };
 
   const totalDebit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.debit) || 0), 0), [lines]);
-  const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credit) || 0), 0), [lines]);
+const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credit) || 0), 0), [lines]);
+
+  const formatAmount = (value: number) => new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.001 && totalDebit > 0;
   const canPost = isBalanced;
@@ -259,7 +261,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
 <h3 className="text-xl font-bold text-gray-800">
               {mode === 'edit' ? `Edit Journal Entry: ${entry.reference}` : 'New Journal Entry'}
             </h3>
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-1">Journal Voucher</p>
+            <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mt-1">{displaySourceRef || entry.sourceRef || ''}</p>
           </div>
         </div>
 
@@ -344,18 +346,13 @@ const JournalForm: React.FC<JournalFormProps> = ({
               <input readOnly={mode === 'edit'} className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode === 'edit' ? 'bg-gray-50' : ''}`} value={entry.reference} />
             </div>
             <div className="space-y-1.5">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-500 block">Source Reference No.</label>
+              <label className="text-xs font-medium text-gray-500">Reference No.</label>
               <input
                   readOnly
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900 font-mono"
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
                   value={displaySourceRef || entry.sourceRef || ''}
                   title="invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX"
-                />
-                <p className="text-xs text-gray-400 italic">
-                  Raw ID: {entry.sourceRef?.substring(0, 8)}... | Type: {entry.sourceType}
-                </p>
-              </div>
+                />           
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Transaction Description</label>
@@ -409,37 +406,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
                             </select>
                           </div>
                         </div>
-            <div className="flex items-end gap-6 col-span-4">
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-medium text-gray-500">Debit Total</label>
-                <input
-                  readOnly
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                  value={totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-medium text-gray-500">Credit Total</label>
-                <input
-                  readOnly
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                  value={totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                />
-              </div>
-              <div className="flex-1 space-y-1.5">
-                <label className="text-xs font-medium text-gray-500">Status</label>
-                <select
-                  disabled
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                  value={(entry.status || 'DRAFT') === 'DRAFT' ? 'ON_HOLD' : (entry.status as string)}
-                >
-                  <option value="POSTED">POSTED</option>
-                  <option value="ON_HOLD">ON HOLD</option>
-                  <option value="REVERSED">REVERSED</option>
-                </select>
-              </div>
-            </div>
-            <input type="hidden" value={controlTotal || ''} />
+   <input type="hidden" value={controlTotal || ''} />
           </div>
           {!isBalanced && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-[13px] font-medium">
@@ -635,11 +602,13 @@ const JournalForm: React.FC<JournalFormProps> = ({
                                     <div className="flex items-center gap-1 justify-end">
                                       <span className="text-[13px] font-normal text-gray-500">₱</span>
                                       <input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.debit || ''}
-                                        onChange={e => updateLine(line.id!, { debit: parseFloat(e.target.value) || 0, credit: 0 })}
+                                        type="text"
+                                        inputMode="decimal"
+                                        pattern="[0-9,]*"
+                                        value={formatAmount(Number(line.debit) || 0)}
+                                        onChange={e => updateLine(line.id!, { debit: parseFloat(e.target.value.replace(/,/g, '')) || 0, credit: 0 })}
                                         className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700"
+                                        placeholder="0.00"
                                       />
                                     </div>
                                   </td>
@@ -650,11 +619,13 @@ const JournalForm: React.FC<JournalFormProps> = ({
                                     <div className="flex items-center gap-1 justify-end">
                                       <span className="text-[13px] font-normal text-gray-500">₱</span>
                                       <input
-                                        type="number"
-                                        step="0.01"
-                                        value={line.credit || ''}
-                                        onChange={e => updateLine(line.id!, { credit: parseFloat(e.target.value) || 0, debit: 0 })}
+                                        type="text"
+                                        inputMode="decimal"
+                                        pattern="[0-9,]*"
+                                        value={formatAmount(Number(line.credit) || 0)}
+                                        onChange={e => updateLine(line.id!, { credit: parseFloat(e.target.value.replace(/,/g, '')) || 0, debit: 0 })}
                                         className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700"
+                                        placeholder="0.00"
                                       />
                                     </div>
                                   </td>
