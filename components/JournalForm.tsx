@@ -16,12 +16,15 @@ interface JournalFormProps {
   items: NonStockItem[];
   qualifications: Qualification[];
   entries: JournalEntry[];
+  entryToEdit?: JournalEntry;
+  linesToEdit?: JournalLine[];
+  mode?: 'new' | 'edit';
   onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onClose: () => void;
 }
 
-const JournalForm: React.FC<JournalFormProps> = ({ 
-  accounts, students, trainers, sponsors, batches, items = [], qualifications, entries, onSubmit, onClose 
+const JournalForm: React.FC<JournalFormProps> = ({
+  accounts, students, trainers, sponsors, batches, items = [], qualifications, entries, entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
 }) => {
   const brandColor = '#F47721';
   const buildEmptyEntry = (): Partial<JournalEntry> => ({
@@ -38,6 +41,14 @@ const JournalForm: React.FC<JournalFormProps> = ({
     const nextRef = AccountingService.getNextReference(entries, 'JV');
     setEntry(prev => ({ ...prev, reference: nextRef }));
   }, [entries]);
+
+  useEffect(() => {
+    if (mode === 'edit' && entryToEdit && linesToEdit?.length > 0) {
+      setEntry({ ...entryToEdit });
+      setLines(linesToEdit.map(l => ({ ...l })));
+      setControlTotal(linesToEdit.reduce((sum, l) => sum + (l.debit || 0), 0));
+    }
+  }, [mode, entryToEdit, linesToEdit]);
 
   const buildDefaultLines = (): Partial<JournalLine>[] => ([]);
 
@@ -223,8 +234,8 @@ const JournalForm: React.FC<JournalFormProps> = ({
     <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
           <div>
-            <h3 className="text-xl font-bold text-gray-800">
-              Journal Entry: {entry.reference || 'New'}
+<h3 className="text-xl font-bold text-gray-800">
+              {mode === 'edit' ? `Edit Journal Entry: ${entry.reference}` : 'New Journal Entry'}
             </h3>
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mt-1">Journal Voucher</p>
           </div>
@@ -308,7 +319,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Journal Voucher No.</label>
-              <input readOnly className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900" value={entry.reference} />
+              <input readOnly={mode === 'edit'} className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode === 'edit' ? 'bg-gray-50' : ''}`} value={entry.reference} />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Reference No.</label>
@@ -323,33 +334,83 @@ const JournalForm: React.FC<JournalFormProps> = ({
               <label className="text-xs font-medium text-gray-500">Transaction Description</label>
               <input required placeholder="Transaction Description" className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200" value={entry.description} onChange={e => setEntry({...entry, description: e.target.value})} />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-500">Debit Total</label>
-              <input
-                readOnly
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                value={totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-500">Credit Total</label>
-              <input
-                readOnly
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                value={totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-500">Status</label>
-              <select
-                disabled
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                value={(entry.status || 'DRAFT') === 'DRAFT' ? 'ON_HOLD' : (entry.status as string)}
-              >
-                <option value="POSTED">POSTED</option>
-                <option value="ON_HOLD">ON HOLD</option>
-                <option value="REVERSED">REVERSED</option>
-              </select>
+                        <div className="flex items-end gap-6 col-span-4">
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-gray-500">Post Period</label>
+                            <input
+                              type="text"
+                              className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                              value={(() => {
+                                // MM-YYYY formatting
+                                if (entry.date) {
+                                  const d = new Date(entry.date);
+                                  if (!isNaN(d.getTime())) {
+                                    return `${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                                  }
+                                }
+                                return '';
+                              })()}
+                              readOnly
+                            />
+                          </div>
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-gray-500">Debit Total</label>
+                            <input
+                              readOnly
+                              className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                              value={totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            />
+                          </div>
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-gray-500">Credit Total</label>
+                            <input
+                              readOnly
+                              className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                              value={totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            />
+                          </div>
+                          <div className="flex-1 space-y-1.5">
+                            <label className="text-xs font-medium text-gray-500">Status</label>
+                            <select
+                              disabled
+                              className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                              value={(entry.status || 'DRAFT') === 'DRAFT' ? 'ON_HOLD' : (entry.status as string)}
+                            >
+                              <option value="POSTED">POSTED</option>
+                              <option value="ON_HOLD">ON HOLD</option>
+                              <option value="REVERSED">REVERSED</option>
+                            </select>
+                          </div>
+                        </div>
+            <div className="flex items-end gap-6 col-span-4">
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-gray-500">Debit Total</label>
+                <input
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                  value={totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-gray-500">Credit Total</label>
+                <input
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                  value={totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-gray-500">Status</label>
+                <select
+                  disabled
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
+                  value={(entry.status || 'DRAFT') === 'DRAFT' ? 'ON_HOLD' : (entry.status as string)}
+                >
+                  <option value="POSTED">POSTED</option>
+                  <option value="ON_HOLD">ON HOLD</option>
+                  <option value="REVERSED">REVERSED</option>
+                </select>
+              </div>
             </div>
             <input type="hidden" value={controlTotal || ''} />
           </div>

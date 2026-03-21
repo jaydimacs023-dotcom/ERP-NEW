@@ -40,6 +40,8 @@ const Ledger: React.FC<LedgerProps> = ({
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+  const [editingLines, setEditingLines] = useState<JournalLine[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | 'none' }>({ key: 'date', direction: 'desc' });
 
   // Column ordering and resize state
@@ -285,7 +287,11 @@ const Ledger: React.FC<LedgerProps> = ({
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            onClick={() => setShowEntryForm(true)}
+            onClick={() => {
+              setEditingEntry(null);
+              setEditingLines([]);
+              setShowEntryForm(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300 shrink-0"
           >
             <Plus size={20} /> New Entry
@@ -611,7 +617,11 @@ const Ledger: React.FC<LedgerProps> = ({
                   <tr
                     key={entry.id}
                     className="hover:bg-gray-50 transition-colors cursor-pointer group"
-                    onClick={() => setSelectedEntry(entry)}
+                    onClick={() => {
+                      setEditingEntry(entry);
+                      setEditingLines(lines.filter(l => l.journalEntryId === entry.id));
+                      setShowEntryForm(true);
+                    }}
                   >
                     {columnOrder.map(colKey => (
                       <td
@@ -645,10 +655,19 @@ const Ledger: React.FC<LedgerProps> = ({
           items={items}
           qualifications={qualifications}
           entries={entries}
-          onClose={() => setShowEntryForm(false)}
+          entryToEdit={editingEntry || undefined}
+          linesToEdit={editingLines}
+          mode={editingEntry ? 'edit' : 'new'}
+          onClose={() => {
+            setShowEntryForm(false);
+            setEditingEntry(null);
+            setEditingLines([]);
+          }}
           onSubmit={(entry, lines) => {
             onPostEntry?.(entry, lines);
             setShowEntryForm(false);
+            setEditingEntry(null);
+            setEditingLines([]);
           }}
         />
       )}

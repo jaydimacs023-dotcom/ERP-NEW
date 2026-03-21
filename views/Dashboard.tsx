@@ -23,7 +23,7 @@ interface DashboardProps {
 
 const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [] }) => {
   const formatCurrency = (val: number) => {
-    const symbol = currency === 'USD' ? '$' : 'â‚±';
+    const symbol = currency === 'USD' ? '$' : '\u20B1';
     const formatted = Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return `${val < 0 ? '-' : ''}${symbol}${formatted} `;
   };
@@ -384,7 +384,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: '#64748B', fontSize: 12 }}
-                      tickFormatter={(val) => `${currency === 'USD' ? '$' : 'â‚±'}${val / 1000}k`}
+                      tickFormatter={(val) => `${currency === 'USD' ? '$' : '\u20B1'}${val / 1000}k`}
                     />
                     <Tooltip
                       formatter={(value: number) => [formatCurrency(value), 'Collected']}
