@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './src/index.css';
+import { FontScaleBootstrap } from './components/FontScale';
 import { NotificationProvider } from './components/NotificationContext';
 import { NotificationList } from './components/NotificationList';
 
@@ -24,6 +25,7 @@ try {
   console.log("📦 Rendering App component...");
   root.render(
     <React.StrictMode>
+      <FontScaleBootstrap />
       <NotificationProvider>
         <App />
         <NotificationList />

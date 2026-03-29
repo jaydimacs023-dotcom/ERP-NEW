@@ -331,6 +331,23 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     setShowPrintModal(true);
   };
 
+  const handleWriteOffNavigation = () => {
+    if (!editingInvoice) return;
+    onNavigate?.('write-off', { invoice: editingInvoice });
+  };
+
+  const handleReversalNavigation = () => {
+    if (!editingInvoice) return;
+    onNavigate?.('payments', { viewMode: 'payment-details', invoice: editingInvoice });
+  };
+
+  const handleVoidInvoiceClick = () => {
+    if (!editingInvoice) return;
+    setVoidingInvoice(editingInvoice);
+    setVoidReason('');
+    setShowVoidModal(true);
+  };
+
   // Handle sponsor change - auto-fill EWT rate
   const handleSponsorChange = (sponsorId: string) => {
     setFormData(prev => ({
@@ -1243,17 +1260,35 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 </html>`;
   };
 
-  const handleDownloadA4 = (invoice: Invoice) => {
+  const buildInvoiceA4PrintHtml = (invoice: Invoice): string => {
     const html = buildInvoiceA4Html(invoice);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${invoice.invoiceNo || 'invoice'}-A4.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    return html.replace(
+      '</body>',
+      `<script>
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            window.focus();
+            window.print();
+          }, 250);
+        });
+        window.addEventListener('afterprint', function () {
+          window.close();
+        });
+      </script></body>`
+    );
+  };
+
+  const handlePrintA4 = (invoice: Invoice) => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups to print the invoice.');
+      return;
+    }
+
+    const html = buildInvoiceA4PrintHtml(invoice);
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   // Revenue accounts for line items
@@ -2187,13 +2222,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <div className="py-1">
                     {editingInvoice?.status === 'OPEN' && (
                       <>
-                        <button onClick={() => alert('Write Off coming soon...')} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2">
+                        <button type="button" onClick={handleWriteOffNavigation} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2">
                           <Scissors size={16} /> Write Off
                         </button>
-                        <button onClick={() => alert('Reversal coming soon...')} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
+                        <button type="button" onClick={handleReversalNavigation} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
                           <CornerUpLeft size={16} /> Reversal
                         </button>
-                        <button onClick={() => { setVoidingInvoice(editingInvoice); setShowVoidModal(true); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                        <button type="button" onClick={handleVoidInvoiceClick} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                           <Ban size={16} /> Void Invoice
                         </button>
                       </>
@@ -2425,7 +2460,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 )}
 
                 <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px' }}>
+                  <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' }}>
                     <thead className="bg-gray-50">
                       <tr>
                         {/* Column definitions for line items table */}
@@ -2441,7 +2476,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                             amount: { key: 'amount', label: 'Amount (₱)', align: 'text-right', width: 110 },
                             actions: { key: 'actions', label: '', align: 'text-center', width: 40 },
                           };
-                          const lineCellStyle = { fontFamily: 'Arial, sans-serif', fontSize: '13px' };
+                          const lineCellStyle = { fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' };
                           return lineColOrder.map((colKey, idx) => {
                             const col = lineColDefs[colKey];
                             return (
@@ -2731,7 +2766,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       transform: 'translate(-50%, -50%) rotate(-20deg)',
                       pointerEvents: 'none',
                       opacity: 0.18,
-                      fontSize: '5rem',
+                      fontSize: 'calc(5rem * var(--app-font-scale))',
                       fontWeight: 900,
                       color: '#10B981',
                       zIndex: 30,
@@ -2892,16 +2927,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">A4 Invoice Preview</h3>
+                  <h3 className="text-lg font-bold text-gray-800">Invoice Preview</h3>
                   <p className="text-sm text-gray-500">{printingInvoice.invoiceNo}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleDownloadA4(printingInvoice)}
+                    onClick={() => handlePrintA4(printingInvoice)}
                     className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
-                    <Download size={15} />
-                    Export A4 HTML
+                    <Printer size={15} />
+                    Print A4
                   </button>
                   <button onClick={() => setShowPrintModal(false)} className="p-1 hover:bg-gray-200 rounded">
                     <X size={20} />

@@ -437,7 +437,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px' }}>
+              <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' }}>
                 <thead className="bg-gray-50">
                   <tr>
                     {(() => {

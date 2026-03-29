@@ -17,6 +17,7 @@ import Ledger from './views/Ledger';
 import Reports from './views/Reports';
 import ChartOfAccounts from './views/ChartOfAccounts';
 import LoginView from './views/LoginView';
+import WelcomeView from './views/WelcomeView';
 import PasswordResetView from './views/PasswordResetView';
 import StudentsView from './views/StudentsView';
 import QualificationsView from './views/QualificationsView';
@@ -52,6 +53,7 @@ import PayrollView from './views/PayrollView';
 import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
+import FontScalePicker from './components/FontScale';
 import MaintenanceView from './views/MaintenanceView';
 import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
@@ -105,6 +107,7 @@ export default function App() {
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [authScreen, setAuthScreen] = useState<'welcome' | 'login'>('welcome');
   const [navigationContext, setNavigationContext] = useState<any>(null);
 
   // Data service reference for CRUD operations
@@ -350,6 +353,7 @@ export default function App() {
     await authService.logout();
     setCurrentUser(null);
     setCurrentOrgId('');
+    setAuthScreen('welcome');
     console.info('[App] User logged out - JWT tokens revoked');
   };
 
@@ -362,6 +366,7 @@ export default function App() {
       setSuspensionBanner('Your tenant organization has been suspended. Access restricted until reactivation.');
       setCurrentUser(null);
       setCurrentOrgId('');
+      setAuthScreen('welcome');
       localStorage.removeItem('at_erp_session');
       handleNotify('error', 'Your tenant organization has been suspended. You have been logged out.');
       console.warn('[App] Logged out suspended organization user:', currentUser.email, currentUser.orgId);
@@ -3504,10 +3509,19 @@ export default function App() {
 
       console.debug('[App] Payment object before save:', paymentToCreate);
       const savedPayment = await dataService.createEntity('payments', paymentToCreate);
-      setPayments(prev => [...prev, savedPayment as Payment]);
+      const persistedPayment = savedPayment as Payment;
+      setPayments(prev => [...prev, persistedPayment]);
 
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', (savedPayment as Payment).id, (savedPayment as Payment).paymentNo);
-      handleNotify('success', `Payment ${(savedPayment as Payment).paymentNo} created successfully`);
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', persistedPayment.id, persistedPayment.paymentNo);
+
+      // If this payment is meant to be posted immediately, post the record we just inserted.
+      // This avoids a second create call while the initial insert is still settling.
+      if (paymentToCreate.status === 'OPEN') {
+        await handlePostPayment(persistedPayment, { useExistingRecord: true });
+        return;
+      }
+
+      handleNotify('success', `Payment ${persistedPayment.paymentNo} created successfully`);
     } catch (error) {
       console.error('[App] Error creating payment:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -3540,9 +3554,13 @@ export default function App() {
     }
   };
 
-  const handlePostPayment = async (payment: Payment) => {
+  type PostPaymentOptions = {
+    useExistingRecord?: boolean;
+  };
+
+  const handlePostPayment = async (payment: Payment, options: PostPaymentOptions = {}) => {
     try {
-      const existing = payments.find(p => p.id === payment.id);
+      const existing = options.useExistingRecord ? payment : payments.find(p => p.id === payment.id);
       const postingTs = new Date().toISOString();
       const paymentToApprove: Payment = {
         ...payment,
@@ -4300,11 +4318,25 @@ export default function App() {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-8">
         <style>{`@keyframes progressBar { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }`}</style>
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-5xl font-black tracking-tight" style={{ color: '#F47721' }}>
-            Accoun<span className="text-white">Tech</span>
-          </h1>
-          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-500">Enterprise Resource Planning</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-4">
+            <img
+              src="/accountech-logo.png"
+              alt="Accountech logo"
+              className="h-24 w-24 object-contain drop-shadow-[0_10px_24px_rgba(0,0,0,0.45)] md:h-28 md:w-28"
+            />
+            <div className="text-center md:text-left">
+              <h1 className="text-5xl font-black tracking-tight leading-none">
+                <span className="bg-gradient-to-r from-[#d8b35b] via-[#f5de9e] to-[#b78422] bg-clip-text text-transparent">
+                  Accoun
+                </span>
+                <span className="text-white">Tech.</span>
+              </h1>
+              <p className="mt-2 italic text-[10px] font-bold uppercase tracking-[0.32em] text-slate-400">
+                SMART SOLUTIONS FOR THE MODERN ECONOMY
+              </p>
+            </div>
+          </div>
         </div>
         <div className="w-72">
           <div className="h-2 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
@@ -4323,6 +4355,7 @@ export default function App() {
         onBackToLogin={() => {
           setShowPasswordReset(false);
           setResetToken(null);
+          setAuthScreen('login');
           // Clear URL parameter
           window.history.replaceState({}, '', window.location.pathname);
         }}
@@ -4332,11 +4365,20 @@ export default function App() {
   }
 
   if (!currentUser) {
+    if (authScreen === 'welcome') {
+      return (
+        <WelcomeView
+          onLoginClick={() => setAuthScreen('login')}
+        />
+      );
+    }
+
     return (
       <LoginView
         onLogin={handleLogin}
         onRegister={handleRegisterWithPersistence}
         onForgotPassword={() => setShowPasswordReset(true)}
+        onBackToWelcome={() => setAuthScreen('welcome')}
         organizations={organizations}
         users={users}
       />
@@ -4607,7 +4649,8 @@ export default function App() {
             </button>
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <FontScalePicker />
             <div className="h-10 w-px bg-slate-100 mx-2" />
             <div className="flex items-center gap-3">
               <div className="text-right">
@@ -4919,6 +4962,8 @@ export default function App() {
               currency={currentOrg?.currency || 'USD'}
               onPostJournal={handlePostJournal}
               onNotify={handleNotify}
+              initialContext={navigationContext}
+              onClearContext={() => setNavigationContext(null)}
             />
           )}
           {activeTab === 'credit-debit-memo' && (

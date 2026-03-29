@@ -2,6 +2,7 @@
 import { AlertTriangle, FileText, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
 import {
+  Invoice,
   Sponsor,
   Student,
   JournalEntry,
@@ -20,10 +21,12 @@ interface ARWriteOffViewProps {
   currency: string;
   onPostJournal: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
+  initialContext?: { invoice?: Invoice };
+  onClearContext?: () => void;
 }
 
 const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
-  orgId, entries, lines, accounts, students, sponsors, currency, onPostJournal, onNotify
+  orgId, entries, lines, accounts, students, sponsors, currency, onPostJournal, onNotify, initialContext, onClearContext
 }) => {
   const [writeOffDate, setWriteOffDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
@@ -38,6 +41,18 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
   useEffect(() => {
     setReference(AccountingService.getNextReference(entries, 'WO'));
   }, [entries]);
+
+  useEffect(() => {
+    if (!initialContext?.invoice) return;
+
+    const { invoice } = initialContext;
+    setCustomerType(invoice.sponsorId ? 'SPONSOR' : 'STUDENT');
+    setCustomerId(invoice.sponsorId || invoice.studentId || '');
+    setAmount(Math.max(0, Number(invoice.balanceDue || 0)));
+    setReason(prev => prev || (invoice.invoiceNo ? `Write-off for Invoice ${invoice.invoiceNo}` : prev));
+
+    onClearContext?.();
+  }, [initialContext, onClearContext]);
 
   useEffect(() => {
     if (customerType === 'SPONSOR' && customerId) {

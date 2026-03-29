@@ -35,6 +35,15 @@
   --acm-danger: #DC2626;
   --acm-warning: #D97706;
   --acm-info: #2563EB;
+  --app-font-scale: 1;
+  --app-font-size: calc(13px * var(--app-font-scale));
+  --app-text-size-8: calc(8px * var(--app-font-scale));
+  --app-text-size-10: calc(10px * var(--app-font-scale));
+  --app-text-size-11: calc(11px * var(--app-font-scale));
+  --app-text-size-12: calc(12px * var(--app-font-scale));
+  --app-text-size-13: calc(13px * var(--app-font-scale));
+  --app-text-size-14: calc(14px * var(--app-font-scale));
+  --app-text-size-16: calc(16px * var(--app-font-scale));
 }
 
 /* ---- Base Reset ---- */
@@ -47,7 +56,7 @@
 html, body, #root {
   width: 100%;
   height: 100%;
-  font-size: 13px;
+  font-size: var(--app-font-size);
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--acm-content-bg);
   color: var(--acm-text-primary);
@@ -69,7 +78,59 @@ body {
 
 button, input, select, textarea {
   font-family: 'Open Sans', sans-serif;
-  font-size: 13px;
+  font-size: inherit;
+}
+
+@media (max-width: 1279px) {
+  :root {
+    --app-font-scale: 0.96;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1439px) {
+  :root {
+    --app-font-scale: 1.05;
+  }
+}
+
+@media (min-width: 1440px) and (max-width: 1599px) {
+  :root {
+    --app-font-scale: 1.08;
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --app-font-scale: 1.02;
+  }
+}
+
+.text-\[8px\] {
+  font-size: var(--app-text-size-8) !important;
+}
+
+.text-\[10px\] {
+  font-size: var(--app-text-size-10) !important;
+}
+
+.text-\[11px\] {
+  font-size: var(--app-text-size-11) !important;
+}
+
+.text-\[12px\] {
+  font-size: var(--app-text-size-12) !important;
+}
+
+.text-\[13px\] {
+  font-size: var(--app-text-size-13) !important;
+}
+
+.text-\[14px\] {
+  font-size: var(--app-text-size-14) !important;
+}
+
+.text-\[16px\] {
+  font-size: var(--app-text-size-16) !important;
 }
 
 /* ---- Scrollbar Styling ---- */

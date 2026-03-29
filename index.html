@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AccounTech</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='10' y='74' font-size='80' font-family='Arial Black, Arial, sans-serif' font-weight='bold' fill='%23F47721'>A</text><text x='50' y='74' font-size='80' font-family='Arial Black, Arial, sans-serif' font-weight='bold' fill='white'>T</text></svg>" />
+    <title>Accountech | Smart Solutions for the Modern Economy</title>
+    <link rel="icon" type="image/png" href="/accountech-logo.png" />
+    <link rel="apple-touch-icon" href="/accountech-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
@@ -23,7 +24,7 @@
         html, body, #root {
             width: 100%;
             height: 100%;
-            font-size: 14px;
+            font-size: 100%;
             font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
         }
 
@@ -40,6 +41,9 @@
         }
 
         @media print {
+            :root {
+                --app-font-scale: 1 !important;
+            }
             .no-print {
                 display: none;
             }

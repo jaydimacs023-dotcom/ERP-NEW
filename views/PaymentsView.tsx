@@ -18,6 +18,7 @@ import {
   Wallet,
   X,
   XCircle,
+  RotateCcw,
   FileText
 } from 'lucide-react';
 
@@ -86,6 +87,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [showVoidModal, setShowVoidModal] = useState(false);
+  const [reversingApplication, setReversingApplication] = useState<{ payment: Payment; application: PaymentApplication } | null>(null);
+  const [reverseReason, setReverseReason] = useState('');
+  const [showReverseModal, setShowReverseModal] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -335,6 +339,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setViewMode('create-payment');
   };
 
+  const loadPaymentForDetails = (payment: Payment) => {
+    loadPaymentForViewing(payment);
+    setViewMode('payment-details');
+  };
+
   // Load payment for applying
   const loadPaymentForApplication = (payment: Payment) => {
     setEditingPayment(payment);
@@ -425,8 +434,31 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       });
       setViewMode('create-payment');
       if (onClearContext) onClearContext();
+      return;
     }
-  }, [initialContext, defaultCashAccountId, onClearContext]);
+
+    if (initialContext && initialContext.viewMode === 'payment-details' && initialContext.invoice) {
+      const inv = initialContext.invoice;
+      const matches = payments.flatMap(payment =>
+        (payment.applications || [])
+          .filter(app => app.invoiceId === inv.id && !app.isReversed)
+          .map(app => ({ payment, app }))
+      );
+
+      if (matches.length > 0) {
+        const latestMatch = [...matches].sort((a, b) =>
+          new Date(b.app.createdAt || b.payment.updatedAt || b.payment.createdAt || b.payment.paymentDate || 0).getTime() -
+          new Date(a.app.createdAt || a.payment.updatedAt || a.payment.createdAt || a.payment.paymentDate || 0).getTime()
+        )[0];
+
+        loadPaymentForDetails(latestMatch.payment);
+      } else {
+        setViewMode('list');
+      }
+
+      if (onClearContext) onClearContext();
+    }
+  }, [initialContext, defaultCashAccountId, onClearContext, payments]);
 
   const baseTotalCredit = formData.amountReceived + formData.ewtAmountCertified;
 
@@ -520,7 +552,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       }
     } else {
       onAddPayment(payment);
-      if (onPostPayment) onPostPayment(payment);
     }
     setViewMode('list');
     setEditingPayment(null);
@@ -594,6 +625,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       const suggested = Math.min(invoice.balanceDue, remaining);
       return { ...prev, [invoice.id]: suggested };
     });
+  };
+
+  const openReverseApplicationModal = (payment: Payment, application: PaymentApplication) => {
+    setReversingApplication({ payment, application });
+    setReverseReason('');
+    setShowReverseModal(true);
   };
 
   const filteredPayments = useMemo(() => {
@@ -894,6 +931,68 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   >
                     <XCircle size={14} />
                     Void Payment
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ModalPortal>
+        )}
+
+        {showReverseModal && reversingApplication && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+                <div className="flex items-center gap-3 border-b p-4">
+                  <div className="rounded-lg bg-amber-100 p-2">
+                    <RotateCcw size={18} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-800">Reverse Application</h4>
+                    <p className="text-sm text-gray-500">{reversingApplication.payment.paymentNo}</p>
+                  </div>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="text-sm text-gray-600">
+                    Invoice: <span className="font-semibold text-gray-900">{invoices.find(i => i.id === reversingApplication.application.invoiceId)?.invoiceNo || reversingApplication.application.invoiceId}</span>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Reason *</label>
+                    <textarea
+                      value={reverseReason}
+                      onChange={e => setReverseReason(e.target.value)}
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                      placeholder="Enter reversal reason..."
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 border-t bg-gray-50 p-4">
+                  <button
+                    onClick={() => {
+                      setShowReverseModal(false);
+                      setReversingApplication(null);
+                      setReverseReason('');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm font-semibold text-gray-700"
+                  >
+                    <X size={14} />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!reverseReason.trim() || !reversingApplication) return;
+                      if (onReverseApplication) {
+                        onReverseApplication(reversingApplication.payment.id, reversingApplication.application.id, reverseReason);
+                      }
+                      setShowReverseModal(false);
+                      setReversingApplication(null);
+                      setReverseReason('');
+                    }}
+                    disabled={!reverseReason.trim()}
+                    className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    <RotateCcw size={14} />
+                    Reverse Application
                   </button>
                 </div>
               </div>
@@ -1505,6 +1604,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       <tr className="text-left text-xs uppercase font-semibold text-gray-600">
                         <th className="px-4 py-2">Invoice Number</th>
                         <th className="px-4 py-2 text-right">Applied Amount</th>
+                        <th className="px-4 py-2 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1514,6 +1614,22 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                           <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
                             <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
                             <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
+                            <td className="px-4 py-2 text-right">
+                              {app.isReversed ? (
+                                <span className="text-xs font-semibold text-gray-400">Reversed</span>
+                              ) : onReverseApplication ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openReverseApplicationModal(editingPayment, app)}
+                                  className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                >
+                                  <RotateCcw size={12} />
+                                  Reverse
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
