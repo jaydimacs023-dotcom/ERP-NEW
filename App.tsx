@@ -452,11 +452,58 @@ export default function App() {
 
   // Modals
   const [showJournalForm, setShowJournalForm] = useState(false);
+  const [journalFormEntry, setJournalFormEntry] = useState<JournalEntry | null>(null);
+  const [journalFormLines, setJournalFormLines] = useState<JournalLine[]>([]);
+  const [journalFormMode, setJournalFormMode] = useState<'new' | 'edit' | 'view'>('new');
 
   // Toast Notification State
   const [toasts, setToasts] = useState<Array<{ id: number; type: 'success' | 'error' | 'info'; message: string }>>([]);
   const [suspensionBanner, setSuspensionBanner] = useState<string | null>(null);
   const applyingPaymentKeysRef = useRef<Set<string>>(new Set());
+  const glRefSequenceRef = useRef<Record<string, number>>({});
+  const invoiceGlSequenceRef = useRef<Record<string, number>>({});
+
+  const extractGlSequence = (value?: string): number => {
+    const ref = (value || '').trim();
+    if (!ref) return 0;
+    const match = ref.match(/^GL(?:\s*No\.?)?[\s-]*(\d+)$/i);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  const getGlSequenceKey = (orgId: string) => orgId || '__global__';
+
+  const getHighestGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
+    return entries.reduce((max, entry) => {
+      if (entry.orgId !== orgId) return max;
+      return Math.max(max, extractGlSequence(entry.glEntryNumber || entry.reference));
+    }, 0);
+  };
+
+  const syncGlSequenceForOrg = (orgId: string, entries: JournalEntry[]) => {
+    const key = getGlSequenceKey(orgId);
+    const seq = getHighestGlSequenceForOrg(entries, orgId);
+    glRefSequenceRef.current[key] = Math.max(glRefSequenceRef.current[key] || 0, seq);
+  };
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    syncGlSequenceForOrg(currentOrgId, journalEntries);
+    syncInvoiceGlSequenceForOrg(currentOrgId, journalEntries);
+  }, [journalEntries, currentOrgId]);
+
+  const getHighestInvoiceGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
+    return entries.reduce((max, entry) => {
+      if (entry.orgId !== orgId) return max;
+      if (String(entry.sourceType || '').toUpperCase() !== 'INVOICE') return max;
+      return Math.max(max, extractGlSequence(entry.glEntryNumber || entry.reference));
+    }, 0);
+  };
+
+  const syncInvoiceGlSequenceForOrg = (orgId: string, entries: JournalEntry[]) => {
+    const key = getGlSequenceKey(orgId);
+    const seq = getHighestInvoiceGlSequenceForOrg(entries, orgId);
+    invoiceGlSequenceRef.current[key] = Math.max(invoiceGlSequenceRef.current[key] || 0, seq);
+  };
   // Data Loading Logic
   useEffect(() => {
     async function loadData() {
@@ -497,7 +544,7 @@ export default function App() {
         let normalizedEntries = (data.journalEntries || []).map((e: any) => {
           if (!e.glEntryNumber) {
             const ref = (e.reference || '').trim();
-            if (/^GL\d+$/i.test(ref)) {
+            if (/^GL[\s-]*(\d+)$/i.test(ref)) {
               // previously backfilled pattern entries
               return { ...e, glEntryNumber: ref };
             }
@@ -513,9 +560,17 @@ export default function App() {
           return next;
         });
 
+        // Seed the per-org GL sequence from loaded data before backfilling.
+        syncGlSequenceForOrg(currentOrgId, normalizedEntries);
+        syncInvoiceGlSequenceForOrg(currentOrgId, normalizedEntries);
+
         // Assign sequential numbers to any entries that still lack a valid
         // GL reference (either column missing or reference not matching pattern).
-        const missing = normalizedEntries.filter(e => !e.glEntryNumber);
+        const missing = normalizedEntries.filter(e => {
+          const status = String(e.status || '').toUpperCase();
+          const isDraftLike = status === 'DRAFT' || status === 'ON_HOLD' || status === 'REVISION_REQUESTED' || status === 'PENDING';
+          return !e.glEntryNumber && !isDraftLike;
+        });
         if (missing.length > 0) {
           const updates: Promise<any>[] = [];
           missing.forEach(e => {
@@ -540,27 +595,110 @@ export default function App() {
         setJournalEntries(normalizedEntries);
         setJournalLines(data.journalLines);
 
-        // backfill invoice records with glEntryNumber from their journal entries
-        // and persist the backfill so refreshes do not lose the linkage.
-        const invoiceGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
+        // Backfill invoice records with their posted journal entry links so the
+        // invoice screen, journal entry table, and GL reference all stay in sync.
+        const invoiceBackfills = new Map<string, Partial<Invoice>>();
+        const postedInvoiceEntries = normalizedEntries.filter((e: any) => {
+          const status = String(e.status || '').toUpperCase();
+          const sourceType = String(e.sourceType || '').toUpperCase();
+          return status === 'POSTED' && sourceType === 'INVOICE';
+        });
+        const resolveEntryGlRef = (entry?: any) => (entry ? (entry.glEntryNumber || entry.reference || '').trim() : '');
+        const queueInvoiceBackfill = (invoiceId: string, updates: Partial<Invoice>) => {
+          const current = invoiceBackfills.get(invoiceId) || {};
+          invoiceBackfills.set(invoiceId, { ...current, ...updates });
+        };
+        const findMatchingInvoiceEntry = (inv: any) => {
+          const sourceMatch = postedInvoiceEntries.find((e: any) => e.sourceRef === inv.id);
+          if (sourceMatch) return sourceMatch;
+
+          const invoiceGl = (inv.glEntryNumber || '').trim();
+          if (invoiceGl) {
+            const glMatch = postedInvoiceEntries.find((e: any) => resolveEntryGlRef(e) === invoiceGl);
+            if (glMatch) return glMatch;
+          }
+
+          const invoiceNo = (inv.invoiceNo || '').trim().toLowerCase();
+          if (invoiceNo) {
+            const descriptionMatch = postedInvoiceEntries.find((e: any) => {
+              const haystack = [
+                e.description,
+                e.reference,
+                e.glEntryNumber,
+                e.sourceRef
+              ].filter(Boolean).join(' ').toLowerCase();
+              return haystack.includes(invoiceNo);
+            });
+            if (descriptionMatch) return descriptionMatch;
+          }
+
+          return null;
+        };
+
         let normalizedInvoices: any[] = (data.invoices || []).map((inv: any) => {
-          if (!inv.glEntryNumber && inv.journalEntryId) {
+          const next = { ...inv };
+          const status = String(inv.status || '').toUpperCase();
+
+          if (inv.journalEntryId) {
             const je = normalizedEntries.find(e => e.id === inv.journalEntryId);
-            if (je && je.glEntryNumber) {
-              invoiceGlBackfills.push({ id: inv.id, glEntryNumber: je.glEntryNumber });
-              return { ...inv, glEntryNumber: je.glEntryNumber };
+            const jeGl = resolveEntryGlRef(je);
+            if (jeGl && inv.glEntryNumber !== jeGl) {
+              queueInvoiceBackfill(inv.id, { glEntryNumber: jeGl });
+              next.glEntryNumber = jeGl;
+            }
+            if (je?.postedBy && !next.postedBy) {
+              queueInvoiceBackfill(inv.id, { postedBy: je.postedBy });
+              next.postedBy = je.postedBy;
+            }
+            if (je?.postedAt && !next.postedAt) {
+              queueInvoiceBackfill(inv.id, { postedAt: je.postedAt });
+              next.postedAt = je.postedAt;
+            }
+          } else if (status === 'OPEN') {
+            const matchingEntry = findMatchingInvoiceEntry(inv);
+            if (matchingEntry) {
+              const matchedGl = resolveEntryGlRef(matchingEntry);
+              const backfillUpdates: Partial<Invoice> = {
+                journalEntryId: matchingEntry.id
+              };
+
+              next.journalEntryId = matchingEntry.id;
+
+              if (matchedGl && inv.glEntryNumber !== matchedGl) {
+                backfillUpdates.glEntryNumber = matchedGl;
+                next.glEntryNumber = matchedGl;
+              }
+              if (matchingEntry.postedBy && !next.postedBy) {
+                backfillUpdates.postedBy = matchingEntry.postedBy;
+                next.postedBy = matchingEntry.postedBy;
+              }
+              if (matchingEntry.postedAt && !next.postedAt) {
+                backfillUpdates.postedAt = matchingEntry.postedAt;
+                next.postedAt = matchingEntry.postedAt;
+              }
+
+              queueInvoiceBackfill(inv.id, backfillUpdates);
             }
           }
-          return inv;
+
+          return next;
         });
-        if (invoiceGlBackfills.length > 0) {
-          Promise.all(
-            invoiceGlBackfills.map((inv: any) => {
-              return dataService.updateInvoice(inv.id, { glEntryNumber: inv.glEntryNumber });
+
+        if (invoiceBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(invoiceBackfills.entries()).map(([id, updates]) => {
+              return dataService.updateInvoice(id, updates);
             })
           )
-            .then(() => console.info('[App] backfilled missing invoice GL references'))
-            .catch(err => console.warn('[App] failed to backfill invoice GL references', err));
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some invoice journal backfills failed', failures);
+              } else {
+                console.info('[App] backfilled invoice journal references');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill invoice journal references', err));
         }
         setInvoices(normalizedInvoices);
 
@@ -793,33 +931,64 @@ export default function App() {
     setActiveTab(getDefaultTab(user.role));
   };
 
-  // helper to produce the next sequential GL reference (GL00000001 style)
+  // helper to produce the next sequential GL reference (legacy GL00000001 style)
   const generateNextGlRef = (): string => {
-    // look at any existing journal entries that have already been assigned
-    // a GL number; fall back to references that look like a GL pattern if the
-    // dedicated `glEntryNumber` property is missing (migrated data, old rows,
-    // etc.). this prevents duplicates after a reload when the column was
-    // previously absent.
-    const orgJournalEntries = journalEntries.filter(e => e.orgId === currentOrgId);
-    const seqs = orgJournalEntries
-      .map(e => {
-        const val = (e.glEntryNumber || '').trim();
-        if (val) return val;
-        // fallback to reference if it starts with GL followed by digits
-        const ref = (e.reference || '').trim();
-        const m = ref.match(/^GL(\d+)$/i);
-        return m ? ref : '';
-      })
-      .map(n => {
-        // take the last numeric group so entries like "GL - 2026 -00012" become "00012"
-        const m = n.match(/(\d+)$/);
-        return m ? m[1] : '';
-      })
-      .map(s => parseInt(s, 10))
-      .filter(n => !isNaN(n));
-    const max = seqs.length > 0 ? Math.max(...seqs) : 0;
-    const next = max + 1;
+    const key = getGlSequenceKey(currentOrgId);
+    const stateMax = getHighestGlSequenceForOrg(journalEntries, currentOrgId);
+    const currentMax = glRefSequenceRef.current[key] || 0;
+    const next = Math.max(currentMax, stateMax) + 1;
+    glRefSequenceRef.current[key] = next;
     return `GL${String(next).padStart(8, '0')}`;
+  };
+
+  // AR invoice approvals use their own reference format so the posted journal
+  // entry and the invoice module show the exact same GL reference.
+  const generateNextInvoiceGlRef = (): string => {
+    const key = getGlSequenceKey(currentOrgId);
+    const stateMax = getHighestInvoiceGlSequenceForOrg(journalEntries, currentOrgId);
+    const currentMax = invoiceGlSequenceRef.current[key] || 0;
+    const next = Math.max(currentMax, stateMax) + 1;
+    invoiceGlSequenceRef.current[key] = next;
+    return `GL No. ${String(next).padStart(8, '0')}`;
+  };
+
+  const resolveJournalRef = (entry?: Pick<JournalEntry, 'glEntryNumber' | 'reference'> | null): string =>
+    (entry ? (entry.glEntryNumber || entry.reference || '').trim() : '');
+
+  const findPostedInvoiceJournalEntry = (invoice: Invoice): JournalEntry | null => {
+    const invoiceGlRef = (invoice.glEntryNumber || '').trim();
+    const invoiceSourceRef = (invoice.id || '').trim();
+
+    return journalEntries.find(entry => {
+      if (entry.orgId !== currentOrgId) return false;
+      if (String(entry.status || '').toUpperCase() !== 'POSTED') return false;
+      if (String(entry.sourceType || '').toUpperCase() !== 'INVOICE') return false;
+      if (invoice.journalEntryId && entry.id === invoice.journalEntryId) return true;
+      if (invoiceSourceRef && entry.sourceRef === invoiceSourceRef) return true;
+      return !!invoiceGlRef && resolveJournalRef(entry) === invoiceGlRef;
+    }) || null;
+  };
+
+  const ensureStudentLedgerEntryForInvoice = (invoice: Invoice, journalRef: string, postedAt?: string) => {
+    if (invoice.sponsorId || !invoice.studentId) return;
+    if (!journalRef.trim()) return;
+    const ledgerEntry: StudentLedger = {
+      id: `sl-${invoice.id}`,
+      orgId: currentOrgId,
+      studentId: invoice.studentId,
+      invoiceId: invoice.id,
+      date: invoice.invoiceDate,
+      description: `Sales Invoice ${invoice.invoiceNo} - ${journalRef}`,
+      debit: invoice.netAmountDue,
+      credit: 0,
+      balance: invoice.netAmountDue,
+      createdAt: postedAt || new Date().toISOString(),
+    } as StudentLedger;
+
+    setStudentLedger(prev => {
+      if (prev.some(entry => entry.invoiceId === invoice.id)) return prev;
+      return [...prev, ledgerEntry];
+    });
   };
 
   const resolvePostingPeriodId = (explicitPeriodId?: string, entryDate?: string): string => {
@@ -850,8 +1019,45 @@ export default function App() {
     return '';
   };
 
+  const resolveInvoiceFallbackPeriodId = (entryDate?: string): string => {
+    const orgPeriods = accountingPeriods.filter(p => p.orgId === currentOrgId && !p.isDeleted);
+    if (orgPeriods.length === 0) return '';
+
+    const targetDate = new Date(entryDate || new Date().toISOString().split('T')[0]);
+    const dateMatched = orgPeriods.filter(p => {
+      const start = new Date(p.startDate);
+      const end = new Date(p.endDate);
+      return targetDate >= start && targetDate <= end;
+    });
+
+    const pickByPriority = (periods: typeof orgPeriods) =>
+      periods.find(p => p.status === 'OPEN') ||
+      periods.find(p => p.status === 'SOFT_CLOSE') ||
+      periods.find(p => p.status === 'HARD_CLOSE') ||
+      periods.find(p => p.status === 'LOCKED') ||
+      null;
+
+    const datePriority = pickByPriority(dateMatched);
+    if (datePriority) return datePriority.id;
+
+    const orgPriority = pickByPriority(orgPeriods);
+    if (orgPriority) return orgPriority.id;
+
+    const latestPeriod = [...orgPeriods].sort((a, b) => {
+      const endA = new Date(a.endDate || a.startDate).getTime();
+      const endB = new Date(b.endDate || b.startDate).getTime();
+      return endB - endA;
+    })[0];
+
+    return latestPeriod?.id || '';
+  };
+
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
-    const resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
+    const sourceType = String(entry.sourceType || '').toUpperCase();
+    let resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
+    if (!resolvedPeriodId && sourceType === 'INVOICE') {
+      resolvedPeriodId = resolveInvoiceFallbackPeriodId(entry.date);
+    }
     if (!resolvedPeriodId) {
       handleNotify('error', 'Cannot post journal entry: no open accounting period found for this date.');
       return null;
@@ -859,7 +1065,7 @@ export default function App() {
 
     const fullEntry = {
       ...entry,
-      id: entry.id || `je - ${Date.now()} `,
+      id: entry.id || `je-${Date.now()}`,
       orgId: currentOrgId,
       periodId: resolvedPeriodId,
       status: 'POSTED',
@@ -867,11 +1073,9 @@ export default function App() {
       createdAt: new Date().toISOString()
     } as JournalEntry;
 
-    // assign GL ref if missing
-    if (!fullEntry.glEntryNumber) {
-      fullEntry.glEntryNumber = generateNextGlRef();
-      fullEntry.reference = fullEntry.reference || fullEntry.glEntryNumber;
-    }
+    const postingGlRef = (fullEntry.glEntryNumber || '').trim() || generateNextGlRef();
+    fullEntry.glEntryNumber = postingGlRef;
+    fullEntry.reference = fullEntry.reference || postingGlRef;
 
     try {
       console.info('[App] Posting journal entry:', fullEntry.id, fullEntry.sourceType);
@@ -959,11 +1163,6 @@ export default function App() {
       createdAt: new Date().toISOString()
     } as JournalEntry;
 
-    if (!fullEntry.glEntryNumber) {
-      fullEntry.glEntryNumber = generateNextGlRef();
-      fullEntry.reference = fullEntry.reference || fullEntry.glEntryNumber;
-    }
-
     try {
       console.info('[App] Saving journal entry draft:', fullEntry.id, fullEntry.sourceType);
       const savedEntry = await dataService.createJournalEntry(fullEntry);
@@ -975,9 +1174,6 @@ export default function App() {
           : savedEntry.sourceType
       };
 
-      if (!normalizedSavedEntry.glEntryNumber && fullEntry.glEntryNumber) {
-        normalizedSavedEntry.glEntryNumber = fullEntry.glEntryNumber;
-      }
       if (!normalizedSavedEntry.reference && fullEntry.reference) {
         normalizedSavedEntry.reference = fullEntry.reference;
       }
@@ -1033,8 +1229,9 @@ export default function App() {
 
       if (!updatedEntry.glEntryNumber) {
         updatedEntry.glEntryNumber = generateNextGlRef();
-        updatedEntry.reference = updatedEntry.reference || updatedEntry.glEntryNumber;
       }
+
+      updatedEntry.reference = updatedEntry.reference || updatedEntry.glEntryNumber;
 
       const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
       const normalizedSavedEntry = {
@@ -1065,11 +1262,19 @@ export default function App() {
   };
 
   const handleViewJournal = (journalEntryId: string) => {
-    const entry = journalEntries.find(e => e.id === journalEntryId);
-    if (entry) {
-      setLedgerSearchTerm((entry.glEntryNumber || entry.reference)?.trim() || '');
-      setActiveTab('ledger');
-    }
+    const normalizedId = journalEntryId.trim();
+    const entry = journalEntries.find(e =>
+      e.id === normalizedId ||
+      (e.glEntryNumber || '').trim() === normalizedId ||
+      (e.reference || '').trim() === normalizedId ||
+      (e.sourceRef || '').trim() === normalizedId
+    );
+    if (!entry) return;
+
+    setJournalFormEntry(entry);
+    setJournalFormLines(journalLines.filter(line => line.journalEntryId === entry.id));
+    setJournalFormMode('view');
+    setShowJournalForm(true);
   };
 
   const navigateTo = (tab: string, context?: any) => {
@@ -2985,7 +3190,18 @@ export default function App() {
       };
 
       // ── Accounting Posting: trigger if status is OPEN ──────────
-      if (invoice.status === 'OPEN' && !invoice.journalEntryId) {
+      const matchedPostedJournal = invoice.status === 'OPEN' ? findPostedInvoiceJournalEntry(invoice) : null;
+      if (invoice.status === 'OPEN' && !invoice.journalEntryId && matchedPostedJournal) {
+        const resolvedGlRef = resolveJournalRef(matchedPostedJournal) || invoice.glEntryNumber || generateNextInvoiceGlRef();
+        invoice = {
+          ...invoice,
+          journalEntryId: matchedPostedJournal.id,
+          glEntryNumber: resolvedGlRef,
+          postedBy: matchedPostedJournal.postedBy || invoice.postedBy || currentUser?.id || 'system',
+          postedAt: matchedPostedJournal.postedAt || invoice.postedAt || new Date().toISOString()
+        };
+      }
+      if (invoice.status === 'OPEN' && !invoice.journalEntryId && !matchedPostedJournal) {
         const postingResult = await postInvoiceToGL(invoice);
         if (postingResult) {
           invoice = {
@@ -3002,12 +3218,26 @@ export default function App() {
         }
       }
 
+      if (invoice.status === 'OPEN') {
+        const matchedSavedJournal = matchedPostedJournal || (
+          invoice.journalEntryId
+            ? journalEntries.find(entry => entry.id === invoice.journalEntryId && entry.orgId === currentOrgId)
+            : null
+        );
+        const journalRef = resolveJournalRef(matchedSavedJournal) || invoice.glEntryNumber;
+        ensureStudentLedgerEntryForInvoice(invoice, journalRef, invoice.postedAt);
+      }
+
       const invoiceWithOrg = { ...invoice, orgId: currentOrgId, createdBy: creatorId, createdAt };
       const saved = await dataService.createInvoice(invoiceWithOrg);
       const normalizedSavedInvoice = {
         ...saved,
         createdBy: saved.createdBy || creatorId,
-        createdAt: saved.createdAt || createdAt
+        createdAt: saved.createdAt || createdAt,
+        journalEntryId: invoice.journalEntryId || saved.journalEntryId,
+        glEntryNumber: invoice.glEntryNumber || saved.glEntryNumber,
+        postedBy: invoice.postedBy || saved.postedBy,
+        postedAt: invoice.postedAt || saved.postedAt
       };
       setInvoices(prev => [...prev, normalizedSavedInvoice]);
 
@@ -3060,10 +3290,9 @@ export default function App() {
     const now = new Date().toISOString();
     const jeId = crypto.randomUUID();
 
-    // ── Generate sequential GL reference number scoped to organization ──
-    // if the invoice already contains a reference (entered by user) use it,
-    // otherwise allocate a new sequential value.
-    const glRef = (invoice.glEntryNumber || '').trim() || generateNextGlRef();
+    // ── Generate sequential AR invoice GL reference number scoped to org ──
+    // if the invoice already contains a reference use it, otherwise allocate
+    // the next invoice-specific value.
 
     // ── Find GL accounts ───────────────────────────────────────────────────
     const sponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
@@ -3092,6 +3321,7 @@ export default function App() {
     }
 
     // ── Build journal lines ─────────────────────────────────────────────
+    const glRef = (invoice.glEntryNumber || '').trim() || generateNextInvoiceGlRef();
     const jLines: JournalLine[] = [];
     jLines.push({
       id: `${jeId}-ar`,
@@ -3187,14 +3417,28 @@ export default function App() {
     try {
       console.info('[App] Updating invoice:', invoice.id);
       const existing = invoices.find(i => i.id === invoice.id);
+      const existingJournalEntryId = invoice.journalEntryId || existing?.journalEntryId;
+      const existingGlEntryNumber = invoice.glEntryNumber || existing?.glEntryNumber;
       invoice = {
         ...invoice,
         createdBy: invoice.createdBy || existing?.createdBy,
         createdAt: invoice.createdAt || existing?.createdAt || new Date().toISOString()
       };
 
+      const matchedPostedJournal = invoice.status === 'OPEN' ? findPostedInvoiceJournalEntry(invoice) : null;
+      if (invoice.status === 'OPEN' && !existingJournalEntryId && matchedPostedJournal) {
+        const resolvedGlRef = resolveJournalRef(matchedPostedJournal) || invoice.glEntryNumber || existingGlEntryNumber || generateNextInvoiceGlRef();
+        invoice = {
+          ...invoice,
+          journalEntryId: matchedPostedJournal.id,
+          glEntryNumber: resolvedGlRef,
+          postedBy: matchedPostedJournal.postedBy || invoice.postedBy || currentUser?.id || 'system',
+          postedAt: matchedPostedJournal.postedAt || invoice.postedAt || new Date().toISOString()
+        };
+      }
+
       // ── Accounting Posting: trigger when status transitions to OPEN ──────────
-      if (invoice.status === 'OPEN' && existing?.status !== 'OPEN' && !existing?.journalEntryId) {
+      if (invoice.status === 'OPEN' && !existingJournalEntryId && !matchedPostedJournal) {
         const postingResult = await postInvoiceToGL(invoice);
         if (postingResult) {
           const { jeId, glRef, now } = postingResult;
@@ -3256,9 +3500,25 @@ export default function App() {
         }
       }
 
+      if (invoice.status === 'OPEN') {
+        const matchedSavedJournal = matchedPostedJournal || (
+          invoice.journalEntryId
+            ? journalEntries.find(entry => entry.id === invoice.journalEntryId && entry.orgId === currentOrgId)
+            : null
+        );
+        const journalRef = resolveJournalRef(matchedSavedJournal) || invoice.glEntryNumber || existingGlEntryNumber;
+        ensureStudentLedgerEntryForInvoice(invoice, journalRef, invoice.postedAt);
+      }
+
       // ── Persist the invoice update ──────────────────────────────────────────
       const updated = await dataService.updateInvoice(invoice.id, invoice);
-      setInvoices(prev => prev.map(i => i.id === invoice.id ? { ...i, ...updated, journalEntryId: invoice.journalEntryId, glEntryNumber: invoice.glEntryNumber, updatedAt: new Date().toISOString() } : i));
+      setInvoices(prev => prev.map(i => i.id === invoice.id ? {
+        ...i,
+        ...updated,
+        journalEntryId: invoice.journalEntryId || updated.journalEntryId || existingJournalEntryId,
+        glEntryNumber: invoice.glEntryNumber || updated.glEntryNumber || existingGlEntryNumber,
+        updatedAt: new Date().toISOString()
+      } : i));
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'INVOICE', invoice.id, invoice.invoiceNo, existing, invoice);
       if (invoice.status !== 'OPEN' || existing?.status === 'OPEN') {
@@ -3962,7 +4222,7 @@ export default function App() {
       };
       const rvrsLines: JournalLine[] = [
         {
-          id: `jl - ${Date.now()} -1`,
+          id: `jl-${Date.now()}-1`,
           journalEntryId: '',
           orgId: currentOrgId,
           accountId: arAcct.id,
@@ -3971,7 +4231,7 @@ export default function App() {
           description: 'Restore Accounts Receivable'
         },
         {
-          id: `jl - ${Date.now()} -2`,
+          id: `jl-${Date.now()}-2`,
           journalEntryId: '',
           orgId: currentOrgId,
           accountId: depositsAcct.id,
@@ -4855,7 +5115,7 @@ export default function App() {
                 };
                 const lines: JournalLine[] = [
                   {
-                    id: `jl - ${Date.now()} -1`,
+                    id: `jl-${Date.now()}-1`,
                     journalEntryId: '',
                     orgId: currentOrgId,
                     accountId: finalBankAcct.id,
@@ -4864,7 +5124,7 @@ export default function App() {
                     description: 'Deposit to Bank'
                   },
                   {
-                    id: `jl - ${Date.now()} -2`,
+                    id: `jl-${Date.now()}-2`,
                     journalEntryId: '',
                     orgId: currentOrgId,
                     accountId: undepositedAcct.id,
@@ -5025,17 +5285,35 @@ export default function App() {
       </main>
 
       {showJournalForm && (
-        <JournalForm
-          accounts={filteredAccounts}
-          students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
-          trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
-          sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
-          batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
-          items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
-          entries={activeJournalEntries}
-          onClose={() => setShowJournalForm(false)}
-          onSubmit={(entry, lines) => { handleSaveOrPostJournal(entry, lines); setShowJournalForm(false); }}
-        />
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm overflow-y-auto">
+          <div className="mx-auto max-w-7xl p-4 md:p-6">
+            <JournalForm
+              accounts={filteredAccounts}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+              items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+              entries={activeJournalEntries}
+              entryToEdit={journalFormEntry || undefined}
+              linesToEdit={journalFormLines}
+              mode={journalFormMode}
+              onClose={() => {
+                setShowJournalForm(false);
+                setJournalFormEntry(null);
+                setJournalFormLines([]);
+                setJournalFormMode('new');
+              }}
+              onSubmit={(entry, lines) => {
+                handleSaveOrPostJournal(entry, lines);
+                setShowJournalForm(false);
+                setJournalFormEntry(null);
+                setJournalFormLines([]);
+                setJournalFormMode('new');
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

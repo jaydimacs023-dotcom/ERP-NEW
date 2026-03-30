@@ -320,12 +320,6 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     }
   }, [localTaxCats, viewMode, formData.lines.length]);
 
-  // View invoice details
-  const handleView = (invoice: Invoice) => {
-    setViewingInvoice(invoice);
-    setShowViewModal(true);
-  };
-
   const handlePrintPreview = (invoice: Invoice) => {
     setPrintingInvoice(invoice);
     setShowPrintModal(true);
@@ -835,7 +829,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const matchesSearch =
         inv.invoiceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.glEntryNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getInvoiceGlRef(inv).toLowerCase().includes(searchTerm.toLowerCase()) ||
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -981,14 +975,34 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
   const getInvoiceGlRef = (invoice: Invoice) => {
-    if (invoice.glEntryNumber?.trim()) return invoice.glEntryNumber.trim();
     if (invoice.journalEntryId) {
-      const je = journalEntries.find(j => j.id === invoice.journalEntryId);
+      const je = journalEntries.find(j =>
+        j.id === invoice.journalEntryId ||
+        (String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === invoice.id)
+      );
       const glNum = (je?.glEntryNumber || je?.reference || '').trim();
       if (glNum) return glNum;
     }
+    const sourceMatch = journalEntries.find(j =>
+      String(j.sourceType || '').toUpperCase() === 'INVOICE' &&
+      j.sourceRef === invoice.id
+    );
+    const sourceGlNum = (sourceMatch?.glEntryNumber || sourceMatch?.reference || '').trim();
+    if (sourceGlNum) return sourceGlNum;
+    if (invoice.glEntryNumber?.trim()) return invoice.glEntryNumber.trim();
     return '-';
   };
+
+  const editingInvoiceJournalEntry = useMemo(() => {
+    if (!editingInvoice) return null;
+    const invoiceGlRef = (editingInvoice.glEntryNumber || '').trim();
+    const invoiceSourceRef = (editingInvoice.id || '').trim();
+    return journalEntries.find(j =>
+      j.id === editingInvoice.journalEntryId ||
+      (invoiceSourceRef && String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === invoiceSourceRef) ||
+      (invoiceGlRef && (j.glEntryNumber || j.reference || '').trim() === invoiceGlRef)
+    ) || null;
+  }, [editingInvoice, journalEntries]);
 
   const escapeHtml = (value: any): string =>
     String(value ?? '')
@@ -1960,10 +1974,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'glReference',
                 width: 'w-32',
                 align: 'text-left' as const,
-                render: (inv: any) =>
-                  inv.journalEntryId ?
-                    (journalEntries.find(j => j.id === inv.journalEntryId)?.glEntryNumber || journalEntries.find(j => j.id === inv.journalEntryId)?.reference || `GL${inv.journalEntryId?.slice(-8).toUpperCase()}`).trim()
-                    : '—',
+                render: (inv: any) => getInvoiceGlRef(inv),
               },
               // ── 5. Sponsor/Student ───────────────────────
               {
@@ -2119,13 +2130,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                           title={inv.status === 'OPEN' ? 'Read-only: Invoice is approved and locked' : 'Click to edit'}
                         >
                           {registryColumns.map(col => (
-                            <td key={col.key} className={`px-4 py-3 ${col.align}`} style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}>
-                              {col.key === 'invoiceDate' && inv.invoiceDate ? (
-                                <span className="font-medium text-gray-800">{format(new Date(inv.invoiceDate), 'MM-dd-yyyy')}</span>
-                              ) : (
-                                <span className="font-medium text-gray-800">{col.render(inv)}</span>
-                              )}
-                            </td>
+                          <td key={col.key} className={`px-4 py-3 ${col.align}`} style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}>
+                            {col.key === 'invoiceDate' && inv.invoiceDate ? (
+                              <span className="font-medium text-gray-800">{format(new Date(inv.invoiceDate), 'MM-dd-yyyy')}</span>
+                            ) : (
+                              <span className="font-medium text-gray-800">{col.render(inv)}</span>
+                            )}
+                          </td>
                           ))}
                         </tr>
                       ))
@@ -2399,33 +2410,52 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <div className="mt-1">
                     {editingInvoice?.journalEntryId || editingInvoice?.status === 'OPEN' ? (
                       (() => {
-                        const je = journalEntries.find(j => j.id === editingInvoice?.journalEntryId);
-                        const glNum = (editingInvoice?.glEntryNumber || je?.glEntryNumber || je?.reference || `GL${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`).trim();
+                        const relatedJournalEntry = editingInvoiceJournalEntry;
+                        const journalTarget = (
+                          relatedJournalEntry?.id ||
+                          editingInvoice?.journalEntryId ||
+                          editingInvoice?.id ||
+                          relatedJournalEntry?.glEntryNumber ||
+                          relatedJournalEntry?.reference ||
+                          editingInvoice?.glEntryNumber ||
+                          editingInvoice?.reference ||
+                          ''
+                        ).trim();
+                        const glNum = (
+                          relatedJournalEntry?.glEntryNumber ||
+                          relatedJournalEntry?.reference ||
+                          editingInvoice?.glEntryNumber ||
+                          editingInvoice?.reference ||
+                          `GL No. ${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`
+                        ).trim();
                         return (
                           <button
-                            onClick={() => (editingInvoice?.journalEntryId || je?.id) && onViewJournal && onViewJournal(editingInvoice?.journalEntryId || je?.id!)}
+                            type="button"
+                            onClick={() => {
+                              if (!journalTarget || !onViewJournal) return;
+                              onViewJournal(journalTarget);
+                            }}
                             className="inline-flex items-center gap-2 px-4 py-2.5 text-base font-normal rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
-                            title="Click to view GL Accounting Entries"
+                            title="Open the related journal entry"
                             style={{ cursor: 'pointer' }}
                           >
                             <Receipt size={16} />
                             <span>{glNum}</span>
-                            <span className="text-base font-normal text-emerald-600 ml-auto">→ View GL Entries</span>
+                            <span className="text-base font-normal text-emerald-600 ml-auto">→ View Journal Entry</span>
                           </button>
                         );
                       })()
                     ) : (
                       <>
-                        <input
-                          value={formData.glEntryNumber || ''}
-                          onChange={e => setFormData({ ...formData, glEntryNumber: e.target.value })}
-                          disabled={isReadOnly}
-                          placeholder="Generated when invoice is approved"
-                          className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
-                      </>
-                    )}
+                      <input
+                        value={formData.glEntryNumber || ''}
+                        readOnly
+                        placeholder="Generated when invoice is approved"
+                        className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                    </>
+                  )}
                   </div>
                 </div>
               </div>

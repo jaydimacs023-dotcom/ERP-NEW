@@ -847,4 +847,3 @@ const DetailItem: React.FC<{ label: string; value: React.ReactNode; icon?: React
 export default Ledger;
 
 
-

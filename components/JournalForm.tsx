@@ -19,7 +19,7 @@ interface JournalFormProps {
   entries: JournalEntry[];
   entryToEdit?: JournalEntry;
   linesToEdit?: JournalLine[];
-  mode?: 'new' | 'edit';
+  mode?: 'new' | 'edit' | 'view';
   onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onClose: () => void;
 }
@@ -39,20 +39,21 @@ const JournalForm: React.FC<JournalFormProps> = ({
   const [entry, setEntry] = useState<Partial<JournalEntry>>(buildEmptyEntry());
 
   useEffect(() => {
+    if (mode !== 'new') return;
     const nextRef = AccountingService.getNextReference(entries, 'JV');
     setEntry(prev => ({ ...prev, reference: nextRef }));
-  }, [entries]);
+  }, [mode, entries]);
 
   useEffect(() => {
-    if (mode === 'edit' && entryToEdit && linesToEdit?.length > 0) {
+    if (mode !== 'new' && entryToEdit) {
       const editedEntry = { ...entryToEdit, displaySourceRef: entryToEdit.sourceRef };
       setEntry(editedEntry);
-      setLines(linesToEdit.map(l => ({ ...l })));
-      setControlTotal(linesToEdit.reduce((sum, l) => sum + (l.debit || 0), 0));
+      setLines((linesToEdit || []).map(l => ({ ...l })));
+      setControlTotal((linesToEdit || []).reduce((sum, l) => sum + (l.debit || 0), 0));
     }
   }, [mode, entryToEdit, linesToEdit]);
 
-    const [displaySourceRef, setDisplaySourceRef] = useState('');
+  const [displaySourceRef, setDisplaySourceRef] = useState('');
   const dataService = DataServiceFactory.getService();
 
   useEffect(() => {
@@ -77,6 +78,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
   const [lines, setLines] = useState<Partial<JournalLine>[]>(buildDefaultLines());
 
   const [controlTotal, setControlTotal] = useState<number>(0);
+  const isViewMode = mode === 'view';
 
   const resetForm = () => {
     setEntry(buildEmptyEntry());
@@ -251,6 +253,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isViewMode) return;
     finalizeSubmit(entry.status || 'DRAFT');
   };
 
@@ -258,8 +261,12 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
     <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
           <div>
-<h3 className="text-xl font-bold text-gray-800">
-              {mode === 'edit' ? `Edit Journal Entry: ${entry.reference}` : 'New Journal Entry'}
+            <h3 className="text-xl font-bold text-gray-800">
+              {mode === 'edit'
+                ? `Edit Journal Entry: ${entry.reference}`
+                : mode === 'view'
+                  ? `Journal Entry Details: ${entry.reference}`
+                  : 'New Journal Entry'}
             </h3>
             <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mt-1">{displaySourceRef || entry.sourceRef || ''}</p>
           </div>
@@ -267,56 +274,64 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
 
         <div className="flex items-center gap-2 px-4 py-2 border-b bg-white">
           <button
-            title="Discard Changes and Close"
+            title={isViewMode ? 'Close Journal Entry' : 'Discard Changes and Close'}
             onClick={onClose}
             type="button"
             className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
           >
             <RotateCcw size={20} />
           </button>
+          {!isViewMode && (
+            <>
+              <button
+                title="Save as Draft"
+                onClick={() => finalizeSubmit('ON_HOLD')}
+                type="button"
+                disabled={!canPost}
+                className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Save size={20} />
+              </button>
+              <button
+                title="Approve"
+                onClick={() => finalizeSubmit('POSTED')}
+                type="button"
+                disabled={!canPost}
+                className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <CheckCircle size={20} />
+              </button>
+              <button
+                title="Add New Record"
+                onClick={resetForm}
+                type="button"
+                className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+              >
+                <Plus size={20} />
+              </button>
+            </>
+          )}
           <button
-            title="Save as Draft"
-            onClick={() => finalizeSubmit('ON_HOLD')}
-            type="button"
-            disabled={!canPost}
-            className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Save size={20} />
-          </button>
-          <button
-            title="Approve"
-            onClick={() => finalizeSubmit('POSTED')}
-            type="button"
-            disabled={!canPost}
-            className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <CheckCircle size={20} />
-          </button>
-          <button
-            title="Add New Record"
-            onClick={resetForm}
-            type="button"
-            className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-          </button>
-          <button
-            title="Cancel"
+            title={isViewMode ? 'Close Journal Entry' : 'Cancel'}
             onClick={onClose}
             type="button"
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
-          <div className="h-6 w-px bg-gray-200 mx-2" />
-          <button
-            title="Reverse"
-            type="button"
-            onClick={() => alert('Reverse coming soon...')}
-            className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <CornerUpLeft size={20} />
-          </button>
+          {!isViewMode && (
+            <>
+              <div className="h-6 w-px bg-gray-200 mx-2" />
+              <button
+                title="Reverse"
+                type="button"
+                onClick={() => alert('Reverse coming soon...')}
+                className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <CornerUpLeft size={20} />
+              </button>
+            </>
+          )}
           <button
             title="Print"
             type="button"
@@ -325,25 +340,38 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
           >
             <Printer size={20} />
           </button>
-          <button
-            title="Reclassify"
-            type="button"
-            onClick={() => alert('Reclassify coming soon...')}
-            className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
-          >
-            <Scissors size={20} />
-          </button>
+          {!isViewMode && (
+            <button
+              title="Reclassify"
+              type="button"
+              onClick={() => alert('Reclassify coming soon...')}
+              className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+            >
+              <Scissors size={20} />
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Transaction Date</label>
-              <input type="date" required className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200" value={entry.date} onChange={e => setEntry({...entry, date: e.target.value})} />
+              <input
+                type="date"
+                required
+                disabled={isViewMode}
+                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
+                value={entry.date}
+                onChange={e => setEntry({...entry, date: e.target.value})}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Journal Voucher No.</label>
-              <input readOnly={mode === 'edit'} className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode === 'edit' ? 'bg-gray-50' : ''}`} value={entry.reference} />
+              <input
+                readOnly={mode !== 'new'}
+                className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode !== 'new' ? 'bg-gray-50' : ''}`}
+                value={entry.reference}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Reference No.</label>
@@ -356,7 +384,14 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Transaction Description</label>
-              <input required placeholder="Transaction Description" className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200" value={entry.description} onChange={e => setEntry({...entry, description: e.target.value})} />
+              <input
+                required
+                placeholder="Transaction Description"
+                disabled={isViewMode}
+                className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
+                value={entry.description}
+                onChange={e => setEntry({...entry, description: e.target.value})}
+              />
             </div>
                         <div className="flex items-end gap-6 col-span-4">
                           <div className="flex-1 space-y-1.5">
@@ -426,13 +461,15 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                 >
                   <FileSpreadsheet size={16} /> Export Line Items
                 </button>
-                <button
-                  type="button"
-                  onClick={addLine}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50"
-                >
-                  <Plus size={16} /> Add Line
-                </button>
+                {!isViewMode && (
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50"
+                  >
+                    <Plus size={16} /> Add Line
+                  </button>
+                )}
               </div>
             </div>
 
@@ -459,19 +496,19 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                             key={col.key}
                             className={`px-3 py-2 ${col.align} relative select-none ${draggedLineColIdx === idx ? 'bg-gray-100 border-dashed border-2 border-gray-300 opacity-50' : ''}`}
                             style={lineColWidths[col.key] ? { width: lineColWidths[col.key], minWidth: lineColWidths[col.key] } : { minWidth: col.width, width: col.width }}
-                            draggable={col.key !== 'actions'}
+                            draggable={!isViewMode && col.key !== 'actions'}
                             onDragStart={e => {
-                              if (col.key === 'actions') return;
+                              if (isViewMode || col.key === 'actions') return;
                               setDraggedLineColIdx(idx);
                               e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragEnd={() => setDraggedLineColIdx(null)}
                             onDragOver={e => {
-                              if (col.key === 'actions') return;
+                              if (isViewMode || col.key === 'actions') return;
                               e.preventDefault();
                             }}
                             onDrop={e => {
-                              if (col.key === 'actions' || draggedLineColIdx === null || draggedLineColIdx === idx) return;
+                              if (isViewMode || col.key === 'actions' || draggedLineColIdx === null || draggedLineColIdx === idx) return;
                               e.preventDefault();
                               const newOrder = [...lineColOrder];
                               const [draggedKey] = newOrder.splice(draggedLineColIdx, 1);
@@ -479,11 +516,11 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               setLineColOrder(newOrder);
                               setDraggedLineColIdx(null);
                             }}
-                            title={col.key !== 'actions' ? 'Drag to reorder column' : undefined}
+                            title={!isViewMode && col.key !== 'actions' ? 'Drag to reorder column' : undefined}
                           >
-                            <div className="flex items-center">
-                              <span>{col.label}</span>
-                              {col.key !== 'actions' && (
+                          <div className="flex items-center">
+                            <span>{col.label}</span>
+                              {!isViewMode && col.key !== 'actions' && (
                                 <div
                                   onMouseDown={e => {
                                     e.stopPropagation();
@@ -559,8 +596,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                   <td key={colKey} className="px-3 py-2">
                                     <select
                                       value={line.accountId || ''}
+                                      disabled={isViewMode}
                                       onChange={e => updateLine(line.id!, { accountId: e.target.value })}
-                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700"
+                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                     >
                                       <option value="">-- Select --</option>
                                       {accounts.filter(a => !a.isHeader).map(acc => (
@@ -575,8 +613,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                     <input
                                       type="text"
                                       value={line.memo || ''}
+                                      disabled={isViewMode}
                                       onChange={e => updateLine(line.id!, { memo: e.target.value })}
-                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700"
+                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                     />
                                   </td>
                                 );
@@ -585,9 +624,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                   <td key={colKey} className="px-3 py-2">
                                     <select
                                       value={qualCode === '0000-0000' ? '0000-0000' : qualId}
+                                      disabled={isViewMode || qualCode === '0000-0000'}
                                       onChange={e => updateLine(line.id!, { qualificationId: e.target.value })}
-                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700"
-                                      disabled={qualCode === '0000-0000'}
+                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                     >
                                       <option value="0000-0000">0000-0000</option>
                                       {qualifications.map(q => (
@@ -606,8 +645,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                         inputMode="decimal"
                                         pattern="[0-9,]*"
                                         value={formatAmount(Number(line.debit) || 0)}
+                                        disabled={isViewMode}
                                         onChange={e => updateLine(line.id!, { debit: parseFloat(e.target.value.replace(/,/g, '')) || 0, credit: 0 })}
-                                        className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700"
+                                        className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                         placeholder="0.00"
                                       />
                                     </div>
@@ -623,8 +663,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                         inputMode="decimal"
                                         pattern="[0-9,]*"
                                         value={formatAmount(Number(line.credit) || 0)}
+                                        disabled={isViewMode}
                                         onChange={e => updateLine(line.id!, { credit: parseFloat(e.target.value.replace(/,/g, '')) || 0, debit: 0 })}
-                                        className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700"
+                                        className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                         placeholder="0.00"
                                       />
                                     </div>
@@ -633,13 +674,15 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               case 'actions':
                                 return (
                                   <td key={colKey} className="px-3 py-2 text-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => removeLine(line.id!)}
-                                      className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
+                                    {!isViewMode && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeLine(line.id!)}
+                                        className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
                                   </td>
                                 );
                               default:

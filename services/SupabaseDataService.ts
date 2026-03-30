@@ -676,7 +676,7 @@ export class SupabaseDataService implements IDataService {
         'invoice_date', 'due_date', 'status', 'subtotal', 'vat_amount', 'grand_total',
         'total_ewt_amount', 'net_amount_due', 'amount_paid', 'balance_due',
         'ewt_rate', 'is_subject_to_ewt', 'reference', 'terms', 'notes', 'journal_entry_id',
-        'vat_pricing', 'vat_rate', 'posted_by', 'posted_at', 'voided_by', 'voided_at', 'void_reason',
+        'gl_entry_number', 'vat_pricing', 'vat_rate', 'posted_by', 'posted_at', 'voided_by', 'voided_at', 'void_reason',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
