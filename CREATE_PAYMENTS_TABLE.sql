@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS payments (
     
     -- Payment details
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'POSTED', 'VOIDED')),
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'OPEN', 'POSTED', 'CLOSED', 'VOIDED')),
     payment_method VARCHAR(30) NOT NULL DEFAULT 'CHECK' CHECK (payment_method IN ('CASH', 'CHECK', 'BANK_TRANSFER', 'CREDIT_CARD', 'EWALLET', 'OFFSET')),
     
     -- Reference info

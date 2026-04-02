@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
-  ChartOfAccount, JournalEntry, JournalLine, Student,
+  ChartOfAccount, JournalEntry, JournalLine, Student, Invoice, InvoiceLine, AccountClass,
   Trainer, Sponsor, Batch, NonStockItem, User, Qualification
 } from '../types';
 import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp } from 'lucide-react';
@@ -12,6 +12,7 @@ interface LedgerProps {
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
   lines: JournalLine[];
+  invoices?: Invoice[];
   students: Student[];
   sponsors: Sponsor[];
   trainers: Trainer[];
@@ -27,7 +28,7 @@ interface LedgerProps {
 }
 
 const Ledger: React.FC<LedgerProps> = ({
-  accounts, entries, lines, students, sponsors, trainers, batches, items, qualifications = [], users = [],
+  accounts, entries, lines, invoices = [], students, sponsors, trainers, batches, items, qualifications = [], users = [],
   currentUser, onPostEntry, onApproveJournal, onReverseJournal,
   initialSearchTerm = ''
 }) => {
@@ -42,6 +43,7 @@ const Ledger: React.FC<LedgerProps> = ({
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
   const [editingLines, setEditingLines] = useState<JournalLine[]>([]);
+  const [entryFormMode, setEntryFormMode] = useState<'new' | 'edit' | 'view'>('new');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | 'none' }>({ key: 'date', direction: 'desc' });
 
   // Column ordering and resize state
@@ -169,6 +171,79 @@ const Ledger: React.FC<LedgerProps> = ({
     const user = users.find(u => u.id === createdBy);
     return user?.name || user?.email || createdBy;
   };
+
+  const getInvoiceLineClassificationCode = (invoice: Invoice | undefined, line: InvoiceLine): string => {
+    const existingCode = String(line.classificationCode || '').trim();
+    if (existingCode) return existingCode;
+
+    const account = accounts.find(a => a.id === line.glAccountId);
+    if (!account) return '';
+
+    if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
+      if (invoice?.batchId) {
+        const batch = batches.find(b => b.id === invoice.batchId);
+        if (batch) {
+          const qual = qualifications.find(q => q.id === batch.qualificationId);
+          return qual?.code || '';
+        }
+      }
+
+      if (invoice?.studentId) {
+        const student = students.find(s => s.id === invoice.studentId);
+        if (student && (student as any).qualificationId) {
+          const qual = qualifications.find(q => q.id === (student as any).qualificationId);
+          return qual?.code || '';
+        }
+      }
+
+      return '';
+    }
+
+    return '0000-0000';
+  };
+
+  const resolveJournalDisplayLines = (entry: JournalEntry): Array<JournalLine & { classificationCode?: string }> => {
+    const baseLines = lines.filter(line => line.journalEntryId === entry.id);
+    if (String(entry.sourceType || '').toUpperCase() !== 'INVOICE') {
+      return baseLines.map(line => ({ ...line }));
+    }
+
+    const invoice = invoices.find(inv =>
+      inv.orgId === (entry.orgId || '') &&
+      (
+        inv.id === entry.sourceRef ||
+        inv.invoiceNo === entry.sourceRef ||
+        inv.glEntryNumber === entry.sourceRef ||
+        inv.journalEntryId === entry.id
+      )
+    );
+    const invoiceLines = (invoice?.lines || [])
+      .slice()
+      .sort((a, b) => (a.lineNumber || 0) - (b.lineNumber || 0));
+    if (invoiceLines.length === 0) {
+      return baseLines.map(line => ({ ...line }));
+    }
+
+    let invoiceLineIndex = 0;
+    return baseLines.map(line => {
+      const account = accounts.find(a => a.id === line.accountId);
+      const isRevenueOrExpense = account?.class === AccountClass.REVENUE || account?.class === AccountClass.EXPENSE;
+      if (!isRevenueOrExpense) {
+        return { ...line };
+      }
+
+      const existingClassCode = String((line as any).classificationCode || '').trim();
+      const sourceInvoiceLine = invoiceLines[invoiceLineIndex];
+      const classificationCode = existingClassCode || (sourceInvoiceLine ? getInvoiceLineClassificationCode(invoice, sourceInvoiceLine) : '');
+      invoiceLineIndex += 1;
+
+      return classificationCode
+        ? ({ ...line, classificationCode } as JournalLine & { classificationCode?: string })
+        : { ...line };
+    });
+  };
+
+  const isLockedJournalEntry = (entry: JournalEntry) => String(entry.status || '').toUpperCase() === 'POSTED';
 
   const getDisplayStatusLabel = (status?: JournalEntry['status']) => {
     const map: Record<JournalEntry['status'], string> = {
@@ -629,7 +704,8 @@ const Ledger: React.FC<LedgerProps> = ({
                     className="hover:bg-gray-50 transition-colors cursor-pointer group"
                     onClick={() => {
                       setEditingEntry(entry);
-                      setEditingLines(lines.filter(l => l.journalEntryId === entry.id));
+                      setEditingLines(resolveJournalDisplayLines(entry));
+                      setEntryFormMode(isLockedJournalEntry(entry) ? 'view' : 'edit');
                       setShowEntryForm(true);
                     }}
                   >
@@ -667,17 +743,19 @@ const Ledger: React.FC<LedgerProps> = ({
           entries={entries}
           entryToEdit={editingEntry || undefined}
           linesToEdit={editingLines}
-          mode={editingEntry ? 'edit' : 'new'}
+          mode={editingEntry ? entryFormMode : 'new'}
           onClose={() => {
             setShowEntryForm(false);
             setEditingEntry(null);
             setEditingLines([]);
+            setEntryFormMode('new');
           }}
           onSubmit={(entry, lines) => {
             onPostEntry?.(entry, lines);
             setShowEntryForm(false);
             setEditingEntry(null);
             setEditingLines([]);
+            setEntryFormMode('new');
           }}
         />
       )}
@@ -845,5 +923,3 @@ const DetailItem: React.FC<{ label: string; value: React.ReactNode; icon?: React
 );
 
 export default Ledger;
-
-

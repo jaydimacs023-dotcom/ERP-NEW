@@ -5050,7 +5050,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
@@ -5140,9 +5140,11 @@ export default function App() {
           />}
           {activeTab === 'payments' && <PaymentsView
             currentOrgId={currentOrgId}
+            organization={currentOrg}
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
             accounts={filteredAccounts}
