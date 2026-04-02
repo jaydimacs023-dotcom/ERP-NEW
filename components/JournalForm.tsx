@@ -25,7 +25,7 @@ interface JournalFormProps {
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({
-  accounts, students, trainers, sponsors, batches, items = [], qualifications, entries, entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
+  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
 }) => {
   const brandColor = '#F47721';
   const buildEmptyEntry = (): Partial<JournalEntry> => ({
@@ -55,6 +55,12 @@ const JournalForm: React.FC<JournalFormProps> = ({
 
   const [displaySourceRef, setDisplaySourceRef] = useState('');
   const dataService = DataServiceFactory.getService();
+  const getQualificationCodeById = (qualificationId?: string) => {
+    const id = String(qualificationId || '').trim();
+    if (!id) return '';
+    if (id === '0000-0000') return '0000-0000';
+    return qualifications.find(q => q.id === id)?.code || '';
+  };
 
   useEffect(() => {
     const loadDisplayRef = async () => {
@@ -119,10 +125,13 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
+    const sourceIsInvoice = String(entry.sourceType || '').toUpperCase() === 'INVOICE';
+
     const rows = lines.map((line, idx) => {
       const account = accounts.find(a => a.id === line.accountId);
       const selectedQualId = (line as any).qualificationId || account?.qualificationId || '';
       const selectedQual = qualifications.find(q => q.id === selectedQualId);
+      const invoiceClassCode = (line as any).classificationCode?.trim() || '';
       const qualCode = (() => {
         if (account) {
           if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
@@ -132,12 +141,15 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
         }
         return '';
       })();
+      const displayClassCode = sourceIsInvoice
+        ? (invoiceClassCode || 'None')
+        : (invoiceClassCode || qualCode || '0000-0000');
       return {
         '#': idx + 1,
         'Account No.': account?.code || '',
         'Account': account ? `${account.code} - ${account.name}` : '',
         'Transaction Description': line.memo || '',
-        'Class': qualCode || '',
+        'Class': displayClassCode || '',
         'Debit Amount': Number(line.debit) || 0,
         'Credit Amount': Number(line.credit) || 0,
       };
@@ -194,7 +206,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       
       const newLine = { ...l, ...updates };
       if (Object.prototype.hasOwnProperty.call(updates, 'qualificationId')) {
-        (newLine as any).qualificationId = (updates as any).qualificationId;
+        const qualificationId = String((updates as any).qualificationId || '').trim();
+        (newLine as any).qualificationId = qualificationId;
+        (newLine as any).classificationCode = getQualificationCodeById(qualificationId);
       }
 
       if (updates.itemId) {
@@ -245,8 +259,10 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       contactId: l.contactId,
       contactType: l.contactType,
       batchId: l.batchId,
-      itemId: l.itemId
-    }));
+      itemId: l.itemId,
+      qualificationId: (l as any).qualificationId,
+      classificationCode: (l as any).classificationCode
+    } as JournalLine & { qualificationId?: string; classificationCode?: string }));
 
     onSubmit({ ...entry, id: entryId, status, createdAt: entry.createdAt || new Date().toISOString() }, finalizedLines);
   };
@@ -258,7 +274,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col w-full min-h-[calc(100vh-12rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
           <div>
             <h3 className="text-xl font-bold text-gray-800">
@@ -319,19 +335,15 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
           >
             <X size={20} />
           </button>
-          {!isViewMode && (
-            <>
-              <div className="h-6 w-px bg-gray-200 mx-2" />
-              <button
-                title="Reverse"
-                type="button"
-                onClick={() => alert('Reverse coming soon...')}
-                className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                <CornerUpLeft size={20} />
-              </button>
-            </>
-          )}
+          <div className="h-6 w-px bg-gray-200 mx-2" />
+          <button
+            title={isViewMode ? 'Reverse Journal Entry' : 'Reverse'}
+            type="button"
+            onClick={() => alert('Reverse coming soon...')}
+            className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <CornerUpLeft size={20} />
+          </button>
           <button
             title="Print"
             type="button"
@@ -340,16 +352,14 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
           >
             <Printer size={20} />
           </button>
-          {!isViewMode && (
-            <button
-              title="Reclassify"
-              type="button"
-              onClick={() => alert('Reclassify coming soon...')}
-              className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
-            >
-              <Scissors size={20} />
-            </button>
-          )}
+          <button
+            title={isViewMode ? 'Reclassify Journal Entry' : 'Reclassify'}
+            type="button"
+            onClick={() => alert('Reclassify coming soon...')}
+            className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors"
+          >
+            <Scissors size={20} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
@@ -574,6 +584,11 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                           {lineColOrder.map(colKey => {
                             let qualCode = '';
                             let qualId = '';
+                            const invoiceClassCode = (line as any).classificationCode?.trim() || '';
+                            const invoiceQualId = invoiceClassCode
+                              ? qualifications.find(q => q.code === invoiceClassCode)?.id || ''
+                              : '';
+                            const sourceIsInvoice = String(entry.sourceType || '').toUpperCase() === 'INVOICE';
                             if (line.accountId) {
                               const acc = accounts.find(a => a.id === line.accountId);
                               if (acc) {
@@ -586,6 +601,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                                 }
                               }
                             }
+                            const displayClassCode = sourceIsInvoice
+                              ? (invoiceClassCode || 'None')
+                              : (invoiceClassCode || qualCode || '0000-0000');
                             switch (colKey) {
                               case 'lineNumber':
                                 return <td key={colKey} className="px-3 py-2 text-gray-400">{idx + 1}</td>;
@@ -622,17 +640,25 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               case 'class':
                                 return (
                                   <td key={colKey} className="px-3 py-2">
-                                    <select
-                                      value={qualCode === '0000-0000' ? '0000-0000' : qualId}
-                                      disabled={isViewMode || qualCode === '0000-0000'}
-                                      onChange={e => updateLine(line.id!, { qualificationId: e.target.value })}
-                                      className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
-                                    >
-                                      <option value="0000-0000">0000-0000</option>
-                                      {qualifications.map(q => (
-                                        <option key={q.id} value={q.id}>{q.code}</option>
-                                      ))}
-                                    </select>
+                                    {isViewMode ? (
+                                      <span className="inline-flex min-h-[28px] w-full items-center rounded bg-gray-50 px-2 py-1 text-[13px] font-normal text-gray-700">
+                                        {displayClassCode}
+                                      </span>
+                                    ) : (
+                                      <select
+                                        value={sourceIsInvoice
+                                          ? (invoiceQualId || (qualCode === '0000-0000' ? '0000-0000' : qualId) || '0000-0000')
+                                          : (qualCode === '0000-0000' ? '0000-0000' : qualId)}
+                                        disabled={sourceIsInvoice ? false : qualCode === '0000-0000'}
+                                        onChange={e => updateLine(line.id!, { qualificationId: e.target.value })}
+                                        className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
+                                      >
+                                        <option value="0000-0000">0000-0000</option>
+                                        {qualifications.map(q => (
+                                          <option key={q.id} value={q.id}>{q.code}</option>
+                                        ))}
+                                      </select>
+                                    )}
                                   </td>
                                 );
                               case 'debit':

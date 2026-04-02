@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -1104,9 +1104,24 @@ export default function App() {
       }));
 
       const savedLines = await dataService.createJournalLines(linesWithActualId);
+      const sourceLineClassMap = new Map(
+        lines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
+      );
+      const savedLinesWithSourceClass = savedLines.map((savedLine, idx) => {
+        const sourceLine = lines.find(line => line.id === savedLine.id) || lines[idx];
+        const classificationCode = String(
+          (sourceLine && sourceLineClassMap.get(sourceLine.id)) || (savedLine as any).classificationCode || ''
+        ).trim();
+        const qualificationId = classificationCode
+          ? (qualifications.find(q => q.code === classificationCode)?.id || (savedLine as any).qualificationId || '')
+          : (savedLine as any).qualificationId || '';
+        return classificationCode
+          ? ({ ...savedLine, classificationCode, qualificationId } as JournalLine & { classificationCode?: string; qualificationId?: string })
+          : savedLine;
+      });
 
       setJournalEntries(prev => [...prev, normalizedSavedEntry]);
-      setJournalLines(prev => [...prev, ...savedLines]);
+      setJournalLines(prev => [...prev, ...savedLinesWithSourceClass]);
 
       // Audit: Journal entry posted
       AuditService.post(
@@ -1261,7 +1276,7 @@ export default function App() {
     }
   };
 
-  const handleViewJournal = (journalEntryId: string) => {
+  const handleViewJournal = (journalEntryId: string, sourceLines?: InvoiceLine[]) => {
     const normalizedId = journalEntryId.trim();
     const entry = journalEntries.find(e =>
       e.id === normalizedId ||
@@ -1272,7 +1287,44 @@ export default function App() {
     if (!entry) return;
 
     setJournalFormEntry(entry);
-    setJournalFormLines(journalLines.filter(line => line.journalEntryId === entry.id));
+    const entryLines = journalLines.filter(line => line.journalEntryId === entry.id);
+    const enrichedLines = String(entry.sourceType || '').toUpperCase() === 'INVOICE'
+      ? (() => {
+          const sourceInvoiceLines = (sourceLines && sourceLines.length > 0)
+            ? sourceLines
+            : (() => {
+                const invoice = invoices.find(inv =>
+                  inv.orgId === currentOrgId &&
+                  (inv.id === entry.sourceRef || inv.invoiceNo === entry.sourceRef || inv.glEntryNumber === entry.sourceRef)
+                );
+                return invoice?.lines || [];
+              })();
+          const invoiceLines = (sourceInvoiceLines || [])
+            .slice()
+            .sort((a, b) => (a.lineNumber || 0) - (b.lineNumber || 0))
+            .map((line: any) => String(line.classificationCode || '').trim());
+          if (invoiceLines.length === 0) return entryLines;
+
+          let invoiceLineIndex = 0;
+          return entryLines.map(line => {
+            const account = filteredAccounts.find(account => account.id === line.accountId);
+            const isRevenueOrExpense = account?.class === AccountClass.REVENUE || account?.class === AccountClass.EXPENSE;
+            if (!isRevenueOrExpense) return line;
+
+            const existingClassCode = String((line as any).classificationCode || '').trim();
+            const classificationCode = existingClassCode || invoiceLines[invoiceLineIndex] || '';
+            const qualificationId = classificationCode
+              ? (qualifications.find(q => q.code === classificationCode)?.id || (line as any).qualificationId || '')
+              : (line as any).qualificationId || '';
+            invoiceLineIndex += 1;
+
+            return classificationCode
+              ? ({ ...line, classificationCode, qualificationId } as JournalLine & { classificationCode?: string; qualificationId?: string })
+              : line;
+          });
+        })()
+      : entryLines;
+    setJournalFormLines(enrichedLines);
     setJournalFormMode('view');
     setShowJournalForm(true);
   };
@@ -4907,7 +4959,7 @@ export default function App() {
             >
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{activeTab.replace('-', ' ')}</h2>
+            <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{showJournalForm ? 'new journal entry' : activeTab.replace('-', ' ')}</h2>
           </div>
           <div className="flex items-center gap-4">
             <FontScalePicker />
@@ -4925,6 +4977,37 @@ export default function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 p-10 scrollbar-hide">
+          {showJournalForm ? (
+            <div className="w-full max-w-none">
+              <JournalForm
+                accounts={filteredAccounts}
+                students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+                trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
+                sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+                batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+                items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+                qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+                entries={activeJournalEntries}
+                entryToEdit={journalFormEntry || undefined}
+                linesToEdit={journalFormLines}
+                mode={journalFormMode}
+                onClose={() => {
+                  setShowJournalForm(false);
+                  setJournalFormEntry(null);
+                  setJournalFormLines([]);
+                  setJournalFormMode('new');
+                }}
+                onSubmit={(entry, lines) => {
+                  handleSaveOrPostJournal(entry, lines);
+                  setShowJournalForm(false);
+                  setJournalFormEntry(null);
+                  setJournalFormLines([]);
+                  setJournalFormMode('new');
+                }}
+              />
+            </div>
+          ) : (
+            <>
           {/* View Router (unchanged) */}
           {activeTab === 'student-portal' && currentUser.studentId && (
             <StudentPortalView
@@ -5281,40 +5364,10 @@ export default function App() {
             />
           )}
 
+            </>
+          )}
         </div>
       </main>
-
-      {showJournalForm && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm overflow-y-auto">
-          <div className="mx-auto max-w-7xl p-4 md:p-6">
-            <JournalForm
-              accounts={filteredAccounts}
-              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
-              trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)}
-              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
-              batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
-              items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
-              entries={activeJournalEntries}
-              entryToEdit={journalFormEntry || undefined}
-              linesToEdit={journalFormLines}
-              mode={journalFormMode}
-              onClose={() => {
-                setShowJournalForm(false);
-                setJournalFormEntry(null);
-                setJournalFormLines([]);
-                setJournalFormMode('new');
-              }}
-              onSubmit={(entry, lines) => {
-                handleSaveOrPostJournal(entry, lines);
-                setShowJournalForm(false);
-                setJournalFormEntry(null);
-                setJournalFormLines([]);
-                setJournalFormMode('new');
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

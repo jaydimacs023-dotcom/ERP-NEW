@@ -34,7 +34,7 @@ interface InvoicesViewProps {
   onUpdateEnrollment?: (enrollment: Enrollment) => void; // For updating billing status after invoice generation
   journalEntries?: JournalEntry[];
   onAddStudentLedgerEntry?: (entry: StudentLedger) => void; // For AR subsidiary ledger
-  onViewJournal?: (journalEntryId: string) => void;
+  onViewJournal?: (journalEntryId: string, sourceLines?: InvoiceLine[]) => void;
   organization?: Organization;
   orgId: string;
   taxCategories: TaxCategoryEntry[];
@@ -284,7 +284,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     if (!account) return '';
 
     // If Revenue or Expense, use Batch Qualification Code or Student Qualification Code
-    if (account.accountClass === AccountClass.REVENUE || account.accountClass === AccountClass.EXPENSE) {
+    if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
       if (formData.batchId) {
         const batch = batches.find(b => b.id === formData.batchId);
         if (batch) {
@@ -303,6 +303,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       // Asset, Liability, Equity
       return '0000-0000';
     }
+  };
+
+  const getInvoiceLineClassificationCode = (line: InvoiceLine) => {
+    const existingCode = String(line.classificationCode || '').trim();
+    if (existingCode) return existingCode;
+
+    if (line.courseFeeId) {
+      const fee = courseFees.find(f => f.id === line.courseFeeId);
+      if (fee?.glAccountId) {
+        return getClassificationCode(fee.glAccountId);
+      }
+    }
+
+    return getClassificationCode(line.glAccountId);
   };
 
   // whenever the list of tax categories changes, recompute net/vat/gross for existing lines
@@ -422,7 +436,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       const code = (() => {
          const account = accounts.find(a => a.id === fee.glAccountId);
          if (!account) return '';
-         if (account.accountClass === AccountClass.REVENUE || account.accountClass === AccountClass.EXPENSE) {
+         if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
              const qual = qualifications.find(q => q.id === batch.qualificationId);
              return qual?.code || '';
          }
@@ -974,6 +988,25 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return s ? `${s.lastName}, ${s.firstName}` : '-';
   };
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
+  const resolveInvoiceJournalTarget = (invoice: Invoice) => {
+    const sourceInvoiceId = (invoice.id || '').trim();
+    const invoiceGlRef = (invoice.glEntryNumber || '').trim();
+    const matchedJournal = journalEntries.find(j =>
+      j.id === invoice.journalEntryId ||
+      (sourceInvoiceId && String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === sourceInvoiceId) ||
+      (invoiceGlRef && (j.glEntryNumber || j.reference || '').trim() === invoiceGlRef)
+    );
+
+    return (
+      matchedJournal?.id ||
+      invoice.journalEntryId ||
+      matchedJournal?.glEntryNumber ||
+      matchedJournal?.reference ||
+      invoiceGlRef ||
+      ''
+    ).trim();
+  };
+
   const getInvoiceGlRef = (invoice: Invoice) => {
     if (invoice.journalEntryId) {
       const je = journalEntries.find(j =>
@@ -995,11 +1028,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   const editingInvoiceJournalEntry = useMemo(() => {
     if (!editingInvoice) return null;
+    const journalTarget = resolveInvoiceJournalTarget(editingInvoice);
     const invoiceGlRef = (editingInvoice.glEntryNumber || '').trim();
-    const invoiceSourceRef = (editingInvoice.id || '').trim();
     return journalEntries.find(j =>
       j.id === editingInvoice.journalEntryId ||
-      (invoiceSourceRef && String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === invoiceSourceRef) ||
+      (journalTarget && j.id === journalTarget) ||
+      (String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === editingInvoice.id) ||
       (invoiceGlRef && (j.glEntryNumber || j.reference || '').trim() === invoiceGlRef)
     ) || null;
   }, [editingInvoice, journalEntries]);
@@ -2411,29 +2445,38 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     {editingInvoice?.journalEntryId || editingInvoice?.status === 'OPEN' ? (
                       (() => {
                         const relatedJournalEntry = editingInvoiceJournalEntry;
-                        const journalTarget = (
-                          relatedJournalEntry?.id ||
-                          editingInvoice?.journalEntryId ||
-                          editingInvoice?.id ||
-                          relatedJournalEntry?.glEntryNumber ||
-                          relatedJournalEntry?.reference ||
-                          editingInvoice?.glEntryNumber ||
-                          editingInvoice?.reference ||
-                          ''
-                        ).trim();
+                        const journalTarget = editingInvoice ? resolveInvoiceJournalTarget(editingInvoice as Invoice) : '';
                         const glNum = (
                           relatedJournalEntry?.glEntryNumber ||
                           relatedJournalEntry?.reference ||
                           editingInvoice?.glEntryNumber ||
-                          editingInvoice?.reference ||
                           `GL No. ${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`
                         ).trim();
+                        if (!journalTarget) {
+                          return (
+                            <>
+                              <input
+                                value={formData.glEntryNumber || ''}
+                                readOnly
+                                placeholder="Generated when invoice is approved"
+                                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
+                              />
+                              <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                            </>
+                          );
+                        }
                         return (
                           <button
                             type="button"
                             onClick={() => {
-                              if (!journalTarget || !onViewJournal) return;
-                              onViewJournal(journalTarget);
+                              if (!onViewJournal) return;
+                              onViewJournal(
+                                journalTarget,
+                                (formData.lines || []).map(line => ({
+                                  ...line,
+                                  classificationCode: getInvoiceLineClassificationCode(line)
+                                }))
+                              );
                             }}
                             className="inline-flex items-center gap-2 px-4 py-2.5 text-base font-normal rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
                             title="Open the related journal entry"
