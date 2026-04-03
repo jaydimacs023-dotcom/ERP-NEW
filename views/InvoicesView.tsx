@@ -988,6 +988,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     return s ? `${s.lastName}, ${s.firstName}` : '-';
   };
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
+  const normalizeGlReference = (value?: string) => {
+    const ref = (value || '').trim();
+    if (!ref) return '';
+    const match = ref.match(/^GL(?:\s*No\.?)?[\s-]*(\d+)$/i);
+    if (!match) return ref;
+    return `GL${match[1].padStart(8, '0')}`;
+  };
   const resolveInvoiceJournalTarget = (invoice: Invoice) => {
     const sourceInvoiceId = (invoice.id || '').trim();
     const invoiceGlRef = (invoice.glEntryNumber || '').trim();
@@ -1013,16 +1020,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         j.id === invoice.journalEntryId ||
         (String(j.sourceType || '').toUpperCase() === 'INVOICE' && j.sourceRef === invoice.id)
       );
-      const glNum = (je?.glEntryNumber || je?.reference || '').trim();
+      const glNum = normalizeGlReference(je?.glEntryNumber || je?.reference);
       if (glNum) return glNum;
     }
     const sourceMatch = journalEntries.find(j =>
       String(j.sourceType || '').toUpperCase() === 'INVOICE' &&
       j.sourceRef === invoice.id
     );
-    const sourceGlNum = (sourceMatch?.glEntryNumber || sourceMatch?.reference || '').trim();
+    const sourceGlNum = normalizeGlReference(sourceMatch?.glEntryNumber || sourceMatch?.reference);
     if (sourceGlNum) return sourceGlNum;
-    if (invoice.glEntryNumber?.trim()) return invoice.glEntryNumber.trim();
+    const invoiceGlNum = normalizeGlReference(invoice.glEntryNumber);
+    if (invoiceGlNum) return invoiceGlNum;
     return '-';
   };
 
@@ -2447,10 +2455,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         const relatedJournalEntry = editingInvoiceJournalEntry;
                         const journalTarget = editingInvoice ? resolveInvoiceJournalTarget(editingInvoice as Invoice) : '';
                         const glNum = (
-                          relatedJournalEntry?.glEntryNumber ||
-                          relatedJournalEntry?.reference ||
-                          editingInvoice?.glEntryNumber ||
-                          `GL No. ${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`
+                          normalizeGlReference(relatedJournalEntry?.glEntryNumber) ||
+                          normalizeGlReference(relatedJournalEntry?.reference) ||
+                          normalizeGlReference(editingInvoice?.glEntryNumber) ||
+                          `GL${editingInvoice?.journalEntryId?.slice(-8).toUpperCase()}`
                         ).trim();
                         if (!journalTarget) {
                           return (
@@ -2461,7 +2469,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                                 placeholder="Generated when invoice is approved"
                                 className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
                               />
-                              <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                              <p className="text-xs text-gray-400 mt-1"></p>
                             </>
                           );
                         }
@@ -2496,7 +2504,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         placeholder="Generated when invoice is approved"
                         className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
                       />
-                      <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                      <p className="text-xs text-gray-400 mt-1"></p>
                     </>
                   )}
                   </div>

@@ -759,6 +759,7 @@ export interface Payment extends BaseEntity {
   id: string;
   orgId: string;
   paymentNo: string;            // Human-readable payment number (e.g., PAY-2025-00001)
+  crNo?: string;                // Collection Receipt number
   sponsorId?: string;           // FK to Sponsor (primary payer)
   studentId?: string;           // FK to Student (if individual payment)
   paymentDate: string;          // Date payment received
@@ -955,6 +956,7 @@ export interface JournalLine {
   credit: number;
   memo?: string;
   description?: string; // Alias for memo
+  classificationCode?: string; // Optional class code for journal display
   contactId?: string;
   contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
   batchId?: string;

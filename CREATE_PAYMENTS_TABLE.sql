@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS payments (
     
     -- Payment identification
     payment_no VARCHAR(50) NOT NULL,
+    cr_no VARCHAR(50),
     
     -- Payer (either sponsor or student)
     sponsor_id UUID REFERENCES sponsors(id) ON DELETE SET NULL,

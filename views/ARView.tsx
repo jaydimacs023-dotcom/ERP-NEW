@@ -186,6 +186,14 @@ const ARView: React.FC<ARViewProps> = ({
   const arInvoices = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
   const arCollections = entries.filter(e => e.sourceType === 'COLLECTION' && e.status !== 'REVERSED');
 
+  const normalizeGlReference = (value?: string) => {
+    const ref = (value || '').trim();
+    if (!ref) return '';
+    const match = ref.match(/^GL(?:\s*No\.?)?[\s-]*(\d+)$/i);
+    if (!match) return ref;
+    return `GL${match[1].padStart(8, '0')}`;
+  };
+
   const subsidiaryBalances = useMemo(() => {
     const balances: Record<string, number> = {};
     const arAccounts = new Set(accounts.filter(a => a.class === AccountClass.ASSET && (a.name || '').toLowerCase().includes('receivable')).map(a => a.id));
@@ -276,7 +284,7 @@ const ARView: React.FC<ARViewProps> = ({
 
       const postPeriod = inv.date ? formatDateMMYYYY(inv.date) : '';
       const dateFmt = formatDateMMDDYYYY(inv.date);
-      const glNbr = inv.glEntryNumber || batch?.batchCode || '';
+      const glNbr = normalizeGlReference(inv.glEntryNumber) || batch?.batchCode || '';
       const status = getDisplayStatus(inv.status, inv);
       const amountVal = arLine?.debit || 0;
       const currency = inv.currency || 'PHP';
@@ -916,7 +924,7 @@ const ARView: React.FC<ARViewProps> = ({
                     <td className="px-3 py-4 text-xs text-gray-400">{/* placeholder for doc icon */}</td>
 
                     <td className="px-6 py-4 text-xs font-medium text-gray-700">{inv.sourceType || 'INVOICE'}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-gray-600">{inv.glEntryNumber || batch?.batchCode || (batch?.name || 'â€”')}</td>
+                    <td className="px-6 py-4 text-xs font-mono text-gray-600">{normalizeGlReference(inv.glEntryNumber) || batch?.batchCode || (batch?.name || 'â€”')}</td>
                     <td className="px-6 py-4 text-xs font-mono font-semibold text-[#025959]">{inv.reference}</td>
 
                     <td className="px-6 py-4 text-xs">

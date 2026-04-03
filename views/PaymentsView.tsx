@@ -138,6 +138,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Form data
   const [formData, setFormData] = useState({
     paymentNo: '',
+    crNo: '',
     sponsorId: '',
     studentId: '',
     paymentDate: new Date().toISOString().split('T')[0],
@@ -324,6 +325,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const buildBlankPaymentForm = () => ({
     paymentNo: generatePaymentNo(),
+    crNo: '',
     sponsorId: '',
     studentId: '',
     paymentDate: new Date().toISOString().split('T')[0],
@@ -369,6 +371,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setInvoiceSelectionMap({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -392,6 +395,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setInvoiceSelectionMap({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -420,6 +424,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setInvoiceSelectionMap({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -439,6 +444,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const printablePayment = {
       ...(editingPayment || {}),
       paymentNo: formData.paymentNo,
+      crNo: formData.crNo || editingPayment?.crNo || '',
       sponsorId: formData.sponsorId || editingPayment?.sponsorId || '',
       studentId: formData.studentId || editingPayment?.studentId || '',
       paymentDate: formData.paymentDate,
@@ -503,6 +509,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       <div class="grid">
         <div class="card">
           <h3>Payment Information</h3>
+          <div class="row"><span>C.R. No.</span><span>${esc(printablePayment.crNo || '-')}</span></div>
           <div class="row"><span>Payor</span><span>${esc(payorName || '-')}</span></div>
           <div class="row"><span>Payment Method</span><span>${esc(printablePayment.paymentMethod || '-')}</span></div>
           <div class="row"><span>Reference No.</span><span>${esc(printablePayment.refNo || '-')}</span></div>
@@ -636,6 +643,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
       setFormData({
         paymentNo: generatePaymentNo(),
+        crNo: '',
         sponsorId: inv.sponsorId || '',
         studentId: inv.studentId || '',
         paymentDate: new Date().toISOString().split('T')[0],
@@ -713,6 +721,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       id: paymentId,
       orgId: currentOrgId,  // Always include org_id for complete data separation
       paymentNo: formData.paymentNo,
+      crNo: formData.crNo || undefined,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       paymentDate: formData.paymentDate,
@@ -1119,6 +1128,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       const payor = getPayorName(pay).toLowerCase();
       const matchesSearch =
         pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (pay.crNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         payor.includes(searchTerm.toLowerCase()) ||
         (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (pay.glEntryNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -1979,7 +1989,17 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <div>
+                      <label className={invoiceLabelClass}>C.R. No.</label>
+                      <input
+                        value={formData.crNo}
+                        onChange={e => setFormData(prev => ({ ...prev, crNo: e.target.value }))}
+                        disabled={isReadOnly}
+                        className={invoiceInputClass}
+                        placeholder="Collection Receipt No."
+                      />
+                    </div>
                     <div>
                       <label className={invoiceLabelClass}>Payor Type *</label>
                       <div className="mt-2 flex gap-4 text-sm">
@@ -2080,7 +2100,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             placeholder="Generated when payment is approved"
                             className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
                           />
-                           <p className="text-xs text-gray-400 mt-1">GL Reference will be auto-generated and linked when you click "Approve"</p>
+                           <p className="text-xs text-gray-400 mt-1"></p>
                         </>
                       )}
                     </div>
@@ -2382,6 +2402,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     <dt className="text-sm font-medium text-gray-600">Payment Date:</dt>
                     <dd className="text-sm text-gray-900">{new Date(editingPayment.paymentDate).toLocaleDateString()}</dd>
                   </div>
+                  {editingPayment.crNo && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">C.R. No.:</dt>
+                      <dd className="text-sm text-gray-900">{editingPayment.crNo}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <dt className="text-sm font-medium text-gray-600">Payor:</dt>
                     <dd className="text-sm text-gray-900">{getPayorName(editingPayment)}</dd>

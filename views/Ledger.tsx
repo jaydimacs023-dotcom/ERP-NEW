@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
   ChartOfAccount, JournalEntry, JournalLine, Student, Invoice, InvoiceLine, AccountClass,
+  Payment,
   Trainer, Sponsor, Batch, NonStockItem, User, Qualification
 } from '../types';
 import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp } from 'lucide-react';
@@ -13,6 +14,7 @@ interface LedgerProps {
   entries: JournalEntry[];
   lines: JournalLine[];
   invoices?: Invoice[];
+  payments?: Payment[];
   students: Student[];
   sponsors: Sponsor[];
   trainers: Trainer[];
@@ -28,7 +30,7 @@ interface LedgerProps {
 }
 
 const Ledger: React.FC<LedgerProps> = ({
-  accounts, entries, lines, invoices = [], students, sponsors, trainers, batches, items, qualifications = [], users = [],
+  accounts, entries, lines, invoices = [], payments = [], students, sponsors, trainers, batches, items, qualifications = [], users = [],
   currentUser, onPostEntry, onApproveJournal, onReverseJournal,
   initialSearchTerm = ''
 }) => {
@@ -172,6 +174,15 @@ const Ledger: React.FC<LedgerProps> = ({
     return user?.name || user?.email || createdBy;
   };
 
+  const DEFAULT_RECEIVABLE_CLASSIFICATION_CODE = '00000-00000';
+
+  const isReceivableAccount = (account?: ChartOfAccount | null): boolean => {
+    if (!account || account.class !== AccountClass.ASSET || account.isHeader) return false;
+    const code = String(account.code || '').trim();
+    const name = String(account.name || '').toLowerCase();
+    return code === '1200' || code === '11100' || code === '11110' || name.includes('accounts receivable') || name.includes('receivable');
+  };
+
   const getInvoiceLineClassificationCode = (invoice: Invoice | undefined, line: InvoiceLine): string => {
     const existingCode = String(line.classificationCode || '').trim();
     if (existingCode) return existingCode;
@@ -227,12 +238,15 @@ const Ledger: React.FC<LedgerProps> = ({
     let invoiceLineIndex = 0;
     return baseLines.map(line => {
       const account = accounts.find(a => a.id === line.accountId);
+      const existingClassCode = String((line as any).classificationCode || '').trim();
+      if (isReceivableAccount(account)) {
+        return ({ ...line, classificationCode: existingClassCode || DEFAULT_RECEIVABLE_CLASSIFICATION_CODE } as JournalLine & { classificationCode?: string });
+      }
       const isRevenueOrExpense = account?.class === AccountClass.REVENUE || account?.class === AccountClass.EXPENSE;
       if (!isRevenueOrExpense) {
         return { ...line };
       }
 
-      const existingClassCode = String((line as any).classificationCode || '').trim();
       const sourceInvoiceLine = invoiceLines[invoiceLineIndex];
       const classificationCode = existingClassCode || (sourceInvoiceLine ? getInvoiceLineClassificationCode(invoice, sourceInvoiceLine) : '');
       invoiceLineIndex += 1;
@@ -741,6 +755,7 @@ const Ledger: React.FC<LedgerProps> = ({
           items={items}
           qualifications={qualifications}
           entries={entries}
+          payments={payments}
           entryToEdit={editingEntry || undefined}
           linesToEdit={editingLines}
           mode={editingEntry ? entryFormMode : 'new'}
@@ -807,7 +822,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
             <div className="p-2 bg-[#F47721] text-white rounded-xl shadow-md font-bold text-xs">VOUCHER</div>
             <div>
                <h3 className="text-lg font-bold text-slate-800 tracking-tight">Journal Entry Details</h3>
-               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-0.5">{entry.reference}</p>
+               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-0.5">{(entry.glEntryNumber || entry.reference || '').trim()}</p>
             </div>
           </div>
         </div>
