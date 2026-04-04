@@ -59,6 +59,8 @@ interface PaymentsViewProps {
 
 type PayorType = 'SPONSOR' | 'STUDENT';
 type ViewMode = 'list' | 'create-payment' | 'apply-payment' | 'payment-details';
+type ListTab = 'payments' | 'applications';
+type ApplicationListTab = 'unapplied' | 'applied';
 type PaymentRegistryColumn = {
   key: string;
   label: string;
@@ -66,6 +68,16 @@ type PaymentRegistryColumn = {
   minWidth: number;
   sortKey?: string;
   value: (payment: Payment) => string | number;
+  render: (payment: Payment) => React.ReactNode;
+};
+
+type ApplicationRegistryColumn = {
+  key: string;
+  label: string;
+  align: 'text-left' | 'text-center' | 'text-right';
+  minWidth: number;
+  sortKey?: string;
+  value?: (payment: Payment) => string | number;
   render: (payment: Payment) => React.ReactNode;
 };
 
@@ -86,6 +98,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   onPostPayment,
   onVoidPayment,
   onApplyToInvoice,
+  onReverseApplication,
   onViewJournal,
   initialContext,
   onClearContext
@@ -95,6 +108,8 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   // View mode management
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [listTab, setListTab] = useState<ListTab>('payments');
+  const [applicationListTab, setApplicationListTab] = useState<ApplicationListTab>('unapplied');
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [payorType, setPayorType] = useState<PayorType>('SPONSOR');
   const [sourceInvoiceId, setSourceInvoiceId] = useState<string | undefined>(undefined);
@@ -131,10 +146,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     'date', 'postPeriod', 'paymentNo', 'status', 'glReference', 'payor', 'method', 'amountReceived', 'amountApplied', 'balance', 'createdBy', 'createdOn'
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+  const [applicationColumnOrder, setApplicationColumnOrder] = useState<string[]>([
+    'date', 'postPeriod', 'paymentNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications', 'action'
+  ]);
+  const [draggedApplicationColumnIdx, setDraggedApplicationColumnIdx] = useState<number | null>(null);
 
   // Column resize state (registry table)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+  const [applicationColumnWidths, setApplicationColumnWidths] = useState<Record<string, number>>({});
+  const applicationResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -167,6 +188,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value ?? 0);
+  };
+
+  const formatPesoKpiAmount = (amount: number) => {
+    if ((currency || 'PHP') === 'PHP') {
+      return `₱${formatInputCurrency(amount)}`;
+    }
+    return formatCurrency(amount);
   };
 
   const parseInputCurrency = (value: string) => {
@@ -207,6 +235,32 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const student = students.find(s => s.id === payment.studentId);
     return student ? `${student.lastName}, ${student.firstName}` : '-';
   };
+
+  const getInvoicePayorName = (invoice: Invoice) => {
+    if (invoice.sponsorId) return sponsors.find(s => s.id === invoice.sponsorId)?.name || '-';
+    const student = students.find(s => s.id === invoice.studentId);
+    return student ? `${student.lastName}, ${student.firstName}` : '-';
+  };
+
+  const getTotalPaymentCredit = (payment: Payment) =>
+    Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0);
+
+  const getAvailablePaymentBalance = (payment: Payment) => {
+    const explicitBalance = Number(payment.customerDepositBalance ?? NaN);
+    if (Number.isFinite(explicitBalance)) {
+      return Math.max(explicitBalance, 0);
+    }
+    return Math.max(getTotalPaymentCredit(payment) - Number(payment.totalApplied ?? 0), 0);
+  };
+
+  const getActiveApplications = (payment: Payment) =>
+    (payment.applications || []).filter(app => !app.isReversed);
+
+  const isAppliedPayment = (payment: Payment) =>
+    getActiveApplications(payment).length > 0 || Number(payment.totalApplied ?? 0) > 0;
+
+  const canApplyPayment = (payment: Payment) =>
+    (payment.status === 'OPEN' || payment.status === 'POSTED') && getAvailablePaymentBalance(payment) > 0.01;
 
   const getCashGlAccount = (bankId?: string) => {
     if (!bankId) return undefined;
@@ -349,6 +403,20 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setPayorType('SPONSOR');
     setFormData(buildBlankPaymentForm());
     setViewMode('create-payment');
+  };
+
+  const startNewPaymentApplication = () => {
+    setApplicationListTab('unapplied');
+    const paymentToApply =
+      unappliedPaymentList.find(payment => canApplyPayment(payment)) ||
+      appliedPaymentList.find(payment => canApplyPayment(payment));
+
+    if (!paymentToApply) {
+      alert('No open payment with available balance is ready for application. Create or post a payment first.');
+      return;
+    }
+
+    loadPaymentForApplication(paymentToApply);
   };
 
   const discardPaymentChanges = () => {
@@ -647,11 +715,24 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   useEffect(() => {
     if (initialContext && initialContext.viewMode === 'create-payment' && initialContext.invoice) {
       const inv = initialContext.invoice;
+      const existingLinkedPayment = payments.find(payment =>
+        !payment.isDeleted &&
+        payment.status !== 'VOIDED' &&
+        payment.sourceInvoiceId === inv.id
+      );
+
+      if (existingLinkedPayment) {
+        loadPaymentForViewing(existingLinkedPayment);
+        if (onClearContext) onClearContext();
+        return;
+      }
+
       setEditingPayment(null);
       setSourceInvoiceId(inv.id);
       setInvoiceApplyMap({});
       setInvoiceSelectionMap({});
       setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
+      const payorLabel = getInvoicePayorName(inv);
       setFormData({
         paymentNo: generatePaymentNo(),
         crNo: '',
@@ -665,7 +746,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         checkDate: '',
         amountReceived: inv.balanceDue,
         ewtAmountCertified: 0,
-        notes: `Payment for Invoice ${inv.invoiceNo}`
+        notes: payorLabel !== '-' ? `Collection from ${payorLabel}` : 'Collection receipt'
       });
       setViewMode('create-payment');
       if (onClearContext) onClearContext();
@@ -693,12 +774,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
       if (onClearContext) onClearContext();
     }
-  }, [initialContext, defaultCashAccountId, onClearContext, payments]);
+  }, [initialContext, defaultCashAccountId, onClearContext, payments, sponsors, students]);
 
   const baseTotalCredit = formData.amountReceived + formData.ewtAmountCertified;
 
   const plannedAppliedTotal = useMemo(() => {
-    return Object.values(invoiceApplyMap).reduce((sum, amount) => sum + (amount || 0), 0);
+    return Object.values(invoiceApplyMap).reduce((sum: number, amount) => sum + Number(amount || 0), 0);
   }, [invoiceApplyMap]);
 
   const existingApplied = editingPayment?.totalApplied || 0;
@@ -806,20 +887,23 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       return;
     }
 
-    const selected = Object.entries(invoiceApplyMap).filter(([invoiceId, amt]) => invoiceSelectionMap[invoiceId] && amt > 0);
+    const selected = Object.entries(invoiceApplyMap).filter(
+      ([invoiceId, amt]) => invoiceSelectionMap[invoiceId] && Number(amt) > 0
+    );
     if (!selected.length) {
       alert('Tick at least one invoice and enter amount to apply.');
       return;
     }
 
-    const totalToApply = selected.reduce((sum, [_, amt]) => sum + amt, 0);
+    const totalToApply = selected.reduce((sum, [_, amt]) => sum + Number(amt || 0), 0);
     if (totalToApply > availableToApply) {
       alert('Applied total exceeds available unapplied balance.');
       return;
     }
 
     selected.forEach(([invoiceId, amount]) => {
-      if (onApplyToInvoice) onApplyToInvoice(editingPayment.id, invoiceId, amount);
+      const applyAmount = Number(amount || 0);
+      if (onApplyToInvoice) onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
     });
 
     if (!onApplyToInvoice) {
@@ -827,7 +911,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         id: generateUUID(),
         paymentId: editingPayment.id,
         invoiceId,
-        amountApplied: amount,
+        amountApplied: Number(amount || 0),
         isReversed: false,
         createdAt: new Date().toISOString()
       }));
@@ -862,7 +946,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       const otherSelectedTotal = Object.entries(prev).reduce((sum, [id, amount]) => {
         if (id === invoice.id) return sum;
         if (!invoiceSelectionMap[id]) return sum;
-        return sum + (amount || 0);
+        return sum + Number(amount || 0);
       }, 0);
       const remaining = Math.max(availableToApply - otherSelectedTotal, 0);
       const suggested = Math.min(invoice.balanceDue, remaining);
@@ -1136,13 +1220,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     .map(key => paymentRegistryColumns.find(col => col.key === key))
     .filter(Boolean) as PaymentRegistryColumn[];
 
-  const filteredPayments = useMemo(() => {
+  const applyRegistryFilters = (list: Payment[]) => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
-    const matches = payments.filter(pay => {
+    return list.filter(pay => {
       const payor = getPayorName(pay).toLowerCase();
       const matchesSearch =
         pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1172,8 +1256,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
       return matchesSearch && matchesStatus && matchesDate && matchesPayer;
     });
+  };
 
-    return [...matches].sort((a, b) => {
+  const sortRegistryPayments = (list: Payment[]) => {
+    return [...list].sort((a, b) => {
       if (sortConfig.direction === 'none') return 0;
       const valueA = getPaymentSortValue(a, sortConfig.key);
       const valueB = getPaymentSortValue(b, sortConfig.key);
@@ -1185,24 +1271,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       }
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
-
-  const getRegistryExportColumns = () => registryColumns;
-
-  const getExportRows = () => {
-    const columns = getRegistryExportColumns();
-    return filteredPayments.map(payment => {
-      const row: Record<string, any> = {};
-      columns.forEach(col => {
-        row[col.label] = col.value(payment);
-      });
-      return row;
-    });
   };
+
+  const filteredPayments = useMemo(() => {
+    return sortRegistryPayments(applyRegistryFilters(payments));
+  }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
   const exportToExcel = () => {
     const rows = getExportRows();
-    if (rows.length === 0) { alert('No payments to export.'); return; }
+    if (rows.length === 0) { alert(getExportEmptyMessage()); return; }
     const columns = getRegistryExportColumns();
     const headers = columns.map(c => c.label);
     const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] as string));
@@ -1223,7 +1300,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Payment_Registry_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.download = `${getExportFilePrefix()}_${new Date().toISOString().slice(0, 10)}.xls`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1232,12 +1309,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const exportToPdf = () => {
     const rows = getExportRows();
-    if (rows.length === 0) { alert('No payments to export.'); return; }
+    if (rows.length === 0) { alert(getExportEmptyMessage()); return; }
     const columns = getRegistryExportColumns();
     const cols = columns.map(c => c.label);
     const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] as string));
-    const orgName = organization?.name || 'Payment Registry';
-    let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Payment Registry</title><style>
+    const orgName = organization?.name || getExportDocumentTitle();
+    let html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(getExportDocumentTitle())}</title><style>
       @page { size: landscape; margin: 12mm; }
       * { box-sizing: border-box; }
       body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
@@ -1251,7 +1328,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       .footer { margin-top:16px; font-size:10px; color:#9ca3af; text-align:right; }
     </style></head><body>`;
     html += `<h2>${esc(orgName)}</h2>`;
-    html += `<div class="subtitle">Payment Registry &mdash; Exported ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })} &mdash; ${rows.length} record(s)</div>`;
+    html += `<div class="subtitle">${esc(getExportDocumentTitle())} &mdash; Exported ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })} &mdash; ${rows.length} record(s)</div>`;
     html += '<table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
     rows.forEach(r => {
       html += '<tr>';
@@ -1280,10 +1357,597 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const closedCount = payments.filter(p => p.status === 'CLOSED').length;
     const unappliedPayments = payments.reduce((sum, payment) => {
       if (payment.status !== 'OPEN' && payment.status !== 'POSTED') return sum;
-      return sum + Math.max(Number(payment.customerDepositBalance ?? 0), 0);
+      return sum + getAvailablePaymentBalance(payment);
     }, 0);
     return { draftCount, openCount, closedCount, unappliedPayments };
   }, [payments]);
+
+  const paymentApplicationBaseList = useMemo(
+    () => payments.filter(payment => payment.status !== 'VOIDED'),
+    [payments]
+  );
+
+  const unappliedPaymentList = useMemo(
+    () => paymentApplicationBaseList.filter(payment => !isAppliedPayment(payment)),
+    [paymentApplicationBaseList]
+  );
+
+  const appliedPaymentList = useMemo(
+    () => paymentApplicationBaseList.filter(payment => isAppliedPayment(payment)),
+    [paymentApplicationBaseList]
+  );
+
+  const paymentApplicationStats = useMemo(() => {
+    const unappliedBalance = unappliedPaymentList.reduce(
+      (sum, payment) => sum + getAvailablePaymentBalance(payment),
+      0
+    );
+    const appliedAmount = appliedPaymentList.reduce(
+      (sum, payment) => sum + Number(payment.totalApplied ?? 0),
+      0
+    );
+    const remainingBalance = appliedPaymentList.reduce(
+      (sum, payment) => sum + getAvailablePaymentBalance(payment),
+      0
+    );
+
+    return {
+      unappliedCount: unappliedPaymentList.length,
+      unappliedBalance,
+      appliedCount: appliedPaymentList.length,
+      appliedAmount,
+      remainingBalance
+    };
+  }, [unappliedPaymentList, appliedPaymentList]);
+
+  const currentApplicationPayments =
+    applicationListTab === 'unapplied' ? unappliedPaymentList : appliedPaymentList;
+
+  const filteredApplicationPayments = useMemo(() => {
+    return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments));
+  }, [currentApplicationPayments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
+
+  const filteredApplicationRemainingBalance = useMemo(() => {
+    return filteredApplicationPayments.reduce((sum, payment) => sum + getAvailablePaymentBalance(payment), 0);
+  }, [filteredApplicationPayments]);
+
+  const getPaymentApplicationActionLabel = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      return canApplyPayment(payment) ? 'Apply Payment' : 'View Payment';
+    }
+    return canApplyPayment(payment) ? 'Continue Apply' : 'View Details';
+  };
+
+  const handlePaymentApplicationAction = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      if (canApplyPayment(payment)) {
+        loadPaymentForApplication(payment);
+        return;
+      }
+      loadPaymentForViewing(payment);
+      return;
+    }
+
+    if (canApplyPayment(payment)) {
+      loadPaymentForApplication(payment);
+      return;
+    }
+
+    loadPaymentForDetails(payment);
+  };
+
+  const handlePaymentApplicationRowClick = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      loadPaymentForViewing(payment);
+      return;
+    }
+
+    loadPaymentForDetails(payment);
+  };
+
+  const getPaymentApplicationInvoiceLabel = (payment: Payment) => {
+    const appliedInvoiceNos = getActiveApplications(payment)
+      .map(app => invoices.find(invoice => invoice.id === app.invoiceId)?.invoiceNo || app.invoiceId)
+      .filter(Boolean);
+
+    const uniqueInvoiceNos = Array.from(new Set(appliedInvoiceNos));
+    if (uniqueInvoiceNos.length > 0) {
+      return uniqueInvoiceNos.join(', ');
+    }
+
+    const sourceInvoiceId = (payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId;
+    if (!sourceInvoiceId) return '-';
+
+    return invoices.find(invoice => invoice.id === sourceInvoiceId)?.invoiceNo || sourceInvoiceId;
+  };
+
+  const applicationRegistryColumns: ApplicationRegistryColumn[] = [
+    {
+      key: 'date',
+      label: 'Date',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'date',
+      value: (payment) => payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'postPeriod',
+      label: 'Post Period',
+      align: 'text-left',
+      minWidth: 112,
+      sortKey: 'postPeriod',
+      value: (payment) => formatPostPeriod(payment.paymentDate),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {formatPostPeriod(payment.paymentDate) || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'paymentNo',
+      label: 'Payment No.',
+      align: 'text-left',
+      minWidth: 160,
+      sortKey: 'paymentNo',
+      value: (payment) => payment.paymentNo || '',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{payment.paymentNo || '-'}</span>
+      )
+    },
+    {
+      key: 'invoiceNo',
+      label: 'Invoice No.',
+      align: 'text-left',
+      minWidth: 176,
+      sortKey: 'invoiceNo',
+      value: (payment) => getPaymentApplicationInvoiceLabel(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getPaymentApplicationInvoiceLabel(payment)}</span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      align: 'text-left',
+      minWidth: 96,
+      sortKey: 'status',
+      value: (payment) => getDisplayStatusLabel(payment.status),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getDisplayStatusLabel(payment.status)}</span>
+      )
+    },
+    {
+      key: 'glReference',
+      label: 'GL Reference No.',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'glReference',
+      value: (payment) => payment.glEntryNumber || '',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.glEntryNumber || (payment.status === 'DRAFT' ? '-' : 'Pending')}
+        </span>
+      )
+    },
+    {
+      key: 'payor',
+      label: 'Sponsor/Student',
+      align: 'text-left',
+      minWidth: 256,
+      sortKey: 'payor',
+      value: (payment) => getPayorName(payment),
+      render: (payment) => (
+        <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+          {payment.sponsorId ? (
+            <Building2 size={14} className="text-gray-400" />
+          ) : (
+            <User size={14} className="text-gray-400" />
+          )}
+          {getPayorName(payment)}
+        </span>
+      )
+    },
+    {
+      key: 'amountReceived',
+      label: 'Amount Received',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountReceived',
+      value: (payment) => getTotalPaymentCredit(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(getTotalPaymentCredit(payment))}</span>
+      )
+    },
+    {
+      key: 'amountApplied',
+      label: 'Amount Applied',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountApplied',
+      value: (payment) => Number(payment.totalApplied ?? 0),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(Number(payment.totalApplied ?? 0))}</span>
+      )
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'balance',
+      value: (payment) => getAvailablePaymentBalance(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(getAvailablePaymentBalance(payment))}</span>
+      )
+    },
+    {
+      key: 'applications',
+      label: 'Applications',
+      align: 'text-center',
+      minWidth: 112,
+      value: (payment) => getActiveApplications(payment).length,
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getActiveApplications(payment).length}</span>
+      )
+    },
+    {
+      key: 'action',
+      label: 'Action',
+      align: 'text-right',
+      minWidth: 160,
+      render: (payment) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePaymentApplicationAction(payment);
+          }}
+          className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+            applicationListTab === 'unapplied' && canApplyPayment(payment)
+              ? 'bg-amber-500 text-white hover:bg-amber-600'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+        >
+          {getPaymentApplicationActionLabel(payment)}
+        </button>
+      )
+    }
+  ];
+
+  const orderedApplicationRegistryColumns = applicationColumnOrder
+    .map(key => applicationRegistryColumns.find(col => col.key === key))
+    .filter(Boolean) as ApplicationRegistryColumn[];
+
+  const clearRegistryFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setDateFilterMode('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setPayerFilterMode('ALL');
+    setPayerSearchTerm('');
+    setShowDateDropdown(false);
+    setShowPayerDropdown(false);
+    setShowExportDropdown(false);
+  };
+
+  function getRegistryExportColumns(): Array<{ label: string; value: (payment: Payment) => string | number }> {
+    if (listTab === 'applications') {
+      return orderedApplicationRegistryColumns
+        .filter((col): col is ApplicationRegistryColumn & { value: (payment: Payment) => string | number } => typeof col.value === 'function')
+        .filter(col => col.key !== 'action');
+    }
+    return registryColumns;
+  }
+
+  function getExportRows() {
+    const sourceRows = listTab === 'applications' ? filteredApplicationPayments : filteredPayments;
+    const columns = getRegistryExportColumns();
+    return sourceRows.map(payment => {
+      const row: Record<string, any> = {};
+      columns.forEach(col => {
+        row[col.label] = col.value(payment);
+      });
+      return row;
+    });
+  }
+
+  function getExportDocumentTitle() {
+    if (listTab !== 'applications') return 'Payment Registry';
+    return applicationListTab === 'unapplied'
+      ? 'Payment Application Registry - Not Yet Applied'
+      : 'Payment Application Registry - Already Applied';
+  }
+
+  function getExportFilePrefix() {
+    if (listTab !== 'applications') return 'Payment_Registry';
+    return applicationListTab === 'unapplied'
+      ? 'Payment_Application_Registry_Not_Yet_Applied'
+      : 'Payment_Application_Registry_Already_Applied';
+  }
+
+  function getExportEmptyMessage() {
+    if (listTab !== 'applications') return 'No payments to export.';
+    return applicationListTab === 'unapplied'
+      ? 'No unapplied payment applications to export.'
+      : 'No applied payment applications to export.';
+  }
+
+  const renderRegistryToolbar = (searchPlaceholder: string) => (
+    <div className="bg-white border-y px-4 py-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex h-9 w-64 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
+          <Search size={14} className="mr-2 text-gray-400" />
+          <input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="flex-1 border-none bg-transparent text-[13px] font-medium text-gray-700 outline-none placeholder:font-normal placeholder:text-gray-300"
+          />
+        </div>
+
+        <div className="relative flex h-9 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
+          <span className="mr-1 text-[13px] text-gray-500">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
+            className="cursor-pointer appearance-none border-none bg-transparent pr-4 text-[13px] font-bold text-gray-800 outline-none"
+          >
+            <option value="ALL">All</option>
+            <option value="DRAFT">ON HOLD</option>
+            <option value="OPEN">OPEN</option>
+            <option value="CLOSED">CLOSED</option>
+            <option value="VOIDED">VOIDED</option>
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+        </div>
+
+        <div className="relative">
+          <div
+            onClick={() => setShowPayerDropdown(!showPayerDropdown)}
+            className="relative flex h-9 max-w-[220px] cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
+          >
+            <span className="mr-1 truncate text-[13px] text-gray-500">Sponsor/Student:</span>
+            <span className="truncate pr-5 text-[13px] font-bold text-gray-800">
+              {payerFilterMode === 'ALL' ? 'All' : payerFilterMode === 'CUSTOM' && payerSearchTerm ? `"${payerSearchTerm}"` : 'Custom...'}
+            </span>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+          </div>
+
+          {showPayerDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowPayerDropdown(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => { setSortConfig({ key: 'payor', direction: 'asc' }); setShowPayerDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronUp size={14} /> Sort Ascending
+                  </button>
+                  <button
+                    onClick={() => { setSortConfig({ key: 'payor', direction: 'desc' }); setShowPayerDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronDown size={14} /> Sort Descending
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                    className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
+                  >
+                    Remove Quick Filter
+                  </button>
+                  <button
+                    onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                    className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
+                    disabled
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => setPayerFilterMode('CUSTOM')}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${payerFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {payerFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Equal to
+                  </button>
+                </div>
+                <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
+                  <input
+                    type="text"
+                    placeholder="Type to search..."
+                    value={payerSearchTerm}
+                    onChange={(e) => {
+                      setPayerSearchTerm(e.target.value);
+                      if (payerFilterMode !== 'CUSTOM') setPayerFilterMode('CUSTOM');
+                    }}
+                    className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                  />
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setShowPayerDropdown(false)}
+                      className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-blue-700"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="relative">
+          <div
+            onClick={() => setShowDateDropdown(!showDateDropdown)}
+            className="relative flex h-9 cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
+          >
+            <span className="mr-1 text-[13px] text-gray-500">Date:</span>
+            <span className="max-w-[120px] truncate pr-5 text-[13px] font-bold text-gray-800">
+              {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+            </span>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+          </div>
+
+          {showDateDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => { setSortConfig({ key: 'date', direction: 'asc' }); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronUp size={14} /> Sort Ascending
+                  </button>
+                  <button
+                    onClick={() => { setSortConfig({ key: 'date', direction: 'desc' }); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronDown size={14} /> Sort Descending
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                    className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
+                  >
+                    Remove Quick Filter
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                    className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
+                    disabled
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => setDateFilterMode('CUSTOM')}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'TODAY' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'THIS_MONTH' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                  </button>
+                </div>
+                <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">From:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                      className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">To:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                      className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setShowDateDropdown(false)}
+                      className="rounded bg-gray-200 px-3 py-1 text-[11px] font-bold uppercase text-gray-600 transition-colors hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => setShowDateDropdown(false)}
+                      className="rounded bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase text-white shadow-sm transition-colors hover:bg-blue-700"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          onClick={clearRegistryFilters}
+          className="p-2 text-gray-400 transition-colors hover:text-orange-500"
+          title="Clear all filters"
+        >
+          <RotateCcw size={16} />
+        </button>
+
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setShowExportDropdown(!showExportDropdown)}
+            className="flex h-9 select-none items-center gap-1.5 rounded border border-gray-200 bg-white px-3 text-[13px] font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            title="Export"
+          >
+            <Download size={16} />
+            <span>Export</span>
+            <ChevronDown size={14} className="text-gray-400" />
+          </button>
+
+          {showExportDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
+              <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => {
+                      setShowExportDropdown(false);
+                      exportToExcel();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                  >
+                    <FileSpreadsheet size={16} className="text-emerald-600" />
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowExportDropdown(false);
+                      exportToPdf();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <FileText size={16} className="text-red-500" />
+                    Export as PDF
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleListTabChange = (nextTab: ListTab) => {
+    setListTab(nextTab);
+    setShowDateDropdown(false);
+    setShowPayerDropdown(false);
+    setShowExportDropdown(false);
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedColumnIdx(index);
@@ -1317,6 +1981,38 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setDraggedColumnIdx(null);
   };
 
+  const handleApplicationDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedApplicationColumnIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleApplicationDragEnd = (e: React.DragEvent) => {
+    setDraggedApplicationColumnIdx(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleApplicationDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleApplicationDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedApplicationColumnIdx === null || draggedApplicationColumnIdx === dropIndex) return;
+
+    const newOrder = [...applicationColumnOrder];
+    const [draggedKey] = newOrder.splice(draggedApplicationColumnIdx, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    setApplicationColumnOrder(newOrder);
+    setDraggedApplicationColumnIdx(null);
+  };
+
   // ===== VIEW: PAYMENT LIST (DASHBOARD) =====
   if (viewMode === 'list') {
     return (
@@ -1325,15 +2021,44 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
           </div>
+        </div>
+
+        <div className="inline-flex w-full max-w-fit rounded-xl border bg-white p-1 shadow-sm">
+          <button
+            onClick={() => handleListTabChange('payments')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              listTab === 'payments'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Wallet size={16} />
+            Payments
+          </button>
+          <button
+            onClick={() => handleListTabChange('applications')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              listTab === 'applications'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <CheckSquare size={16} />
+            Payment Applications
+          </button>
+        </div>
+
+        {listTab === 'payments' && (
+          <>
+        <div className="flex justify-end">
           <button
             onClick={startNewPayment}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white font-semibold transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
           >
             <Plus size={20} />
             New Payment
           </button>
         </div>
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="rounded-xl border bg-white p-4">
             <div className="flex items-center gap-3">
@@ -1371,292 +2096,20 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           <div className="rounded-xl border bg-white p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-orange-100 p-2">
-                <DollarSign size={20} className="text-orange-600" />
+                <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-400">Unapplied Payments</p>
-                <p className="text-lg font-semibold text-gray-800">{formatCurrency(paymentStats.unappliedPayments)}</p>
+                <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentStats.unappliedPayments)}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border-y px-4 py-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex h-9 w-64 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
-              <Search size={14} className="mr-2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search payments..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="flex-1 border-none bg-transparent text-[13px] font-medium text-gray-700 outline-none placeholder:font-normal placeholder:text-gray-300"
-              />
-            </div>
-
-            <div className="relative flex h-9 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
-              <span className="mr-1 text-[13px] text-gray-500">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
-                className="cursor-pointer appearance-none border-none bg-transparent pr-4 text-[13px] font-bold text-gray-800 outline-none"
-              >
-                <option value="ALL">All</option>
-                <option value="DRAFT">ON HOLD</option>
-                <option value="OPEN">OPEN</option>
-                <option value="CLOSED">CLOSED</option>
-                <option value="VOIDED">VOIDED</option>
-              </select>
-              <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
-            </div>
-
-            <div className="relative">
-              <div
-                onClick={() => setShowPayerDropdown(!showPayerDropdown)}
-                className="relative flex h-9 max-w-[220px] cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
-              >
-                <span className="mr-1 truncate text-[13px] text-gray-500">Sponsor/Student:</span>
-                <span className="truncate pr-5 text-[13px] font-bold text-gray-800">
-                  {payerFilterMode === 'ALL' ? 'All' : payerFilterMode === 'CUSTOM' && payerSearchTerm ? `"${payerSearchTerm}"` : 'Custom...'}
-                </span>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
-              </div>
-
-              {showPayerDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowPayerDropdown(false)} />
-                  <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
-                    <div className="p-1">
-                      <button
-                        onClick={() => { setSortConfig({ key: 'payor', direction: 'asc' }); setShowPayerDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
-                      >
-                        <ChevronUp size={14} /> Sort Ascending
-                      </button>
-                      <button
-                        onClick={() => { setSortConfig({ key: 'payor', direction: 'desc' }); setShowPayerDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
-                      >
-                        <ChevronDown size={14} /> Sort Descending
-                      </button>
-                    </div>
-                    <div className="border-t border-gray-100 p-1">
-                      <button
-                        onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
-                        className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
-                      >
-                        Remove Quick Filter
-                      </button>
-                      <button
-                        onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
-                        className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
-                        disabled
-                      >
-                        Clear Filter
-                      </button>
-                    </div>
-                    <div className="border-t border-gray-100 p-1">
-                      <button
-                        onClick={() => setPayerFilterMode('CUSTOM')}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${payerFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        {payerFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Equal to
-                      </button>
-                    </div>
-                    <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
-                      <input
-                        type="text"
-                        placeholder="Type to search..."
-                        value={payerSearchTerm}
-                        onChange={(e) => {
-                          setPayerSearchTerm(e.target.value);
-                          if (payerFilterMode !== 'CUSTOM') setPayerFilterMode('CUSTOM');
-                        }}
-                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
-                      />
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        <button
-                          onClick={() => setShowPayerDropdown(false)}
-                          className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-blue-700"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="relative">
-              <div
-                onClick={() => setShowDateDropdown(!showDateDropdown)}
-                className="relative flex h-9 cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
-              >
-                <span className="mr-1 text-[13px] text-gray-500">Date:</span>
-                <span className="max-w-[120px] truncate pr-5 text-[13px] font-bold text-gray-800">
-                  {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
-                </span>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
-              </div>
-
-              {showDateDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
-                  <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
-                    <div className="p-1">
-                      <button
-                        onClick={() => { setSortConfig({ key: 'date', direction: 'asc' }); setShowDateDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
-                      >
-                        <ChevronUp size={14} /> Sort Ascending
-                      </button>
-                      <button
-                        onClick={() => { setSortConfig({ key: 'date', direction: 'desc' }); setShowDateDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
-                      >
-                        <ChevronDown size={14} /> Sort Descending
-                      </button>
-                    </div>
-                    <div className="border-t border-gray-100 p-1">
-                      <button
-                        onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
-                        className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
-                      >
-                        Remove Quick Filter
-                      </button>
-                      <button
-                        onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
-                        className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
-                        disabled
-                      >
-                        Clear Filter
-                      </button>
-                    </div>
-                    <div className="border-t border-gray-100 p-1">
-                      <button
-                        onClick={() => setDateFilterMode('CUSTOM')}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
-                      </button>
-                      <button
-                        onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'TODAY' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
-                      </button>
-                      <button
-                        onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'THIS_MONTH' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
-                      >
-                        {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
-                      </button>
-                    </div>
-                    <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">From:</span>
-                        <input
-                          type="date"
-                          value={dateFrom}
-                          onChange={(e) => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
-                          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">To:</span>
-                        <input
-                          type="date"
-                          value={dateTo}
-                          onChange={(e) => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
-                          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
-                        />
-                      </div>
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        <button
-                          onClick={() => setShowDateDropdown(false)}
-                          className="rounded bg-gray-200 px-3 py-1 text-[11px] font-bold uppercase text-gray-600 transition-colors hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => setShowDateDropdown(false)}
-                          className="rounded bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase text-white shadow-sm transition-colors hover:bg-blue-700"
-                        >
-                          OK
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('ALL');
-                setDateFilterMode('ALL');
-                setDateFrom('');
-                setDateTo('');
-                setPayerFilterMode('ALL');
-                setPayerSearchTerm('');
-                setShowDateDropdown(false);
-                setShowPayerDropdown(false);
-                setShowExportDropdown(false);
-              }}
-              className="p-2 text-gray-400 transition-colors hover:text-orange-500"
-              title="Clear all filters"
-            >
-              <RotateCcw size={16} />
-            </button>
-
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setShowExportDropdown(!showExportDropdown)}
-                className="flex h-9 select-none items-center gap-1.5 rounded border border-gray-200 bg-white px-3 text-[13px] font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                title="Export"
-              >
-                <Download size={16} />
-                <span>Export</span>
-                <ChevronDown size={14} className="text-gray-400" />
-              </button>
-
-              {showExportDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
-                    <div className="p-1">
-                      <button
-                        onClick={() => {
-                          setShowExportDropdown(false);
-                          exportToExcel();
-                        }}
-                        className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
-                      >
-                        <FileSpreadsheet size={16} className="text-emerald-600" />
-                        Export as Excel
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowExportDropdown(false);
-                          exportToPdf();
-                        }}
-                        className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <FileText size={16} className="text-red-500" />
-                        Export as PDF
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        {renderRegistryToolbar('Search payments...')}
 
         <div className="overflow-x-auto rounded-xl border bg-white">
-            <table className="min-w-max w-full font-sans">
+            <table className="w-full font-sans">
               <thead className="border-b bg-emerald-600">
                 <tr>
                   {registryColumns.map((col, idx) => (
@@ -1668,7 +2121,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, idx)}
                       className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
-                      style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : { width: col.minWidth, minWidth: col.minWidth }}
+                      style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
                       title="Drag to reorder column"
                     >
                       <div
@@ -1713,7 +2166,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y">
                 {filteredPayments.length === 0 ? (
                   <tr>
                     <td colSpan={registryColumns.length} className="p-12 text-center text-gray-500">
@@ -1736,7 +2189,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         <td
                           key={col.key}
                           className={`px-4 py-3 ${col.align}`}
-                          style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : { width: col.minWidth, minWidth: col.minWidth }}
+                          style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
                         >
                           {col.render(payment)}
                         </td>
@@ -1747,6 +2200,206 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               </tbody>
             </table>
           </div>
+          </>
+        )}
+
+        {listTab === 'applications' && (
+          <>
+            <div className="flex justify-end">
+              <button
+                onClick={startNewPaymentApplication}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
+              >
+                <Plus size={20} />
+                New Pay Application
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-amber-100 p-2">
+                    <Clock size={20} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied</p>
+                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.unappliedCount}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-orange-100 p-2">
+                    <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied Balance</p>
+                    <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentApplicationStats.unappliedBalance)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-emerald-100 p-2">
+                    <CheckCircle size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Already Applied</p>
+                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.appliedCount}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-sky-100 p-2">
+                    <span className="block text-lg font-bold leading-none text-sky-600">₱</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Amount Applied</p>
+                    <p className="text-lg font-semibold text-gray-800">{formatCurrency(paymentApplicationStats.appliedAmount)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {renderRegistryToolbar('Search payment applications...')}
+
+            <div className="rounded-xl border bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Payment Application Lists</h3>
+                  <p className="text-sm text-gray-500">
+                    Track payments waiting for invoice application and payments that already have invoice applications.
+                  </p>
+                </div>
+
+                <div className="inline-flex rounded-lg border bg-gray-50 p-1">
+                  <button
+                    onClick={() => setApplicationListTab('unapplied')}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                      applicationListTab === 'unapplied'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    Not Yet Applied ({unappliedPaymentList.length})
+                  </button>
+                  <button
+                    onClick={() => setApplicationListTab('applied')}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                      applicationListTab === 'applied'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    Already Applied ({appliedPaymentList.length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-x-scroll rounded-xl border bg-white pb-2">
+                <table className="min-w-max w-full font-sans">
+                  <thead className="border-b bg-emerald-600">
+                    <tr>
+                      {orderedApplicationRegistryColumns.map((col, idx) => (
+                        <th
+                          key={col.key}
+                          draggable
+                          onDragStart={(e) => handleApplicationDragStart(e, idx)}
+                          onDragEnd={handleApplicationDragEnd}
+                          onDragOver={handleApplicationDragOver}
+                          onDrop={(e) => handleApplicationDrop(e, idx)}
+                          className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedApplicationColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
+                          style={applicationColumnWidths[col.key] ? { width: applicationColumnWidths[col.key], minWidth: applicationColumnWidths[col.key] } : undefined}
+                          title="Drag to reorder column"
+                        >
+                          <div
+                            className={`flex items-center text-[13px] font-bold text-white ${
+                              col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
+                            } ${col.sortKey ? 'cursor-pointer hover:text-gray-100' : ''}`}
+                            onClick={col.sortKey ? () => handleSort(col.sortKey) : undefined}
+                          >
+                            {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
+                          </div>
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const th = e.currentTarget.parentElement;
+                              if (!th) return;
+                              const startWidth = th.getBoundingClientRect().width;
+                              applicationResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                              const onMouseMove = (ev: MouseEvent) => {
+                                if (!applicationResizeRef.current) return;
+                                const diff = ev.clientX - applicationResizeRef.current.startX;
+                                const newWidth = Math.max(60, applicationResizeRef.current.startWidth + diff);
+                                setApplicationColumnWidths(prev => ({ ...prev, [applicationResizeRef.current!.colKey]: newWidth }));
+                              };
+                              const onMouseUp = () => {
+                                applicationResizeRef.current = null;
+                                document.removeEventListener('mousemove', onMouseMove);
+                                document.removeEventListener('mouseup', onMouseUp);
+                                document.body.style.cursor = '';
+                                document.body.style.userSelect = '';
+                              };
+                              document.addEventListener('mousemove', onMouseMove);
+                              document.addEventListener('mouseup', onMouseUp);
+                              document.body.style.cursor = 'col-resize';
+                              document.body.style.userSelect = 'none';
+                            }}
+                            className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize transition-colors hover:bg-emerald-400 z-10"
+                            title="Drag to resize column"
+                            draggable={false}
+                          />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredApplicationPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={orderedApplicationRegistryColumns.length} className="px-4 py-12 text-center text-gray-500">
+                          <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                          {currentApplicationPayments.length === 0
+                            ? (applicationListTab === 'unapplied'
+                              ? 'No payments waiting for application'
+                              : 'No applied payments found')
+                            : 'No payment applications match the current filters'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredApplicationPayments.map(payment => {
+                        return (
+                          <tr
+                            key={payment.id}
+                            className="cursor-pointer transition-colors hover:bg-gray-50"
+                            onClick={() => handlePaymentApplicationRowClick(payment)}
+                          >
+                            {orderedApplicationRegistryColumns.map(col => (
+                              <td
+                                key={col.key}
+                                className={`px-4 py-3 ${col.align}`}
+                                style={applicationColumnWidths[col.key] ? { width: applicationColumnWidths[col.key], minWidth: applicationColumnWidths[col.key] } : undefined}
+                              >
+                                {col.render(payment)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                {applicationListTab === 'unapplied'
+                  ? `Showing ${filteredApplicationPayments.length} payment(s) with no active invoice applications.`
+                  : `Showing ${filteredApplicationPayments.length} payment(s) with active invoice applications and ${formatCurrency(filteredApplicationRemainingBalance)} remaining unapplied balance.`}
+              </div>
+            </div>
+          </>
+        )}
 
         {showVoidModal && voidingPayment && (
           <ModalPortal>
@@ -1878,7 +2531,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft size={16} />
-            Back to Payments
+            Back to Payments and Applications
           </button>
         </div>
 
@@ -2250,7 +2903,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft size={16} />
-            Back to Payments
+            Back to Payments and Applications
           </button>
         </div>
 
@@ -2282,8 +2935,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <button
                 onClick={applySelectedInvoices}
                 disabled={plannedAppliedTotal <= 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed text-sm"
-                style={{ backgroundColor: brandColor }}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-700"
               >
                 <CheckCircle size={16} />
                 Apply Selected
@@ -2292,41 +2944,59 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </div>
 
           <div className="flex-1 overflow-auto p-6">
-            <div className="rounded-xl border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+            <div className="overflow-x-scroll rounded-xl border bg-white pb-2">
+              <table className="min-w-max w-full font-sans">
+                <thead className="border-b bg-emerald-600">
                   <tr>
-                    <th className="px-3 py-2 text-center">Apply</th>
-                    <th className="px-3 py-2 text-left">Invoice No</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-right">Amount Due</th>
-                    <th className="px-3 py-2 text-right">Apply Amount</th>
+                    <th className="px-4 py-3 text-center font-semibold text-white">
+                      <div className="flex items-center justify-center text-[13px] font-bold text-white">Apply</div>
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-white">
+                      <div className="flex items-center text-[13px] font-bold text-white">Invoice No</div>
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-white">
+                      <div className="flex items-center text-[13px] font-bold text-white">Date</div>
+                    </th>
+                    <th className="px-4 py-3 text-right font-semibold text-white">
+                      <div className="flex items-center justify-end text-[13px] font-bold text-white">Amount Due</div>
+                    </th>
+                    <th className="px-4 py-3 text-right font-semibold text-white">
+                      <div className="flex items-center justify-end text-[13px] font-bold text-white">Apply Amount</div>
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y">
                   {isFetchingOpenInvoices && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-gray-500">Fetching open invoices...</td>
+                      <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                        Fetching open invoices...
+                      </td>
                     </tr>
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No open invoices for this payor.</td>
+                      <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                        No open invoices for this payor.
+                      </td>
                     </tr>
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
-                    <tr key={inv.id} className="border-t">
-                      <td className="px-3 py-2 text-center">
+                    <tr key={inv.id} className="cursor-pointer transition-colors hover:bg-gray-50">
+                      <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
                           checked={!!invoiceSelectionMap[inv.id]}
                           onChange={e => handleInvoiceTick(inv, e.target.checked)}
                         />
                       </td>
-                      <td className="px-3 py-2 font-medium text-gray-800">{inv.invoiceNo}</td>
-                      <td className="px-3 py-2 text-gray-600">{inv.invoiceDate}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{formatCurrency(inv.balanceDue)}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-3 font-medium text-gray-800">{inv.invoiceNo}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatCurrency(inv.balanceDue)}</td>
+                      <td className="px-4 py-3 text-right">
                         <input
                           type="number"
                           min="0"
@@ -2338,7 +3008,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             const value = parseFloat(e.target.value) || 0;
                             setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
                           }}
-                          className="w-36 rounded-lg border px-2 py-1 text-right"
+                          className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-right text-sm font-medium text-gray-800 outline-none transition-colors focus:border-emerald-400"
                         />
                       </td>
                     </tr>

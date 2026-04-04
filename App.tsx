@@ -1129,15 +1129,10 @@ export default function App() {
     return `GL${String(next).padStart(8, '0')}`;
   };
 
-  // AR invoice approvals use the same GL format as payments, but keep a separate
-  // sequence so invoice posting does not consume the payment number series.
+  // AR invoices now share the same system-wide GL sequence as every other
+  // posted transaction so GL references reflect true posting order.
   const generateNextInvoiceGlRef = (): string => {
-    const key = getGlSequenceKey(currentOrgId);
-    const stateMax = getHighestInvoiceGlSequenceForOrg(journalEntries, currentOrgId);
-    const currentMax = invoiceGlSequenceRef.current[key] || 0;
-    const next = Math.max(currentMax, stateMax) + 1;
-    invoiceGlSequenceRef.current[key] = next;
-    return `GL${String(next).padStart(8, '0')}`;
+    return generateNextGlRef();
   };
 
   const resolveJournalRef = (entry?: Pick<JournalEntry, 'glEntryNumber' | 'reference'> | null): string =>
@@ -4248,14 +4243,14 @@ export default function App() {
         }
       }
 
-      const { sourceInvoiceId, ...paymentToSave } = paymentToCreate;
+      const paymentToSave = paymentToCreate;
       console.debug('[App] Payment object before save:', paymentToSave);
       const savedPayment = await dataService.createEntity('payments', paymentToSave);
       const persistedPayment = {
         ...paymentToSave,
-        ...(savedPayment as Payment),
+        ...(savedPayment as PaymentWithSource),
         crNo: (savedPayment as Payment)?.crNo ?? paymentToSave.crNo,
-        sourceInvoiceId
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? paymentToSave.sourceInvoiceId
       } as PaymentWithSource;
       setPayments(prev => [...prev, persistedPayment]);
 
@@ -4296,15 +4291,19 @@ export default function App() {
         }
       }
 
-      const updates: PaymentWithSource = { ...payment, orgId: currentOrgId, updatedAt: new Date().toISOString() };
-      const { sourceInvoiceId, ...paymentUpdates } = updates;
-      const savedPayment = await dataService.updateEntity('payments', payment.id, paymentUpdates);
+      const updates: PaymentWithSource = {
+        ...payment,
+        orgId: currentOrgId,
+        sourceInvoiceId: payment.sourceInvoiceId ?? (existing as PaymentWithSource).sourceInvoiceId,
+        updatedAt: new Date().toISOString()
+      };
+      const savedPayment = await dataService.updateEntity('payments', payment.id, updates);
       const persistedPayment = {
         ...existing,
-        ...paymentUpdates,
-        ...(savedPayment as Payment),
-        crNo: (savedPayment as Payment)?.crNo ?? paymentUpdates.crNo ?? existing.crNo,
-        sourceInvoiceId: sourceInvoiceId ?? (existing as PaymentWithSource).sourceInvoiceId
+        ...updates,
+        ...(savedPayment as PaymentWithSource),
+        crNo: (savedPayment as Payment)?.crNo ?? updates.crNo ?? existing.crNo,
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? updates.sourceInvoiceId
       } as PaymentWithSource;
       setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...persistedPayment } : p));
 
@@ -4345,12 +4344,13 @@ export default function App() {
       const paymentToApprove: PaymentWithSource = {
         ...payment,
         orgId: payment.orgId || currentOrgId,
+        sourceInvoiceId: payment.sourceInvoiceId,
         status: 'OPEN',
         postedAt: payment.postedAt || postingTs,
         postedBy: payment.postedBy || currentUser?.id || 'system',
         updatedAt: postingTs
       };
-      const { sourceInvoiceId, ...paymentToApproveRecord } = paymentToApprove;
+      const paymentToApproveRecord = paymentToApprove;
       const paymentRequiredFieldsError = validatePaymentRequiredFields(paymentToApproveRecord);
       if (paymentRequiredFieldsError) {
         handleNotify('error', paymentRequiredFieldsError);
@@ -4367,9 +4367,9 @@ export default function App() {
         const savedPayment = await dataService.updateEntity('payments', paymentToApprove.id, paymentToApproveRecord);
         const persistedPayment = {
           ...paymentToApproveRecord,
-          ...(savedPayment as Payment),
+          ...(savedPayment as PaymentWithSource),
           crNo: (savedPayment as Payment)?.crNo ?? paymentToApproveRecord.crNo,
-          sourceInvoiceId
+          sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? paymentToApproveRecord.sourceInvoiceId
         } as PaymentWithSource;
         if (existing) {
           setPayments(prev => prev.map(p => p.id === paymentToApprove.id ? { ...p, ...persistedPayment } : p));
@@ -4468,9 +4468,9 @@ export default function App() {
         : await dataService.createEntity('payments', finalizedPayment);
       const persistedPayment = {
         ...finalizedPayment,
-        ...(savedPayment as Payment),
+        ...(savedPayment as PaymentWithSource),
         crNo: (savedPayment as Payment)?.crNo ?? finalizedPayment.crNo,
-        sourceInvoiceId
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? finalizedPayment.sourceInvoiceId
       } as PaymentWithSource;
       if (existing) {
         setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...finalizedPayment, ...persistedPayment } : p));
@@ -5285,7 +5285,7 @@ export default function App() {
               <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
               <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
@@ -5327,7 +5327,7 @@ export default function App() {
               {userCanAccess('revenue-recognition') && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => navigateTo('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('customers') && <NavItem icon={<Users size={18} />} label="Learners & Customers" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('invoices') && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('enrollments') && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => navigateTo('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -5615,6 +5615,7 @@ export default function App() {
           {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
           {activeTab === 'invoices' && <InvoicesView
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}

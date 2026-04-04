@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser, Payment } from '../types';
 import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -16,6 +16,7 @@ import {
 
 interface InvoicesViewProps {
   invoices: Invoice[];
+  payments?: Payment[];
   sponsors: Sponsor[];
   students: Student[];
   users: AppUser[];
@@ -42,7 +43,7 @@ interface InvoicesViewProps {
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
-  invoices, sponsors, students, users, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
+  invoices, payments = [], sponsors, students, users, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
@@ -212,7 +213,37 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             : 'Transaction Description is required before saving or approving the invoice.'
       )
     : '';
-  const canPayInvoice = !!editingInvoice && editingInvoice.status === 'OPEN' && !isPaidInvoice(editingInvoice);
+  const getLinkedSavedPayment = (invoice?: Pick<Invoice, 'id'> | null) => {
+    if (!invoice?.id) return null;
+    return payments.find(payment =>
+      !payment.isDeleted &&
+      payment.status !== 'VOIDED' &&
+      payment.sourceInvoiceId === invoice.id
+    ) || null;
+  };
+
+  const hasActivePaymentApplication = (invoice?: Pick<Invoice, 'id'> | null) => {
+    if (!invoice?.id) return false;
+    return payments.some(payment =>
+      !payment.isDeleted &&
+      payment.status !== 'VOIDED' &&
+      (payment.applications || []).some(app => app.invoiceId === invoice.id && !app.isReversed)
+    );
+  };
+
+  const linkedSavedPayment = editingInvoice ? getLinkedSavedPayment(editingInvoice) : null;
+  const hasInvoiceApplication = editingInvoice ? hasActivePaymentApplication(editingInvoice) : false;
+  const canPayInvoice =
+    !!editingInvoice &&
+    editingInvoice.status === 'OPEN' &&
+    !isPaidInvoice(editingInvoice) &&
+    !linkedSavedPayment &&
+    !hasInvoiceApplication;
+  const payButtonTitle = linkedSavedPayment
+    ? `Payment ${linkedSavedPayment.paymentNo} is already saved for this invoice`
+    : hasInvoiceApplication
+      ? 'This invoice already has a payment application'
+      : 'Pay';
 
   // Generate next invoice number
   const generateInvoiceNo = () => {
@@ -1064,7 +1095,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     const ref = (value || '').trim();
     if (!ref) return '';
     const match = ref.match(/^GL(?:\s*No\.?)?[\s-]*(\d+)$/i);
-    if (!match) return ref;
+    if (!match) return '';
     return `GL${match[1].padStart(8, '0')}`;
   };
   const resolveInvoiceJournalTarget = (invoice: Invoice) => {
@@ -2134,7 +2165,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 sortKey: 'balance',
                 width: 'w-32',
                 align: 'text-right' as const,
-                render: (inv: any) => inv.balanceDue > 0 ? formatCurrency(inv.balanceDue) : 'PAID',
+                render: (inv: any) => formatCurrency(Number(inv.balanceDue ?? 0)),
               },
               {
                 key: 'createdBy',
@@ -2339,7 +2370,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </button>
               <div className="h-6 w-px bg-gray-200 mx-2" />
               <button
-                title="Pay"
+                title={payButtonTitle}
                 disabled={!canPayInvoice}
                 onClick={() => onNavigate?.('payments', { viewMode: 'create-payment', invoice: editingInvoice })}
                 className={`p-2 rounded-lg transition-colors font-black text-[10px] leading-none flex items-center justify-center ${canPayInvoice ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-300 cursor-not-allowed'}`}

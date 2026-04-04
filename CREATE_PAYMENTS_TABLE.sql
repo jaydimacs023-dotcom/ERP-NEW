@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS payments (
     bank_account_id UUID REFERENCES bank_accounts(id) ON DELETE SET NULL,
     check_number VARCHAR(50),
     check_date DATE,
+    source_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
     
     -- Amounts
     amount_received NUMERIC(15,2) NOT NULL DEFAULT 0,
@@ -95,6 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_payments_sponsor_id ON payments(sponsor_id);
 CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_payment_date ON payments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_payments_source_invoice_id ON payments(source_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_not_deleted ON payments(org_id) WHERE is_deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_payment_applications_payment_id ON payment_applications(payment_id);

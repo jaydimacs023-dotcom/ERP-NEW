@@ -741,7 +741,7 @@ export class SupabaseDataService implements IDataService {
       payments: [
         'id', 'org_id', 'payment_no', 'cr_no', 'sponsor_id', 'student_id',
         'payment_date', 'status', 'payment_method', 'ref_no', 'bank_account_id',
-        'check_number', 'check_date', 'amount_received', 'ewt_amount_certified',
+        'check_number', 'check_date', 'source_invoice_id', 'amount_received', 'ewt_amount_certified',
         'total_applied', 'customer_deposit_balance', 'journal_entry_id',
         'voided_at', 'voided_by', 'void_reason', 'posted_at', 'posted_by',
         'notes', 'created_at', 'created_by', 'updated_at', 'updated_by',
