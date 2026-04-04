@@ -66,37 +66,35 @@ const JournalForm: React.FC<JournalFormProps> = ({
 
   const DEFAULT_RECEIVABLE_CLASSIFICATION_CODE = '00000-00000';
 
-  const isReceivableAccount = (account?: ChartOfAccount | null): boolean => {
-    if (!account || account.class !== AccountClass.ASSET || account.isHeader) return false;
-    const code = String(account.code || '').trim();
-    const name = String(account.name || '').toLowerCase();
-    return code === '1200' || code === '11100' || code === '11110' || name.includes('accounts receivable') || name.includes('receivable');
-  };
-
-  const isPaymentDefaultClassAccount = (account?: ChartOfAccount | null): boolean => {
-    if (!account || account.isHeader) return false;
-    const code = String(account.code || '').trim();
-    const name = String(account.name || '').toLowerCase();
-    return (
-      code === '1000' ||
-      code === '1010' ||
-      code === '2000' ||
-      name.includes('undeposited funds') ||
-      name.includes('cash on hand') ||
-      (name.includes('cash') && name.includes('hand')) ||
-      name.includes('cash in bank') ||
-      (name.includes('cash') && name.includes('bank')) ||
-      (name.includes('customer') && name.includes('deposit')) ||
-      (name.includes('advance') && name.includes('customer')) ||
-      (name.includes('unearned') && name.includes('revenue'))
-    );
-  };
-
   const isDefaultClassificationAccount = (account?: ChartOfAccount | null): boolean =>
-    isReceivableAccount(account) || isPaymentDefaultClassAccount(account);
+    !!account && !account.isHeader && account.class !== AccountClass.REVENUE && account.class !== AccountClass.EXPENSE;
+
+  const resolveClassificationCodeForAccount = (line: Partial<JournalLine> & { qualificationId?: string }, account?: ChartOfAccount | null): string => {
+    if (!account) {
+      return String((line as any).classificationCode || '').trim();
+    }
+
+    if (isDefaultClassificationAccount(account)) {
+      return DEFAULT_RECEIVABLE_CLASSIFICATION_CODE;
+    }
+
+    if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
+      const selectedQualId = String((line as any).qualificationId || account.qualificationId || '').trim();
+      const selectedQualCode = getQualificationCodeById(selectedQualId);
+      if (selectedQualCode) return selectedQualCode;
+
+      const existingCode = String((line as any).classificationCode || '').trim();
+      if (existingCode && existingCode !== DEFAULT_RECEIVABLE_CLASSIFICATION_CODE) {
+        return existingCode;
+      }
+      return '';
+    }
+
+    return String((line as any).classificationCode || '').trim();
+  };
 
   const formatClassificationCode = (code: string, account?: ChartOfAccount | null): string => {
-    if (isDefaultClassificationAccount(account) && code === DEFAULT_RECEIVABLE_CLASSIFICATION_CODE) {
+    if (isDefaultClassificationAccount(account)) {
       return `${DEFAULT_RECEIVABLE_CLASSIFICATION_CODE} (Default)`;
     }
     return code;
@@ -191,27 +189,11 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
 
     const rows = lines.map((line, idx) => {
       const account = accounts.find(a => a.id === line.accountId);
-      const selectedQualId = (line as any).qualificationId || account?.qualificationId || '';
-      const selectedQual = qualifications.find(q => q.id === selectedQualId);
       const invoiceClassCode = (line as any).classificationCode?.trim() || '';
-      const fallbackClassCode = isDefaultClassificationAccount(account) ? DEFAULT_RECEIVABLE_CLASSIFICATION_CODE : '';
-      const qualCode = (() => {
-        if (account) {
-          if (isDefaultClassificationAccount(account)) {
-            return DEFAULT_RECEIVABLE_CLASSIFICATION_CODE;
-          }
-          if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
-            return selectedQual?.code || '';
-          }
-          return '0000-0000';
-        }
-        return '';
-      })();
-      const displayClassCode = sourceIsInvoice
-        ? (invoiceClassCode || fallbackClassCode)
-          ? formatClassificationCode(invoiceClassCode || fallbackClassCode, account)
-          : 'None'
-        : formatClassificationCode(invoiceClassCode || qualCode || fallbackClassCode || '0000-0000', account);
+      const resolvedClassCode = resolveClassificationCodeForAccount(line, account);
+      const displayClassCode = resolvedClassCode
+        ? formatClassificationCode(resolvedClassCode, account)
+        : (isDefaultClassificationAccount(account) ? `${DEFAULT_RECEIVABLE_CLASSIFICATION_CODE} (Default)` : 'None');
       return {
         '#': idx + 1,
         'Account No.': account?.code || '',
@@ -273,10 +255,22 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       if (l.id !== id) return l;
       
       const newLine = { ...l, ...updates };
+      const account = accounts.find(a => a.id === newLine.accountId);
       if (Object.prototype.hasOwnProperty.call(updates, 'qualificationId')) {
         const qualificationId = String((updates as any).qualificationId || '').trim();
         (newLine as any).qualificationId = qualificationId;
-        (newLine as any).classificationCode = getQualificationCodeById(qualificationId);
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'accountId')) {
+        if (isDefaultClassificationAccount(account)) {
+          (newLine as any).qualificationId = '';
+        }
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(updates, 'qualificationId') && !Object.prototype.hasOwnProperty.call(updates, 'accountId')) {
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
       }
 
       if (updates.itemId) {
@@ -328,8 +322,12 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       contactType: l.contactType,
       batchId: l.batchId,
       itemId: l.itemId,
-      qualificationId: (l as any).qualificationId,
-      classificationCode: (l as any).classificationCode
+      qualificationId: (() => {
+        const account = accounts.find(a => a.id === l.accountId);
+        if (isDefaultClassificationAccount(account)) return '';
+        return (l as any).qualificationId || account?.qualificationId || '';
+      })(),
+      classificationCode: resolveClassificationCodeForAccount(l, accounts.find(a => a.id === l.accountId))
     } as JournalLine & { qualificationId?: string; classificationCode?: string }));
 
     onSubmit({ ...entry, id: entryId, status, createdAt: entry.createdAt || new Date().toISOString() }, finalizedLines);
@@ -664,6 +662,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                             const defaultSelectClassCode = isDefaultClassificationAccount(account)
                               ? DEFAULT_RECEIVABLE_CLASSIFICATION_CODE
                               : '0000-0000';
+                            const isBalanceSheetAccount = isDefaultClassificationAccount(account);
                             if (line.accountId) {
                               const acc = accounts.find(a => a.id === line.accountId);
                               if (acc) {
@@ -719,7 +718,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               case 'class':
                                 return (
                                   <td key={colKey} className="px-3 py-2">
-                                    {isViewMode ? (
+                                    {isViewMode || isBalanceSheetAccount ? (
                                       <span className="inline-flex min-h-[28px] w-full items-center rounded bg-gray-50 px-2 py-1 text-[13px] font-normal text-gray-700">
                                         {displayClassCode}
                                       </span>

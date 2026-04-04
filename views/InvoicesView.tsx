@@ -164,9 +164,55 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   });
 
   const brandColor = '#F47721';
+  const isPaidInvoice = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
+    !!invoice && (invoice.status === 'CLOSED' || Number(invoice.balanceDue ?? 0) <= 0);
+  const resolvedViewingInvoice = React.useMemo(
+    () => (viewingInvoice ? invoices.find(i => i.id === viewingInvoice.id) || viewingInvoice : null),
+    [viewingInvoice, invoices]
+  );
+  const resolvedPrintingInvoice = React.useMemo(
+    () => (printingInvoice ? invoices.find(i => i.id === printingInvoice.id) || printingInvoice : null),
+    [printingInvoice, invoices]
+  );
 
-  // Check if form should be read-only (invoice is approved and locked)
-  const isReadOnly = editingInvoice?.status === 'OPEN';
+  const isInvoicePosted = (invoice?: Pick<Invoice, 'status' | 'journalEntryId' | 'postedAt' | 'glEntryNumber'> | null) =>
+    !!invoice && (
+      invoice.status === 'OPEN' ||
+      !!invoice.journalEntryId ||
+      !!invoice.postedAt ||
+      !!String(invoice.glEntryNumber || '').trim()
+    );
+
+  // Check if form should be read-only (posted invoices are locked)
+  const isReadOnly = isInvoicePosted(editingInvoice);
+  const isMissingInvoiceTaxCategory = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    return !normalized || normalized.toLowerCase() === 'none';
+  };
+
+  const validateInvoiceRequiredFields = (invoiceDraft: Pick<Invoice, 'notes' | 'lines'> | null | undefined) => {
+    const missingFields: string[] = [];
+    if (!String(invoiceDraft?.notes || '').trim()) {
+      missingFields.push('Transaction Description');
+    }
+    if ((invoiceDraft?.lines || []).some(line => isMissingInvoiceTaxCategory(line.taxCategoryId))) {
+      missingFields.push('Tax Category');
+    }
+    return missingFields;
+  };
+
+  const invoiceRequiredFieldIssues = validateInvoiceRequiredFields(formData);
+  const canSubmitInvoice = invoiceRequiredFieldIssues.length === 0;
+  const invoiceRequiredFieldMessage = invoiceRequiredFieldIssues.length > 0
+    ? (
+        invoiceRequiredFieldIssues.length === 2
+          ? 'Transaction Description and Tax Category for every line item are required before saving or approving the invoice.'
+          : invoiceRequiredFieldIssues[0] === 'Tax Category'
+            ? 'Tax Category must be selected for every line item before saving or approving the invoice.'
+            : 'Transaction Description is required before saving or approving the invoice.'
+      )
+    : '';
+  const canPayInvoice = !!editingInvoice && editingInvoice.status === 'OPEN' && !isPaidInvoice(editingInvoice);
 
   // Generate next invoice number
   const generateInvoiceNo = () => {
@@ -674,12 +720,25 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // Save invoice
   const handleSave = () => {
+    if (isReadOnly) {
+      alert('This invoice is already posted and can no longer be saved as draft.');
+      return;
+    }
+    const requiredFieldIssues = validateInvoiceRequiredFields(formData);
+    if (requiredFieldIssues.length > 0) {
+      alert(invoiceRequiredFieldMessage || 'Required invoice fields are missing.');
+      return;
+    }
     if (!formData.sponsorId && !formData.studentId) {
       alert('Please select a sponsor or student.');
       return;
     }
     if (formData.lines.length === 0) {
       alert('Please add at least one line item.');
+      return;
+    }
+    if (!String(formData.notes || '').trim()) {
+      alert('Transaction description is required before saving the invoice.');
       return;
     }
 
@@ -707,7 +766,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
-      notes: formData.notes || undefined,
+      notes: String(formData.notes || '').trim() || undefined,
       lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
       createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
@@ -726,12 +785,25 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // Approve invoice
   const handleApprove = () => {
+    if (isReadOnly) {
+      alert('This invoice is already posted and can no longer be approved.');
+      return;
+    }
+    const requiredFieldIssues = validateInvoiceRequiredFields(formData);
+    if (requiredFieldIssues.length > 0) {
+      alert(invoiceRequiredFieldMessage || 'Required invoice fields are missing.');
+      return;
+    }
     if (!formData.sponsorId && !formData.studentId) {
       alert('Please select a sponsor or student.');
       return;
     }
     if (formData.lines.length === 0) {
       alert('Please add at least one line item.');
+      return;
+    }
+    if (!String(formData.notes || '').trim()) {
+      alert('Transaction description is required before approving the invoice.');
       return;
     }
 
@@ -759,7 +831,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
-      notes: formData.notes || undefined,
+      notes: String(formData.notes || '').trim() || undefined,
       lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
       createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
@@ -1217,7 +1289,23 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     <style>
       @page { size: A4; margin: 16mm; }
       body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
-      .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; }
+      .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; overflow: hidden; }
+      .content { position: relative; z-index: 1; }
+      .watermark {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotate(-20deg);
+        font-size: 78px;
+        font-weight: 900;
+        color: rgba(16, 185, 129, 0.16);
+        letter-spacing: 0.2em;
+        pointer-events: none;
+        user-select: none;
+        z-index: 0;
+      }
       .muted { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }
       .band { background:#d8ebf6; font-weight:700; }
@@ -1228,6 +1316,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   </head>
   <body>
     <div class="page">
+      ${isPaidInvoice(invoice) ? '<div class="watermark">PAID</div>' : ''}
+      <div class="content">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Tenant logo" style="max-width:300px;max-height:90px;object-fit:contain;" />` : `<div style="font-size:28px;font-weight:800;">${escapeHtml(orgName)}</div>`}
@@ -1311,6 +1401,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       </div>
 
       ${invoice.notes ? `<div style="margin-top:20px;"><div class="muted">Notes</div><div>${escapeHtml(invoice.notes)}</div></div>` : ''}
+      </div>
     </div>
   </body>
 </html>`;
@@ -2212,19 +2303,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               >
                 <RotateCcw size={20} />
               </button>
-              {editingInvoice?.status !== 'OPEN' && (
+              {!isReadOnly && (
                 <>
                   <button
                     title="Save as Draft"
                     onClick={handleSave}
-                    className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                    disabled={!canSubmitInvoice}
+                    className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save size={20} />
                   </button>
                   <button
                     title="Approve"
                     onClick={handleApprove}
-                    className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                    disabled={!canSubmitInvoice}
+                    className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle size={20} />
                   </button>
@@ -2247,9 +2340,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               <div className="h-6 w-px bg-gray-200 mx-2" />
               <button
                 title="Pay"
-                disabled={editingInvoice?.status !== 'OPEN'}
+                disabled={!canPayInvoice}
                 onClick={() => onNavigate?.('payments', { viewMode: 'create-payment', invoice: editingInvoice })}
-                className={`p-2 rounded-lg transition-colors font-black text-[10px] leading-none flex items-center justify-center ${editingInvoice?.status === 'OPEN' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-300 cursor-not-allowed'}`}
+                className={`p-2 rounded-lg transition-colors font-black text-[10px] leading-none flex items-center justify-center ${canPayInvoice ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-300 cursor-not-allowed'}`}
                 style={{ width: '36px', height: '36px' }}
               >
                 PAY
@@ -2290,6 +2383,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {!isReadOnly && invoiceRequiredFieldMessage && (
+              <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {invoiceRequiredFieldMessage}
+              </div>
+            )}
 
             <div className="flex-1 p-6 space-y-8">
               {/* Batch / Sponsor / Dates row */}
@@ -2551,7 +2650,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                             classificationCode: { key: 'classificationCode', label: 'Class', align: 'text-left', width: 120 },
                             courseFeeId: { key: 'courseFeeId', label: 'Course Fee', align: 'text-left', width: 120 },
                             description: { key: 'description', label: 'Description', align: 'text-left', width: 180 },
-                            taxCategoryId: { key: 'taxCategoryId', label: 'Tax Category', align: 'text-right', width: 120 },
+                            taxCategoryId: { key: 'taxCategoryId', label: 'Tax Category *', align: 'text-right', width: 120 },
                             quantity: { key: 'quantity', label: 'Qty', align: 'text-right', width: 80 },
                             unitPrice: { key: 'unitPrice', label: 'Unit Price (₱)', align: 'text-right', width: 110 },
                             amount: { key: 'amount', label: 'Amount (₱)', align: 'text-right', width: 110 },
@@ -2833,12 +2932,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
       {/* View Invoice Modal */}
 
       {
-        showViewModal && viewingInvoice && (
+        showViewModal && resolvedViewingInvoice && (
           <ModalPortal>
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
                 {/* PAID Watermark Overlay */}
-                {viewingInvoice.balanceDue === 0 && (
+                {isPaidInvoice(resolvedViewingInvoice) && (
                   <div
                     style={{
                       position: 'absolute',
@@ -2861,19 +2960,19 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                 )}
                 <div className="flex items-center justify-between p-4 border-b">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-800">Invoice {viewingInvoice.invoiceNo}</h3>
-                    <p className="text-sm text-gray-500">{viewingInvoice.invoiceDate}</p>
+                    <h3 className="text-lg font-bold text-gray-800">Invoice {resolvedViewingInvoice.invoiceNo}</h3>
+                    <p className="text-sm text-gray-500">{resolvedViewingInvoice.invoiceDate}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handlePrintPreview(viewingInvoice)}
+                      onClick={() => handlePrintPreview(resolvedViewingInvoice)}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
                       title="Open A4 Print View"
                     >
                       <Printer size={15} />
                       Print A4
                     </button>
-                    {getStatusBadge(viewingInvoice.status)}
+                    {getStatusBadge(resolvedViewingInvoice.status)}
                     <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-200 rounded">
                       <X size={20} />
                     </button>
@@ -2885,17 +2984,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <div>
                       <p className="text-xs font-medium text-gray-500 mb-1">Bill To</p>
                       <p className="font-medium text-gray-800">
-                        {viewingInvoice.sponsorId ? getSponsorName(viewingInvoice.sponsorId) : getStudentName(viewingInvoice.studentId)}
+                        {resolvedViewingInvoice.sponsorId ? getSponsorName(resolvedViewingInvoice.sponsorId) : getStudentName(resolvedViewingInvoice.studentId)}
                       </p>
-                      {viewingInvoice.batchId && (
-                        <p className="text-sm text-gray-500">Batch: {getBatchCode(viewingInvoice.batchId)}</p>
+                      {resolvedViewingInvoice.batchId && (
+                        <p className="text-sm text-gray-500">Batch: {getBatchCode(resolvedViewingInvoice.batchId)}</p>
                       )}
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-medium text-gray-500 mb-1">Due Date</p>
-                      <p className="font-medium text-gray-800">{viewingInvoice.dueDate}</p>
-                      {viewingInvoice.terms && (
-                        <p className="text-sm text-gray-500">Terms: {viewingInvoice.terms}</p>
+                      <p className="font-medium text-gray-800">{resolvedViewingInvoice.dueDate}</p>
+                      {resolvedViewingInvoice.terms && (
+                        <p className="text-sm text-gray-500">Terms: {resolvedViewingInvoice.terms}</p>
                       )}
                     </div>
                   </div>
@@ -2913,7 +3012,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {viewingInvoice.lines?.map((line, idx) => (
+                        {resolvedViewingInvoice.lines?.map((line, idx) => (
                           <tr key={idx} className="border-t">
                             <td className="px-4 py-2 text-xs text-gray-500">{line.classificationCode || 'None'}</td>
                             <td className="px-4 py-2">{line.description}</td>
@@ -2931,48 +3030,48 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <div className="w-72 space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-500">Subtotal:</span>
-                        <span className="font-medium">{formatCurrency(viewingInvoice.subtotal)}</span>
+                        <span className="font-medium">{formatCurrency(resolvedViewingInvoice.subtotal)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">VAT:</span>
-                        <span>{formatCurrency(viewingInvoice.vatAmount)}</span>
+                        <span>{formatCurrency(resolvedViewingInvoice.vatAmount)}</span>
                       </div>
                       <div className="flex justify-between border-t pt-2">
                         <span className="font-medium">Grand Total:</span>
-                        <span className="font-bold">{formatCurrency(viewingInvoice.grandTotal)}</span>
+                        <span className="font-bold">{formatCurrency(resolvedViewingInvoice.grandTotal)}</span>
                       </div>
-                      {viewingInvoice.isSubjectToEwt && (
+                      {resolvedViewingInvoice.isSubjectToEwt && (
                         <div className="flex justify-between text-purple-600">
-                          <span>Less: EWT ({((viewingInvoice.ewtRate || 0) * 100).toFixed(0)}%):</span>
-                          <span>({formatCurrency(viewingInvoice.totalEwtAmount)})</span>
+                          <span>Less: EWT ({((resolvedViewingInvoice.ewtRate || 0) * 100).toFixed(0)}%):</span>
+                          <span>({formatCurrency(resolvedViewingInvoice.totalEwtAmount)})</span>
                         </div>
                       )}
                       <div className="flex justify-between border-t pt-2" style={{ color: brandColor }}>
                         <span className="font-bold">Net Amount Due:</span>
-                        <span className="font-bold">{formatCurrency(viewingInvoice.netAmountDue)}</span>
+                        <span className="font-bold">{formatCurrency(resolvedViewingInvoice.netAmountDue)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Less: Payments:</span>
-                        <span className="text-green-600">({formatCurrency(viewingInvoice.amountPaid)})</span>
+                        <span className="text-green-600">({formatCurrency(resolvedViewingInvoice.amountPaid)})</span>
                       </div>
                       <div className="flex justify-between border-t pt-2 text-lg">
                         <span className="font-bold">Balance Due:</span>
-                        <span className="font-bold" style={{ color: viewingInvoice.balanceDue > 0 ? brandColor : '#10B981' }}>
-                          {formatCurrency(viewingInvoice.balanceDue)}
+                        <span className="font-bold" style={{ color: resolvedViewingInvoice.balanceDue > 0 ? brandColor : '#10B981' }}>
+                          {formatCurrency(resolvedViewingInvoice.balanceDue)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {viewingInvoice.notes && (
+                  {resolvedViewingInvoice.notes && (
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
-                      <p className="text-sm text-gray-700">{viewingInvoice.notes}</p>
+                      <p className="text-sm text-gray-700">{resolvedViewingInvoice.notes}</p>
                     </div>
                   )}
 
                   {/* Annex: Student Breakdown for Sponsor/Batch Invoices */}
-                  {viewingInvoice.sponsorId && viewingInvoice.batchId && batchStudents?.length > 0 && (
+                  {resolvedViewingInvoice.sponsorId && resolvedViewingInvoice.batchId && batchStudents?.length > 0 && (
                     <div className="mt-10 print:break-before-page">
                       <h4 className="text-lg font-bold text-gray-800 mb-2">Annex: Student Breakdown</h4>
                       <div className="border rounded-lg overflow-hidden">
@@ -3002,18 +3101,18 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
           </ModalPortal>
         )}
-      {showPrintModal && printingInvoice && (
+      {showPrintModal && resolvedPrintingInvoice && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between p-4 border-b">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800">Invoice Preview</h3>
-                  <p className="text-sm text-gray-500">{printingInvoice.invoiceNo}</p>
+                  <p className="text-sm text-gray-500">{resolvedPrintingInvoice.invoiceNo}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePrintA4(printingInvoice)}
+                    onClick={() => handlePrintA4(resolvedPrintingInvoice)}
                     className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     <Printer size={15} />
@@ -3026,7 +3125,24 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
               </div>
 
               <div className="flex-1 overflow-auto bg-gray-200 p-6">
-                <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800">
+                <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800 relative overflow-hidden">
+                  {isPaidInvoice(resolvedPrintingInvoice) && (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+                      style={{
+                        transform: 'rotate(-20deg)',
+                        zIndex: 0,
+                        color: 'rgba(16, 185, 129, 0.16)',
+                        fontSize: 'calc(5rem * var(--app-font-scale))',
+                        fontWeight: 900,
+                        letterSpacing: '0.2em',
+                        textShadow: '2px 2px 8px #fff'
+                      }}
+                    >
+                      PAID
+                    </div>
+                  )}
+                  <div className="relative" style={{ zIndex: 1 }}>
                   <div className="flex justify-between items-start">
                     <div>
                       {organization?.logoUrl ? (
@@ -3040,9 +3156,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     <div className="min-w-[300px]">
                       <h2 className="text-5xl font-bold leading-none mb-2">Invoice</h2>
                       <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
-                        <p className="font-semibold">Reference No.:</p><p className="text-right">{printingInvoice.invoiceNo}</p>
-                        <p className="font-semibold">Date:</p><p className="text-right">{printingInvoice.invoiceDate}</p>
-                        <p className="font-semibold">Due Date:</p><p className="text-right">{printingInvoice.dueDate}</p>
+                        <p className="font-semibold">Reference No.:</p><p className="text-right">{resolvedPrintingInvoice.invoiceNo}</p>
+                        <p className="font-semibold">Date:</p><p className="text-right">{resolvedPrintingInvoice.invoiceDate}</p>
+                        <p className="font-semibold">Due Date:</p><p className="text-right">{resolvedPrintingInvoice.dueDate}</p>
                       </div>
                     </div>
                   </div>
@@ -3054,20 +3170,20 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                     </div>
                     <div className="grid grid-cols-2 text-[13px]">
                       <div className="px-2 py-2 whitespace-pre-line">
-                        {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
-                        {printingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                        {resolvedPrintingInvoice.sponsorId ? getSponsorName(resolvedPrintingInvoice.sponsorId) : getStudentName(resolvedPrintingInvoice.studentId)}{'\n'}
+                        {resolvedPrintingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.address || '-')
                           : (() => {
-                            const s = students.find(st => st.id === printingInvoice.studentId);
+                            const s = students.find(st => st.id === resolvedPrintingInvoice.studentId);
                             return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
                           })()}
                       </div>
                       <div className="px-2 py-2 whitespace-pre-line">
-                        {printingInvoice.sponsorId ? getSponsorName(printingInvoice.sponsorId) : getStudentName(printingInvoice.studentId)}{'\n'}
-                        {printingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.address || '-')
+                        {resolvedPrintingInvoice.sponsorId ? getSponsorName(resolvedPrintingInvoice.sponsorId) : getStudentName(resolvedPrintingInvoice.studentId)}{'\n'}
+                        {resolvedPrintingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.address || '-')
                           : (() => {
-                            const s = students.find(st => st.id === printingInvoice.studentId);
+                            const s = students.find(st => st.id === resolvedPrintingInvoice.studentId);
                             return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
                           })()}
                       </div>
@@ -3081,12 +3197,12 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <div className="px-2 py-1">CONTACT</div>
                     </div>
                     <div className="grid grid-cols-3 text-[13px]">
-                      <div className="px-2 py-1">{getInvoiceGlRef(printingInvoice)}</div>
-                      <div className="px-2 py-1">{printingInvoice.terms || '-'}</div>
+                      <div className="px-2 py-1">{getInvoiceGlRef(resolvedPrintingInvoice)}</div>
+                      <div className="px-2 py-1">{resolvedPrintingInvoice.terms || '-'}</div>
                       <div className="px-2 py-1">
-                        {printingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === printingInvoice.sponsorId)?.contactPerson || '-')
-                          : (students.find(s => s.id === printingInvoice.studentId)?.contactNumber || '-')}
+                        {resolvedPrintingInvoice.sponsorId
+                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.contactPerson || '-')
+                          : (students.find(s => s.id === resolvedPrintingInvoice.studentId)?.contactNumber || '-')}
                       </div>
                     </div>
                   </div>
@@ -3105,7 +3221,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {(printingInvoice.lines || []).map((line, idx) => (
+                        {(resolvedPrintingInvoice.lines || []).map((line, idx) => (
                           <tr key={line.id || idx} className="border-t border-gray-100">
                             <td className="px-3 py-2">{idx + 1}</td>
                             <td className="px-3 py-2">{line.description}</td>
@@ -3122,21 +3238,22 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
                   <div className="mt-6 flex justify-end">
                     <div className="w-[320px] space-y-1">
-                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(printingInvoice.subtotal || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(printingInvoice.vatAmount || 0)}</span></div>
-                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(printingInvoice.grandTotal || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(printingInvoice.netAmountDue || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(printingInvoice.amountPaid || 0)}</span></div>
-                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(printingInvoice.balanceDue || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.subtotal || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.vatAmount || 0)}</span></div>
+                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(resolvedPrintingInvoice.grandTotal || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(resolvedPrintingInvoice.netAmountDue || 0)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.amountPaid || 0)}</span></div>
+                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(resolvedPrintingInvoice.balanceDue || 0)}</span></div>
                     </div>
                   </div>
 
-                  {printingInvoice.notes && (
+                  {resolvedPrintingInvoice.notes && (
                     <div className="mt-8">
                       <p className="text-gray-500 uppercase text-[11px] tracking-wide">Notes</p>
-                      <p className="mt-1">{printingInvoice.notes}</p>
+                      <p className="mt-1">{resolvedPrintingInvoice.notes}</p>
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             </div>

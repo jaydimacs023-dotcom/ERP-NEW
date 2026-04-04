@@ -771,6 +771,7 @@ export interface Payment extends BaseEntity {
   bankAccountId?: string;       // FK to BankAccount (where deposited)
   checkNumber?: string;         // Check number if payment by check
   checkDate?: string;           // Check date
+  sourceInvoiceId?: string;     // Optional invoice source when payment is created from AR pay flow
 
   // Amounts
   amountReceived: number;       // Total amount received from payer

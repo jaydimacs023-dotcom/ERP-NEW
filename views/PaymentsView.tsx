@@ -97,6 +97,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [payorType, setPayorType] = useState<PayorType>('SPONSOR');
+  const [sourceInvoiceId, setSourceInvoiceId] = useState<string | undefined>(undefined);
   
   // List filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -342,6 +343,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Initialize form for new payment
   const startNewPayment = () => {
     setEditingPayment(null);
+    setSourceInvoiceId(undefined);
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setPayorType('SPONSOR');
@@ -351,6 +353,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const discardPaymentChanges = () => {
     setEditingPayment(null);
+    setSourceInvoiceId(undefined);
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setPayorType('SPONSOR');
@@ -366,6 +369,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
     
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
@@ -390,6 +394,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Load payment for viewing in the payment interface (for all statuses)
   const loadPaymentForViewing = (payment: Payment) => {
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
@@ -419,6 +424,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Load payment for applying
   const loadPaymentForApplication = (payment: Payment) => {
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
@@ -574,6 +580,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       alert('Approve the payment before applying invoices.');
       return;
     }
+    if ((editingPayment.customerDepositBalance ?? 0) <= 0.01) {
+      alert('This payment has already been fully applied.');
+      return;
+    }
     setViewMode('apply-payment');
   };
 
@@ -638,6 +648,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (initialContext && initialContext.viewMode === 'create-payment' && initialContext.invoice) {
       const inv = initialContext.invoice;
       setEditingPayment(null);
+      setSourceInvoiceId(inv.id);
       setInvoiceApplyMap({});
       setInvoiceSelectionMap({});
       setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
@@ -709,19 +720,26 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (!formData.paymentDate) return 'Payment date is required.';
     if (!formData.bankAccountId) return 'Cash account is required.';
     if (!formData.sponsorId && !formData.studentId) return 'Select a sponsor or student.';
+    if (!String(formData.notes || '').trim()) return 'Transaction Description is required.';
+    if (!String(formData.crNo || '').trim()) return 'C.R. No. is required.';
     if (baseTotalCredit <= 0) return 'Amount received or EWT must be greater than zero.';
     return '';
   };
 
+  const headerValidationError = validateHeader();
+
   const buildPayment = (status: PaymentStatus) => {
     const paymentId = editingPayment?.id || generateUUID();
     const currentApplications = editingPayment?.applications || [];
+    const trimmedCrNo = String(formData.crNo || '').trim();
+    const trimmedNotes = String(formData.notes || '').trim();
 
     const payment: Partial<Payment> = {
       id: paymentId,
       orgId: currentOrgId,  // Always include org_id for complete data separation
       paymentNo: formData.paymentNo,
-      crNo: formData.crNo || undefined,
+      crNo: trimmedCrNo || undefined,
+      sourceInvoiceId: sourceInvoiceId || undefined,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       paymentDate: formData.paymentDate,
@@ -736,7 +754,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       totalApplied: existingApplied,
       customerDepositBalance: baseTotalCredit - existingApplied,
       applications: currentApplications,
-      notes: formData.notes || undefined,
+      notes: trimmedNotes || undefined,
       createdAt: editingPayment?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       postedAt: status === 'OPEN' ? (editingPayment?.postedAt || new Date().toISOString()) : editingPayment?.postedAt
@@ -1887,16 +1905,18 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             {!isReadOnly && (
               <>
                 <button
-                  title="Save as Draft"
+                  title={headerValidationError || 'Save as Draft'}
                   onClick={handleSaveDraft}
-                  className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  disabled={!!headerValidationError}
+                  className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Save size={20} />
                 </button>
                 <button
-                  title="Approve"
+                  title={headerValidationError || 'Approve'}
                   onClick={handleSavePayment}
-                  className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                  disabled={!!headerValidationError}
+                  className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <CheckCircle size={20} />
                 </button>
@@ -1912,7 +1932,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <button
               title="Apply"
               onClick={handleOpenApplyPayment}
-              disabled={!editingPayment || (editingPayment.status !== 'OPEN' && editingPayment.status !== 'POSTED')}
+              disabled={!editingPayment || (editingPayment.status !== 'OPEN' && editingPayment.status !== 'POSTED') || (editingPayment.customerDepositBalance ?? 0) <= 0.01}
               className="px-3 py-2 text-sm font-bold uppercase tracking-wide text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               APPLY
@@ -1991,7 +2011,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
                   <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
                     <div>
-                      <label className={invoiceLabelClass}>C.R. No.</label>
+                      <label className={invoiceLabelClass}>C.R. No. *</label>
                       <input
                         value={formData.crNo}
                         onChange={e => setFormData(prev => ({ ...prev, crNo: e.target.value }))}
