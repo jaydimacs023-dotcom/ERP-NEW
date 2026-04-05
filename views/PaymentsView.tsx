@@ -44,6 +44,7 @@ interface PaymentsViewProps {
   invoices: Invoice[];
   bankAccounts: BankAccount[];
   accounts: ChartOfAccount[];
+  journalEntries: JournalEntry[];
   currency: string;
   onAddPayment: (payment: Payment) => void;
   onUpdatePayment: (payment: Payment) => void;
@@ -81,6 +82,14 @@ type ApplicationRegistryColumn = {
   render: (payment: Payment) => React.ReactNode;
 };
 
+type ApplyPaymentColumn = {
+  key: string;
+  label: string;
+  align: 'text-left' | 'text-center' | 'text-right';
+  minWidth: number;
+  render: (inv: Invoice, invoiceSelectionMap: Record<string, boolean>, invoiceApplyMap: Record<string, number>, transactionDescriptions: Record<string, string>, setTransactionDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>, handleInvoiceTick: (inv: Invoice, checked: boolean) => void) => React.ReactNode;
+};
+
 const PaymentsView: React.FC<PaymentsViewProps> = ({
   currentOrgId,
   organization,
@@ -91,6 +100,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   invoices,
   bankAccounts,
   accounts,
+  journalEntries,
   currency,
   onAddPayment,
   onUpdatePayment,
@@ -130,6 +140,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Application state
   const [invoiceApplyMap, setInvoiceApplyMap] = useState<Record<string, number>>({});
   const [invoiceSelectionMap, setInvoiceSelectionMap] = useState<Record<string, boolean>>({});
+  const [transactionDescriptions, setTransactionDescriptions] = useState<Record<string, string>>({});
   const [openInvoicesForPayor, setOpenInvoicesForPayor] = useState<Invoice[]>([]);
   const [isFetchingOpenInvoices, setIsFetchingOpenInvoices] = useState(false);
   
@@ -147,7 +158,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
   const [applicationColumnOrder, setApplicationColumnOrder] = useState<string[]>([
-    'date', 'postPeriod', 'paymentApplicationNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications', 'action'
+    'date', 'postPeriod', 'paymentApplicationNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications'
   ]);
   const [draggedApplicationColumnIdx, setDraggedApplicationColumnIdx] = useState<number | null>(null);
 
@@ -156,6 +167,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
   const [applicationColumnWidths, setApplicationColumnWidths] = useState<Record<string, number>>({});
   const applicationResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  // Drag-and-drop column ordering state (apply payment table)
+  const [applyPaymentColumnOrder, setApplyPaymentColumnOrder] = useState<string[]>([
+    'apply', 'invoiceNo', 'date', 'postPeriod', 'transactionDescription', 'amountDue', 'applyAmount'
+  ]);
+  const [draggedApplyPaymentColumnIdx, setDraggedApplyPaymentColumnIdx] = useState<number | null>(null);
+
+  // Column resize state (apply payment table)
+  const [applyPaymentColumnWidths, setApplyPaymentColumnWidths] = useState<Record<string, number>>({});
+  const applyPaymentResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -353,7 +374,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const getPaymentApplicationGlReferenceLabel = (payment: Payment) => {
     const applications = getPaymentApplicationRecords(payment);
     if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending';
-    return applications.map(application => application.glReference || 'Pending').join(', ');
+    return applications.map(application => {
+      if (application.glReference) return application.glReference;
+      // Fallback: look up GL reference from journal entry
+      if (application.journalEntryId) {
+        const journalEntry = journalEntries.find(je => je.id === application.journalEntryId);
+        if (journalEntry?.glEntryNumber) return journalEntry.glEntryNumber;
+      }
+      return 'Pending';
+    }).join(', ');
   };
 
   const isInvoiceSettled = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
@@ -628,6 +657,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
+    setTransactionDescriptions({});
     setFormData({
       paymentNo: payment.paymentNo,
       crNo: payment.crNo || '',
@@ -1041,6 +1071,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (onApplyToInvoice) {
       for (const [invoiceId, amount] of selected) {
         const applyAmount = Number(amount || 0);
+        const description = transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`;
         await onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
       }
     }
@@ -1058,6 +1089,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           return applicationNo;
         })(),
         amountApplied: Number(amount || 0),
+        description: transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`,
         isReversed: false,
         createdAt: new Date().toISOString()
       }));
@@ -1075,6 +1107,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
+    setTransactionDescriptions({});
     setViewMode('list');
   };
 
@@ -1775,29 +1808,103 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       render: (payment) => (
         <span className="font-medium text-gray-800">{getActiveApplications(payment).length}</span>
       )
+    }
+  ];
+
+  const applyPaymentColumns: ApplyPaymentColumn[] = [
+    {
+      key: 'apply',
+      label: 'Apply',
+      align: 'text-center',
+      minWidth: 80,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick) => (
+        <input
+          type="checkbox"
+          checked={!!invoiceSelectionMap[inv.id]}
+          onChange={e => handleInvoiceTick(inv, e.target.checked)}
+        />
+      )
     },
     {
-      key: 'action',
-      label: 'Action',
-      align: 'text-right',
+      key: 'invoiceNo',
+      label: 'Invoice No',
+      align: 'text-left',
       minWidth: 160,
-      render: (payment) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePaymentApplicationAction(payment);
+      render: (inv) => <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      align: 'text-left',
+      minWidth: 128,
+      render: (inv) => (
+        <span className="text-gray-600">
+          {inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'postPeriod',
+      label: 'Post Period',
+      align: 'text-left',
+      minWidth: 112,
+      render: (inv) => (
+        <span className="text-gray-600">
+          {formatPostPeriod(inv.invoiceDate) || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'transactionDescription',
+      label: 'Transaction Description',
+      align: 'text-left',
+      minWidth: 200,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions) => (
+        <input
+          type="text"
+          value={transactionDescriptions[inv.id] || `Payment application for invoice ${inv.invoiceNo}`}
+          onChange={e => {
+            setTransactionDescriptions(prev => ({ ...prev, [inv.id]: e.target.value }));
           }}
-          className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-            applicationListTab === 'unapplied' && canApplyPayment(payment)
-              ? 'bg-amber-500 text-white hover:bg-amber-600'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          {getPaymentApplicationActionLabel(payment)}
-        </button>
+          disabled={!invoiceSelectionMap[inv.id]}
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-emerald-400 disabled:bg-gray-50 disabled:text-gray-500"
+          placeholder="Enter transaction description"
+        />
+      )
+    },
+    {
+      key: 'amountDue',
+      label: 'Amount Due',
+      align: 'text-right',
+      minWidth: 128,
+      render: (inv) => <span className="font-semibold text-gray-800">{formatCurrency(inv.balanceDue)}</span>
+    },
+    {
+      key: 'applyAmount',
+      label: 'Apply Amount',
+      align: 'text-right',
+      minWidth: 140,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick, availableToApply) => (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          disabled={!invoiceSelectionMap[inv.id]}
+          max={Math.min(inv.balanceDue, availableToApply)}
+          value={invoiceApplyMap[inv.id] || ''}
+          onChange={e => {
+            const value = parseFloat(e.target.value) || 0;
+            setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
+          }}
+          className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-right text-sm font-medium text-gray-800 outline-none transition-colors focus:border-emerald-400"
+        />
       )
     }
   ];
+
+  const orderedApplyPaymentColumns = applyPaymentColumnOrder
+    .map(key => applyPaymentColumns.find(col => col.key === key))
+    .filter(Boolean) as ApplyPaymentColumn[];
 
   const orderedApplicationRegistryColumns = applicationColumnOrder
     .map(key => applicationRegistryColumns.find(col => col.key === key))
@@ -2192,6 +2299,38 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     setApplicationColumnOrder(newOrder);
     setDraggedApplicationColumnIdx(null);
+  };
+
+  const handleApplyPaymentDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedApplyPaymentColumnIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleApplyPaymentDragEnd = (e: React.DragEvent) => {
+    setDraggedApplyPaymentColumnIdx(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleApplyPaymentDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleApplyPaymentDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedApplyPaymentColumnIdx === null || draggedApplyPaymentColumnIdx === dropIndex) return;
+
+    const newOrder = [...applyPaymentColumnOrder];
+    const [draggedKey] = newOrder.splice(draggedApplyPaymentColumnIdx, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    setApplyPaymentColumnOrder(newOrder);
+    setDraggedApplyPaymentColumnIdx(null);
   };
 
   // ===== VIEW: PAYMENT LIST (DASHBOARD) =====
@@ -3199,7 +3338,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               </div>
               <div className="text-right mx-4">
                 <div className="text-xs text-gray-600">Available to Apply</div>
-                <div className="text-lg font-bold" style={{ color: brandColor }}>
+                <div className="text-lg font-bold text-black">
                   {formatCurrency(availableToApply)}
                 </div>
               </div>
@@ -3228,27 +3367,63 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <table className="min-w-max w-full font-sans">
                 <thead className="border-b bg-emerald-600">
                   <tr>
-                    <th className="px-4 py-3 text-center font-semibold text-white">
-                      <div className="flex items-center justify-center text-[13px] font-bold text-white">Apply</div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-white">
-                      <div className="flex items-center text-[13px] font-bold text-white">Invoice No</div>
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-white">
-                      <div className="flex items-center text-[13px] font-bold text-white">Date</div>
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold text-white">
-                      <div className="flex items-center justify-end text-[13px] font-bold text-white">Amount Due</div>
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold text-white">
-                      <div className="flex items-center justify-end text-[13px] font-bold text-white">Apply Amount</div>
-                    </th>
+                    {orderedApplyPaymentColumns.map((col, idx) => (
+                      <th
+                        key={col.key}
+                        draggable
+                        onDragStart={(e) => handleApplyPaymentDragStart(e, idx)}
+                        onDragEnd={handleApplyPaymentDragEnd}
+                        onDragOver={handleApplyPaymentDragOver}
+                        onDrop={(e) => handleApplyPaymentDrop(e, idx)}
+                        className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedApplyPaymentColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
+                        style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
+                        title="Drag to reorder column"
+                      >
+                        <div
+                          className={`flex items-center text-[13px] font-bold text-white ${
+                            col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
+                          }`}
+                        >
+                          {col.label}
+                        </div>
+                        <div
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const th = e.currentTarget.parentElement;
+                            if (!th) return;
+                            const startWidth = th.getBoundingClientRect().width;
+                            applyPaymentResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                            const onMouseMove = (ev: MouseEvent) => {
+                              if (!applyPaymentResizeRef.current) return;
+                              const diff = ev.clientX - applyPaymentResizeRef.current.startX;
+                              const newWidth = Math.max(60, applyPaymentResizeRef.current.startWidth + diff);
+                              setApplyPaymentColumnWidths(prev => ({ ...prev, [applyPaymentResizeRef.current!.colKey]: newWidth }));
+                            };
+                            const onMouseUp = () => {
+                              applyPaymentResizeRef.current = null;
+                              document.removeEventListener('mousemove', onMouseMove);
+                              document.removeEventListener('mouseup', onMouseUp);
+                              document.body.style.cursor = '';
+                              document.body.style.userSelect = '';
+                            };
+                            document.addEventListener('mousemove', onMouseMove);
+                            document.addEventListener('mouseup', onMouseUp);
+                            document.body.style.cursor = 'col-resize';
+                            document.body.style.userSelect = 'none';
+                          }}
+                          className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize transition-colors hover:bg-emerald-400 z-10"
+                          title="Drag to resize column"
+                          draggable={false}
+                        />
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {isFetchingOpenInvoices && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
                         <FileText size={40} className="mx-auto mb-2 text-gray-300" />
                         Fetching open invoices...
                       </td>
@@ -3256,7 +3431,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
                         <FileText size={40} className="mx-auto mb-2 text-gray-300" />
                         No open invoices for this payor.
                       </td>
@@ -3264,33 +3439,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
                     <tr key={inv.id} className="cursor-pointer transition-colors hover:bg-gray-50">
-                      <td className="px-4 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!invoiceSelectionMap[inv.id]}
-                          onChange={e => handleInvoiceTick(inv, e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{inv.invoiceNo}</td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{formatCurrency(inv.balanceDue)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          disabled={!invoiceSelectionMap[inv.id]}
-                          max={Math.min(inv.balanceDue, availableToApply)}
-                          value={invoiceApplyMap[inv.id] || ''}
-                          onChange={e => {
-                            const value = parseFloat(e.target.value) || 0;
-                            setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
-                          }}
-                          className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-right text-sm font-medium text-gray-800 outline-none transition-colors focus:border-emerald-400"
-                        />
-                      </td>
+                      {orderedApplyPaymentColumns.map(col => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 ${col.align}`}
+                          style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
+                        >
+                          {col.render(inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick, availableToApply)}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -3300,7 +3457,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="mt-4 rounded-lg border bg-gray-50 p-4">
               <div className="flex justify-between text-sm">
                 <span className="font-semibold text-gray-700">Total to Apply:</span>
-                <span className="font-bold" style={{ color: brandColor }}>{formatCurrency(plannedAppliedTotal)}</span>
+                <span className="font-bold text-black">{formatCurrency(plannedAppliedTotal)}</span>
               </div>
             </div>
           </div>
@@ -3509,6 +3666,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         <th className="px-4 py-2">Invoice Number</th>
                         <th className="px-4 py-2">Application No.</th>
                         <th className="px-4 py-2">GL Reference No.</th>
+                        <th className="px-4 py-2">Description</th>
                         <th className="px-4 py-2 text-center">Status</th>
                         <th className="px-4 py-2 text-right">Applied Amount</th>
                         <th className="px-4 py-2 text-right">Actions</th>
@@ -3522,6 +3680,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
                             <td className="px-4 py-2 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
                             <td className="px-4 py-2 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                            <td className="px-4 py-2 text-xs">{app.description || '-'}</td>
                             <td className="px-4 py-2 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
                             <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
                             <td className="px-4 py-2 text-right">

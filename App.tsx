@@ -953,6 +953,7 @@ export default function App() {
             }
 
             const applicationJournalDetail = applicationNo;
+            const applicationDescription = application.description || applicationJournalDetail;
             const journalEntry = application.journalEntryId
               ? normalizedEntries.find(entry => entry.id === application.journalEntryId)
               : undefined;
@@ -962,14 +963,14 @@ export default function App() {
               String(journalEntry.sourceType || '').toUpperCase() === 'APPLICATION' &&
               (
                 String(journalEntry.reference || '').trim() !== applicationJournalDetail ||
-                String(journalEntry.description || '').trim() !== applicationJournalDetail
+                String(journalEntry.description || '').trim() !== applicationDescription
               )
             ) {
               journalEntry.reference = applicationJournalDetail;
-              journalEntry.description = applicationJournalDetail;
+              journalEntry.description = applicationDescription;
               paymentApplicationJournalBackfills.set(journalEntry.id, {
                 reference: applicationJournalDetail,
-                description: applicationJournalDetail
+                description: applicationDescription
               });
             }
 
@@ -4951,6 +4952,7 @@ export default function App() {
         invoiceId,
         applicationNo: generatedApplicationNo,
         amountApplied: amount,
+        description: `Payment application for invoice ${invoice.invoiceNo}`,
         isReversed: false,
         createdBy: currentUser?.id || 'system',
         createdAt: applicationTs,
@@ -4959,6 +4961,7 @@ export default function App() {
       const savedApplication = await dataService.createEntity('payment_applications', newApplication) as PaymentApplication;
       const applicationNo = String(savedApplication.applicationNo || generatedApplicationNo).trim() || generatedApplicationNo;
       const applicationJournalDetail = applicationNo;
+      const applicationDescription = `Payment application for invoice ${invoice.invoiceNo}`;
 
       // Reuse an existing GL entry for this application id if present (idempotent)
       let savedApplicationEntry = journalEntries.find(
@@ -4970,7 +4973,7 @@ export default function App() {
           periodId: invoice.periodId || '',
           date: new Date().toISOString().split('T')[0],
           reference: applicationJournalDetail,
-          description: applicationJournalDetail,
+          description: applicationDescription,
           status: 'POSTED',
           sourceType: 'APPLICATION',
           sourceRef: savedApplication.id,
@@ -5011,13 +5014,13 @@ export default function App() {
         savedApplicationEntry &&
         (
           String(savedApplicationEntry.reference || '').trim() !== applicationJournalDetail ||
-          String(savedApplicationEntry.description || '').trim() !== applicationJournalDetail
+          String(savedApplicationEntry.description || '').trim() !== applicationDescription
         )
       ) {
         try {
           const alignedApplicationEntry = await dataService.updateJournalEntry(savedApplicationEntry.id, {
             reference: applicationJournalDetail,
-            description: applicationJournalDetail
+            description: applicationDescription
           });
           savedApplicationEntry = {
             ...savedApplicationEntry,
@@ -6065,6 +6068,7 @@ export default function App() {
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
             accounts={filteredAccounts}
+            journalEntries={activeJournalEntries}
             currency={currentOrg?.currency || 'PHP'}
             onAddPayment={handleAddPayment}
             onUpdatePayment={handleUpdatePayment}
