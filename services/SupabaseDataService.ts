@@ -548,7 +548,7 @@ export class SupabaseDataService implements IDataService {
         }
 
         if (this.shouldRetryPaymentStatusWrite(table, payload, error, paymentStatusFallbackApplied)) {
-          console.warn('[Supabase] payments_status_check rejected OPEN; retrying with POSTED for compatibility');
+          console.warn('[Supabase] payments_status_check rejected payment status; retrying with POSTED for compatibility');
           payload = this.normalizePaymentStatusForStorage(payload);
           paymentStatusFallbackApplied = true;
           continue;
@@ -606,7 +606,7 @@ export class SupabaseDataService implements IDataService {
         }
 
         if (this.shouldRetryPaymentStatusWrite(table, payload, error, paymentStatusFallbackApplied)) {
-          console.warn('[Supabase] payments_status_check rejected OPEN; retrying with POSTED for compatibility');
+          console.warn('[Supabase] payments_status_check rejected payment status; retrying with POSTED for compatibility');
           payload = this.normalizePaymentStatusForStorage(payload);
           paymentStatusFallbackApplied = true;
           continue;
@@ -628,7 +628,7 @@ export class SupabaseDataService implements IDataService {
 
     const normalized = { ...payload };
     const status = String(normalized.status || '').toUpperCase();
-    if (status === 'OPEN') {
+    if (status === 'OPEN' || status === 'CLOSED') {
       normalized.status = 'POSTED';
     }
 
@@ -643,7 +643,7 @@ export class SupabaseDataService implements IDataService {
   ): boolean {
     if (fallbackApplied || table !== 'payments') return false;
     if (!/payments_status_check/i.test(errorText)) return false;
-    return String(payload?.status || '').toUpperCase() === 'OPEN';
+    return ['OPEN', 'CLOSED'].includes(String(payload?.status || '').toUpperCase());
   }
 
   /**
@@ -748,7 +748,7 @@ export class SupabaseDataService implements IDataService {
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
       payment_applications: [
-        'id', 'payment_id', 'invoice_id', 'amount_applied',
+        'id', 'org_id', 'payment_id', 'invoice_id', 'application_no', 'amount_applied',
         'is_reversed', 'reversal_reason', 'reversed_at', 'reversed_by',
         'gl_reference', 'journal_entry_id',
         'created_at', 'created_by', 'updated_at', 'updated_by'
@@ -948,9 +948,10 @@ export class SupabaseDataService implements IDataService {
     // Note: insertToSupabase will NOT apply camelToSnake again since data is already in snake_case
     // We need to call the API directly to avoid double-conversion
     const result = await this.insertToSupabaseRaw('students', filteredStudent);
+    const savedStudent = result as Record<string, any>;
     return {
-      ...result,
-      documents: this.parseStudentDocumentsFromDb((result as any).documents)
+      ...savedStudent,
+      documents: this.parseStudentDocumentsFromDb(savedStudent.documents)
     };
   }
 
@@ -981,9 +982,10 @@ export class SupabaseDataService implements IDataService {
     });
 
     const result = await this.updateInSupabaseRaw('students', id, filteredUpdates);
+    const savedStudent = result as Record<string, any>;
     return {
-      ...result,
-      documents: this.parseStudentDocumentsFromDb((result as any).documents)
+      ...savedStudent,
+      documents: this.parseStudentDocumentsFromDb(savedStudent.documents)
     };
   }
 
@@ -1681,6 +1683,86 @@ export class SupabaseDataService implements IDataService {
         }
       } else {
         throw new Error('Missing orgId - cannot generate payment number');
+      }
+    }
+
+    // For payment applications: generate unique application number using atomic database function
+    if (table === 'payment_applications') {
+      const paymentApplication = entity as any;
+      const orgId = paymentApplication.org_id || paymentApplication.orgId;
+      const existingApplicationNo = paymentApplication.applicationNo || paymentApplication.application_no;
+
+      console.log('[SupabaseDataService] Creating payment application:', {
+        hasApplicationNo: !!existingApplicationNo,
+        applicationNo: existingApplicationNo,
+        orgId
+      });
+
+      if (existingApplicationNo) {
+        paymentApplication.applicationNo = existingApplicationNo;
+        paymentApplication.application_no = existingApplicationNo;
+        console.log('[SupabaseDataService] Using provided payment application_no:', existingApplicationNo);
+      } else if (orgId) {
+        try {
+          const headers = await this.getHeaders();
+          const rpcUrl = `${this.supabaseUrl}/rest/v1/rpc/get_next_payment_application_no`;
+          const fallbackApplicationNo = paymentApplication.applicationNo || paymentApplication.application_no;
+
+          console.log('[SupabaseDataService] Calling payment application RPC:', { rpcUrl, orgId });
+
+          const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ p_org_id: orgId })
+          });
+
+          console.log('[SupabaseDataService] Payment application RPC Response status:', response.status);
+
+          if (!response.ok) {
+            const errorBody = await response.text();
+            console.error(`[SupabaseDataService] Payment application RPC error (${response.status}):`, errorBody);
+            throw new Error(`Payment application RPC call failed: ${response.status} - ${errorBody}`);
+          }
+
+          let generatedApplicationNo: any;
+          try {
+            const responseText = await response.text();
+            console.log('[SupabaseDataService] Payment application RPC raw response:', responseText);
+
+            generatedApplicationNo = responseText.startsWith('"')
+              ? JSON.parse(responseText)
+              : responseText;
+          } catch (parseErr) {
+            console.error('[SupabaseDataService] Error parsing payment application RPC response:', parseErr);
+            throw parseErr;
+          }
+
+          if (generatedApplicationNo) {
+            paymentApplication.applicationNo = generatedApplicationNo;
+            paymentApplication.application_no = generatedApplicationNo;
+            console.log('[SupabaseDataService] Generated payment application_no:', generatedApplicationNo);
+          } else {
+            console.error('[SupabaseDataService] Payment application RPC returned empty/null:', generatedApplicationNo);
+            throw new Error('Failed to generate payment application number - RPC returned: ' + generatedApplicationNo);
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          const rpcMissing =
+            errorMessage.includes('PGRST202') ||
+            errorMessage.includes('get_next_payment_application_no') ||
+            errorMessage.includes('404');
+
+          if (rpcMissing && fallbackApplicationNo) {
+            paymentApplication.applicationNo = fallbackApplicationNo;
+            paymentApplication.application_no = fallbackApplicationNo;
+            console.warn('[SupabaseDataService] Payment application RPC unavailable. Using client-generated application_no:', fallbackApplicationNo);
+          } else {
+            console.error('[SupabaseDataService] Failed to generate payment application number via RPC:', err);
+            throw err;
+          }
+        }
+      } else {
+        throw new Error('Missing orgId or applicationNo - cannot create payment application');
       }
     }
 

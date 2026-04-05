@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
@@ -50,7 +50,7 @@ interface PaymentsViewProps {
   onDeletePayment: (id: string) => Promise<boolean>;
   onPostPayment?: (payment: Payment) => void;
   onVoidPayment?: (id: string, reason: string) => void;
-  onApplyToInvoice?: (paymentId: string, invoiceId: string, amount: number) => void;
+  onApplyToInvoice?: (paymentId: string, invoiceId: string, amount: number) => Promise<void> | void;
   onReverseApplication?: (paymentId: string, applicationId: string, reason: string) => void;
   onViewJournal?: (journalEntryId: string) => void;
   initialContext?: { viewMode: ViewMode; invoice?: Invoice };
@@ -147,7 +147,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   ]);
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
   const [applicationColumnOrder, setApplicationColumnOrder] = useState<string[]>([
-    'date', 'postPeriod', 'paymentNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications', 'action'
+    'date', 'postPeriod', 'paymentApplicationNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications', 'action'
   ]);
   const [draggedApplicationColumnIdx, setDraggedApplicationColumnIdx] = useState<number | null>(null);
 
@@ -230,6 +230,26 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return `PAY-${year}-${String(nextNum).padStart(5, '0')}`;
   };
 
+  const generatePaymentApplicationNo = (reservedApplicationNos?: Set<string>) => {
+    const year = new Date().getFullYear();
+    const existingNums = payments
+      .flatMap(payment => payment.applications || [])
+      .map(application => {
+        const match = String(application.applicationNo || '').trim().match(/^PAYAPP-\d{4}-(\d+)$/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => n > 0);
+
+    const existingSet = new Set(existingNums);
+    let nextNum = existingNums.length ? Math.max(...existingNums) + 1 : 1;
+
+    while (existingSet.has(nextNum) || reservedApplicationNos?.has(`PAYAPP-${year}-${String(nextNum).padStart(5, '0')}`)) {
+      nextNum += 1;
+    }
+
+    return `PAYAPP-${year}-${String(nextNum).padStart(5, '0')}`;
+  };
+
   const getPayorName = (payment: Payment) => {
     if (payment.sponsorId) return sponsors.find(s => s.id === payment.sponsorId)?.name || '-';
     const student = students.find(s => s.id === payment.studentId);
@@ -241,6 +261,51 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const student = students.find(s => s.id === invoice.studentId);
     return student ? `${student.lastName}, ${student.firstName}` : '-';
   };
+
+  const selectedSourceInvoice = useMemo(
+    () => invoices.find(invoice => invoice.id === sourceInvoiceId),
+    [invoices, sourceInvoiceId]
+  );
+
+  const invoiceSelectionOptions = useMemo(() => {
+    const selectedId = sourceInvoiceId;
+    const hasSelectedPayor = !!selectedPayorId;
+
+    return invoices
+      .filter(invoice => {
+        if (invoice.orgId !== currentOrgId) return false;
+        if (invoice.status === 'VOIDED') return false;
+        if (selectedId && invoice.id === selectedId) return true;
+        if (!hasSelectedPayor) return false;
+        if (payorType === 'SPONSOR') return invoice.sponsorId === formData.sponsorId && invoice.status === 'OPEN';
+        return invoice.studentId === formData.studentId && invoice.status === 'OPEN';
+      })
+      .sort((a, b) => {
+        const dateDiff = new Date(b.invoiceDate || 0).getTime() - new Date(a.invoiceDate || 0).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [invoices, sourceInvoiceId, selectedPayorId, currentOrgId, payorType, formData.sponsorId, formData.studentId]);
+
+  const existingLinkedInvoicePayment = useMemo(() => {
+    if (!sourceInvoiceId) return null;
+
+    return payments.find(payment =>
+      payment.id !== editingPayment?.id &&
+      payment.orgId === currentOrgId &&
+      !payment.isDeleted &&
+      payment.status !== 'VOIDED' &&
+      payment.sourceInvoiceId === sourceInvoiceId
+    ) || null;
+  }, [payments, editingPayment?.id, currentOrgId, sourceInvoiceId]);
+
+  const existingLinkedInvoicePaymentStatusLabel = existingLinkedInvoicePayment
+    ? (existingLinkedInvoicePayment.status === 'DRAFT'
+      ? 'Draft'
+      : existingLinkedInvoicePayment.status === 'CLOSED'
+        ? 'Closed'
+        : 'Approved')
+    : '';
 
   const getTotalPaymentCredit = (payment: Payment) =>
     Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0);
@@ -258,6 +323,73 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const isAppliedPayment = (payment: Payment) =>
     getActiveApplications(payment).length > 0 || Number(payment.totalApplied ?? 0) > 0;
+
+  const getPaymentApplicationRecords = (payment: Payment) =>
+    getActiveApplications(payment)
+      .slice()
+      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+
+  const getPaymentApplicationNo = (application: PaymentApplication) => {
+    const savedApplicationNo = String(application.applicationNo || '').trim();
+    if (savedApplicationNo) return savedApplicationNo;
+
+    const createdYear = application.createdAt
+      ? new Date(application.createdAt).getFullYear()
+      : new Date().getFullYear();
+    const suffix = String(application.id || '')
+      .replace(/-/g, '')
+      .slice(-6)
+      .toUpperCase();
+
+    return `PAYAPP-${createdYear}-${suffix || 'PENDING'}`;
+  };
+
+  const getPaymentApplicationNumberLabel = (payment: Payment) => {
+    const applications = getPaymentApplicationRecords(payment);
+    if (applications.length === 0) return '-';
+    return applications.map(getPaymentApplicationNo).join(', ');
+  };
+
+  const getPaymentApplicationGlReferenceLabel = (payment: Payment) => {
+    const applications = getPaymentApplicationRecords(payment);
+    if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending';
+    return applications.map(application => application.glReference || 'Pending').join(', ');
+  };
+
+  const isInvoiceSettled = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
+    !!invoice && (invoice.status === 'CLOSED' || Number(invoice.balanceDue ?? 0) <= 0.01);
+
+  const isPaymentPostedOrFinalized = (payment?: Pick<Payment, 'status' | 'postedAt' | 'journalEntryId'> | null) =>
+    !!payment && payment.status !== 'DRAFT' && payment.status !== 'VOIDED' &&
+    (payment.status === 'OPEN' || payment.status === 'POSTED' || payment.status === 'CLOSED' || !!payment.postedAt || !!payment.journalEntryId);
+
+  const getApplicationStatusLabel = (payment: Payment, application: PaymentApplication) => {
+    if (application.isReversed) return 'REVERSED';
+
+    const invoice = invoices.find(inv => inv.id === application.invoiceId);
+    const isConfirmed = isPaymentPostedOrFinalized(payment);
+    const fullyAllocated = Number(application.amountApplied ?? 0) > 0;
+
+    if (isConfirmed && fullyAllocated && isInvoiceSettled(invoice)) {
+      return 'CLOSED';
+    }
+
+    return 'OPEN';
+  };
+
+  const getApplicationRegistryStatus = (payment: Payment): PaymentStatus => {
+    if (payment.status === 'VOIDED' || payment.status === 'DRAFT') {
+      return payment.status;
+    }
+
+    const activeApplications = getActiveApplications(payment);
+    if (activeApplications.length === 0) {
+      return payment.status === 'CLOSED' && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+    }
+
+    const allApplicationsClosed = activeApplications.every(app => getApplicationStatusLabel(payment, app) === 'CLOSED');
+    return allApplicationsClosed && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+  };
 
   const canApplyPayment = (payment: Payment) =>
     (payment.status === 'OPEN' || payment.status === 'POSTED') && getAvailablePaymentBalance(payment) > 0.01;
@@ -617,7 +749,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 const invoice = invoices.find(i => i.id === app.invoiceId);
                 return `<tr>
                   <td>${esc(invoice?.invoiceNo || app.invoiceId)}</td>
-                  <td>${esc(app.isReversed ? 'Reversed' : 'Active')}</td>
+                  <td>${esc(getApplicationStatusLabel(printablePayment, app))}</td>
                   <td class="num">${formatCurrency(Number(app.amountApplied ?? 0))}</td>
                 </tr>`;
               }).join('')}
@@ -800,6 +932,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (!formData.paymentNo) return 'Payment number is required.';
     if (!formData.paymentDate) return 'Payment date is required.';
     if (!formData.bankAccountId) return 'Cash account is required.';
+    if (!sourceInvoiceId) return 'Invoice No. is required. Tag this payment to an invoice before saving or approving.';
+    if (!selectedSourceInvoice) return 'Select a valid invoice number before saving or approving payment.';
+    if (existingLinkedInvoicePayment) {
+      return `A payment already exists for invoice ${selectedSourceInvoice.invoiceNo} (${existingLinkedInvoicePayment.paymentNo}, ${existingLinkedInvoicePaymentStatusLabel}). Review, edit, or complete the existing payment instead of creating a new one.`;
+    }
     if (!formData.sponsorId && !formData.studentId) return 'Select a sponsor or student.';
     if (!String(formData.notes || '').trim()) return 'Transaction Description is required.';
     if (!String(formData.crNo || '').trim()) return 'C.R. No. is required.';
@@ -881,7 +1018,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setEditingPayment(null);
   };
 
-  const applySelectedInvoices = () => {
+  const applySelectedInvoices = async () => {
     if (!editingPayment) {
       alert('Payment not found.');
       return;
@@ -901,16 +1038,25 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       return;
     }
 
-    selected.forEach(([invoiceId, amount]) => {
-      const applyAmount = Number(amount || 0);
-      if (onApplyToInvoice) onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
-    });
+    if (onApplyToInvoice) {
+      for (const [invoiceId, amount] of selected) {
+        const applyAmount = Number(amount || 0);
+        await onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
+      }
+    }
 
     if (!onApplyToInvoice) {
+      const reservedApplicationNos = new Set<string>();
       const newApps: PaymentApplication[] = selected.map(([invoiceId, amount]) => ({
         id: generateUUID(),
+        orgId: currentOrgId,
         paymentId: editingPayment.id,
         invoiceId,
+        applicationNo: (() => {
+          const applicationNo = generatePaymentApplicationNo(reservedApplicationNos);
+          reservedApplicationNos.add(applicationNo);
+          return applicationNo;
+        })(),
         amountApplied: Number(amount || 0),
         isReversed: false,
         createdAt: new Date().toISOString()
@@ -980,10 +1126,38 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const invoiceInputClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed';
   const invoiceReadOnlyClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 bg-gray-50 text-gray-900';
   const invoicePostPeriodClass = 'w-full mt-1 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 bg-orange-50 text-gray-900';
+  const previewSectionTitleClass = 'mb-4 text-xs font-medium uppercase tracking-wide text-gray-500';
+  const previewLabelClass = 'text-xs font-medium uppercase tracking-wide text-gray-500';
+  const previewValueClass = 'mt-1 text-[13px] font-medium text-gray-700';
 
   const getCreatedByName = (createdBy?: string) => {
     if (!createdBy) return '-';
     return users.find(u => u.id === createdBy)?.name || createdBy || '-';
+  };
+
+  const handleSourceInvoiceChange = (invoiceId: string) => {
+    if (!invoiceId) {
+      if (sourceInvoiceId) {
+        alert('Invoice No. is required. Select another invoice instead of clearing the tagged invoice.');
+        return;
+      }
+      setSourceInvoiceId(undefined);
+      return;
+    }
+
+    const invoice = invoices.find(item => item.id === invoiceId);
+    setSourceInvoiceId(invoiceId);
+    if (!invoice) return;
+
+    const payorLabel = getInvoicePayorName(invoice);
+    setPayorType(invoice.sponsorId ? 'SPONSOR' : 'STUDENT');
+    setFormData(prev => ({
+      ...prev,
+      sponsorId: invoice.sponsorId || '',
+      studentId: invoice.studentId || '',
+      amountReceived: prev.amountReceived > 0 ? prev.amountReceived : Number(invoice.balanceDue ?? 0),
+      notes: String(prev.notes || '').trim() ? prev.notes : (payorLabel !== '-' ? `Collection from ${payorLabel}` : 'Collection receipt')
+    }));
   };
 
   const getDisplayStatusLabel = (status: PaymentStatus) => {
@@ -1029,7 +1203,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       : <ChevronDown size={12} className="ml-1 text-emerald-400" />;
   };
 
-  const getPaymentSortValue = (payment: Payment, key: string) => {
+  const getPaymentSortValue = (payment: Payment, key: string, mode: ListTab) => {
     switch (key) {
       case 'date':
       case 'paymentDate':
@@ -1038,10 +1212,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         return payment.paymentDate || '';
       case 'paymentNo':
         return payment.paymentNo || '';
+      case 'paymentApplicationNo':
+        return getPaymentApplicationNumberLabel(payment);
       case 'status':
-        return getDisplayStatusLabel(payment.status);
+        return getDisplayStatusLabel(mode === 'applications' ? getApplicationRegistryStatus(payment) : payment.status);
       case 'glReference':
-        return payment.glEntryNumber || '';
+        return mode === 'applications' ? getPaymentApplicationGlReferenceLabel(payment) : (payment.glEntryNumber || '');
       case 'payor':
         return getPayorName(payment);
       case 'method':
@@ -1220,7 +1396,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     .map(key => paymentRegistryColumns.find(col => col.key === key))
     .filter(Boolean) as PaymentRegistryColumn[];
 
-  const applyRegistryFilters = (list: Payment[]) => {
+  const applyRegistryFilters = (list: Payment[], mode: ListTab) => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -1228,17 +1404,22 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     return list.filter(pay => {
       const payor = getPayorName(pay).toLowerCase();
+      const applicationNo = mode === 'applications' ? getPaymentApplicationNumberLabel(pay).toLowerCase() : '';
+      const applicationGlReference = mode === 'applications' ? getPaymentApplicationGlReferenceLabel(pay).toLowerCase() : '';
       const matchesSearch =
         pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        applicationNo.includes(searchTerm.toLowerCase()) ||
         (pay.crNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         payor.includes(searchTerm.toLowerCase()) ||
         (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (pay.glEntryNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (pay.glEntryNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        applicationGlReference.includes(searchTerm.toLowerCase());
 
+      const effectiveStatus = mode === 'applications' ? getApplicationRegistryStatus(pay) : pay.status;
       const matchesStatus = statusFilter === 'ALL' ||
         (statusFilter === 'OPEN'
-          ? (pay.status === 'OPEN' || pay.status === 'POSTED')
-          : pay.status === statusFilter);
+          ? (effectiveStatus === 'OPEN' || effectiveStatus === 'POSTED')
+          : effectiveStatus === statusFilter);
 
       const paymentDate = pay.paymentDate?.slice(0, 10) || '';
       let matchesDate = true;
@@ -1258,11 +1439,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     });
   };
 
-  const sortRegistryPayments = (list: Payment[]) => {
+  const sortRegistryPayments = (list: Payment[], mode: ListTab) => {
     return [...list].sort((a, b) => {
       if (sortConfig.direction === 'none') return 0;
-      const valueA = getPaymentSortValue(a, sortConfig.key);
-      const valueB = getPaymentSortValue(b, sortConfig.key);
+      const valueA = getPaymentSortValue(a, sortConfig.key, mode);
+      const valueB = getPaymentSortValue(b, sortConfig.key, mode);
       let comparison = 0;
       if (typeof valueA === 'number' && typeof valueB === 'number') {
         comparison = valueA - valueB;
@@ -1274,7 +1455,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   };
 
   const filteredPayments = useMemo(() => {
-    return sortRegistryPayments(applyRegistryFilters(payments));
+    return sortRegistryPayments(applyRegistryFilters(payments, 'payments'), 'payments');
   }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
   const exportToExcel = () => {
@@ -1404,7 +1585,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     applicationListTab === 'unapplied' ? unappliedPaymentList : appliedPaymentList;
 
   const filteredApplicationPayments = useMemo(() => {
-    return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments));
+    return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments, 'applications'), 'applications');
   }, [currentApplicationPayments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
   const filteredApplicationRemainingBalance = useMemo(() => {
@@ -1489,14 +1670,14 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       )
     },
     {
-      key: 'paymentNo',
-      label: 'Payment No.',
+      key: 'paymentApplicationNo',
+      label: 'Payment Application No.',
       align: 'text-left',
-      minWidth: 160,
-      sortKey: 'paymentNo',
-      value: (payment) => payment.paymentNo || '',
+      minWidth: 200,
+      sortKey: 'paymentApplicationNo',
+      value: (payment) => getPaymentApplicationNumberLabel(payment),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{payment.paymentNo || '-'}</span>
+        <span className="font-medium text-gray-800">{getPaymentApplicationNumberLabel(payment)}</span>
       )
     },
     {
@@ -1516,21 +1697,21 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       align: 'text-left',
       minWidth: 96,
       sortKey: 'status',
-      value: (payment) => getDisplayStatusLabel(payment.status),
+      value: (payment) => getDisplayStatusLabel(getApplicationRegistryStatus(payment)),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{getDisplayStatusLabel(payment.status)}</span>
+        <span className="font-medium text-gray-800">{getDisplayStatusLabel(getApplicationRegistryStatus(payment))}</span>
       )
     },
     {
       key: 'glReference',
       label: 'GL Reference No.',
       align: 'text-left',
-      minWidth: 128,
+      minWidth: 160,
       sortKey: 'glReference',
-      value: (payment) => payment.glEntryNumber || '',
+      value: (payment) => getPaymentApplicationGlReferenceLabel(payment),
       render: (payment) => (
         <span className="font-medium text-gray-800">
-          {payment.glEntryNumber || (payment.status === 'DRAFT' ? '-' : 'Pending')}
+          {getPaymentApplicationGlReferenceLabel(payment)}
         </span>
       )
     },
@@ -2606,6 +2787,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <CornerUpLeft size={20} />
             </button>
           </div>
+          {!isReadOnly && headerValidationError && (
+            <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {headerValidationError}
+            </div>
+          )}
 
           <div className="flex-1 overflow-auto p-6">
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -2682,6 +2868,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             checked={payorType === 'SPONSOR'}
                             onChange={() => {
                               setPayorType('SPONSOR');
+                              setSourceInvoiceId(undefined);
                               setFormData(prev => ({ ...prev, studentId: '' }));
                             }}
                             disabled={isReadOnly}
@@ -2694,6 +2881,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             checked={payorType === 'STUDENT'}
                             onChange={() => {
                               setPayorType('STUDENT');
+                              setSourceInvoiceId(undefined);
                               setFormData(prev => ({ ...prev, sponsorId: '' }));
                             }}
                             disabled={isReadOnly}
@@ -2707,7 +2895,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       {payorType === 'SPONSOR' ? (
                         <select
                           value={formData.sponsorId}
-                          onChange={e => setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }))}
+                          onChange={e => {
+                            setSourceInvoiceId(undefined);
+                            setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }));
+                          }}
                           disabled={isReadOnly}
                           className={invoiceInputClass}
                         >
@@ -2719,7 +2910,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       ) : (
                         <select
                           value={formData.studentId}
-                          onChange={e => setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }))}
+                          onChange={e => {
+                            setSourceInvoiceId(undefined);
+                            setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }));
+                          }}
                           disabled={isReadOnly}
                           className={invoiceInputClass}
                         >
@@ -2732,8 +2926,32 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12">
+                    <div className="md:col-span-3">
+                      <label className={invoiceLabelClass}>Invoice No. *</label>
+                      <select
+                        value={sourceInvoiceId || ''}
+                        onChange={e => handleSourceInvoiceChange(e.target.value)}
+                        disabled={isReadOnly || (!selectedPayorId && !sourceInvoiceId)}
+                        className={invoiceInputClass}
+                      >
+                        <option value="" disabled={!!selectedPayorId || !!sourceInvoiceId}>
+                          {selectedPayorId || sourceInvoiceId ? 'Select Invoice' : 'Select Sponsor/Student first'}
+                        </option>
+                        {invoiceSelectionOptions.map(invoice => (
+                          <option key={invoice.id} value={invoice.id}>{invoice.invoiceNo}</option>
+                        ))}
+                      </select>
+                      {!selectedPayorId && !sourceInvoiceId && (
+                        <p className="mt-1 text-xs text-gray-500">Choose the sponsor or student first to load invoice numbers.</p>
+                      )}
+                      {existingLinkedInvoicePayment && (
+                        <p className="mt-1 text-xs font-medium text-rose-600">
+                          A payment already exists for this invoice under {existingLinkedInvoicePayment.paymentNo}. Review, edit, or complete that payment instead.
+                        </p>
+                      )}
+                    </div>
+                    <div className="md:col-span-3">
                       <label className={invoiceLabelClass}>Transaction Description *</label>
                       <input
                         value={formData.notes}
@@ -2743,7 +2961,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         placeholder="Payment notes or memo..."
                       />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className={invoiceLabelClass}>Status</label>
                       <div className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50">
                         <span className="text-[13px] font-medium text-gray-700">
@@ -2751,7 +2969,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div>
+                    <div className="md:col-span-4">
                       <label className={invoiceLabelClass}>GL Reference No.</label>
                       {editingPayment?.journalEntryId && onViewJournal ? (
                         <button
@@ -2838,19 +3056,19 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               {/* GL Impact Summary */}
               <div className="space-y-4 xl:col-span-4">
                 <div className="rounded-xl border bg-white p-4">
-                  <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-600">
+                  <h3 className={previewSectionTitleClass}>
                     GL Journal Entry Preview
                   </h3>
                   
                   {glImpactRows.length === 0 ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-                      âš ï¸ Configure required GL accounts before posting this payment.
+                      Configure required GL accounts before posting this payment.
                     </div>
                   ) : (
                     <>
-                      <table className="w-full text-sm">
+                      <table className="w-full text-[11px]">
                         <thead>
-                          <tr className="text-left text-xs uppercase text-gray-500">
+                          <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
                             <th className="pb-2">GL Account</th>
                             <th className="pb-2 text-right">Debit</th>
                             <th className="pb-2 text-right">Credit</th>
@@ -2859,32 +3077,94 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         <tbody>
                           {glImpactRows.map((row, index) => (
                             <tr key={index} className="border-t text-gray-700">
-                              <td className="py-2 text-xs">{row.account}</td>
-                              <td className="py-2 text-right font-medium text-blue-600">{row.debit ? formatCurrency(row.debit) : '-'}</td>
-                              <td className="py-2 text-right font-medium text-green-600">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                              <td className="py-2 text-[11px] font-medium">{row.account}</td>
+                              <td className="py-2 text-right text-[11px] font-medium text-gray-700">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                              <td className="py-2 text-right text-[11px] font-medium text-gray-700">{row.credit ? formatCurrency(row.credit) : '-'}</td>
                             </tr>
                           ))}
-                          <tr className="border-t-2 border-gray-300 font-bold text-gray-800">
-                            <td className="py-3 text-xs">Total</td>
-                            <td className="py-3 text-right text-xs text-blue-600">{formatCurrency(baseTotalCredit)}</td>
-                            <td className="py-3 text-right text-xs text-green-600">{formatCurrency(baseTotalCredit)}</td>
+                          <tr className="border-t-2 border-gray-300 font-bold text-gray-700">
+                            <td className="py-3 text-[11px]">Total</td>
+                            <td className="py-3 text-right text-[11px]">{formatCurrency(baseTotalCredit)}</td>
+                            <td className="py-3 text-right text-[11px]">{formatCurrency(baseTotalCredit)}</td>
                           </tr>
                         </tbody>
                       </table>
-                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-700">
-                        <div className="mb-2">ðŸ“‹ GL Entry Details:</div>
-                        <ul className="space-y-1 pl-4 text-xs font-normal">
-                          <li>â€¢ Journal Entry Date: {new Date(formData.paymentDate).toLocaleDateString()}</li>
-                          <li>â€¢ Reference: {formData.paymentNo}</li>
-                          <li>â€¢ Total Debit = Total Credit (balanced entry)</li>
+                      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-700">
+                        <div className="mb-2 font-semibold">GL Entry Details</div>
+                        <ul className="list-disc space-y-1 pl-4 text-[11px] font-medium">
+                          <li>Journal Entry Date: {new Date(formData.paymentDate).toLocaleDateString()}</li>
+                          <li>Reference: {formData.paymentNo}</li>
+                          <li>Total Debit = Total Credit (balanced entry)</li>
                         </ul>
                       </div>
-                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">
-                        âœ“ Click "Approve" to create this journal entry and record payment
-                      </div>
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[11px] font-semibold text-emerald-700">Click "Approve" to create this journal entry and record payment</div>
                     </>
                   )}
                 </div>
+
+                {selectedSourceInvoice && (
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className={previewSectionTitleClass}>
+                      Invoice Preview
+                    </h3>
+
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className={previewLabelClass}>Invoice No.</div>
+                        <div className={previewValueClass}>{selectedSourceInvoice.invoiceNo}</div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Invoice Date</div>
+                          <div className={previewValueClass}>
+                            {selectedSourceInvoice.invoiceDate ? format(new Date(selectedSourceInvoice.invoiceDate), 'MM-dd-yyyy') : '-'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Due Date</div>
+                          <div className={previewValueClass}>
+                            {selectedSourceInvoice.dueDate ? format(new Date(selectedSourceInvoice.dueDate), 'MM-dd-yyyy') : '-'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3 sm:col-span-2">
+                          <div className={previewLabelClass}>Payor</div>
+                          <div className={previewValueClass}>{getInvoicePayorName(selectedSourceInvoice)}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Invoice Status</div>
+                          <div className={previewValueClass}>{selectedSourceInvoice.status}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Amount Paid</div>
+                          <div className={previewValueClass}>{formatCurrency(Number(selectedSourceInvoice.amountPaid ?? 0))}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Grand Total</div>
+                          <div className={previewValueClass}>{formatCurrency(Number(selectedSourceInvoice.grandTotal ?? 0))}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className={previewLabelClass}>Balance Due</div>
+                          <div className="mt-1 text-[13px] font-semibold text-gray-700">{formatCurrency(Number(selectedSourceInvoice.balanceDue ?? 0))}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center justify-between gap-3 text-[13px]">
+                          <span className="font-medium text-gray-500">Entered payment total</span>
+                          <span className="font-medium text-gray-700">{formatCurrency(baseTotalCredit)}</span>
+                        </div>
+                        <div className="mt-2 text-[11px] font-medium text-gray-600">
+                          {Math.abs(baseTotalCredit - Number(selectedSourceInvoice.balanceDue ?? 0)) <= 0.01
+                            ? 'The entered payment matches the invoice balance due.'
+                            : baseTotalCredit < Number(selectedSourceInvoice.balanceDue ?? 0)
+                              ? `The payment is ${formatCurrency(Number(selectedSourceInvoice.balanceDue ?? 0) - baseTotalCredit)} short of the current balance due.`
+                              : `The payment exceeds the current balance due by ${formatCurrency(baseTotalCredit - Number(selectedSourceInvoice.balanceDue ?? 0))}.`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -3227,6 +3507,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     <thead className="bg-gray-100">
                       <tr className="text-left text-xs uppercase font-semibold text-gray-600">
                         <th className="px-4 py-2">Invoice Number</th>
+                        <th className="px-4 py-2">Application No.</th>
+                        <th className="px-4 py-2">GL Reference No.</th>
+                        <th className="px-4 py-2 text-center">Status</th>
                         <th className="px-4 py-2 text-right">Applied Amount</th>
                         <th className="px-4 py-2 text-right">Actions</th>
                       </tr>
@@ -3237,6 +3520,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         return (
                           <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
                             <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
+                            <td className="px-4 py-2 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
+                            <td className="px-4 py-2 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                            <td className="px-4 py-2 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
                             <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
                             <td className="px-4 py-2 text-right">
                               {app.isReversed ? (
@@ -3280,4 +3566,5 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 };
 
 export default PaymentsView;
+
 

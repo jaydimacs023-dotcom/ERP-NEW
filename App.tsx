@@ -397,6 +397,64 @@ export default function App() {
   const [exchangeRates, setExchangeRates] = useState<any[]>([]);
   const [accountingPeriods, setAccountingPeriods] = useState<any[]>([]);
   const [taxCategories, setTaxCategories] = useState<TaxCategoryEntry[]>([]);
+
+  function getPaymentTotalCredit(payment?: Pick<Payment, 'amountReceived' | 'ewtAmountCertified'> | null): number {
+    return Number(payment?.amountReceived ?? 0) + Number(payment?.ewtAmountCertified ?? 0);
+  }
+
+  function getPaymentAvailableBalance(
+    payment?: Pick<Payment, 'amountReceived' | 'ewtAmountCertified' | 'totalApplied' | 'customerDepositBalance'> | null
+  ): number {
+    const explicitBalance = Number(payment?.customerDepositBalance ?? NaN);
+    if (Number.isFinite(explicitBalance)) {
+      return Math.max(explicitBalance, 0);
+    }
+
+    return Math.max(getPaymentTotalCredit(payment) - Number(payment?.totalApplied ?? 0), 0);
+  }
+
+  function isFinalizedPaymentStatus(status?: Payment['status'] | null): boolean {
+    return status === 'OPEN' || status === 'POSTED' || status === 'CLOSED';
+  }
+
+  function resolveAppliedPaymentStatus(
+    payment: Pick<Payment, 'status' | 'amountReceived' | 'ewtAmountCertified'>,
+    totalApplied: number,
+    customerDepositBalance: number
+  ): Payment['status'] {
+    if (!isFinalizedPaymentStatus(payment.status)) {
+      return payment.status;
+    }
+
+    const normalizedBalance = Math.max(Number(customerDepositBalance ?? 0), 0);
+    const totalCredit = getPaymentTotalCredit(payment);
+    const fullyApplied =
+      normalizedBalance <= 0.01 &&
+      Math.abs(totalCredit - Number(totalApplied ?? 0)) <= 0.01;
+
+    return fullyApplied ? 'CLOSED' : 'OPEN';
+  }
+
+  function getPersistablePaymentStatus(status?: Payment['status'] | null): Payment['status'] {
+    // Some deployed databases still reject CLOSED on payments, so we keep CLOSED as a
+    // derived UI status and persist POSTED for finalized records.
+    if (status === 'CLOSED') {
+      return 'POSTED';
+    }
+
+    return status || 'DRAFT';
+  }
+
+  function resolvePaidInvoiceStatus(
+    invoice: Pick<Invoice, 'status'>,
+    balanceDue: number
+  ): Invoice['status'] {
+    if (invoice.status === 'VOIDED') {
+      return invoice.status;
+    }
+
+    return Math.max(Number(balanceDue ?? 0), 0) <= 0.01 ? 'CLOSED' : 'OPEN';
+  }
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -462,6 +520,7 @@ export default function App() {
   const applyingPaymentKeysRef = useRef<Set<string>>(new Set());
   const glRefSequenceRef = useRef<Record<string, number>>({});
   const invoiceGlSequenceRef = useRef<Record<string, number>>({});
+  const paymentApplicationSequenceRef = useRef<Record<string, number>>({});
 
   const extractGlSequence = (value?: string): number => {
     const ref = (value || '').trim();
@@ -471,6 +530,19 @@ export default function App() {
   };
 
   const getGlSequenceKey = (orgId: string) => orgId || '__global__';
+  const getPaymentApplicationSequenceKey = (orgId: string, year: number) => `${orgId || '__global__'}:${year}`;
+
+  const extractPaymentApplicationSequence = (value?: string, year?: number): number => {
+    const ref = String(value || '').trim();
+    if (!ref) return 0;
+    const match = ref.match(/^PAYAPP-(\d{4})-(\d+)$/i);
+    if (!match) return 0;
+    if (year && parseInt(match[1], 10) !== year) return 0;
+    return parseInt(match[2], 10);
+  };
+
+  const formatPaymentApplicationNo = (year: number, sequence: number): string =>
+    `PAYAPP-${year}-${String(sequence).padStart(5, '0')}`;
 
   const getHighestGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
     return entries.reduce((max, entry) => {
@@ -485,11 +557,44 @@ export default function App() {
     glRefSequenceRef.current[key] = Math.max(glRefSequenceRef.current[key] || 0, seq);
   };
 
+  const syncPaymentApplicationSequenceForOrg = (orgId: string, paymentList: Payment[]) => {
+    const nextSequences = { ...paymentApplicationSequenceRef.current };
+    paymentList.forEach(payment => {
+      if (payment.orgId !== orgId) return;
+      (payment.applications || []).forEach(application => {
+        const year = application.createdAt
+          ? new Date(application.createdAt).getFullYear()
+          : new Date().getFullYear();
+        const sequence = extractPaymentApplicationSequence(application.applicationNo, year);
+        if (sequence <= 0) return;
+        const key = getPaymentApplicationSequenceKey(orgId, year);
+        nextSequences[key] = Math.max(nextSequences[key] || 0, sequence);
+      });
+    });
+    paymentApplicationSequenceRef.current = nextSequences;
+  };
+
+  const generateNextPaymentApplicationNo = (orgId: string, createdAt?: string): string => {
+    const applicationDate = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(applicationDate.getTime())
+      ? new Date().getFullYear()
+      : applicationDate.getFullYear();
+    const key = getPaymentApplicationSequenceKey(orgId, year);
+    const nextSequence = (paymentApplicationSequenceRef.current[key] || 0) + 1;
+    paymentApplicationSequenceRef.current[key] = nextSequence;
+    return formatPaymentApplicationNo(year, nextSequence);
+  };
+
   useEffect(() => {
     if (!currentOrgId) return;
     syncGlSequenceForOrg(currentOrgId, journalEntries);
     syncInvoiceGlSequenceForOrg(currentOrgId, journalEntries);
   }, [journalEntries, currentOrgId]);
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    syncPaymentApplicationSequenceForOrg(currentOrgId, payments);
+  }, [payments, currentOrgId]);
 
   const getHighestInvoiceGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
     return entries.reduce((max, entry) => {
@@ -805,24 +910,171 @@ export default function App() {
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
         const loadedPayments = (data.payments || []).filter(p => !p.isDeleted) as Payment[];
-        const loadedPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        const rawPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        const paymentMap = new Map(loadedPayments.map(payment => [payment.id, payment]));
+        const paymentApplicationNumberCounters = new Map<string, number>();
+        const paymentApplicationNumberBackfills: Array<{ id: string; applicationNo: string }> = [];
+        const paymentApplicationGlBackfills: Array<{ id: string; glReference: string }> = [];
+        const paymentApplicationJournalBackfills = new Map<string, { reference: string; description: string }>();
+
+        rawPaymentApplications.forEach(application => {
+          const payment = paymentMap.get(application.paymentId);
+          if (!payment?.orgId) return;
+          const year = application.createdAt
+            ? new Date(application.createdAt).getFullYear()
+            : new Date().getFullYear();
+          const sequence = extractPaymentApplicationSequence(application.applicationNo, year);
+          if (sequence <= 0) return;
+          const key = getPaymentApplicationSequenceKey(payment.orgId, year);
+          paymentApplicationNumberCounters.set(key, Math.max(paymentApplicationNumberCounters.get(key) || 0, sequence));
+        });
+
+        const loadedPaymentApplications = rawPaymentApplications
+          .slice()
+          .sort((a, b) => {
+            const createdAtDiff = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+            if (createdAtDiff !== 0) return createdAtDiff;
+            return String(a.id || '').localeCompare(String(b.id || ''));
+          })
+          .map(application => {
+            const payment = paymentMap.get(application.paymentId);
+            const orgId = payment?.orgId || currentOrgId;
+            const year = application.createdAt
+              ? new Date(application.createdAt).getFullYear()
+              : new Date().getFullYear();
+            const key = getPaymentApplicationSequenceKey(orgId, year);
+
+            let applicationNo = String(application.applicationNo || '').trim();
+            if (!applicationNo) {
+              const nextSequence = (paymentApplicationNumberCounters.get(key) || 0) + 1;
+              paymentApplicationNumberCounters.set(key, nextSequence);
+              applicationNo = formatPaymentApplicationNo(year, nextSequence);
+              paymentApplicationNumberBackfills.push({ id: application.id, applicationNo });
+            }
+
+            const applicationJournalDetail = applicationNo;
+            const journalEntry = application.journalEntryId
+              ? normalizedEntries.find(entry => entry.id === application.journalEntryId)
+              : undefined;
+
+            if (
+              journalEntry &&
+              String(journalEntry.sourceType || '').toUpperCase() === 'APPLICATION' &&
+              (
+                String(journalEntry.reference || '').trim() !== applicationJournalDetail ||
+                String(journalEntry.description || '').trim() !== applicationJournalDetail
+              )
+            ) {
+              journalEntry.reference = applicationJournalDetail;
+              journalEntry.description = applicationJournalDetail;
+              paymentApplicationJournalBackfills.set(journalEntry.id, {
+                reference: applicationJournalDetail,
+                description: applicationJournalDetail
+              });
+            }
+
+            let glReference = application.glReference;
+            if (!glReference && journalEntry) {
+              const resolvedGlRef = String(journalEntry?.glEntryNumber || journalEntry?.reference || '').trim();
+              if (resolvedGlRef) {
+                glReference = resolvedGlRef;
+                paymentApplicationGlBackfills.push({ id: application.id, glReference: resolvedGlRef });
+              }
+            }
+
+            return {
+              ...application,
+              orgId,
+              applicationNo,
+              glReference
+            } as PaymentApplication;
+          });
+
+        if (paymentApplicationNumberBackfills.length > 0) {
+          Promise.allSettled(
+            paymentApplicationNumberBackfills.map((applicationBackfill) =>
+              dataService.updateEntity('payment_applications', applicationBackfill.id, {
+                applicationNo: applicationBackfill.applicationNo,
+                updatedAt: new Date().toISOString()
+              })
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application number backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application numbers');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application numbers', err));
+        }
+
+        if (paymentApplicationGlBackfills.length > 0) {
+          Promise.allSettled(
+            paymentApplicationGlBackfills.map((applicationBackfill) =>
+              dataService.updateEntity('payment_applications', applicationBackfill.id, {
+                glReference: applicationBackfill.glReference,
+                updatedAt: new Date().toISOString()
+              })
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application GL reference backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application GL references');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application GL references', err));
+        }
+
+        if (paymentApplicationJournalBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(paymentApplicationJournalBackfills.entries()).map(([id, updates]) =>
+              dataService.updateJournalEntry(id, updates)
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application journal reference/details backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application journal reference/details');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application journal reference/details', err));
+        }
         // backfill payment records with glEntryNumber from their journal entries
         const paymentGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
+        const paymentStatusBackfills: Array<{ id: string; status: Payment['status'] }> = [];
         const paymentJournalDescriptionBackfills = new Map<string, string>();
         const paymentLineBackfills = new Map<string, Partial<JournalLine>>();
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
           const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
           const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
-        const paymentTransactionDescription = resolvePaymentTransactionDescription(payment);
-        
-        let glEntryNumber = payment.glEntryNumber;
-        if (!glEntryNumber && payment.journalEntryId) {
-          const je = normalizedEntries.find(e => e.id === payment.journalEntryId);
+          const paymentTransactionDescription = resolvePaymentTransactionDescription(payment);
+          const resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0);
+          const resolvedStatus = resolveAppliedPaymentStatus(
+            payment,
+            payment.totalApplied ?? appliedTotal,
+            resolvedBalance
+          );
+          const persistableResolvedStatus = getPersistablePaymentStatus(resolvedStatus);
+
+          let glEntryNumber = payment.glEntryNumber;
+          if (!glEntryNumber && payment.journalEntryId) {
+            const je = normalizedEntries.find(e => e.id === payment.journalEntryId);
             if (je && je.glEntryNumber) {
               glEntryNumber = je.glEntryNumber;
               paymentGlBackfills.push({ id: payment.id, glEntryNumber: je.glEntryNumber });
             }
+          }
+
+          if (resolvedStatus !== 'CLOSED' && persistableResolvedStatus !== payment.status) {
+            paymentStatusBackfills.push({ id: payment.id, status: persistableResolvedStatus });
           }
 
           if (payment.journalEntryId) {
@@ -867,10 +1119,11 @@ export default function App() {
 
           return {
             ...payment,
+            status: resolvedStatus,
             glEntryNumber,
             applications: apps,
             totalApplied: payment.totalApplied ?? appliedTotal,
-            customerDepositBalance: payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0)
+            customerDepositBalance: resolvedBalance
           } as Payment;
         });
 
@@ -882,6 +1135,25 @@ export default function App() {
           )
             .then(() => console.info('[App] backfilled missing payment GL references'))
             .catch(err => console.warn('[App] failed to backfill payment GL references', err));
+        }
+        if (paymentStatusBackfills.length > 0) {
+          Promise.allSettled(
+            paymentStatusBackfills.map((paymentBackfill) => {
+              return dataService.updateEntity('payments', paymentBackfill.id, {
+                status: paymentBackfill.status,
+                updatedAt: new Date().toISOString()
+              });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment status backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment lifecycle statuses');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment lifecycle statuses', err));
         }
         if (paymentLineBackfills.size > 0) {
           Promise.allSettled(
@@ -4211,6 +4483,70 @@ export default function App() {
     return `PAY-${year}-${String(next).padStart(5, '0')}`;
   };
 
+  const getConflictingInvoiceLinkedPayment = (sourceInvoiceId?: string, excludePaymentId?: string) => {
+    const normalizedInvoiceId = String(sourceInvoiceId || '').trim();
+    if (!normalizedInvoiceId) return undefined;
+
+    return payments.find(existingPayment =>
+      existingPayment.orgId === currentOrgId &&
+      existingPayment.id !== excludePaymentId &&
+      !existingPayment.isDeleted &&
+      existingPayment.status !== 'VOIDED' &&
+      String(existingPayment.sourceInvoiceId || '').trim() === normalizedInvoiceId
+    );
+  };
+
+  const formatPaymentWorkflowStatus = (status?: Payment['status']) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'Draft';
+      case 'OPEN':
+      case 'POSTED':
+      case 'CLOSED':
+        return 'Approved';
+      case 'VOIDED':
+        return 'Voided';
+      default:
+        return 'Saved';
+    }
+  };
+
+  const validatePaymentInvoiceLink = (payment?: PaymentWithSource, excludePaymentId?: string): string => {
+    const sourceInvoiceId = String(payment?.sourceInvoiceId || '').trim();
+    if (!sourceInvoiceId) {
+      return 'Invoice No. is required before saving or approving payment.';
+    }
+
+    const sourceInvoice = invoices.find(invoice =>
+      invoice.id === sourceInvoiceId &&
+      invoice.orgId === currentOrgId &&
+      !invoice.isDeleted
+    );
+
+    if (!sourceInvoice) {
+      return 'Selected invoice could not be found for this organization.';
+    }
+
+    if (sourceInvoice.status === 'VOIDED') {
+      return `Invoice ${sourceInvoice.invoiceNo} has been voided and cannot be tagged to a payment.`;
+    }
+
+    const payorMatches = (
+      (sourceInvoice.sponsorId || '') === (payment?.sponsorId || '') &&
+      (sourceInvoice.studentId || '') === (payment?.studentId || '')
+    );
+    if (!payorMatches) {
+      return `Invoice ${sourceInvoice.invoiceNo} is linked to a different payor. Select the matching sponsor or student before saving this payment.`;
+    }
+
+    const conflictingPayment = getConflictingInvoiceLinkedPayment(sourceInvoiceId, excludePaymentId ?? payment?.id);
+    if (conflictingPayment) {
+      return `A payment already exists for invoice ${sourceInvoice.invoiceNo} (${conflictingPayment.paymentNo}, ${formatPaymentWorkflowStatus(conflictingPayment.status)}). Review, edit, or complete the existing payment instead of creating a new one.`;
+    }
+
+    return '';
+  };
+
   const handleAddPayment = async (payment: PaymentWithSource) => {
     try {
       console.info('[App] Creating payment:', payment.paymentNo);
@@ -4234,6 +4570,12 @@ export default function App() {
         updatedAt: new Date().toISOString()
         // Note: paymentNo will be server-generated atomically by payments-write edge function
       };
+
+      const invoiceLinkError = validatePaymentInvoiceLink(paymentToCreate);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
+        return;
+      }
 
       if (paymentToCreate.status === 'DRAFT' || paymentToCreate.status === 'OPEN') {
         const requiredFieldsError = validatePaymentRequiredFields(paymentToCreate);
@@ -4297,6 +4639,11 @@ export default function App() {
         sourceInvoiceId: payment.sourceInvoiceId ?? (existing as PaymentWithSource).sourceInvoiceId,
         updatedAt: new Date().toISOString()
       };
+      const invoiceLinkError = validatePaymentInvoiceLink(updates, existing.id);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
+        return;
+      }
       const savedPayment = await dataService.updateEntity('payments', payment.id, updates);
       const persistedPayment = {
         ...existing,
@@ -4325,8 +4672,9 @@ export default function App() {
     return payment ? `Payment ${payment.paymentNo}` : '';
   };
 
-  const validatePaymentRequiredFields = (payment?: Pick<Payment, 'crNo' | 'notes'> | null): string => {
+  const validatePaymentRequiredFields = (payment?: Pick<PaymentWithSource, 'crNo' | 'notes' | 'sourceInvoiceId'> | null): string => {
     const missingFields: string[] = [];
+    if (!String(payment?.sourceInvoiceId || '').trim()) missingFields.push('Invoice No.');
     if (!String(payment?.notes || '').trim()) missingFields.push('Transaction Description');
     if (!String(payment?.crNo || '').trim()) missingFields.push('C.R. No.');
 
@@ -4354,6 +4702,11 @@ export default function App() {
       const paymentRequiredFieldsError = validatePaymentRequiredFields(paymentToApproveRecord);
       if (paymentRequiredFieldsError) {
         handleNotify('error', paymentRequiredFieldsError);
+        return;
+      }
+      const invoiceLinkError = validatePaymentInvoiceLink(paymentToApproveRecord, paymentToApprove.id);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
         return;
       }
       const paymentTransactionDescription = resolvePaymentTransactionDescription(paymentToApproveRecord);
@@ -4556,6 +4909,15 @@ export default function App() {
       handleNotify('error', 'Apply amount must be greater than zero.');
       return;
     }
+    if (!isFinalizedPaymentStatus(payment.status)) {
+      handleNotify('error', 'Only posted or finalized payments can be applied to invoices.');
+      return;
+    }
+    const availablePaymentBalance = getPaymentAvailableBalance(payment);
+    if (availablePaymentBalance + 0.01 < amount) {
+      handleNotify('error', 'Apply amount exceeds the remaining unapplied balance of this payment.');
+      return;
+    }
     const applyKey = `${paymentId}:${invoiceId}`;
     if (applyingPaymentKeysRef.current.has(applyKey)) {
       return;
@@ -4579,6 +4941,7 @@ export default function App() {
 
       const applicationId = generateUUID();
       const applicationTs = new Date().toISOString();
+      const generatedApplicationNo = generateNextPaymentApplicationNo(currentOrgId, applicationTs);
 
       // Persist application first to avoid duplicate GL posting on retries.
       const newApplication = {
@@ -4586,12 +4949,16 @@ export default function App() {
         orgId: currentOrgId,
         paymentId,
         invoiceId,
+        applicationNo: generatedApplicationNo,
         amountApplied: amount,
         isReversed: false,
+        createdBy: currentUser?.id || 'system',
         createdAt: applicationTs,
         updatedAt: applicationTs
       };
       const savedApplication = await dataService.createEntity('payment_applications', newApplication) as PaymentApplication;
+      const applicationNo = String(savedApplication.applicationNo || generatedApplicationNo).trim() || generatedApplicationNo;
+      const applicationJournalDetail = applicationNo;
 
       // Reuse an existing GL entry for this application id if present (idempotent)
       let savedApplicationEntry = journalEntries.find(
@@ -4602,7 +4969,8 @@ export default function App() {
           orgId: currentOrgId,
           periodId: invoice.periodId || '',
           date: new Date().toISOString().split('T')[0],
-          description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+          reference: applicationJournalDetail,
+          description: applicationJournalDetail,
           status: 'POSTED',
           sourceType: 'APPLICATION',
           sourceRef: savedApplication.id,
@@ -4617,7 +4985,8 @@ export default function App() {
             accountId: depositsAcct.id,
             debit: amount,
             credit: 0,
-            description: 'Apply from Customer Deposits'
+            description: applicationJournalDetail,
+            memo: applicationJournalDetail
           },
           {
             id: `jl-${Date.now()}-2`,
@@ -4626,7 +4995,8 @@ export default function App() {
             accountId: arAcct.id,
             debit: 0,
             credit: amount,
-            description: 'Reduce Accounts Receivable'
+            description: applicationJournalDetail,
+            memo: applicationJournalDetail
           }
         ];
         const posted = await handlePostJournal(applEntry, applLines);
@@ -4637,28 +5007,67 @@ export default function App() {
         savedApplicationEntry = posted;
       }
 
+      if (
+        savedApplicationEntry &&
+        (
+          String(savedApplicationEntry.reference || '').trim() !== applicationJournalDetail ||
+          String(savedApplicationEntry.description || '').trim() !== applicationJournalDetail
+        )
+      ) {
+        try {
+          const alignedApplicationEntry = await dataService.updateJournalEntry(savedApplicationEntry.id, {
+            reference: applicationJournalDetail,
+            description: applicationJournalDetail
+          });
+          savedApplicationEntry = {
+            ...savedApplicationEntry,
+            ...alignedApplicationEntry
+          };
+        } catch (journalAlignErr) {
+          console.warn('[App] Payment application journal reference/details alignment skipped:', journalAlignErr);
+        }
+      }
+
       // Best-effort linkage update (auto-stripped if columns are missing in DB schema)
+      const applicationUpdatedAt = new Date().toISOString();
       try {
         await dataService.updateEntity('payment_applications', savedApplication.id, {
+          applicationNo,
           glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
           journalEntryId: savedApplicationEntry.id,
-          updatedAt: new Date().toISOString()
+          updatedAt: applicationUpdatedAt
         });
       } catch (linkErr) {
         console.warn('[App] Payment application GL linkage update skipped due schema mismatch:', linkErr);
       }
 
+      const persistedApplication: PaymentApplication = {
+        ...savedApplication,
+        orgId: currentOrgId,
+        applicationNo,
+        glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
+        journalEntryId: savedApplicationEntry.id,
+        updatedAt: applicationUpdatedAt
+      };
+
       // 2. Persist Payment application totals.
       const updatedPayment = {
         ...payment,
-        applications: [...(payment.applications || []), savedApplication],
+        applications: [...(payment.applications || []), persistedApplication],
         totalApplied: (payment.totalApplied || 0) + amount,
-        customerDepositBalance: (payment.customerDepositBalance || 0) - amount,
+        customerDepositBalance: Math.max(availablePaymentBalance - amount, 0),
+        status: resolveAppliedPaymentStatus(
+          payment,
+          (payment.totalApplied || 0) + amount,
+          Math.max(availablePaymentBalance - amount, 0)
+        ),
         updatedAt: new Date().toISOString()
       };
+      const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
       await dataService.updateEntity('payments', paymentId, {
         totalApplied: updatedPayment.totalApplied,
         customerDepositBalance: updatedPayment.customerDepositBalance,
+        status: persistedPaymentStatus,
         updatedAt: updatedPayment.updatedAt
       });
       setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
@@ -4666,7 +5075,7 @@ export default function App() {
       // 3. Persist Invoice balance/status update.
       const newAmountPaid = (invoice.amountPaid || 0) + amount;
       const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
-      const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
+      const newStatus = resolvePaidInvoiceStatus(invoice, newBalanceDue);
       const updatedInvoice = await dataService.updateInvoice(invoiceId, {
         amountPaid: newAmountPaid,
         balanceDue: newBalanceDue,
@@ -4675,7 +5084,7 @@ export default function App() {
       });
       setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, ...(updatedInvoice as Invoice) } : i));
 
-      handleNotify('success', `Applied ${invoice.invoiceNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
+      handleNotify('success', `Applied ${invoice.invoiceNo} via ${applicationNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('idx_unique_active_application') || msg.includes('duplicate key value')) {
@@ -4718,9 +5127,15 @@ export default function App() {
       ...payment,
       applications: updatedApplications,
       totalApplied: (payment.totalApplied || 0) - reversedAmount,
-      customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount,
+      customerDepositBalance: getPaymentAvailableBalance(payment) + reversedAmount,
+      status: resolveAppliedPaymentStatus(
+        payment,
+        (payment.totalApplied || 0) - reversedAmount,
+        getPaymentAvailableBalance(payment) + reversedAmount
+      ),
       updatedAt: new Date().toISOString()
     };
+    const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
     await dataService.updateEntity('payment_applications', applicationId, {
       isReversed: true,
       reversalReason: reason,
@@ -4731,14 +5146,15 @@ export default function App() {
     await dataService.updateEntity('payments', paymentId, {
       totalApplied: updatedPayment.totalApplied,
       customerDepositBalance: updatedPayment.customerDepositBalance,
+      status: persistedPaymentStatus,
       updatedAt: updatedPayment.updatedAt
     });
     setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
     // 2. Update Invoice Balance and Status
-    const newAmountPaid = (invoice.amountPaid || 0) - reversedAmount;
+    const newAmountPaid = Math.max((invoice.amountPaid || 0) - reversedAmount, 0);
     const newBalanceDue = (invoice.balanceDue || 0) + reversedAmount;
-    const newStatus = invoice.status === 'CLOSED' ? 'OPEN' : invoice.status;
+    const newStatus = resolvePaidInvoiceStatus(invoice, newBalanceDue);
     const updatedInvoice = {
       ...invoice,
       amountPaid: newAmountPaid,

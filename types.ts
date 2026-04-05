@@ -742,8 +742,10 @@ export type PaymentMethod = 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' |
 
 export interface PaymentApplication extends BaseEntity {
   id: string;
+  orgId: string;
   paymentId: string;            // FK to Payment
   invoiceId: string;            // FK to Invoice
+  applicationNo?: string;       // Human-readable application number (e.g., PAYAPP-2026-00001)
   amountApplied: number;        // Amount applied to this invoice
   glReference?: string;         // Auto-generated GL reference (e.g., GL00000042)
   journalEntryId?: string;      // FK to journal entry created by application
