@@ -1,42 +1,57 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount } from '../types';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
   AlertTriangle,
   ArrowRight,
   ArrowLeft,
+  ArrowUpDown,
   Building2,
   Calendar,
   CheckCircle,
+  ChevronDown,
+  ChevronUp,
   CreditCard,
+  Clock,
+  Download,
+  DollarSign,
+  FileSpreadsheet,
   Landmark,
   Plus,
+  Printer,
   Save,
   Search,
+  Send,
+  CornerUpLeft,
   User,
   Wallet,
   X,
   XCircle,
   RotateCcw,
-  FileText
+  FileText,
+  CheckSquare
 } from 'lucide-react';
 
 interface PaymentsViewProps {
   currentOrgId: string;  // Current organization for org_id separation
+  organization?: Organization;
   payments: Payment[];
   sponsors: Sponsor[];
   students: Student[];
+  users?: AppUser[];
   invoices: Invoice[];
   bankAccounts: BankAccount[];
   accounts: ChartOfAccount[];
+  journalEntries: JournalEntry[];
   currency: string;
   onAddPayment: (payment: Payment) => void;
   onUpdatePayment: (payment: Payment) => void;
   onDeletePayment: (id: string) => Promise<boolean>;
   onPostPayment?: (payment: Payment) => void;
   onVoidPayment?: (id: string, reason: string) => void;
-  onApplyToInvoice?: (paymentId: string, invoiceId: string, amount: number) => void;
+  onApplyToInvoice?: (paymentId: string, invoiceId: string, amount: number) => Promise<void> | void;
   onReverseApplication?: (paymentId: string, applicationId: string, reason: string) => void;
   onViewJournal?: (journalEntryId: string) => void;
   initialContext?: { viewMode: ViewMode; invoice?: Invoice };
@@ -45,15 +60,47 @@ interface PaymentsViewProps {
 
 type PayorType = 'SPONSOR' | 'STUDENT';
 type ViewMode = 'list' | 'create-payment' | 'apply-payment' | 'payment-details';
+type ListTab = 'payments' | 'applications';
+type ApplicationListTab = 'unapplied' | 'applied';
+type PaymentRegistryColumn = {
+  key: string;
+  label: string;
+  align: 'text-left' | 'text-center' | 'text-right';
+  minWidth: number;
+  sortKey?: string;
+  value: (payment: Payment) => string | number;
+  render: (payment: Payment) => React.ReactNode;
+};
+
+type ApplicationRegistryColumn = {
+  key: string;
+  label: string;
+  align: 'text-left' | 'text-center' | 'text-right';
+  minWidth: number;
+  sortKey?: string;
+  value?: (payment: Payment) => string | number;
+  render: (payment: Payment) => React.ReactNode;
+};
+
+type ApplyPaymentColumn = {
+  key: string;
+  label: string;
+  align: 'text-left' | 'text-center' | 'text-right';
+  minWidth: number;
+  render: (inv: Invoice, invoiceSelectionMap: Record<string, boolean>, invoiceApplyMap: Record<string, number>, transactionDescriptions: Record<string, string>, setTransactionDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>, handleInvoiceTick: (inv: Invoice, checked: boolean) => void) => React.ReactNode;
+};
 
 const PaymentsView: React.FC<PaymentsViewProps> = ({
   currentOrgId,
+  organization,
   payments,
   sponsors,
   students,
+  users = [],
   invoices,
   bankAccounts,
   accounts,
+  journalEntries,
   currency,
   onAddPayment,
   onUpdatePayment,
@@ -61,6 +108,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   onPostPayment,
   onVoidPayment,
   onApplyToInvoice,
+  onReverseApplication,
   onViewJournal,
   initialContext,
   onClearContext
@@ -70,16 +118,29 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   // View mode management
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [listTab, setListTab] = useState<ListTab>('payments');
+  const [applicationListTab, setApplicationListTab] = useState<ApplicationListTab>('unapplied');
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [payorType, setPayorType] = useState<PayorType>('SPONSOR');
+  const [sourceInvoiceId, setSourceInvoiceId] = useState<string | undefined>(undefined);
   
   // List filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'ALL'>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | 'none' }>({ key: 'paymentDate', direction: 'desc' });
+  const [showPayerDropdown, setShowPayerDropdown] = useState(false);
+  const [payerFilterMode, setPayerFilterMode] = useState<'ALL' | 'CUSTOM'>('ALL');
+  const [payerSearchTerm, setPayerSearchTerm] = useState('');
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   
   // Application state
   const [invoiceApplyMap, setInvoiceApplyMap] = useState<Record<string, number>>({});
   const [invoiceSelectionMap, setInvoiceSelectionMap] = useState<Record<string, boolean>>({});
+  const [transactionDescriptions, setTransactionDescriptions] = useState<Record<string, string>>({});
   const [openInvoicesForPayor, setOpenInvoicesForPayor] = useState<Invoice[]>([]);
   const [isFetchingOpenInvoices, setIsFetchingOpenInvoices] = useState(false);
   
@@ -91,9 +152,36 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [reverseReason, setReverseReason] = useState('');
   const [showReverseModal, setShowReverseModal] = useState(false);
 
+  // Drag-and-drop column ordering state (registry table)
+  const [columnOrder, setColumnOrder] = useState<string[]>([
+    'date', 'postPeriod', 'paymentNo', 'status', 'glReference', 'payor', 'method', 'amountReceived', 'amountApplied', 'balance', 'createdBy', 'createdOn'
+  ]);
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+  const [applicationColumnOrder, setApplicationColumnOrder] = useState<string[]>([
+    'date', 'postPeriod', 'paymentApplicationNo', 'invoiceNo', 'status', 'glReference', 'payor', 'amountReceived', 'amountApplied', 'balance', 'applications'
+  ]);
+  const [draggedApplicationColumnIdx, setDraggedApplicationColumnIdx] = useState<number | null>(null);
+
+  // Column resize state (registry table)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+  const [applicationColumnWidths, setApplicationColumnWidths] = useState<Record<string, number>>({});
+  const applicationResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  // Drag-and-drop column ordering state (apply payment table)
+  const [applyPaymentColumnOrder, setApplyPaymentColumnOrder] = useState<string[]>([
+    'apply', 'invoiceNo', 'date', 'postPeriod', 'transactionDescription', 'amountDue', 'applyAmount'
+  ]);
+  const [draggedApplyPaymentColumnIdx, setDraggedApplyPaymentColumnIdx] = useState<number | null>(null);
+
+  // Column resize state (apply payment table)
+  const [applyPaymentColumnWidths, setApplyPaymentColumnWidths] = useState<Record<string, number>>({});
+  const applyPaymentResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
   // Form data
   const [formData, setFormData] = useState({
     paymentNo: '',
+    crNo: '',
     sponsorId: '',
     studentId: '',
     paymentDate: new Date().toISOString().split('T')[0],
@@ -115,6 +203,26 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     style: 'currency',
     currency: currency || 'PHP'
   }).format(amount || 0);
+
+  const formatInputCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value ?? 0);
+  };
+
+  const formatPesoKpiAmount = (amount: number) => {
+    if ((currency || 'PHP') === 'PHP') {
+      return `₱${formatInputCurrency(amount)}`;
+    }
+    return formatCurrency(amount);
+  };
+
+  const parseInputCurrency = (value: string) => {
+    const cleaned = value.replace(/,/g, '').replace(/\s/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   const generatePaymentNo = () => {
     const year = new Date().getFullYear();
@@ -143,11 +251,177 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return `PAY-${year}-${String(nextNum).padStart(5, '0')}`;
   };
 
+  const generatePaymentApplicationNo = (reservedApplicationNos?: Set<string>) => {
+    const year = new Date().getFullYear();
+    const existingNums = payments
+      .flatMap(payment => payment.applications || [])
+      .map(application => {
+        const match = String(application.applicationNo || '').trim().match(/^PAYAPP-\d{4}-(\d+)$/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => n > 0);
+
+    const existingSet = new Set(existingNums);
+    let nextNum = existingNums.length ? Math.max(...existingNums) + 1 : 1;
+
+    while (existingSet.has(nextNum) || reservedApplicationNos?.has(`PAYAPP-${year}-${String(nextNum).padStart(5, '0')}`)) {
+      nextNum += 1;
+    }
+
+    return `PAYAPP-${year}-${String(nextNum).padStart(5, '0')}`;
+  };
+
   const getPayorName = (payment: Payment) => {
     if (payment.sponsorId) return sponsors.find(s => s.id === payment.sponsorId)?.name || '-';
     const student = students.find(s => s.id === payment.studentId);
     return student ? `${student.lastName}, ${student.firstName}` : '-';
   };
+
+  const getInvoicePayorName = (invoice: Invoice) => {
+    if (invoice.sponsorId) return sponsors.find(s => s.id === invoice.sponsorId)?.name || '-';
+    const student = students.find(s => s.id === invoice.studentId);
+    return student ? `${student.lastName}, ${student.firstName}` : '-';
+  };
+
+  const selectedSourceInvoice = useMemo(
+    () => invoices.find(invoice => invoice.id === sourceInvoiceId),
+    [invoices, sourceInvoiceId]
+  );
+
+  const invoiceSelectionOptions = useMemo(() => {
+    const selectedId = sourceInvoiceId;
+    const hasSelectedPayor = !!selectedPayorId;
+
+    return invoices
+      .filter(invoice => {
+        if (invoice.orgId !== currentOrgId) return false;
+        if (invoice.status === 'VOIDED') return false;
+        if (selectedId && invoice.id === selectedId) return true;
+        if (!hasSelectedPayor) return false;
+        if (payorType === 'SPONSOR') return invoice.sponsorId === formData.sponsorId && invoice.status === 'OPEN';
+        return invoice.studentId === formData.studentId && invoice.status === 'OPEN';
+      })
+      .sort((a, b) => {
+        const dateDiff = new Date(b.invoiceDate || 0).getTime() - new Date(a.invoiceDate || 0).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return String(a.invoiceNo || '').localeCompare(String(b.invoiceNo || ''), undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [invoices, sourceInvoiceId, selectedPayorId, currentOrgId, payorType, formData.sponsorId, formData.studentId]);
+
+  const existingLinkedInvoicePayment = useMemo(() => {
+    if (!sourceInvoiceId) return null;
+
+    return payments.find(payment =>
+      payment.id !== editingPayment?.id &&
+      payment.orgId === currentOrgId &&
+      !payment.isDeleted &&
+      payment.status !== 'VOIDED' &&
+      payment.sourceInvoiceId === sourceInvoiceId
+    ) || null;
+  }, [payments, editingPayment?.id, currentOrgId, sourceInvoiceId]);
+
+  const existingLinkedInvoicePaymentStatusLabel = existingLinkedInvoicePayment
+    ? (existingLinkedInvoicePayment.status === 'DRAFT'
+      ? 'Draft'
+      : existingLinkedInvoicePayment.status === 'CLOSED'
+        ? 'Closed'
+        : 'Approved')
+    : '';
+
+  const getTotalPaymentCredit = (payment: Payment) =>
+    Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0);
+
+  const getAvailablePaymentBalance = (payment: Payment) => {
+    const explicitBalance = Number(payment.customerDepositBalance ?? NaN);
+    if (Number.isFinite(explicitBalance)) {
+      return Math.max(explicitBalance, 0);
+    }
+    return Math.max(getTotalPaymentCredit(payment) - Number(payment.totalApplied ?? 0), 0);
+  };
+
+  const getActiveApplications = (payment: Payment) =>
+    (payment.applications || []).filter(app => !app.isReversed);
+
+  const isAppliedPayment = (payment: Payment) =>
+    getActiveApplications(payment).length > 0 || Number(payment.totalApplied ?? 0) > 0;
+
+  const getPaymentApplicationRecords = (payment: Payment) =>
+    getActiveApplications(payment)
+      .slice()
+      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+
+  const getPaymentApplicationNo = (application: PaymentApplication) => {
+    const savedApplicationNo = String(application.applicationNo || '').trim();
+    if (savedApplicationNo) return savedApplicationNo;
+
+    const createdYear = application.createdAt
+      ? new Date(application.createdAt).getFullYear()
+      : new Date().getFullYear();
+    const suffix = String(application.id || '')
+      .replace(/-/g, '')
+      .slice(-6)
+      .toUpperCase();
+
+    return `PAYAPP-${createdYear}-${suffix || 'PENDING'}`;
+  };
+
+  const getPaymentApplicationNumberLabel = (payment: Payment) => {
+    const applications = getPaymentApplicationRecords(payment);
+    if (applications.length === 0) return '-';
+    return applications.map(getPaymentApplicationNo).join(', ');
+  };
+
+  const getPaymentApplicationGlReferenceLabel = (payment: Payment) => {
+    const applications = getPaymentApplicationRecords(payment);
+    if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending';
+    return applications.map(application => {
+      if (application.glReference) return application.glReference;
+      // Fallback: look up GL reference from journal entry
+      if (application.journalEntryId) {
+        const journalEntry = journalEntries.find(je => je.id === application.journalEntryId);
+        if (journalEntry?.glEntryNumber) return journalEntry.glEntryNumber;
+      }
+      return 'Pending';
+    }).join(', ');
+  };
+
+  const isInvoiceSettled = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
+    !!invoice && (invoice.status === 'CLOSED' || Number(invoice.balanceDue ?? 0) <= 0.01);
+
+  const isPaymentPostedOrFinalized = (payment?: Pick<Payment, 'status' | 'postedAt' | 'journalEntryId'> | null) =>
+    !!payment && payment.status !== 'DRAFT' && payment.status !== 'VOIDED' &&
+    (payment.status === 'OPEN' || payment.status === 'POSTED' || payment.status === 'CLOSED' || !!payment.postedAt || !!payment.journalEntryId);
+
+  const getApplicationStatusLabel = (payment: Payment, application: PaymentApplication) => {
+    if (application.isReversed) return 'REVERSED';
+
+    const invoice = invoices.find(inv => inv.id === application.invoiceId);
+    const isConfirmed = isPaymentPostedOrFinalized(payment);
+    const fullyAllocated = Number(application.amountApplied ?? 0) > 0;
+
+    if (isConfirmed && fullyAllocated && isInvoiceSettled(invoice)) {
+      return 'CLOSED';
+    }
+
+    return 'OPEN';
+  };
+
+  const getApplicationRegistryStatus = (payment: Payment): PaymentStatus => {
+    if (payment.status === 'VOIDED' || payment.status === 'DRAFT') {
+      return payment.status;
+    }
+
+    const activeApplications = getActiveApplications(payment);
+    if (activeApplications.length === 0) {
+      return payment.status === 'CLOSED' && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+    }
+
+    const allApplicationsClosed = activeApplications.every(app => getApplicationStatusLabel(payment, app) === 'CLOSED');
+    return allApplicationsClosed && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+  };
+
+  const canApplyPayment = (payment: Payment) =>
+    (payment.status === 'OPEN' || payment.status === 'POSTED') && getAvailablePaymentBalance(payment) > 0.01;
 
   const getCashGlAccount = (bankId?: string) => {
     if (!bankId) return undefined;
@@ -265,27 +539,55 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return CASH_ON_HAND_UNDEPOSITED_ID;
   }, [bankAccounts]);
 
+  const buildBlankPaymentForm = () => ({
+    paymentNo: generatePaymentNo(),
+    crNo: '',
+    sponsorId: '',
+    studentId: '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMethod: 'BANK_TRANSFER' as PaymentMethod,
+    refNo: '',
+    bankAccountId: defaultCashAccountId,
+    checkNumber: '',
+    checkDate: '',
+    amountReceived: 0,
+    ewtAmountCertified: 0,
+    notes: ''
+  });
+
   // Initialize form for new payment
   const startNewPayment = () => {
     setEditingPayment(null);
+    setSourceInvoiceId(undefined);
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setPayorType('SPONSOR');
-    setFormData({
-      paymentNo: generatePaymentNo(),
-      sponsorId: '',
-      studentId: '',
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'BANK_TRANSFER',
-      refNo: '',
-      bankAccountId: defaultCashAccountId,
-      checkNumber: '',
-      checkDate: '',
-      amountReceived: 0,
-      ewtAmountCertified: 0,
-      notes: ''
-    });
+    setFormData(buildBlankPaymentForm());
     setViewMode('create-payment');
+  };
+
+  const startNewPaymentApplication = () => {
+    setApplicationListTab('unapplied');
+    const paymentToApply =
+      unappliedPaymentList.find(payment => canApplyPayment(payment)) ||
+      appliedPaymentList.find(payment => canApplyPayment(payment));
+
+    if (!paymentToApply) {
+      alert('No open payment with available balance is ready for application. Create or post a payment first.');
+      return;
+    }
+
+    loadPaymentForApplication(paymentToApply);
+  };
+
+  const discardPaymentChanges = () => {
+    setEditingPayment(null);
+    setSourceInvoiceId(undefined);
+    setInvoiceApplyMap({});
+    setInvoiceSelectionMap({});
+    setPayorType('SPONSOR');
+    setFormData(buildBlankPaymentForm());
+    setViewMode('list');
   };
 
   // Load payment for editing/viewing if it's in draft status
@@ -296,11 +598,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
     
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -319,11 +623,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Load payment for viewing in the payment interface (for all statuses)
   const loadPaymentForViewing = (payment: Payment) => {
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -347,11 +653,14 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Load payment for applying
   const loadPaymentForApplication = (payment: Payment) => {
     setEditingPayment(payment);
+    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
     setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
+    setTransactionDescriptions({});
     setFormData({
       paymentNo: payment.paymentNo,
+      crNo: payment.crNo || '',
       sponsorId: payment.sponsorId || '',
       studentId: payment.studentId || '',
       paymentDate: payment.paymentDate,
@@ -365,6 +674,160 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       notes: payment.notes || ''
     });
     setViewMode('apply-payment');
+  };
+
+  const handlePrintPayment = () => {
+    const printablePayment = {
+      ...(editingPayment || {}),
+      paymentNo: formData.paymentNo,
+      crNo: formData.crNo || editingPayment?.crNo || '',
+      sponsorId: formData.sponsorId || editingPayment?.sponsorId || '',
+      studentId: formData.studentId || editingPayment?.studentId || '',
+      paymentDate: formData.paymentDate,
+      paymentMethod: formData.paymentMethod,
+      refNo: formData.refNo || editingPayment?.refNo || '',
+      bankAccountId: formData.bankAccountId === CASH_ON_HAND_UNDEPOSITED_ID ? undefined : (formData.bankAccountId || editingPayment?.bankAccountId || ''),
+      checkNumber: formData.checkNumber || editingPayment?.checkNumber || '',
+      checkDate: formData.checkDate || editingPayment?.checkDate || '',
+      amountReceived: Number(formData.amountReceived ?? editingPayment?.amountReceived ?? 0),
+      ewtAmountCertified: Number(formData.ewtAmountCertified ?? editingPayment?.ewtAmountCertified ?? 0),
+      totalApplied: Number(editingPayment?.totalApplied ?? 0),
+      customerDepositBalance: Number(editingPayment?.customerDepositBalance ?? (Number(formData.amountReceived ?? 0) + Number(formData.ewtAmountCertified ?? 0))),
+      status: editingPayment?.status || 'DRAFT',
+      notes: formData.notes || editingPayment?.notes || '',
+      applications: editingPayment?.applications || []
+    } as Payment;
+
+    const payorName = getPayorName(printablePayment);
+    const activeApplications = (printablePayment.applications || []).filter(app => !app.isReversed);
+    const totalReceived = Number(printablePayment.amountReceived ?? 0) + Number(printablePayment.ewtAmountCertified ?? 0);
+    const dateLabel = printablePayment.paymentDate ? format(new Date(printablePayment.paymentDate), 'MM-dd-yyyy') : '-';
+    const statusLabel = getDisplayStatusLabel(printablePayment.status);
+    const bankLabel = getCashGlLabel(printablePayment.bankAccountId as string | undefined);
+    const esc = (value: any) =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Payment Voucher</title><style>
+      @page { size: landscape; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { margin:0; padding:20px; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+      .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #f3f4f6; }
+      .org { font-size:18px; font-weight:700; }
+      .title { font-size:22px; font-weight:800; color:#f47721; margin-top:4px; }
+      .sub { color:#6b7280; font-size:12px; margin-top:4px; }
+      .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+      .card { border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+      .card h3 { margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#4b5563; }
+      .row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:13px; }
+      .row span:first-child { color:#6b7280; }
+      .row span:last-child { font-weight:600; color:#111827; text-align:right; }
+      table { width:100%; border-collapse:collapse; font-size:12px; }
+      th { text-align:left; background:#f9fafb; color:#4b5563; text-transform:uppercase; font-size:10px; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid #e5e7eb; }
+      td { padding:8px 10px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+      td.num { text-align:right; white-space:nowrap; }
+      .footer { margin-top:18px; color:#9ca3af; font-size:10px; text-align:right; }
+    </style></head><body>
+      <div class="header">
+        <div>
+          <div class="org">${esc(organization?.name || 'Payment Registry')}</div>
+          <div class="title">Payment Voucher</div>
+          <div class="sub">Payment No. ${esc(printablePayment.paymentNo || '-')} | ${esc(dateLabel)} | ${esc(statusLabel)}</div>
+        </div>
+        <div class="sub" style="text-align:right">
+          Printed ${esc(new Date().toLocaleString('en-PH'))}
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Payment Information</h3>
+          <div class="row"><span>C.R. No.</span><span>${esc(printablePayment.crNo || '-')}</span></div>
+          <div class="row"><span>Payor</span><span>${esc(payorName || '-')}</span></div>
+          <div class="row"><span>Payment Method</span><span>${esc(printablePayment.paymentMethod || '-')}</span></div>
+          <div class="row"><span>Reference No.</span><span>${esc(printablePayment.refNo || '-')}</span></div>
+          <div class="row"><span>Cash Account</span><span>${esc(bankLabel || '-')}</span></div>
+          <div class="row"><span>Check Number</span><span>${esc(printablePayment.checkNumber || '-')}</span></div>
+          <div class="row"><span>Check Date</span><span>${esc(printablePayment.checkDate || '-')}</span></div>
+        </div>
+        <div class="card">
+          <h3>Amount Summary</h3>
+          <div class="row"><span>Amount Received</span><span>${formatCurrency(Number(printablePayment.amountReceived ?? 0))}</span></div>
+          <div class="row"><span>EWT Amount Certified</span><span>${formatCurrency(Number(printablePayment.ewtAmountCertified ?? 0))}</span></div>
+          <div class="row"><span>Total Received</span><span>${formatCurrency(totalReceived)}</span></div>
+          <div class="row"><span>Amount Applied</span><span>${formatCurrency(Number(printablePayment.totalApplied ?? 0))}</span></div>
+          <div class="row"><span>Unapplied Balance</span><span>${formatCurrency(Number(printablePayment.customerDepositBalance ?? 0))}</span></div>
+          <div class="row"><span>Status</span><span>${statusLabel}</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Invoice Applications</h3>
+        ${activeApplications.length === 0 ? '<div class="sub">No applications yet.</div>' : `
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Application Status</th>
+                <th class="num">Applied Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${activeApplications.map(app => {
+                const invoice = invoices.find(i => i.id === app.invoiceId);
+                return `<tr>
+                  <td>${esc(invoice?.invoiceNo || app.invoiceId)}</td>
+                  <td>${esc(getApplicationStatusLabel(printablePayment, app))}</td>
+                  <td class="num">${formatCurrency(Number(app.amountApplied ?? 0))}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        `}
+      </div>
+      ${printablePayment.notes ? `<div class="card" style="margin-top:16px"><h3>Transaction Description</h3><div class="sub" style="white-space:pre-wrap;color:#111827">${esc(printablePayment.notes).replace(/\n/g, '<br/>')}</div></div>` : ''}
+      <div class="footer">Generated by ${esc(organization?.name || 'AT-ERP')}</div>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Please allow popups to print the payment.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
+  };
+
+  const handleOpenApplyPayment = () => {
+    if (!editingPayment) {
+      alert('Save or open a payment before applying invoices.');
+      return;
+    }
+    if (editingPayment.status !== 'OPEN' && editingPayment.status !== 'POSTED') {
+      alert('Approve the payment before applying invoices.');
+      return;
+    }
+    if ((editingPayment.customerDepositBalance ?? 0) <= 0.01) {
+      alert('This payment has already been fully applied.');
+      return;
+    }
+    setViewMode('apply-payment');
+  };
+
+  const handleOpenReversePayment = () => {
+    if (!editingPayment) {
+      alert('Open a saved payment before reversing applications.');
+      return;
+    }
+    const hasActiveApplication = (editingPayment.applications || []).some(app => !app.isReversed);
+    if (!hasActiveApplication) {
+      alert('There are no active applications to reverse yet.');
+      return;
+    }
+    setViewMode('payment-details');
   };
 
   // Fetch open invoices for payor
@@ -414,12 +877,27 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   useEffect(() => {
     if (initialContext && initialContext.viewMode === 'create-payment' && initialContext.invoice) {
       const inv = initialContext.invoice;
+      const existingLinkedPayment = payments.find(payment =>
+        !payment.isDeleted &&
+        payment.status !== 'VOIDED' &&
+        payment.sourceInvoiceId === inv.id
+      );
+
+      if (existingLinkedPayment) {
+        loadPaymentForViewing(existingLinkedPayment);
+        if (onClearContext) onClearContext();
+        return;
+      }
+
       setEditingPayment(null);
+      setSourceInvoiceId(inv.id);
       setInvoiceApplyMap({});
       setInvoiceSelectionMap({});
       setPayorType(inv.sponsorId ? 'SPONSOR' : 'STUDENT');
+      const payorLabel = getInvoicePayorName(inv);
       setFormData({
         paymentNo: generatePaymentNo(),
+        crNo: '',
         sponsorId: inv.sponsorId || '',
         studentId: inv.studentId || '',
         paymentDate: new Date().toISOString().split('T')[0],
@@ -430,7 +908,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         checkDate: '',
         amountReceived: inv.balanceDue,
         ewtAmountCertified: 0,
-        notes: `Payment for Invoice ${inv.invoiceNo}`
+        notes: payorLabel !== '-' ? `Collection from ${payorLabel}` : 'Collection receipt'
       });
       setViewMode('create-payment');
       if (onClearContext) onClearContext();
@@ -458,12 +936,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
       if (onClearContext) onClearContext();
     }
-  }, [initialContext, defaultCashAccountId, onClearContext, payments]);
+  }, [initialContext, defaultCashAccountId, onClearContext, payments, sponsors, students]);
 
   const baseTotalCredit = formData.amountReceived + formData.ewtAmountCertified;
 
   const plannedAppliedTotal = useMemo(() => {
-    return Object.values(invoiceApplyMap).reduce((sum, amount) => sum + (amount || 0), 0);
+    return Object.values(invoiceApplyMap).reduce((sum: number, amount) => sum + Number(amount || 0), 0);
   }, [invoiceApplyMap]);
 
   const existingApplied = editingPayment?.totalApplied || 0;
@@ -484,19 +962,32 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (!formData.paymentNo) return 'Payment number is required.';
     if (!formData.paymentDate) return 'Payment date is required.';
     if (!formData.bankAccountId) return 'Cash account is required.';
+    if (!sourceInvoiceId) return 'Invoice No. is required. Tag this payment to an invoice before saving or approving.';
+    if (!selectedSourceInvoice) return 'Select a valid invoice number before saving or approving payment.';
+    if (existingLinkedInvoicePayment) {
+      return `A payment already exists for invoice ${selectedSourceInvoice.invoiceNo} (${existingLinkedInvoicePayment.paymentNo}, ${existingLinkedInvoicePaymentStatusLabel}). Review, edit, or complete the existing payment instead of creating a new one.`;
+    }
     if (!formData.sponsorId && !formData.studentId) return 'Select a sponsor or student.';
+    if (!String(formData.notes || '').trim()) return 'Transaction Description is required.';
+    if (!String(formData.crNo || '').trim()) return 'C.R. No. is required.';
     if (baseTotalCredit <= 0) return 'Amount received or EWT must be greater than zero.';
     return '';
   };
 
+  const headerValidationError = validateHeader();
+
   const buildPayment = (status: PaymentStatus) => {
     const paymentId = editingPayment?.id || generateUUID();
     const currentApplications = editingPayment?.applications || [];
+    const trimmedCrNo = String(formData.crNo || '').trim();
+    const trimmedNotes = String(formData.notes || '').trim();
 
     const payment: Partial<Payment> = {
       id: paymentId,
       orgId: currentOrgId,  // Always include org_id for complete data separation
       paymentNo: formData.paymentNo,
+      crNo: trimmedCrNo || undefined,
+      sourceInvoiceId: sourceInvoiceId || undefined,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       paymentDate: formData.paymentDate,
@@ -511,7 +1002,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       totalApplied: existingApplied,
       customerDepositBalance: baseTotalCredit - existingApplied,
       applications: currentApplications,
-      notes: formData.notes || undefined,
+      notes: trimmedNotes || undefined,
       createdAt: editingPayment?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       postedAt: status === 'OPEN' ? (editingPayment?.postedAt || new Date().toISOString()) : editingPayment?.postedAt
@@ -557,34 +1048,48 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setEditingPayment(null);
   };
 
-  const applySelectedInvoices = () => {
+  const applySelectedInvoices = async () => {
     if (!editingPayment) {
       alert('Payment not found.');
       return;
     }
 
-    const selected = Object.entries(invoiceApplyMap).filter(([invoiceId, amt]) => invoiceSelectionMap[invoiceId] && amt > 0);
+    const selected = Object.entries(invoiceApplyMap).filter(
+      ([invoiceId, amt]) => invoiceSelectionMap[invoiceId] && Number(amt) > 0
+    );
     if (!selected.length) {
       alert('Tick at least one invoice and enter amount to apply.');
       return;
     }
 
-    const totalToApply = selected.reduce((sum, [_, amt]) => sum + amt, 0);
+    const totalToApply = selected.reduce((sum, [_, amt]) => sum + Number(amt || 0), 0);
     if (totalToApply > availableToApply) {
       alert('Applied total exceeds available unapplied balance.');
       return;
     }
 
-    selected.forEach(([invoiceId, amount]) => {
-      if (onApplyToInvoice) onApplyToInvoice(editingPayment.id, invoiceId, amount);
-    });
+    if (onApplyToInvoice) {
+      for (const [invoiceId, amount] of selected) {
+        const applyAmount = Number(amount || 0);
+        const description = transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`;
+        await onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
+      }
+    }
 
     if (!onApplyToInvoice) {
+      const reservedApplicationNos = new Set<string>();
       const newApps: PaymentApplication[] = selected.map(([invoiceId, amount]) => ({
         id: generateUUID(),
+        orgId: currentOrgId,
         paymentId: editingPayment.id,
         invoiceId,
-        amountApplied: amount,
+        applicationNo: (() => {
+          const applicationNo = generatePaymentApplicationNo(reservedApplicationNos);
+          reservedApplicationNos.add(applicationNo);
+          return applicationNo;
+        })(),
+        amountApplied: Number(amount || 0),
+        description: transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`,
         isReversed: false,
         createdAt: new Date().toISOString()
       }));
@@ -602,6 +1107,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
+    setTransactionDescriptions({});
     setViewMode('list');
   };
 
@@ -619,7 +1125,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       const otherSelectedTotal = Object.entries(prev).reduce((sum, [id, amount]) => {
         if (id === invoice.id) return sum;
         if (!invoiceSelectionMap[id]) return sum;
-        return sum + (amount || 0);
+        return sum + Number(amount || 0);
       }, 0);
       const remaining = Math.max(availableToApply - otherSelectedTotal, 0);
       const suggested = Math.min(invoice.balanceDue, remaining);
@@ -633,18 +1139,75 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setShowReverseModal(true);
   };
 
-  const filteredPayments = useMemo(() => {
-    return payments.filter(pay => {
-      const payor = getPayorName(pay).toLowerCase();
-      const matchesSearch =
-        pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payor.includes(searchTerm.toLowerCase()) ||
-        (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'ALL' || 
-        (statusFilter === 'OPEN' ? (pay.status === 'OPEN' || pay.status === 'POSTED') : pay.status === statusFilter);
-      return matchesSearch && matchesStatus;
-    });
-  }, [payments, searchTerm, statusFilter, sponsors, students]);
+  const formatPostPeriod = (dateValue?: string) => {
+    if (!dateValue) return '';
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${month}-${year}`;
+  };
+
+  const formatCreatedOn = (value?: string) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return format(parsed, 'MM-dd-yyyy');
+  };
+
+  const invoiceLabelClass = 'text-xs font-medium text-gray-500';
+  const invoiceInputClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed';
+  const invoiceReadOnlyClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 bg-gray-50 text-gray-900';
+  const invoicePostPeriodClass = 'w-full mt-1 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 bg-orange-50 text-gray-900';
+  const previewSectionTitleClass = 'mb-4 text-xs font-medium uppercase tracking-wide text-gray-500';
+  const previewLabelClass = 'text-xs font-medium uppercase tracking-wide text-gray-500';
+  const previewValueClass = 'mt-1 text-[13px] font-medium text-gray-700';
+
+  const getCreatedByName = (createdBy?: string) => {
+    if (!createdBy) return '-';
+    return users.find(u => u.id === createdBy)?.name || createdBy || '-';
+  };
+
+  const handleSourceInvoiceChange = (invoiceId: string) => {
+    if (!invoiceId) {
+      if (sourceInvoiceId) {
+        alert('Invoice No. is required. Select another invoice instead of clearing the tagged invoice.');
+        return;
+      }
+      setSourceInvoiceId(undefined);
+      return;
+    }
+
+    const invoice = invoices.find(item => item.id === invoiceId);
+    setSourceInvoiceId(invoiceId);
+    if (!invoice) return;
+
+    const payorLabel = getInvoicePayorName(invoice);
+    setPayorType(invoice.sponsorId ? 'SPONSOR' : 'STUDENT');
+    setFormData(prev => ({
+      ...prev,
+      sponsorId: invoice.sponsorId || '',
+      studentId: invoice.studentId || '',
+      amountReceived: prev.amountReceived > 0 ? prev.amountReceived : Number(invoice.balanceDue ?? 0),
+      notes: String(prev.notes || '').trim() ? prev.notes : (payorLabel !== '-' ? `Collection from ${payorLabel}` : 'Collection receipt')
+    }));
+  };
+
+  const getDisplayStatusLabel = (status: PaymentStatus) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'ON HOLD';
+      case 'OPEN':
+      case 'POSTED':
+        return 'OPEN';
+      case 'CLOSED':
+        return 'CLOSED';
+      case 'VOIDED':
+        return 'VOIDED';
+      default:
+        return status;
+    }
+  };
 
   const getMethodIcon = (method: PaymentMethod) => {
     switch (method) {
@@ -655,6 +1218,1121 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
   };
 
+  const handleSort = (columnKey: string) => {
+    setSortConfig(current => {
+      if (current.key !== columnKey) return { key: columnKey, direction: 'asc' as const };
+      if (current.direction === 'asc') return { key: columnKey, direction: 'desc' as const };
+      if (current.direction === 'desc') return { key: columnKey, direction: 'none' as const };
+      return { key: columnKey, direction: 'asc' as const };
+    });
+  };
+
+  const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig.key !== columnKey || sortConfig.direction === 'none') {
+      return <ArrowUpDown size={12} className="ml-1 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    }
+    return sortConfig.direction === 'asc'
+      ? <ChevronUp size={12} className="ml-1 text-emerald-400" />
+      : <ChevronDown size={12} className="ml-1 text-emerald-400" />;
+  };
+
+  const getPaymentSortValue = (payment: Payment, key: string, mode: ListTab) => {
+    switch (key) {
+      case 'date':
+      case 'paymentDate':
+        return payment.paymentDate || '';
+      case 'postPeriod':
+        return payment.paymentDate || '';
+      case 'paymentNo':
+        return payment.paymentNo || '';
+      case 'paymentApplicationNo':
+        return getPaymentApplicationNumberLabel(payment);
+      case 'status':
+        return getDisplayStatusLabel(mode === 'applications' ? getApplicationRegistryStatus(payment) : payment.status);
+      case 'glReference':
+        return mode === 'applications' ? getPaymentApplicationGlReferenceLabel(payment) : (payment.glEntryNumber || '');
+      case 'payor':
+        return getPayorName(payment);
+      case 'method':
+        return payment.paymentMethod || '';
+      case 'amountReceived':
+        return Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0);
+      case 'amountApplied':
+        return Number(payment.totalApplied ?? 0);
+      case 'balance':
+        return Number(payment.customerDepositBalance ?? 0);
+      case 'createdBy':
+        return getCreatedByName(payment.createdBy);
+      case 'createdOn':
+        return payment.createdAt || '';
+      default:
+        return '';
+    }
+  };
+
+  const paymentRegistryColumns: PaymentRegistryColumn[] = [
+    {
+      key: 'date',
+      label: 'Date',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'date',
+      value: (payment) => payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'postPeriod',
+      label: 'Post Period',
+      align: 'text-left',
+      minWidth: 112,
+      sortKey: 'postPeriod',
+      value: (payment) => formatPostPeriod(payment.paymentDate),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {formatPostPeriod(payment.paymentDate) || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'paymentNo',
+      label: 'Payment No.',
+      align: 'text-left',
+      minWidth: 160,
+      sortKey: 'paymentNo',
+      value: (payment) => payment.paymentNo || '',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.paymentNo || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      align: 'text-left',
+      minWidth: 96,
+      sortKey: 'status',
+      value: (payment) => getDisplayStatusLabel(payment.status),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {getDisplayStatusLabel(payment.status)}
+        </span>
+      )
+    },
+    {
+      key: 'glReference',
+      label: 'GL Reference No.',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'glReference',
+      value: (payment) => payment.glEntryNumber || '',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.glEntryNumber || (payment.status === 'DRAFT' ? '-' : 'Pending')}
+        </span>
+      )
+    },
+    {
+      key: 'payor',
+      label: 'Sponsor/Student',
+      align: 'text-left',
+      minWidth: 256,
+      sortKey: 'payor',
+      value: (payment) => getPayorName(payment),
+      render: (payment) => (
+        <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+          {payment.sponsorId ? (
+            <Building2 size={14} className="text-gray-400" />
+          ) : (
+            <User size={14} className="text-gray-400" />
+          )}
+          {getPayorName(payment)}
+        </span>
+      )
+    },
+    {
+      key: 'method',
+      label: 'Method',
+      align: 'text-left',
+      minWidth: 112,
+      sortKey: 'method',
+      value: (payment) => payment.paymentMethod || '',
+      render: (payment) => (
+        <span className="inline-flex items-center gap-1 font-medium text-gray-800">
+          {getMethodIcon(payment.paymentMethod)}
+          <span>{payment.paymentMethod}</span>
+        </span>
+      )
+    },
+    {
+      key: 'amountReceived',
+      label: 'Amount Received',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountReceived',
+      value: (payment) => Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</span>
+      )
+    },
+    {
+      key: 'amountApplied',
+      label: 'Amount Applied',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountApplied',
+      value: (payment) => Number(payment.totalApplied ?? 0),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(payment.totalApplied)}</span>
+      )
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'balance',
+      value: (payment) => Number(payment.customerDepositBalance ?? 0),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(payment.customerDepositBalance)}</span>
+      )
+    },
+    {
+      key: 'createdBy',
+      label: 'Created By',
+      align: 'text-left',
+      minWidth: 160,
+      sortKey: 'createdBy',
+      value: (payment) => getCreatedByName(payment.createdBy),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getCreatedByName(payment.createdBy)}</span>
+      )
+    },
+    {
+      key: 'createdOn',
+      label: 'Created On',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'createdOn',
+      value: (payment) => formatCreatedOn(payment.createdAt),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCreatedOn(payment.createdAt)}</span>
+      )
+    }
+  ];
+
+  const registryColumns = columnOrder
+    .map(key => paymentRegistryColumns.find(col => col.key === key))
+    .filter(Boolean) as PaymentRegistryColumn[];
+
+  const applyRegistryFilters = (list: Payment[], mode: ListTab) => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    return list.filter(pay => {
+      const payor = getPayorName(pay).toLowerCase();
+      const applicationNo = mode === 'applications' ? getPaymentApplicationNumberLabel(pay).toLowerCase() : '';
+      const applicationGlReference = mode === 'applications' ? getPaymentApplicationGlReferenceLabel(pay).toLowerCase() : '';
+      const matchesSearch =
+        pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        applicationNo.includes(searchTerm.toLowerCase()) ||
+        (pay.crNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payor.includes(searchTerm.toLowerCase()) ||
+        (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (pay.glEntryNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        applicationGlReference.includes(searchTerm.toLowerCase());
+
+      const effectiveStatus = mode === 'applications' ? getApplicationRegistryStatus(pay) : pay.status;
+      const matchesStatus = statusFilter === 'ALL' ||
+        (statusFilter === 'OPEN'
+          ? (effectiveStatus === 'OPEN' || effectiveStatus === 'POSTED')
+          : effectiveStatus === statusFilter);
+
+      const paymentDate = pay.paymentDate?.slice(0, 10) || '';
+      let matchesDate = true;
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = paymentDate === todayStr;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = paymentDate >= monthStart && paymentDate <= monthEnd;
+      } else if (dateFilterMode === 'CUSTOM') {
+        matchesDate = (!dateFrom || paymentDate >= dateFrom) &&
+          (!dateTo || paymentDate <= dateTo);
+      }
+
+      const matchesPayer = payerFilterMode !== 'CUSTOM' || payerSearchTerm.trim() === '' ||
+        payor.includes(payerSearchTerm.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesDate && matchesPayer;
+    });
+  };
+
+  const sortRegistryPayments = (list: Payment[], mode: ListTab) => {
+    return [...list].sort((a, b) => {
+      if (sortConfig.direction === 'none') return 0;
+      const valueA = getPaymentSortValue(a, sortConfig.key, mode);
+      const valueB = getPaymentSortValue(b, sortConfig.key, mode);
+      let comparison = 0;
+      if (typeof valueA === 'number' && typeof valueB === 'number') {
+        comparison = valueA - valueB;
+      } else {
+        comparison = String(valueA).localeCompare(String(valueB), undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const filteredPayments = useMemo(() => {
+    return sortRegistryPayments(applyRegistryFilters(payments, 'payments'), 'payments');
+  }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
+
+  const exportToExcel = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { alert(getExportEmptyMessage()); return; }
+    const columns = getRegistryExportColumns();
+    const headers = columns.map(c => c.label);
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] as string));
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
+    rows.forEach(r => {
+      html += '<tr>';
+      columns.forEach(col => {
+        const val = r[col.label];
+        const isNum = typeof val === 'number';
+        const value = isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val;
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(value)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</table></body></html>';
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${getExportFilePrefix()}_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPdf = () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { alert(getExportEmptyMessage()); return; }
+    const columns = getRegistryExportColumns();
+    const cols = columns.map(c => c.label);
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] as string));
+    const orgName = organization?.name || getExportDocumentTitle();
+    let html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(getExportDocumentTitle())}</title><style>
+      @page { size: landscape; margin: 12mm; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      h2 { margin:0 0 4px; font-size:18px; }
+      .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
+      table { width:100%; border-collapse:collapse; font-size:11px; }
+      th { background:#059669; color:#fff; padding:8px 10px; text-align:left; font-weight:700; }
+      td { padding:7px 10px; border-bottom:1px solid #e5e7eb; }
+      tr:nth-child(even) { background:#f9fafb; }
+      .num { text-align:right; }
+      .footer { margin-top:16px; font-size:10px; color:#9ca3af; text-align:right; }
+    </style></head><body>`;
+    html += `<h2>${esc(orgName)}</h2>`;
+    html += `<div class="subtitle">${esc(getExportDocumentTitle())} &mdash; Exported ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })} &mdash; ${rows.length} record(s)</div>`;
+    html += '<table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      cols.forEach(c => {
+        const val = r[c];
+        const isNum = typeof val === 'number';
+        const value = isNum ? new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : val;
+        html += `<td${isNum ? ' class="num"' : ''}>${esc(value)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += `<div class="footer">Generated on ${new Date().toLocaleString('en-PH')}</div>`;
+    html += '</body></html>';
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => w.print(), 400);
+    }
+  };
+
+  const paymentStats = useMemo(() => {
+    const draftCount = payments.filter(p => p.status === 'DRAFT').length;
+    const openCount = payments.filter(p => p.status === 'OPEN' || p.status === 'POSTED').length;
+    const closedCount = payments.filter(p => p.status === 'CLOSED').length;
+    const unappliedPayments = payments.reduce((sum, payment) => {
+      if (payment.status !== 'OPEN' && payment.status !== 'POSTED') return sum;
+      return sum + getAvailablePaymentBalance(payment);
+    }, 0);
+    return { draftCount, openCount, closedCount, unappliedPayments };
+  }, [payments]);
+
+  const paymentApplicationBaseList = useMemo(
+    () => payments.filter(payment => payment.status !== 'VOIDED'),
+    [payments]
+  );
+
+  const unappliedPaymentList = useMemo(
+    () => paymentApplicationBaseList.filter(payment => !isAppliedPayment(payment)),
+    [paymentApplicationBaseList]
+  );
+
+  const appliedPaymentList = useMemo(
+    () => paymentApplicationBaseList.filter(payment => isAppliedPayment(payment)),
+    [paymentApplicationBaseList]
+  );
+
+  const paymentApplicationStats = useMemo(() => {
+    const unappliedBalance = unappliedPaymentList.reduce(
+      (sum, payment) => sum + getAvailablePaymentBalance(payment),
+      0
+    );
+    const appliedAmount = appliedPaymentList.reduce(
+      (sum, payment) => sum + Number(payment.totalApplied ?? 0),
+      0
+    );
+    const remainingBalance = appliedPaymentList.reduce(
+      (sum, payment) => sum + getAvailablePaymentBalance(payment),
+      0
+    );
+
+    return {
+      unappliedCount: unappliedPaymentList.length,
+      unappliedBalance,
+      appliedCount: appliedPaymentList.length,
+      appliedAmount,
+      remainingBalance
+    };
+  }, [unappliedPaymentList, appliedPaymentList]);
+
+  const currentApplicationPayments =
+    applicationListTab === 'unapplied' ? unappliedPaymentList : appliedPaymentList;
+
+  const filteredApplicationPayments = useMemo(() => {
+    return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments, 'applications'), 'applications');
+  }, [currentApplicationPayments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
+
+  const filteredApplicationRemainingBalance = useMemo(() => {
+    return filteredApplicationPayments.reduce((sum, payment) => sum + getAvailablePaymentBalance(payment), 0);
+  }, [filteredApplicationPayments]);
+
+  const getPaymentApplicationActionLabel = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      return canApplyPayment(payment) ? 'Apply Payment' : 'View Payment';
+    }
+    return canApplyPayment(payment) ? 'Continue Apply' : 'View Details';
+  };
+
+  const handlePaymentApplicationAction = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      if (canApplyPayment(payment)) {
+        loadPaymentForApplication(payment);
+        return;
+      }
+      loadPaymentForViewing(payment);
+      return;
+    }
+
+    if (canApplyPayment(payment)) {
+      loadPaymentForApplication(payment);
+      return;
+    }
+
+    loadPaymentForDetails(payment);
+  };
+
+  const handlePaymentApplicationRowClick = (payment: Payment) => {
+    if (applicationListTab === 'unapplied') {
+      loadPaymentForViewing(payment);
+      return;
+    }
+
+    loadPaymentForDetails(payment);
+  };
+
+  const getPaymentApplicationInvoiceLabel = (payment: Payment) => {
+    const appliedInvoiceNos = getActiveApplications(payment)
+      .map(app => invoices.find(invoice => invoice.id === app.invoiceId)?.invoiceNo || app.invoiceId)
+      .filter(Boolean);
+
+    const uniqueInvoiceNos = Array.from(new Set(appliedInvoiceNos));
+    if (uniqueInvoiceNos.length > 0) {
+      return uniqueInvoiceNos.join(', ');
+    }
+
+    const sourceInvoiceId = (payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId;
+    if (!sourceInvoiceId) return '-';
+
+    return invoices.find(invoice => invoice.id === sourceInvoiceId)?.invoiceNo || sourceInvoiceId;
+  };
+
+  const applicationRegistryColumns: ApplicationRegistryColumn[] = [
+    {
+      key: 'date',
+      label: 'Date',
+      align: 'text-left',
+      minWidth: 128,
+      sortKey: 'date',
+      value: (payment) => payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-',
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {payment.paymentDate ? format(new Date(payment.paymentDate), 'MM-dd-yyyy') : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'postPeriod',
+      label: 'Post Period',
+      align: 'text-left',
+      minWidth: 112,
+      sortKey: 'postPeriod',
+      value: (payment) => formatPostPeriod(payment.paymentDate),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {formatPostPeriod(payment.paymentDate) || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'paymentApplicationNo',
+      label: 'Payment Application No.',
+      align: 'text-left',
+      minWidth: 200,
+      sortKey: 'paymentApplicationNo',
+      value: (payment) => getPaymentApplicationNumberLabel(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getPaymentApplicationNumberLabel(payment)}</span>
+      )
+    },
+    {
+      key: 'invoiceNo',
+      label: 'Invoice No.',
+      align: 'text-left',
+      minWidth: 176,
+      sortKey: 'invoiceNo',
+      value: (payment) => getPaymentApplicationInvoiceLabel(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getPaymentApplicationInvoiceLabel(payment)}</span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      align: 'text-left',
+      minWidth: 96,
+      sortKey: 'status',
+      value: (payment) => getDisplayStatusLabel(getApplicationRegistryStatus(payment)),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getDisplayStatusLabel(getApplicationRegistryStatus(payment))}</span>
+      )
+    },
+    {
+      key: 'glReference',
+      label: 'GL Reference No.',
+      align: 'text-left',
+      minWidth: 160,
+      sortKey: 'glReference',
+      value: (payment) => getPaymentApplicationGlReferenceLabel(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">
+          {getPaymentApplicationGlReferenceLabel(payment)}
+        </span>
+      )
+    },
+    {
+      key: 'payor',
+      label: 'Sponsor/Student',
+      align: 'text-left',
+      minWidth: 256,
+      sortKey: 'payor',
+      value: (payment) => getPayorName(payment),
+      render: (payment) => (
+        <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+          {payment.sponsorId ? (
+            <Building2 size={14} className="text-gray-400" />
+          ) : (
+            <User size={14} className="text-gray-400" />
+          )}
+          {getPayorName(payment)}
+        </span>
+      )
+    },
+    {
+      key: 'amountReceived',
+      label: 'Amount Received',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountReceived',
+      value: (payment) => getTotalPaymentCredit(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(getTotalPaymentCredit(payment))}</span>
+      )
+    },
+    {
+      key: 'amountApplied',
+      label: 'Amount Applied',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'amountApplied',
+      value: (payment) => Number(payment.totalApplied ?? 0),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(Number(payment.totalApplied ?? 0))}</span>
+      )
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      align: 'text-right',
+      minWidth: 128,
+      sortKey: 'balance',
+      value: (payment) => getAvailablePaymentBalance(payment),
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{formatCurrency(getAvailablePaymentBalance(payment))}</span>
+      )
+    },
+    {
+      key: 'applications',
+      label: 'Applications',
+      align: 'text-center',
+      minWidth: 112,
+      value: (payment) => getActiveApplications(payment).length,
+      render: (payment) => (
+        <span className="font-medium text-gray-800">{getActiveApplications(payment).length}</span>
+      )
+    }
+  ];
+
+  const applyPaymentColumns: ApplyPaymentColumn[] = [
+    {
+      key: 'apply',
+      label: 'Apply',
+      align: 'text-center',
+      minWidth: 80,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick) => (
+        <input
+          type="checkbox"
+          checked={!!invoiceSelectionMap[inv.id]}
+          onChange={e => handleInvoiceTick(inv, e.target.checked)}
+        />
+      )
+    },
+    {
+      key: 'invoiceNo',
+      label: 'Invoice No',
+      align: 'text-left',
+      minWidth: 160,
+      render: (inv) => <span className="font-medium text-gray-800">{inv.invoiceNo}</span>
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      align: 'text-left',
+      minWidth: 128,
+      render: (inv) => (
+        <span className="text-gray-600">
+          {inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-'}
+        </span>
+      )
+    },
+    {
+      key: 'postPeriod',
+      label: 'Post Period',
+      align: 'text-left',
+      minWidth: 112,
+      render: (inv) => (
+        <span className="text-gray-600">
+          {formatPostPeriod(inv.invoiceDate) || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'transactionDescription',
+      label: 'Transaction Description',
+      align: 'text-left',
+      minWidth: 200,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions) => (
+        <input
+          type="text"
+          value={transactionDescriptions[inv.id] || `Payment application for invoice ${inv.invoiceNo}`}
+          onChange={e => {
+            setTransactionDescriptions(prev => ({ ...prev, [inv.id]: e.target.value }));
+          }}
+          disabled={!invoiceSelectionMap[inv.id]}
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-emerald-400 disabled:bg-gray-50 disabled:text-gray-500"
+          placeholder="Enter transaction description"
+        />
+      )
+    },
+    {
+      key: 'amountDue',
+      label: 'Amount Due',
+      align: 'text-right',
+      minWidth: 128,
+      render: (inv) => <span className="font-semibold text-gray-800">{formatCurrency(inv.balanceDue)}</span>
+    },
+    {
+      key: 'applyAmount',
+      label: 'Apply Amount',
+      align: 'text-right',
+      minWidth: 140,
+      render: (inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick, availableToApply) => (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          disabled={!invoiceSelectionMap[inv.id]}
+          max={Math.min(inv.balanceDue, availableToApply)}
+          value={invoiceApplyMap[inv.id] || ''}
+          onChange={e => {
+            const value = parseFloat(e.target.value) || 0;
+            setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
+          }}
+          className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-right text-sm font-medium text-gray-800 outline-none transition-colors focus:border-emerald-400"
+        />
+      )
+    }
+  ];
+
+  const orderedApplyPaymentColumns = applyPaymentColumnOrder
+    .map(key => applyPaymentColumns.find(col => col.key === key))
+    .filter(Boolean) as ApplyPaymentColumn[];
+
+  const orderedApplicationRegistryColumns = applicationColumnOrder
+    .map(key => applicationRegistryColumns.find(col => col.key === key))
+    .filter(Boolean) as ApplicationRegistryColumn[];
+
+  const clearRegistryFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setDateFilterMode('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setPayerFilterMode('ALL');
+    setPayerSearchTerm('');
+    setShowDateDropdown(false);
+    setShowPayerDropdown(false);
+    setShowExportDropdown(false);
+  };
+
+  function getRegistryExportColumns(): Array<{ label: string; value: (payment: Payment) => string | number }> {
+    if (listTab === 'applications') {
+      return orderedApplicationRegistryColumns
+        .filter((col): col is ApplicationRegistryColumn & { value: (payment: Payment) => string | number } => typeof col.value === 'function')
+        .filter(col => col.key !== 'action');
+    }
+    return registryColumns;
+  }
+
+  function getExportRows() {
+    const sourceRows = listTab === 'applications' ? filteredApplicationPayments : filteredPayments;
+    const columns = getRegistryExportColumns();
+    return sourceRows.map(payment => {
+      const row: Record<string, any> = {};
+      columns.forEach(col => {
+        row[col.label] = col.value(payment);
+      });
+      return row;
+    });
+  }
+
+  function getExportDocumentTitle() {
+    if (listTab !== 'applications') return 'Payment Registry';
+    return applicationListTab === 'unapplied'
+      ? 'Payment Application Registry - Not Yet Applied'
+      : 'Payment Application Registry - Already Applied';
+  }
+
+  function getExportFilePrefix() {
+    if (listTab !== 'applications') return 'Payment_Registry';
+    return applicationListTab === 'unapplied'
+      ? 'Payment_Application_Registry_Not_Yet_Applied'
+      : 'Payment_Application_Registry_Already_Applied';
+  }
+
+  function getExportEmptyMessage() {
+    if (listTab !== 'applications') return 'No payments to export.';
+    return applicationListTab === 'unapplied'
+      ? 'No unapplied payment applications to export.'
+      : 'No applied payment applications to export.';
+  }
+
+  const renderRegistryToolbar = (searchPlaceholder: string) => (
+    <div className="bg-white border-y px-4 py-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex h-9 w-64 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
+          <Search size={14} className="mr-2 text-gray-400" />
+          <input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="flex-1 border-none bg-transparent text-[13px] font-medium text-gray-700 outline-none placeholder:font-normal placeholder:text-gray-300"
+          />
+        </div>
+
+        <div className="relative flex h-9 items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50">
+          <span className="mr-1 text-[13px] text-gray-500">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
+            className="cursor-pointer appearance-none border-none bg-transparent pr-4 text-[13px] font-bold text-gray-800 outline-none"
+          >
+            <option value="ALL">All</option>
+            <option value="DRAFT">ON HOLD</option>
+            <option value="OPEN">OPEN</option>
+            <option value="CLOSED">CLOSED</option>
+            <option value="VOIDED">VOIDED</option>
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+        </div>
+
+        <div className="relative">
+          <div
+            onClick={() => setShowPayerDropdown(!showPayerDropdown)}
+            className="relative flex h-9 max-w-[220px] cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
+          >
+            <span className="mr-1 truncate text-[13px] text-gray-500">Sponsor/Student:</span>
+            <span className="truncate pr-5 text-[13px] font-bold text-gray-800">
+              {payerFilterMode === 'ALL' ? 'All' : payerFilterMode === 'CUSTOM' && payerSearchTerm ? `"${payerSearchTerm}"` : 'Custom...'}
+            </span>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+          </div>
+
+          {showPayerDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowPayerDropdown(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => { setSortConfig({ key: 'payor', direction: 'asc' }); setShowPayerDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronUp size={14} /> Sort Ascending
+                  </button>
+                  <button
+                    onClick={() => { setSortConfig({ key: 'payor', direction: 'desc' }); setShowPayerDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'payor' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronDown size={14} /> Sort Descending
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                    className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
+                  >
+                    Remove Quick Filter
+                  </button>
+                  <button
+                    onClick={() => { setPayerFilterMode('ALL'); setPayerSearchTerm(''); setShowPayerDropdown(false); }}
+                    className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
+                    disabled
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => setPayerFilterMode('CUSTOM')}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${payerFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {payerFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Equal to
+                  </button>
+                </div>
+                <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
+                  <input
+                    type="text"
+                    placeholder="Type to search..."
+                    value={payerSearchTerm}
+                    onChange={(e) => {
+                      setPayerSearchTerm(e.target.value);
+                      if (payerFilterMode !== 'CUSTOM') setPayerFilterMode('CUSTOM');
+                    }}
+                    className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                  />
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setShowPayerDropdown(false)}
+                      className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-blue-700"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="relative">
+          <div
+            onClick={() => setShowDateDropdown(!showDateDropdown)}
+            className="relative flex h-9 cursor-pointer select-none items-center rounded border bg-white px-3 transition-colors hover:bg-gray-50"
+          >
+            <span className="mr-1 text-[13px] text-gray-500">Date:</span>
+            <span className="max-w-[120px] truncate pr-5 text-[13px] font-bold text-gray-800">
+              {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+            </span>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2 text-gray-400" />
+          </div>
+
+          {showDateDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)} />
+              <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => { setSortConfig({ key: 'date', direction: 'asc' }); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'asc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronUp size={14} /> Sort Ascending
+                  </button>
+                  <button
+                    onClick={() => { setSortConfig({ key: 'date', direction: 'desc' }); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-gray-100 ${sortConfig.key === 'date' && sortConfig.direction === 'desc' ? 'bg-orange-50 font-bold text-orange-600' : 'text-gray-700'}`}
+                  >
+                    <ChevronDown size={14} /> Sort Descending
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                    className="w-full px-3 py-1.5 text-left text-[13px] text-gray-700 hover:bg-gray-100"
+                  >
+                    Remove Quick Filter
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                    className="w-full cursor-not-allowed px-3 py-1.5 text-left text-[13px] text-gray-400 hover:bg-gray-100"
+                    disabled
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+                <div className="border-t border-gray-100 p-1">
+                  <button
+                    onClick={() => setDateFilterMode('CUSTOM')}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'CUSTOM' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'TODAY' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                  </button>
+                  <button
+                    onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${dateFilterMode === 'THIS_MONTH' ? 'bg-blue-50 font-bold text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                  </button>
+                </div>
+                <div className="space-y-2 border-t border-gray-100 bg-gray-50/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">From:</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                      className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 text-[11px] font-semibold uppercase text-gray-400">To:</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                      className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      onClick={() => setShowDateDropdown(false)}
+                      className="rounded bg-gray-200 px-3 py-1 text-[11px] font-bold uppercase text-gray-600 transition-colors hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => setShowDateDropdown(false)}
+                      className="rounded bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase text-white shadow-sm transition-colors hover:bg-blue-700"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          onClick={clearRegistryFilters}
+          className="p-2 text-gray-400 transition-colors hover:text-orange-500"
+          title="Clear all filters"
+        >
+          <RotateCcw size={16} />
+        </button>
+
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setShowExportDropdown(!showExportDropdown)}
+            className="flex h-9 select-none items-center gap-1.5 rounded border border-gray-200 bg-white px-3 text-[13px] font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            title="Export"
+          >
+            <Download size={16} />
+            <span>Export</span>
+            <ChevronDown size={14} className="text-gray-400" />
+          </button>
+
+          {showExportDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowExportDropdown(false)} />
+              <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl">
+                <div className="p-1">
+                  <button
+                    onClick={() => {
+                      setShowExportDropdown(false);
+                      exportToExcel();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                  >
+                    <FileSpreadsheet size={16} className="text-emerald-600" />
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowExportDropdown(false);
+                      exportToPdf();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-[13px] text-gray-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                  >
+                    <FileText size={16} className="text-red-500" />
+                    Export as PDF
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleListTabChange = (nextTab: ListTab) => {
+    setListTab(nextTab);
+    setShowDateDropdown(false);
+    setShowPayerDropdown(false);
+    setShowExportDropdown(false);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedColumnIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedColumnIdx(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+
+    const newOrder = [...columnOrder];
+    const [draggedKey] = newOrder.splice(draggedColumnIdx, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    setColumnOrder(newOrder);
+    setDraggedColumnIdx(null);
+  };
+
+  const handleApplicationDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedApplicationColumnIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleApplicationDragEnd = (e: React.DragEvent) => {
+    setDraggedApplicationColumnIdx(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleApplicationDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleApplicationDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedApplicationColumnIdx === null || draggedApplicationColumnIdx === dropIndex) return;
+
+    const newOrder = [...applicationColumnOrder];
+    const [draggedKey] = newOrder.splice(draggedApplicationColumnIdx, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    setApplicationColumnOrder(newOrder);
+    setDraggedApplicationColumnIdx(null);
+  };
+
+  const handleApplyPaymentDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedApplyPaymentColumnIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleApplyPaymentDragEnd = (e: React.DragEvent) => {
+    setDraggedApplyPaymentColumnIdx(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleApplyPaymentDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleApplyPaymentDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedApplyPaymentColumnIdx === null || draggedApplyPaymentColumnIdx === dropIndex) return;
+
+    const newOrder = [...applyPaymentColumnOrder];
+    const [draggedKey] = newOrder.splice(draggedApplyPaymentColumnIdx, 1);
+    newOrder.splice(dropIndex, 0, draggedKey);
+
+    setApplyPaymentColumnOrder(newOrder);
+    setDraggedApplyPaymentColumnIdx(null);
+  };
+
   // ===== VIEW: PAYMENT LIST (DASHBOARD) =====
   if (viewMode === 'list') {
     return (
@@ -662,226 +2340,386 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
-            <p className="text-sm text-gray-500 italic">Acumatica Workflow: Record payments first, then apply invoices separately</p>
           </div>
+        </div>
+
+        <div className="inline-flex w-full max-w-fit rounded-xl border bg-white p-1 shadow-sm">
+          <button
+            onClick={() => handleListTabChange('payments')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              listTab === 'payments'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Wallet size={16} />
+            Payments
+          </button>
+          <button
+            onClick={() => handleListTabChange('applications')}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              listTab === 'applications'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <CheckSquare size={16} />
+            Payment Applications
+          </button>
+        </div>
+
+        {listTab === 'payments' && (
+          <>
+        <div className="flex justify-end">
           <button
             onClick={startNewPayment}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-white font-semibold"
-            style={{ backgroundColor: brandColor }}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
           >
             <Plus size={20} />
             New Payment
           </button>
         </div>
-
-        <div className="rounded-xl border bg-white p-4">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">Payment Register</h3>
-            <div className="ml-auto text-xs text-blue-600 italic">💡 Click on any <span className="underline">Draft payment</span> to edit</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search size={14} className="pointer-events-none absolute left-2 top-2.5 text-gray-400" />
-                <input
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Search payments..."
-                  className="w-full rounded-lg border py-2 pl-8 pr-3 text-sm"
-                />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="rounded-xl border bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-gray-100 p-2">
+                <Clock size={20} className="text-gray-600" />
               </div>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as PaymentStatus | 'ALL')}
-                className="rounded-lg border px-3 py-2 text-sm"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="DRAFT">On Hold</option>
-                <option value="OPEN">Open</option>
-                <option value="VOIDED">Voided</option>
-              </select>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">On Hold</p>
+                <p className="text-xl font-semibold text-gray-800">{paymentStats.draftCount}</p>
+              </div>
             </div>
           </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-blue-100 p-2">
+                <Send size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Open</p>
+                <p className="text-xl font-semibold text-blue-600">{paymentStats.openCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-green-100 p-2">
+                <CheckCircle size={20} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Closed</p>
+                <p className="text-xl font-semibold text-green-600">{paymentStats.closedCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-orange-100 p-2">
+                <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400">Unapplied Payments</p>
+                <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentStats.unappliedPayments)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-emerald-600 border-b">
+        {renderRegistryToolbar('Search payments...')}
+
+        <div className="overflow-x-auto rounded-xl border bg-white">
+            <table className="w-full font-sans">
+              <thead className="border-b bg-emerald-600">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Payment No.
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '120px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      GL Reference
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '100px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Date
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '200px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Sponsor/Student
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-center font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '90px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Status
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Method
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '140px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Received
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '130px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Amount Applied
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-x border-transparent cursor-move relative select-none" style={{minWidth: '110px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Balance
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-white text-[13px] font-sans group hover:bg-emerald-700 transition-colors border-r border-transparent cursor-move relative select-none" style={{minWidth: '160px'}} title="Drag to reorder">
-                    <div className="flex items-center justify-end text-[13px] font-bold text-white cursor-pointer hover:text-gray-100">
-                      Actions
-                    </div>
-                  </th>
+                  {registryColumns.map((col, idx) => (
+                    <th
+                      key={col.key}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
+                      style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
+                      title="Drag to reorder column"
+                    >
+                      <div
+                        className={`flex items-center text-[13px] font-bold text-white ${
+                          col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
+                        } ${col.sortKey ? 'cursor-pointer hover:text-gray-100' : ''}`}
+                        onClick={col.sortKey ? () => handleSort(col.sortKey!) : undefined}
+                      >
+                        {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
+                      </div>
+                      <div
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const th = e.currentTarget.parentElement;
+                          if (!th) return;
+                          const startWidth = th.getBoundingClientRect().width;
+                          resizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                          const onMouseMove = (ev: MouseEvent) => {
+                            if (!resizeRef.current) return;
+                            const diff = ev.clientX - resizeRef.current.startX;
+                            const newWidth = Math.max(60, resizeRef.current.startWidth + diff);
+                            setColumnWidths(prev => ({ ...prev, [resizeRef.current!.colKey]: newWidth }));
+                          };
+                          const onMouseUp = () => {
+                            resizeRef.current = null;
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                            document.body.style.cursor = '';
+                            document.body.style.userSelect = '';
+                          };
+                          document.addEventListener('mousemove', onMouseMove);
+                          document.addEventListener('mouseup', onMouseUp);
+                          document.body.style.cursor = 'col-resize';
+                          document.body.style.userSelect = 'none';
+                        }}
+                        className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-emerald-400 transition-colors z-10"
+                        title="Drag to resize column"
+                        draggable={false}
+                      />
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
-                {filteredPayments.length === 0 && (
+              <tbody className="divide-y">
+                {filteredPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-6 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <FileText size={40} className="text-gray-300" />
-                        <span>No payments found</span>
+                    <td colSpan={registryColumns.length} className="p-12 text-center text-gray-500">
+                      <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+                      <div className="space-y-1">
+                        <p className="text-lg font-semibold text-gray-700">No payments recorded</p>
+                        <p className="text-sm text-gray-500">Click "New Payment" to get started</p>
                       </div>
                     </td>
                   </tr>
-                )}
-                {filteredPayments.map(payment => (
-                  <tr 
-                    key={payment.id} 
-                    className={`border-t ${
-                      payment.status === 'DRAFT'
-                        ? 'hover:bg-blue-50 transition-colors'
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {/* Payment No. - Clickable to view in Payment Interface */}
-                    <td 
-                      className="px-3 py-2 font-medium cursor-pointer"
+                ) : (
+                  filteredPayments.map(payment => (
+                    <tr
+                      key={payment.id}
+                      className="cursor-pointer transition-colors hover:bg-gray-50"
                       onClick={() => loadPaymentForViewing(payment)}
+                      title={payment.status === 'DRAFT' ? 'Click to edit draft payment' : 'Click to view payment'}
                     >
-                      <span className={`${
-                        payment.status === 'DRAFT' ? 'text-blue-600 underline' : 'text-blue-600 underline hover:text-blue-700'
-                      }`}>
-                        {payment.paymentNo}
-                      </span>
-                    </td>
-                    
-                    {/* GL Reference */}
-                    <td className="px-3 py-2 text-sm text-gray-600">
-                      {payment.glEntryNumber || (payment.status === 'DRAFT' ? '—' : 'Pending')}
-                    </td>
-                    
-                    {/* Date */}
-                    <td className="px-3 py-2">
-                      {new Date(payment.paymentDate).toLocaleDateString()}
-                    </td>
-                    
-                    {/* Sponsor/Student */}
-                    <td className="px-3 py-2">
-                      <div className="inline-flex items-center gap-2">
-                        {payment.sponsorId ? <Building2 size={14} className="text-gray-400" /> : <User size={14} className="text-gray-400" />}
-                        {getPayorName(payment)}
-                      </div>
-                    </td>
-                    
-                    {/* Status */}
-                    <td className="px-3 py-2 text-center">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                        payment.status === 'OPEN' ? 'bg-emerald-100 text-emerald-700' :
-                        payment.status === 'VOIDED' ? 'bg-rose-100 text-rose-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {payment.status === 'DRAFT' ? 'On Hold' : 
-                         (payment.status === 'OPEN' || payment.status === 'POSTED' ? 'Open' : payment.status)}
-                      </span>
-                    </td>
-                    
-                    {/* Method */}
-                    <td className="px-3 py-2">
-                      <div className="inline-flex items-center gap-1 text-gray-600">
-                        {getMethodIcon(payment.paymentMethod)}
-                        <span>{payment.paymentMethod}</span>
-                      </div>
-                    </td>
-                    
-                    {/* Amount Received */}
-                    <td className="px-3 py-2 text-right font-semibold">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</td>
-                    
-                    {/* Amount Applied */}
-                    <td className="px-3 py-2 text-right text-emerald-700">{formatCurrency(payment.totalApplied)}</td>
-                    
-                    {/* Balance */}
-                    <td className="px-3 py-2 text-right font-semibold text-sky-700">{formatCurrency(payment.customerDepositBalance)}</td>
-                    
-                    {/* Actions */}
-                    <td className="px-3 py-2 text-right">
-                      <div className="inline-flex gap-1">
-                        {payment.status === 'DRAFT' && (
-                          <button
-                            onClick={() => loadPaymentForEditing(payment)}
-                            className="rounded-lg border px-2 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50"
-                            title="Edit draft payment"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        <button
-                          onClick={() => loadPaymentForApplication(payment)}
-                          disabled={payment.status !== 'OPEN' && payment.status !== 'POSTED'}
-                          className="rounded-lg border px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Apply invoices to this payment"
+                      {registryColumns.map(col => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 ${col.align}`}
+                          style={columnWidths[col.key] ? { width: columnWidths[col.key], minWidth: columnWidths[col.key] } : undefined}
                         >
-                          Apply
-                        </button>
-                        <button
-                          onClick={() => onDeletePayment(payment.id)}
-                          className="rounded-lg border px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                        >
-                          Delete
-                        </button>
-                        {payment.status !== 'VOIDED' && (
-                          <button
-                            onClick={() => {
-                              setVoidingPayment(payment);
-                              setVoidReason('');
-                              setShowVoidModal(true);
-                            }}
-                            className="rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
-                          >
-                            Void
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {col.render(payment)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        </div>
+          </>
+        )}
+
+        {listTab === 'applications' && (
+          <>
+            <div className="flex justify-end">
+              <button
+                onClick={startNewPaymentApplication}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
+              >
+                <Plus size={20} />
+                New Pay Application
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-amber-100 p-2">
+                    <Clock size={20} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied</p>
+                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.unappliedCount}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-orange-100 p-2">
+                    <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied Balance</p>
+                    <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentApplicationStats.unappliedBalance)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-emerald-100 p-2">
+                    <CheckCircle size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Already Applied</p>
+                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.appliedCount}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-sky-100 p-2">
+                    <span className="block text-lg font-bold leading-none text-sky-600">₱</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400">Amount Applied</p>
+                    <p className="text-lg font-semibold text-gray-800">{formatCurrency(paymentApplicationStats.appliedAmount)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {renderRegistryToolbar('Search payment applications...')}
+
+            <div className="rounded-xl border bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Payment Application Lists</h3>
+                  <p className="text-sm text-gray-500">
+                    Track payments waiting for invoice application and payments that already have invoice applications.
+                  </p>
+                </div>
+
+                <div className="inline-flex rounded-lg border bg-gray-50 p-1">
+                  <button
+                    onClick={() => setApplicationListTab('unapplied')}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                      applicationListTab === 'unapplied'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    Not Yet Applied ({unappliedPaymentList.length})
+                  </button>
+                  <button
+                    onClick={() => setApplicationListTab('applied')}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                      applicationListTab === 'applied'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    Already Applied ({appliedPaymentList.length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-x-scroll rounded-xl border bg-white pb-2">
+                <table className="min-w-max w-full font-sans">
+                  <thead className="border-b bg-emerald-600">
+                    <tr>
+                      {orderedApplicationRegistryColumns.map((col, idx) => (
+                        <th
+                          key={col.key}
+                          draggable
+                          onDragStart={(e) => handleApplicationDragStart(e, idx)}
+                          onDragEnd={handleApplicationDragEnd}
+                          onDragOver={handleApplicationDragOver}
+                          onDrop={(e) => handleApplicationDrop(e, idx)}
+                          className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedApplicationColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
+                          style={applicationColumnWidths[col.key] ? { width: applicationColumnWidths[col.key], minWidth: applicationColumnWidths[col.key] } : undefined}
+                          title="Drag to reorder column"
+                        >
+                          <div
+                            className={`flex items-center text-[13px] font-bold text-white ${
+                              col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
+                            } ${col.sortKey ? 'cursor-pointer hover:text-gray-100' : ''}`}
+                            onClick={col.sortKey ? () => handleSort(col.sortKey) : undefined}
+                          >
+                            {col.label} {col.sortKey && <SortIndicator columnKey={col.sortKey} />}
+                          </div>
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const th = e.currentTarget.parentElement;
+                              if (!th) return;
+                              const startWidth = th.getBoundingClientRect().width;
+                              applicationResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                              const onMouseMove = (ev: MouseEvent) => {
+                                if (!applicationResizeRef.current) return;
+                                const diff = ev.clientX - applicationResizeRef.current.startX;
+                                const newWidth = Math.max(60, applicationResizeRef.current.startWidth + diff);
+                                setApplicationColumnWidths(prev => ({ ...prev, [applicationResizeRef.current!.colKey]: newWidth }));
+                              };
+                              const onMouseUp = () => {
+                                applicationResizeRef.current = null;
+                                document.removeEventListener('mousemove', onMouseMove);
+                                document.removeEventListener('mouseup', onMouseUp);
+                                document.body.style.cursor = '';
+                                document.body.style.userSelect = '';
+                              };
+                              document.addEventListener('mousemove', onMouseMove);
+                              document.addEventListener('mouseup', onMouseUp);
+                              document.body.style.cursor = 'col-resize';
+                              document.body.style.userSelect = 'none';
+                            }}
+                            className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize transition-colors hover:bg-emerald-400 z-10"
+                            title="Drag to resize column"
+                            draggable={false}
+                          />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredApplicationPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={orderedApplicationRegistryColumns.length} className="px-4 py-12 text-center text-gray-500">
+                          <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                          {currentApplicationPayments.length === 0
+                            ? (applicationListTab === 'unapplied'
+                              ? 'No payments waiting for application'
+                              : 'No applied payments found')
+                            : 'No payment applications match the current filters'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredApplicationPayments.map(payment => {
+                        return (
+                          <tr
+                            key={payment.id}
+                            className="cursor-pointer transition-colors hover:bg-gray-50"
+                            onClick={() => handlePaymentApplicationRowClick(payment)}
+                          >
+                            {orderedApplicationRegistryColumns.map(col => (
+                              <td
+                                key={col.key}
+                                className={`px-4 py-3 ${col.align}`}
+                                style={applicationColumnWidths[col.key] ? { width: applicationColumnWidths[col.key], minWidth: applicationColumnWidths[col.key] } : undefined}
+                              >
+                                {col.render(payment)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                {applicationListTab === 'unapplied'
+                  ? `Showing ${filteredApplicationPayments.length} payment(s) with no active invoice applications.`
+                  : `Showing ${filteredApplicationPayments.length} payment(s) with active invoice applications and ${formatCurrency(filteredApplicationRemainingBalance)} remaining unapplied balance.`}
+              </div>
+            </div>
+          </>
+        )}
 
         {showVoidModal && voidingPayment && (
           <ModalPortal>
@@ -1013,7 +2851,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft size={16} />
-            Back to Payments
+            Back to Payments and Applications
           </button>
         </div>
 
@@ -1021,43 +2859,78 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
             <div>
               <h3 className="text-xl font-bold text-gray-800">
-                {editingPayment ? 'Edit Draft Payment' : 'Record New Payment'}
+                New Payment : {formData.paymentNo}
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                {editingPayment 
-                  ? `Editing: ${editingPayment.paymentNo}` 
-                  : 'Step 1 of 2: Record cash received, then apply invoices'}
+             
               </p>
             </div>
-            {/* Action Buttons - Top Right */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('list')}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-              >
-                Cancel
-              </button>
-              {!isReadOnly && (
-                <>
-                  <button
-                    onClick={handleSaveDraft}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 font-semibold hover:bg-gray-50 text-sm"
-                  >
-                    <Save size={16} />
-                    {editingPayment ? 'Update Draft' : 'Save as Draft'}
-                  </button>
-                  <button
-                    onClick={handleSavePayment}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    <CheckCircle size={16} />
-                    Approve
-                  </button>
-                </>
-              )}
-            </div>
           </div>
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-white">
+            <button
+              title="Discard Changes and Close"
+              onClick={discardPaymentChanges}
+              className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <RotateCcw size={20} />
+            </button>
+            {!isReadOnly && (
+              <>
+                <button
+                  title={headerValidationError || 'Save as Draft'}
+                  onClick={handleSaveDraft}
+                  disabled={!!headerValidationError}
+                  className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Save size={20} />
+                </button>
+                <button
+                  title={headerValidationError || 'Approve'}
+                  onClick={handleSavePayment}
+                  disabled={!!headerValidationError}
+                  className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <CheckCircle size={20} />
+                </button>
+              </>
+            )}
+            <button
+              title="Add New Payment"
+              onClick={startNewPayment}
+              className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+            >
+              <Plus size={20} />
+            </button>
+            <button
+              title="Apply"
+              onClick={handleOpenApplyPayment}
+              disabled={!editingPayment || (editingPayment.status !== 'OPEN' && editingPayment.status !== 'POSTED') || (editingPayment.customerDepositBalance ?? 0) <= 0.01}
+              className="px-3 py-2 text-sm font-bold uppercase tracking-wide text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              APPLY
+            </button>
+            <button
+              title="Print"
+              onClick={handlePrintPayment}
+              className="p-2 text-gray-500 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
+            >
+              <Printer size={20} />
+            </button>
+            <button
+              title="Reverse"
+              onClick={handleOpenReversePayment}
+              disabled={!editingPayment || !(editingPayment.applications || []).some(app => !app.isReversed)}
+              className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <CornerUpLeft size={20} />
+            </button>
+          </div>
+          {!isReadOnly && headerValidationError && (
+            <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {headerValidationError}
+            </div>
+          )}
 
           <div className="flex-1 overflow-auto p-6">
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -1065,17 +2938,26 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <div className="space-y-4 xl:col-span-8">
                 <div className="rounded-xl border bg-white p-4">
                   <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Information</h3>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Payment No.</label>
+                      <label className={invoiceLabelClass}>Payment No.</label>
                       <input
                         value={formData.paymentNo}
                         disabled
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm bg-gray-50 text-gray-600"
+                        className={invoiceReadOnlyClass}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Payment Date *</label>
+                      <label className={invoiceLabelClass}>Post Period</label>
+                      <input
+                        type="text"
+                        value={formatPostPeriod(formData.paymentDate)}
+                        readOnly
+                        className={invoicePostPeriodClass}
+                      />
+                    </div>
+                    <div>
+                      <label className={invoiceLabelClass}>Payment Date *</label>
                       <div className="relative mt-1">
                         <Calendar size={14} className="pointer-events-none absolute right-3 top-2.5 text-gray-400" />
                         <input
@@ -1083,17 +2965,17 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                           value={formData.paymentDate}
                           onChange={e => setFormData(prev => ({ ...prev, paymentDate: e.target.value }))}
                           disabled={isReadOnly}
-                          className="w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                          className={invoiceInputClass}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Payment Method *</label>
+                      <label className={invoiceLabelClass}>Payment Method *</label>
                       <select
                         value={formData.paymentMethod}
                         onChange={e => setFormData(prev => ({ ...prev, paymentMethod: e.target.value as PaymentMethod }))}
                         disabled={isReadOnly}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={invoiceInputClass}
                       >
                         <option value="BANK_TRANSFER">Bank Transfer</option>
                         <option value="CHECK">Check</option>
@@ -1105,9 +2987,19 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Payor Type *</label>
+                      <label className={invoiceLabelClass}>C.R. No. *</label>
+                      <input
+                        value={formData.crNo}
+                        onChange={e => setFormData(prev => ({ ...prev, crNo: e.target.value }))}
+                        disabled={isReadOnly}
+                        className={invoiceInputClass}
+                        placeholder="Collection Receipt No."
+                      />
+                    </div>
+                    <div>
+                      <label className={invoiceLabelClass}>Payor Type *</label>
                       <div className="mt-2 flex gap-4 text-sm">
                         <label className="inline-flex items-center gap-2">
                           <input
@@ -1115,6 +3007,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             checked={payorType === 'SPONSOR'}
                             onChange={() => {
                               setPayorType('SPONSOR');
+                              setSourceInvoiceId(undefined);
                               setFormData(prev => ({ ...prev, studentId: '' }));
                             }}
                             disabled={isReadOnly}
@@ -1127,6 +3020,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             checked={payorType === 'STUDENT'}
                             onChange={() => {
                               setPayorType('STUDENT');
+                              setSourceInvoiceId(undefined);
                               setFormData(prev => ({ ...prev, sponsorId: '' }));
                             }}
                             disabled={isReadOnly}
@@ -1136,13 +3030,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       </div>
                     </div>
                     <div className="md:col-span-2">
-                      <label className="text-xs font-semibold text-gray-500">Payor Name *</label>
+                      <label className={invoiceLabelClass}>Payor Name *</label>
                       {payorType === 'SPONSOR' ? (
                         <select
                           value={formData.sponsorId}
-                          onChange={e => setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }))}
+                          onChange={e => {
+                            setSourceInvoiceId(undefined);
+                            setFormData(prev => ({ ...prev, sponsorId: e.target.value, studentId: '' }));
+                          }}
                           disabled={isReadOnly}
-                          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                          className={invoiceInputClass}
                         >
                           <option value="">Select Sponsor</option>
                           {sponsors.map(s => (
@@ -1152,15 +3049,89 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       ) : (
                         <select
                           value={formData.studentId}
-                          onChange={e => setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }))}
+                          onChange={e => {
+                            setSourceInvoiceId(undefined);
+                            setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }));
+                          }}
                           disabled={isReadOnly}
-                          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                          className={invoiceInputClass}
                         >
                           <option value="">Select Student</option>
                           {students.map(s => (
                             <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
                           ))}
                         </select>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12">
+                    <div className="md:col-span-3">
+                      <label className={invoiceLabelClass}>Invoice No. *</label>
+                      <select
+                        value={sourceInvoiceId || ''}
+                        onChange={e => handleSourceInvoiceChange(e.target.value)}
+                        disabled={isReadOnly || (!selectedPayorId && !sourceInvoiceId)}
+                        className={invoiceInputClass}
+                      >
+                        <option value="" disabled={!!selectedPayorId || !!sourceInvoiceId}>
+                          {selectedPayorId || sourceInvoiceId ? 'Select Invoice' : 'Select Sponsor/Student first'}
+                        </option>
+                        {invoiceSelectionOptions.map(invoice => (
+                          <option key={invoice.id} value={invoice.id}>{invoice.invoiceNo}</option>
+                        ))}
+                      </select>
+                      {!selectedPayorId && !sourceInvoiceId && (
+                        <p className="mt-1 text-xs text-gray-500">Choose the sponsor or student first to load invoice numbers.</p>
+                      )}
+                      {existingLinkedInvoicePayment && (
+                        <p className="mt-1 text-xs font-medium text-rose-600">
+                          A payment already exists for this invoice under {existingLinkedInvoicePayment.paymentNo}. Review, edit, or complete that payment instead.
+                        </p>
+                      )}
+                    </div>
+                    <div className="md:col-span-3">
+                      <label className={invoiceLabelClass}>Transaction Description *</label>
+                      <input
+                        value={formData.notes}
+                        onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        disabled={isReadOnly}
+                        className={invoiceInputClass}
+                        placeholder="Payment notes or memo..."
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={invoiceLabelClass}>Status</label>
+                      <div className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50">
+                        <span className="text-[13px] font-medium text-gray-700">
+                          {getDisplayStatusLabel(editingPayment?.status || 'DRAFT')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="md:col-span-4">
+                      <label className={invoiceLabelClass}>GL Reference No.</label>
+                      {editingPayment?.journalEntryId && onViewJournal ? (
+                        <button
+                          type="button"
+                          onClick={() => onViewJournal(editingPayment.journalEntryId!)}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 text-base font-normal rounded-lg bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 transition-all w-full justify-center shadow-sm"
+                          title="Open the related journal entry"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <FileText size={16} />
+                          <span>{editingPayment.glEntryNumber || `GL No. ${editingPayment.journalEntryId!.slice(-8).toUpperCase()}`}</span>
+                          <span className="text-base font-normal text-emerald-600 ml-auto">{'-> View Journal Entry'}</span>
+                        </button>
+                      ) : (
+                        <>
+                          <input
+                            value={editingPayment?.glEntryNumber || ''}
+                            readOnly
+                            placeholder="Generated when payment is approved"
+                            className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
+                          />
+                           <p className="text-xs text-gray-400 mt-1"></p>
+                        </>
                       )}
                     </div>
                   </div>
@@ -1171,46 +3142,44 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Details</h3>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Amount Received *</label>
+                      <label className={invoiceLabelClass}>Amount Received *</label>
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.amountReceived}
-                        onChange={e => setFormData(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        inputMode="decimal"
+                        value={formatInputCurrency(formData.amountReceived)}
+                        onChange={e => setFormData(prev => ({ ...prev, amountReceived: parseInputCurrency(e.target.value) }))}
                         disabled={isReadOnly}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={invoiceInputClass}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">EWT Amount Certified</label>
+                      <label className={invoiceLabelClass}>EWT Amount Certified</label>
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.ewtAmountCertified}
-                        onChange={e => setFormData(prev => ({ ...prev, ewtAmountCertified: parseFloat(e.target.value) || 0 }))}
+                        type="text"
+                        inputMode="decimal"
+                        value={formatInputCurrency(formData.ewtAmountCertified)}
+                        onChange={e => setFormData(prev => ({ ...prev, ewtAmountCertified: parseInputCurrency(e.target.value) }))}
                         disabled={isReadOnly}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={invoiceInputClass}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Reference No.</label>
+                      <label className={invoiceLabelClass}>Reference No.</label>
                       <input
                         value={formData.refNo}
                         onChange={e => setFormData(prev => ({ ...prev, refNo: e.target.value }))}
                         disabled={isReadOnly}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={invoiceInputClass}
                         placeholder="TRF / OR / Check Ref"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-500">Cash Account *</label>
+                      <label className={invoiceLabelClass}>Cash Account *</label>
                       <select
                         value={formData.bankAccountId}
                         onChange={e => setFormData(prev => ({ ...prev, bankAccountId: e.target.value }))}
                         disabled={isReadOnly}
-                        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className={invoiceInputClass}
                       >
                         <option value="">Select Cash Account</option>
                         {cashAccountOptions.map(account => (
@@ -1220,36 +3189,25 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="mt-3">
-                    <label className="text-xs font-semibold text-gray-500">Notes</label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      disabled={isReadOnly}
-                      rows={2}
-                      className="mt-1 w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                      placeholder="Add any notes..."
-                    />
-                  </div>
                 </div>
               </div>
 
               {/* GL Impact Summary */}
               <div className="space-y-4 xl:col-span-4">
                 <div className="rounded-xl border bg-white p-4">
-                  <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-600">
+                  <h3 className={previewSectionTitleClass}>
                     GL Journal Entry Preview
                   </h3>
                   
                   {glImpactRows.length === 0 ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-                      ⚠️ Configure required GL accounts before posting this payment.
+                      Configure required GL accounts before posting this payment.
                     </div>
                   ) : (
                     <>
-                      <table className="w-full text-sm">
+                      <table className="w-full text-[11px]">
                         <thead>
-                          <tr className="text-left text-xs uppercase text-gray-500">
+                          <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
                             <th className="pb-2">GL Account</th>
                             <th className="pb-2 text-right">Debit</th>
                             <th className="pb-2 text-right">Credit</th>
@@ -1258,32 +3216,94 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         <tbody>
                           {glImpactRows.map((row, index) => (
                             <tr key={index} className="border-t text-gray-700">
-                              <td className="py-2 text-xs">{row.account}</td>
-                              <td className="py-2 text-right font-medium text-blue-600">{row.debit ? formatCurrency(row.debit) : '-'}</td>
-                              <td className="py-2 text-right font-medium text-green-600">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                              <td className="py-2 text-[11px] font-medium">{row.account}</td>
+                              <td className="py-2 text-right text-[11px] font-medium text-gray-700">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                              <td className="py-2 text-right text-[11px] font-medium text-gray-700">{row.credit ? formatCurrency(row.credit) : '-'}</td>
                             </tr>
                           ))}
-                          <tr className="border-t-2 border-gray-300 font-bold text-gray-800">
-                            <td className="py-3 text-xs">Total</td>
-                            <td className="py-3 text-right text-xs text-blue-600">{formatCurrency(baseTotalCredit)}</td>
-                            <td className="py-3 text-right text-xs text-green-600">{formatCurrency(baseTotalCredit)}</td>
+                          <tr className="border-t-2 border-gray-300 font-bold text-gray-700">
+                            <td className="py-3 text-[11px]">Total</td>
+                            <td className="py-3 text-right text-[11px]">{formatCurrency(baseTotalCredit)}</td>
+                            <td className="py-3 text-right text-[11px]">{formatCurrency(baseTotalCredit)}</td>
                           </tr>
                         </tbody>
                       </table>
-                      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-700">
-                        <div className="mb-2">📋 GL Entry Details:</div>
-                        <ul className="space-y-1 pl-4 text-xs font-normal">
-                          <li>• Journal Entry Date: {new Date(formData.paymentDate).toLocaleDateString()}</li>
-                          <li>• Reference: {formData.paymentNo}</li>
-                          <li>• Total Debit = Total Credit (balanced entry)</li>
+                      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-700">
+                        <div className="mb-2 font-semibold">GL Entry Details</div>
+                        <ul className="list-disc space-y-1 pl-4 text-[11px] font-medium">
+                          <li>Journal Entry Date: {new Date(formData.paymentDate).toLocaleDateString()}</li>
+                          <li>Reference: {formData.paymentNo}</li>
+                          <li>Total Debit = Total Credit (balanced entry)</li>
                         </ul>
                       </div>
-                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">
-                        ✓ Click "Approve" to create this journal entry and record payment
-                      </div>
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[11px] font-semibold text-emerald-700">Click "Approve" to create this journal entry and record payment</div>
                     </>
                   )}
                 </div>
+
+                {selectedSourceInvoice && (
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className={previewSectionTitleClass}>
+                      Invoice Preview
+                    </h3>
+
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className={previewLabelClass}>Invoice No.</div>
+                        <div className={previewValueClass}>{selectedSourceInvoice.invoiceNo}</div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Invoice Date</div>
+                          <div className={previewValueClass}>
+                            {selectedSourceInvoice.invoiceDate ? format(new Date(selectedSourceInvoice.invoiceDate), 'MM-dd-yyyy') : '-'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Due Date</div>
+                          <div className={previewValueClass}>
+                            {selectedSourceInvoice.dueDate ? format(new Date(selectedSourceInvoice.dueDate), 'MM-dd-yyyy') : '-'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3 sm:col-span-2">
+                          <div className={previewLabelClass}>Payor</div>
+                          <div className={previewValueClass}>{getInvoicePayorName(selectedSourceInvoice)}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Invoice Status</div>
+                          <div className={previewValueClass}>{selectedSourceInvoice.status}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Amount Paid</div>
+                          <div className={previewValueClass}>{formatCurrency(Number(selectedSourceInvoice.amountPaid ?? 0))}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          <div className={previewLabelClass}>Grand Total</div>
+                          <div className={previewValueClass}>{formatCurrency(Number(selectedSourceInvoice.grandTotal ?? 0))}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className={previewLabelClass}>Balance Due</div>
+                          <div className="mt-1 text-[13px] font-semibold text-gray-700">{formatCurrency(Number(selectedSourceInvoice.balanceDue ?? 0))}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center justify-between gap-3 text-[13px]">
+                          <span className="font-medium text-gray-500">Entered payment total</span>
+                          <span className="font-medium text-gray-700">{formatCurrency(baseTotalCredit)}</span>
+                        </div>
+                        <div className="mt-2 text-[11px] font-medium text-gray-600">
+                          {Math.abs(baseTotalCredit - Number(selectedSourceInvoice.balanceDue ?? 0)) <= 0.01
+                            ? 'The entered payment matches the invoice balance due.'
+                            : baseTotalCredit < Number(selectedSourceInvoice.balanceDue ?? 0)
+                              ? `The payment is ${formatCurrency(Number(selectedSourceInvoice.balanceDue ?? 0) - baseTotalCredit)} short of the current balance due.`
+                              : `The payment exceeds the current balance due by ${formatCurrency(baseTotalCredit - Number(selectedSourceInvoice.balanceDue ?? 0))}.`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1302,7 +3322,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft size={16} />
-            Back to Payments
+            Back to Payments and Applications
           </button>
         </div>
 
@@ -1318,7 +3338,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               </div>
               <div className="text-right mx-4">
                 <div className="text-xs text-gray-600">Available to Apply</div>
-                <div className="text-lg font-bold" style={{ color: brandColor }}>
+                <div className="text-lg font-bold text-black">
                   {formatCurrency(availableToApply)}
                 </div>
               </div>
@@ -1334,8 +3354,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <button
                 onClick={applySelectedInvoices}
                 disabled={plannedAppliedTotal <= 0}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed text-sm"
-                style={{ backgroundColor: brandColor }}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-700"
               >
                 <CheckCircle size={16} />
                 Apply Selected
@@ -1344,55 +3363,91 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </div>
 
           <div className="flex-1 overflow-auto p-6">
-            <div className="rounded-xl border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+            <div className="overflow-x-scroll rounded-xl border bg-white pb-2">
+              <table className="min-w-max w-full font-sans">
+                <thead className="border-b bg-emerald-600">
                   <tr>
-                    <th className="px-3 py-2 text-center">Apply</th>
-                    <th className="px-3 py-2 text-left">Invoice No</th>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-right">Amount Due</th>
-                    <th className="px-3 py-2 text-right">Apply Amount</th>
+                    {orderedApplyPaymentColumns.map((col, idx) => (
+                      <th
+                        key={col.key}
+                        draggable
+                        onDragStart={(e) => handleApplyPaymentDragStart(e, idx)}
+                        onDragEnd={handleApplyPaymentDragEnd}
+                        onDragOver={handleApplyPaymentDragOver}
+                        onDrop={(e) => handleApplyPaymentDrop(e, idx)}
+                        className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedApplyPaymentColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
+                        style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
+                        title="Drag to reorder column"
+                      >
+                        <div
+                          className={`flex items-center text-[13px] font-bold text-white ${
+                            col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
+                          }`}
+                        >
+                          {col.label}
+                        </div>
+                        <div
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const th = e.currentTarget.parentElement;
+                            if (!th) return;
+                            const startWidth = th.getBoundingClientRect().width;
+                            applyPaymentResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                            const onMouseMove = (ev: MouseEvent) => {
+                              if (!applyPaymentResizeRef.current) return;
+                              const diff = ev.clientX - applyPaymentResizeRef.current.startX;
+                              const newWidth = Math.max(60, applyPaymentResizeRef.current.startWidth + diff);
+                              setApplyPaymentColumnWidths(prev => ({ ...prev, [applyPaymentResizeRef.current!.colKey]: newWidth }));
+                            };
+                            const onMouseUp = () => {
+                              applyPaymentResizeRef.current = null;
+                              document.removeEventListener('mousemove', onMouseMove);
+                              document.removeEventListener('mouseup', onMouseUp);
+                              document.body.style.cursor = '';
+                              document.body.style.userSelect = '';
+                            };
+                            document.addEventListener('mousemove', onMouseMove);
+                            document.addEventListener('mouseup', onMouseUp);
+                            document.body.style.cursor = 'col-resize';
+                            document.body.style.userSelect = 'none';
+                          }}
+                          className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize transition-colors hover:bg-emerald-400 z-10"
+                          title="Drag to resize column"
+                          draggable={false}
+                        />
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y">
                   {isFetchingOpenInvoices && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-gray-500">Fetching open invoices...</td>
+                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
+                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                        Fetching open invoices...
+                      </td>
                     </tr>
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No open invoices for this payor.</td>
+                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
+                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                        No open invoices for this payor.
+                      </td>
                     </tr>
                   )}
                   {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
-                    <tr key={inv.id} className="border-t">
-                      <td className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!invoiceSelectionMap[inv.id]}
-                          onChange={e => handleInvoiceTick(inv, e.target.checked)}
-                        />
-                      </td>
-                      <td className="px-3 py-2 font-medium text-gray-800">{inv.invoiceNo}</td>
-                      <td className="px-3 py-2 text-gray-600">{inv.invoiceDate}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{formatCurrency(inv.balanceDue)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          disabled={!invoiceSelectionMap[inv.id]}
-                          max={Math.min(inv.balanceDue, availableToApply)}
-                          value={invoiceApplyMap[inv.id] || ''}
-                          onChange={e => {
-                            const value = parseFloat(e.target.value) || 0;
-                            setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, inv.balanceDue) }));
-                          }}
-                          className="w-36 rounded-lg border px-2 py-1 text-right"
-                        />
-                      </td>
+                    <tr key={inv.id} className="cursor-pointer transition-colors hover:bg-gray-50">
+                      {orderedApplyPaymentColumns.map(col => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3 ${col.align}`}
+                          style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
+                        >
+                          {col.render(inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick, availableToApply)}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -1402,7 +3457,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="mt-4 rounded-lg border bg-gray-50 p-4">
               <div className="flex justify-between text-sm">
                 <span className="font-semibold text-gray-700">Total to Apply:</span>
-                <span className="font-bold" style={{ color: brandColor }}>{formatCurrency(plannedAppliedTotal)}</span>
+                <span className="font-bold text-black">{formatCurrency(plannedAppliedTotal)}</span>
               </div>
             </div>
           </div>
@@ -1433,7 +3488,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{editingPayment.paymentNo}</h2>
               <p className="text-sm text-gray-600 mt-1">
-                {new Date(editingPayment.paymentDate).toLocaleDateString()} • {getPayorName(editingPayment)}
+                {new Date(editingPayment.paymentDate).toLocaleDateString()} â€¢ {getPayorName(editingPayment)}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -1474,6 +3529,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     <dt className="text-sm font-medium text-gray-600">Payment Date:</dt>
                     <dd className="text-sm text-gray-900">{new Date(editingPayment.paymentDate).toLocaleDateString()}</dd>
                   </div>
+                  {editingPayment.crNo && (
+                    <div className="flex justify-between">
+                      <dt className="text-sm font-medium text-gray-600">C.R. No.:</dt>
+                      <dd className="text-sm text-gray-900">{editingPayment.crNo}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <dt className="text-sm font-medium text-gray-600">Payor:</dt>
                     <dd className="text-sm text-gray-900">{getPayorName(editingPayment)}</dd>
@@ -1537,7 +3598,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   <div className="flex justify-between">
                     <dt className="text-sm font-medium text-gray-600">GL Entry Number:</dt>
                     <dd className="text-sm font-semibold text-blue-600">
-                      {editingPayment.glEntryNumber || '—'}
+                      {editingPayment.glEntryNumber || 'â€”'}
                     </dd>
                   </div>
                   {editingPayment.postedAt && (
@@ -1567,7 +3628,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     <tbody>
                       {glLines.map((line, index) => (
                         <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
-                          <td className="px-4 py-2 text-xs">{line.account?.code || '—'} - {line.account?.name || 'Unknown'}</td>
+                          <td className="px-4 py-2 text-xs">{line.account?.code || 'â€”'} - {line.account?.name || 'Unknown'}</td>
                           <td className="px-4 py-2 text-right font-medium text-blue-600">{line.debit ? formatCurrency(line.debit) : '-'}</td>
                           <td className="px-4 py-2 text-right font-medium text-green-600">{line.credit ? formatCurrency(line.credit) : '-'}</td>
                         </tr>
@@ -1603,6 +3664,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     <thead className="bg-gray-100">
                       <tr className="text-left text-xs uppercase font-semibold text-gray-600">
                         <th className="px-4 py-2">Invoice Number</th>
+                        <th className="px-4 py-2">Application No.</th>
+                        <th className="px-4 py-2">GL Reference No.</th>
+                        <th className="px-4 py-2">Description</th>
+                        <th className="px-4 py-2 text-center">Status</th>
                         <th className="px-4 py-2 text-right">Applied Amount</th>
                         <th className="px-4 py-2 text-right">Actions</th>
                       </tr>
@@ -1613,6 +3678,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         return (
                           <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
                             <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
+                            <td className="px-4 py-2 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
+                            <td className="px-4 py-2 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                            <td className="px-4 py-2 text-xs">{app.description || '-'}</td>
+                            <td className="px-4 py-2 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
                             <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
                             <td className="px-4 py-2 text-right">
                               {app.isReversed ? (
@@ -1639,10 +3708,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               </div>
             )}
 
-            {/* Notes */}
+            {/* Transaction Description */}
             {editingPayment.notes && (
               <div className="mt-6 pt-6 border-t">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Notes</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-4">Transaction Description</h3>
                 <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4">{editingPayment.notes}</p>
               </div>
             )}
@@ -1656,4 +3725,5 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 };
 
 export default PaymentsView;
+
 

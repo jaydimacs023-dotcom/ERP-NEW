@@ -36,6 +36,20 @@ function bytesToB64Url(bytes: Uint8Array): string {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function camelToSnakeKeys(value: any): any {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => camelToSnakeKeys(item));
+  if (value instanceof Date) return value;
+
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(value)) {
+    const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+    result[snakeKey] = camelToSnakeKeys(value[key]);
+  }
+  return result;
+}
+
 async function verifyHs256Jwt(token: string, secret: string): Promise<JwtPayload | null> {
   try {
     const parts = token.split(".");
@@ -118,11 +132,12 @@ Deno.serve(async (req) => {
   // Action 1: create payment (draft/posted)
   if (body.action === "create_payment") {
     const payment = body.payment || {};
-    if (payment.orgId !== actorOrgId) return json(403, { error: "org mismatch" });
+    const paymentOrgId = payment.orgId || payment.org_id;
+    if (paymentOrgId !== actorOrgId) return json(403, { error: "org mismatch" });
 
     // Generate the next payment number atomically using database function
     // This prevents race conditions when multiple concurrent requests are made
-    let paymentNo = payment.paymentNo;
+    let paymentNo = payment.paymentNo || payment.payment_no;
     if (!paymentNo) {
       // Call the database function to generate the next unique payment number
       const { data: result, error: fnError } = await admin
@@ -140,13 +155,14 @@ Deno.serve(async (req) => {
       paymentNo = result;
     }
 
+    const normalizedPayment = camelToSnakeKeys(payment);
     const insertPayload = {
-      ...payment,
+      ...normalizedPayment,
       payment_no: paymentNo,  // Use the atomically generated payment_no
       org_id: actorOrgId,
       created_by: actorUserId,
       updated_by: actorUserId,
-      created_at: payment.createdAt ?? new Date().toISOString(),
+      created_at: normalizedPayment.created_at ?? normalizedPayment.createdAt ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 

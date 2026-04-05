@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChartOfAccount, Student, Trainer, Sponsor, Batch, NonStockItem,
-  JournalLine, JournalEntry, AccountClass, Qualification, Invoice
+  JournalLine, JournalEntry, AccountClass, Qualification, Invoice, Payment
 } from '../types';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import { AccountingService } from '../accountingService';
@@ -17,6 +17,7 @@ interface JournalFormProps {
   items: NonStockItem[];
   qualifications: Qualification[];
   entries: JournalEntry[];
+  payments?: Payment[];
   entryToEdit?: JournalEntry;
   linesToEdit?: JournalLine[];
   mode?: 'new' | 'edit' | 'view';
@@ -25,7 +26,7 @@ interface JournalFormProps {
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({
-  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
+  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
 }) => {
   const brandColor = '#F47721';
   const buildEmptyEntry = (): Partial<JournalEntry> => ({
@@ -59,12 +60,70 @@ const JournalForm: React.FC<JournalFormProps> = ({
     const id = String(qualificationId || '').trim();
     if (!id) return '';
     if (id === '0000-0000') return '0000-0000';
+    if (id === DEFAULT_RECEIVABLE_CLASSIFICATION_CODE) return DEFAULT_RECEIVABLE_CLASSIFICATION_CODE;
     return qualifications.find(q => q.id === id)?.code || '';
+  };
+
+  const DEFAULT_RECEIVABLE_CLASSIFICATION_CODE = '00000-00000';
+
+  const isDefaultClassificationAccount = (account?: ChartOfAccount | null): boolean =>
+    !!account && !account.isHeader && account.class !== AccountClass.REVENUE && account.class !== AccountClass.EXPENSE;
+
+  const resolveClassificationCodeForAccount = (line: Partial<JournalLine> & { qualificationId?: string }, account?: ChartOfAccount | null): string => {
+    if (!account) {
+      return String((line as any).classificationCode || '').trim();
+    }
+
+    if (isDefaultClassificationAccount(account)) {
+      return DEFAULT_RECEIVABLE_CLASSIFICATION_CODE;
+    }
+
+    if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
+      const selectedQualId = String((line as any).qualificationId || account.qualificationId || '').trim();
+      const selectedQualCode = getQualificationCodeById(selectedQualId);
+      if (selectedQualCode) return selectedQualCode;
+
+      const existingCode = String((line as any).classificationCode || '').trim();
+      if (existingCode && existingCode !== DEFAULT_RECEIVABLE_CLASSIFICATION_CODE) {
+        return existingCode;
+      }
+      return '';
+    }
+
+    return String((line as any).classificationCode || '').trim();
+  };
+
+  const formatClassificationCode = (code: string, account?: ChartOfAccount | null): string => {
+    if (isDefaultClassificationAccount(account)) {
+      return `${DEFAULT_RECEIVABLE_CLASSIFICATION_CODE} (Default)`;
+    }
+    return code;
   };
 
   useEffect(() => {
     const loadDisplayRef = async () => {
-      if (!entry.sourceRef || !entry.sourceType || entry.sourceType !== 'INVOICE') {
+      const sourceType = String(entry.sourceType || '').toUpperCase();
+      if (sourceType === 'PAYMENT') {
+        const paymentJournalRef = String(entry.reference || '').trim();
+        const sourcePaymentId = String(entry.sourceRef || '').trim();
+        const payment = payments.find(p =>
+          (sourcePaymentId && String(p.id || '').trim() === sourcePaymentId) ||
+          (String(p.journalEntryId || '').trim() === String(entry.id || '').trim()) ||
+          (paymentJournalRef && String(p.glEntryNumber || '').trim() === paymentJournalRef)
+        );
+        if (payment?.paymentNo) {
+          setDisplaySourceRef(payment.paymentNo);
+          return;
+        }
+        if (/^PAY-/i.test(paymentJournalRef)) {
+          setDisplaySourceRef(paymentJournalRef);
+          return;
+        }
+        setDisplaySourceRef(sourcePaymentId || paymentJournalRef);
+        return;
+      }
+
+      if (!entry.sourceRef || sourceType !== 'INVOICE') {
         setDisplaySourceRef('');
         return;
       }
@@ -77,7 +136,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
       }
     };
     loadDisplayRef();
-  }, [entry.sourceRef, entry.sourceType]);
+  }, [entry.sourceRef, entry.reference, entry.sourceType, entry.id, payments]);
 
   const buildDefaultLines = (): Partial<JournalLine>[] => ([]);
 
@@ -125,25 +184,16 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const sourceIsInvoice = String(entry.sourceType || '').toUpperCase() === 'INVOICE';
+    const sourceType = String(entry.sourceType || '').toUpperCase();
+    const sourceIsInvoice = sourceType === 'INVOICE';
 
     const rows = lines.map((line, idx) => {
       const account = accounts.find(a => a.id === line.accountId);
-      const selectedQualId = (line as any).qualificationId || account?.qualificationId || '';
-      const selectedQual = qualifications.find(q => q.id === selectedQualId);
       const invoiceClassCode = (line as any).classificationCode?.trim() || '';
-      const qualCode = (() => {
-        if (account) {
-          if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
-            return selectedQual?.code || '';
-          }
-          return '0000-0000';
-        }
-        return '';
-      })();
-      const displayClassCode = sourceIsInvoice
-        ? (invoiceClassCode || 'None')
-        : (invoiceClassCode || qualCode || '0000-0000');
+      const resolvedClassCode = resolveClassificationCodeForAccount(line, account);
+      const displayClassCode = resolvedClassCode
+        ? formatClassificationCode(resolvedClassCode, account)
+        : (isDefaultClassificationAccount(account) ? `${DEFAULT_RECEIVABLE_CLASSIFICATION_CODE} (Default)` : 'None');
       return {
         '#': idx + 1,
         'Account No.': account?.code || '',
@@ -205,10 +255,22 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       if (l.id !== id) return l;
       
       const newLine = { ...l, ...updates };
+      const account = accounts.find(a => a.id === newLine.accountId);
       if (Object.prototype.hasOwnProperty.call(updates, 'qualificationId')) {
         const qualificationId = String((updates as any).qualificationId || '').trim();
         (newLine as any).qualificationId = qualificationId;
-        (newLine as any).classificationCode = getQualificationCodeById(qualificationId);
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'accountId')) {
+        if (isDefaultClassificationAccount(account)) {
+          (newLine as any).qualificationId = '';
+        }
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(updates, 'qualificationId') && !Object.prototype.hasOwnProperty.call(updates, 'accountId')) {
+        (newLine as any).classificationCode = resolveClassificationCodeForAccount(newLine, account);
       }
 
       if (updates.itemId) {
@@ -260,8 +322,12 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
       contactType: l.contactType,
       batchId: l.batchId,
       itemId: l.itemId,
-      qualificationId: (l as any).qualificationId,
-      classificationCode: (l as any).classificationCode
+      qualificationId: (() => {
+        const account = accounts.find(a => a.id === l.accountId);
+        if (isDefaultClassificationAccount(account)) return '';
+        return (l as any).qualificationId || account?.qualificationId || '';
+      })(),
+      classificationCode: resolveClassificationCodeForAccount(l, accounts.find(a => a.id === l.accountId))
     } as JournalLine & { qualificationId?: string; classificationCode?: string }));
 
     onSubmit({ ...entry, id: entryId, status, createdAt: entry.createdAt || new Date().toISOString() }, finalizedLines);
@@ -279,9 +345,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
           <div>
             <h3 className="text-xl font-bold text-gray-800">
               {mode === 'edit'
-                ? `Edit Journal Entry: ${entry.reference}`
+                ? `Edit Journal Entry: ${(entry.glEntryNumber || entry.reference || '').trim()}`
                 : mode === 'view'
-                  ? `Journal Entry Details: ${entry.reference}`
+                  ? `Journal Entry Details: ${(entry.glEntryNumber || entry.reference || '').trim()}`
                   : 'New Journal Entry'}
             </h3>
             <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mt-1">{displaySourceRef || entry.sourceRef || ''}</p>
@@ -380,7 +446,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
               <input
                 readOnly={mode !== 'new'}
                 className={`w-full mt-1 px-3 py-2 border rounded-lg text-gray-900 ${mode !== 'new' ? 'bg-gray-50' : ''}`}
-                value={entry.reference}
+                value={(entry.glEntryNumber || entry.reference || '').trim()}
               />
             </div>
             <div className="space-y-1.5">
@@ -389,7 +455,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                   readOnly
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
                   value={displaySourceRef || entry.sourceRef || ''}
-                  title="invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX"
+                  title={String(entry.sourceType || '').toUpperCase() === 'PAYMENT'
+                    ? 'payment_no from payments.id = sourceRef (UUID). Shows Payment No.'
+                    : 'invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX'}
                 />           
             </div>
             <div className="space-y-1.5">
@@ -487,7 +555,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
               <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' }}>
                 <thead className="bg-gray-50">
                   <tr>
-                    {(() => {
+                        {(() => {
                       const lineColDefs = {
                         lineNumber: { key: 'lineNumber', label: '#', align: 'text-left', width: 40 },
                         accountNo: { key: 'accountNo', label: 'Account No.', align: 'text-left', width: 120 },
@@ -588,11 +656,19 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                             const invoiceQualId = invoiceClassCode
                               ? qualifications.find(q => q.code === invoiceClassCode)?.id || ''
                               : '';
-                            const sourceIsInvoice = String(entry.sourceType || '').toUpperCase() === 'INVOICE';
+                            const sourceType = String(entry.sourceType || '').toUpperCase();
+                            const sourceIsInvoice = sourceType === 'INVOICE';
+                            const fallbackClassCode = isDefaultClassificationAccount(account) ? DEFAULT_RECEIVABLE_CLASSIFICATION_CODE : '';
+                            const defaultSelectClassCode = isDefaultClassificationAccount(account)
+                              ? DEFAULT_RECEIVABLE_CLASSIFICATION_CODE
+                              : '0000-0000';
+                            const isBalanceSheetAccount = isDefaultClassificationAccount(account);
                             if (line.accountId) {
                               const acc = accounts.find(a => a.id === line.accountId);
                               if (acc) {
-                                if (acc.class === AccountClass.REVENUE || acc.class === AccountClass.EXPENSE) {
+                                if (isDefaultClassificationAccount(acc)) {
+                                  qualCode = DEFAULT_RECEIVABLE_CLASSIFICATION_CODE;
+                                } else if (acc.class === AccountClass.REVENUE || acc.class === AccountClass.EXPENSE) {
                                   qualId = (line as any).qualificationId || acc.qualificationId || '';
                                   const qual = qualifications.find(q => q.id === qualId);
                                   qualCode = qual?.code || '';
@@ -602,8 +678,10 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               }
                             }
                             const displayClassCode = sourceIsInvoice
-                              ? (invoiceClassCode || 'None')
-                              : (invoiceClassCode || qualCode || '0000-0000');
+                              ? (invoiceClassCode || fallbackClassCode)
+                                ? formatClassificationCode(invoiceClassCode || fallbackClassCode, account)
+                                : 'None'
+                              : formatClassificationCode(invoiceClassCode || qualCode || fallbackClassCode || '0000-0000', account);
                             switch (colKey) {
                               case 'lineNumber':
                                 return <td key={colKey} className="px-3 py-2 text-gray-400">{idx + 1}</td>;
@@ -640,20 +718,22 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               case 'class':
                                 return (
                                   <td key={colKey} className="px-3 py-2">
-                                    {isViewMode ? (
+                                    {isViewMode || isBalanceSheetAccount ? (
                                       <span className="inline-flex min-h-[28px] w-full items-center rounded bg-gray-50 px-2 py-1 text-[13px] font-normal text-gray-700">
                                         {displayClassCode}
                                       </span>
                                     ) : (
                                       <select
                                         value={sourceIsInvoice
-                                          ? (invoiceQualId || (qualCode === '0000-0000' ? '0000-0000' : qualId) || '0000-0000')
-                                          : (qualCode === '0000-0000' ? '0000-0000' : qualId)}
-                                        disabled={sourceIsInvoice ? false : qualCode === '0000-0000'}
+                                          ? (invoiceQualId || qualId || defaultSelectClassCode)
+                                          : (qualId || defaultSelectClassCode)}
+                                        disabled={sourceIsInvoice ? false : qualCode === defaultSelectClassCode}
                                         onChange={e => updateLine(line.id!, { qualificationId: e.target.value })}
                                         className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed"
                                       >
-                                        <option value="0000-0000">0000-0000</option>
+                                        <option value={defaultSelectClassCode}>
+                                          {defaultSelectClassCode === DEFAULT_RECEIVABLE_CLASSIFICATION_CODE ? '00000-00000 (Default)' : '0000-0000'}
+                                        </option>
                                         {qualifications.map(q => (
                                           <option key={q.id} value={q.id}>{q.code}</option>
                                         ))}

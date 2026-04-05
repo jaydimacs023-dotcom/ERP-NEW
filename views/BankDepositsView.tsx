@@ -74,7 +74,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
       deposits.flatMap(d => (d.lines || []).map(l => l.paymentId).filter(Boolean))
     );
     return payments.filter(p =>
-      p.status === 'POSTED' &&
+      (p.status === 'POSTED' || p.status === 'OPEN') &&
       p.amountReceived > 0 &&
       !depositedPaymentIds.has(p.id)
     );

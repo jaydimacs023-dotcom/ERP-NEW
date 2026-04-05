@@ -742,8 +742,10 @@ export type PaymentMethod = 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' |
 
 export interface PaymentApplication extends BaseEntity {
   id: string;
+  orgId: string;
   paymentId: string;            // FK to Payment
   invoiceId: string;            // FK to Invoice
+  applicationNo?: string;       // Human-readable application number (e.g., PAYAPP-2026-00001)
   amountApplied: number;        // Amount applied to this invoice
   glReference?: string;         // Auto-generated GL reference (e.g., GL00000042)
   journalEntryId?: string;      // FK to journal entry created by application
@@ -759,6 +761,7 @@ export interface Payment extends BaseEntity {
   id: string;
   orgId: string;
   paymentNo: string;            // Human-readable payment number (e.g., PAY-2025-00001)
+  crNo?: string;                // Collection Receipt number
   sponsorId?: string;           // FK to Sponsor (primary payer)
   studentId?: string;           // FK to Student (if individual payment)
   paymentDate: string;          // Date payment received
@@ -770,6 +773,7 @@ export interface Payment extends BaseEntity {
   bankAccountId?: string;       // FK to BankAccount (where deposited)
   checkNumber?: string;         // Check number if payment by check
   checkDate?: string;           // Check date
+  sourceInvoiceId?: string;     // Optional invoice source when payment is created from AR pay flow
 
   // Amounts
   amountReceived: number;       // Total amount received from payer
@@ -955,6 +959,7 @@ export interface JournalLine {
   credit: number;
   memo?: string;
   description?: string; // Alias for memo
+  classificationCode?: string; // Optional class code for journal display
   contactId?: string;
   contactType?: 'STUDENT' | 'TRAINER' | 'SPONSOR' | 'VENDOR' | 'OTHER' | 'EMPLOYEE';
   batchId?: string;

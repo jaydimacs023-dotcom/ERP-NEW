@@ -11,13 +11,15 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
@@ -25,5 +27,25 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "index.tsx",
+    "db.ts",
+    "types.ts",
+    "vite.config.ts",
+    "components/**/*",
+    "config/**/*",
+    "services/**/*",
+    "utils/**/*",
+    "views/**/*",
+    "vite/types/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "src",
+    "supabase",
+    "tests"
+  ]
 }

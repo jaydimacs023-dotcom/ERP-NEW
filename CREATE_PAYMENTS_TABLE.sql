@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS payments (
     
     -- Payment identification
     payment_no VARCHAR(50) NOT NULL,
+    cr_no VARCHAR(50),
     
     -- Payer (either sponsor or student)
     sponsor_id UUID REFERENCES sponsors(id) ON DELETE SET NULL,
@@ -17,7 +18,7 @@ CREATE TABLE IF NOT EXISTS payments (
     
     -- Payment details
     payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'POSTED', 'VOIDED')),
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'OPEN', 'POSTED', 'CLOSED', 'VOIDED')),
     payment_method VARCHAR(30) NOT NULL DEFAULT 'CHECK' CHECK (payment_method IN ('CASH', 'CHECK', 'BANK_TRANSFER', 'CREDIT_CARD', 'EWALLET', 'OFFSET')),
     
     -- Reference info
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS payments (
     bank_account_id UUID REFERENCES bank_accounts(id) ON DELETE SET NULL,
     check_number VARCHAR(50),
     check_date DATE,
+    source_invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
     
     -- Amounts
     amount_received NUMERIC(15,2) NOT NULL DEFAULT 0,
@@ -65,8 +67,10 @@ CREATE TABLE IF NOT EXISTS payments (
 -- Payment Applications Table (links payments to invoices)
 CREATE TABLE IF NOT EXISTS payment_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    application_no VARCHAR(50),
     
     -- Application amount
     amount_applied NUMERIC(15,2) NOT NULL CHECK (amount_applied > 0),
@@ -94,11 +98,16 @@ CREATE INDEX IF NOT EXISTS idx_payments_sponsor_id ON payments(sponsor_id);
 CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_payment_date ON payments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_payments_source_invoice_id ON payments(source_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_not_deleted ON payments(org_id) WHERE is_deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_payment_applications_payment_id ON payment_applications(payment_id);
 CREATE INDEX IF NOT EXISTS idx_payment_applications_invoice_id ON payment_applications(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_org_id ON payment_applications(org_id);
 CREATE INDEX IF NOT EXISTS idx_payment_applications_not_reversed ON payment_applications(payment_id) WHERE is_reversed = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_applications_org_application_no
+    ON payment_applications(org_id, application_no)
+    WHERE application_no IS NOT NULL;
 
 -- Row Level Security
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
@@ -136,37 +145,29 @@ CREATE POLICY "Users can delete payments in their organization" ON payments
 -- RLS Policies for payment_applications (inherit from payments)
 CREATE POLICY "Users can view payment applications for their payments" ON payment_applications
     FOR SELECT USING (
-        payment_id IN (
-            SELECT id FROM payments WHERE org_id IN (
-                SELECT org_id FROM users WHERE id = auth.uid()
-            )
+        org_id IN (
+            SELECT org_id FROM users WHERE id = auth.uid()
         )
     );
 
 CREATE POLICY "Users can insert payment applications for their payments" ON payment_applications
     FOR INSERT WITH CHECK (
-        payment_id IN (
-            SELECT id FROM payments WHERE org_id IN (
-                SELECT org_id FROM users WHERE id = auth.uid()
-            )
+        org_id IN (
+            SELECT org_id FROM users WHERE id = auth.uid()
         )
     );
 
 CREATE POLICY "Users can update payment applications for their payments" ON payment_applications
     FOR UPDATE USING (
-        payment_id IN (
-            SELECT id FROM payments WHERE org_id IN (
-                SELECT org_id FROM users WHERE id = auth.uid()
-            )
+        org_id IN (
+            SELECT org_id FROM users WHERE id = auth.uid()
         )
     );
 
 CREATE POLICY "Users can delete payment applications for their payments" ON payment_applications
     FOR DELETE USING (
-        payment_id IN (
-            SELECT id FROM payments WHERE org_id IN (
-                SELECT org_id FROM users WHERE id = auth.uid()
-            )
+        org_id IN (
+            SELECT org_id FROM users WHERE id = auth.uid()
         )
     );
 

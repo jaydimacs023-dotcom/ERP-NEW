@@ -397,6 +397,64 @@ export default function App() {
   const [exchangeRates, setExchangeRates] = useState<any[]>([]);
   const [accountingPeriods, setAccountingPeriods] = useState<any[]>([]);
   const [taxCategories, setTaxCategories] = useState<TaxCategoryEntry[]>([]);
+
+  function getPaymentTotalCredit(payment?: Pick<Payment, 'amountReceived' | 'ewtAmountCertified'> | null): number {
+    return Number(payment?.amountReceived ?? 0) + Number(payment?.ewtAmountCertified ?? 0);
+  }
+
+  function getPaymentAvailableBalance(
+    payment?: Pick<Payment, 'amountReceived' | 'ewtAmountCertified' | 'totalApplied' | 'customerDepositBalance'> | null
+  ): number {
+    const explicitBalance = Number(payment?.customerDepositBalance ?? NaN);
+    if (Number.isFinite(explicitBalance)) {
+      return Math.max(explicitBalance, 0);
+    }
+
+    return Math.max(getPaymentTotalCredit(payment) - Number(payment?.totalApplied ?? 0), 0);
+  }
+
+  function isFinalizedPaymentStatus(status?: Payment['status'] | null): boolean {
+    return status === 'OPEN' || status === 'POSTED' || status === 'CLOSED';
+  }
+
+  function resolveAppliedPaymentStatus(
+    payment: Pick<Payment, 'status' | 'amountReceived' | 'ewtAmountCertified'>,
+    totalApplied: number,
+    customerDepositBalance: number
+  ): Payment['status'] {
+    if (!isFinalizedPaymentStatus(payment.status)) {
+      return payment.status;
+    }
+
+    const normalizedBalance = Math.max(Number(customerDepositBalance ?? 0), 0);
+    const totalCredit = getPaymentTotalCredit(payment);
+    const fullyApplied =
+      normalizedBalance <= 0.01 &&
+      Math.abs(totalCredit - Number(totalApplied ?? 0)) <= 0.01;
+
+    return fullyApplied ? 'CLOSED' : 'OPEN';
+  }
+
+  function getPersistablePaymentStatus(status?: Payment['status'] | null): Payment['status'] {
+    // Some deployed databases still reject CLOSED on payments, so we keep CLOSED as a
+    // derived UI status and persist POSTED for finalized records.
+    if (status === 'CLOSED') {
+      return 'POSTED';
+    }
+
+    return status || 'DRAFT';
+  }
+
+  function resolvePaidInvoiceStatus(
+    invoice: Pick<Invoice, 'status'>,
+    balanceDue: number
+  ): Invoice['status'] {
+    if (invoice.status === 'VOIDED') {
+      return invoice.status;
+    }
+
+    return Math.max(Number(balanceDue ?? 0), 0) <= 0.01 ? 'CLOSED' : 'OPEN';
+  }
   const [locations, setLocations] = useState<Location[]>([]);
   const [schedules, setSchedules] = useState<TrainerSchedule[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -462,6 +520,7 @@ export default function App() {
   const applyingPaymentKeysRef = useRef<Set<string>>(new Set());
   const glRefSequenceRef = useRef<Record<string, number>>({});
   const invoiceGlSequenceRef = useRef<Record<string, number>>({});
+  const paymentApplicationSequenceRef = useRef<Record<string, number>>({});
 
   const extractGlSequence = (value?: string): number => {
     const ref = (value || '').trim();
@@ -471,6 +530,19 @@ export default function App() {
   };
 
   const getGlSequenceKey = (orgId: string) => orgId || '__global__';
+  const getPaymentApplicationSequenceKey = (orgId: string, year: number) => `${orgId || '__global__'}:${year}`;
+
+  const extractPaymentApplicationSequence = (value?: string, year?: number): number => {
+    const ref = String(value || '').trim();
+    if (!ref) return 0;
+    const match = ref.match(/^PAYAPP-(\d{4})-(\d+)$/i);
+    if (!match) return 0;
+    if (year && parseInt(match[1], 10) !== year) return 0;
+    return parseInt(match[2], 10);
+  };
+
+  const formatPaymentApplicationNo = (year: number, sequence: number): string =>
+    `PAYAPP-${year}-${String(sequence).padStart(5, '0')}`;
 
   const getHighestGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
     return entries.reduce((max, entry) => {
@@ -485,11 +557,44 @@ export default function App() {
     glRefSequenceRef.current[key] = Math.max(glRefSequenceRef.current[key] || 0, seq);
   };
 
+  const syncPaymentApplicationSequenceForOrg = (orgId: string, paymentList: Payment[]) => {
+    const nextSequences = { ...paymentApplicationSequenceRef.current };
+    paymentList.forEach(payment => {
+      if (payment.orgId !== orgId) return;
+      (payment.applications || []).forEach(application => {
+        const year = application.createdAt
+          ? new Date(application.createdAt).getFullYear()
+          : new Date().getFullYear();
+        const sequence = extractPaymentApplicationSequence(application.applicationNo, year);
+        if (sequence <= 0) return;
+        const key = getPaymentApplicationSequenceKey(orgId, year);
+        nextSequences[key] = Math.max(nextSequences[key] || 0, sequence);
+      });
+    });
+    paymentApplicationSequenceRef.current = nextSequences;
+  };
+
+  const generateNextPaymentApplicationNo = (orgId: string, createdAt?: string): string => {
+    const applicationDate = createdAt ? new Date(createdAt) : new Date();
+    const year = Number.isNaN(applicationDate.getTime())
+      ? new Date().getFullYear()
+      : applicationDate.getFullYear();
+    const key = getPaymentApplicationSequenceKey(orgId, year);
+    const nextSequence = (paymentApplicationSequenceRef.current[key] || 0) + 1;
+    paymentApplicationSequenceRef.current[key] = nextSequence;
+    return formatPaymentApplicationNo(year, nextSequence);
+  };
+
   useEffect(() => {
     if (!currentOrgId) return;
     syncGlSequenceForOrg(currentOrgId, journalEntries);
     syncInvoiceGlSequenceForOrg(currentOrgId, journalEntries);
   }, [journalEntries, currentOrgId]);
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    syncPaymentApplicationSequenceForOrg(currentOrgId, payments);
+  }, [payments, currentOrgId]);
 
   const getHighestInvoiceGlSequenceForOrg = (entries: JournalEntry[], orgId: string): number => {
     return entries.reduce((max, entry) => {
@@ -593,11 +698,15 @@ export default function App() {
         }
 
         setJournalEntries(normalizedEntries);
-        setJournalLines(data.journalLines);
+        const sourceAccounts = (data.accounts || []) as ChartOfAccount[];
+        const sourceSponsors = (data.sponsors || []) as Sponsor[];
+        const normalizedJournalLines: any[] = (data.journalLines || []).map((line: any) => ({ ...line }));
 
         // Backfill invoice records with their posted journal entry links so the
         // invoice screen, journal entry table, and GL reference all stay in sync.
         const invoiceBackfills = new Map<string, Partial<Invoice>>();
+        const journalDescriptionBackfills = new Map<string, string>();
+        const journalLineBackfills = new Map<string, Partial<JournalLine>>();
         const postedInvoiceEntries = normalizedEntries.filter((e: any) => {
           const status = String(e.status || '').toUpperCase();
           const sourceType = String(e.sourceType || '').toUpperCase();
@@ -607,6 +716,41 @@ export default function App() {
         const queueInvoiceBackfill = (invoiceId: string, updates: Partial<Invoice>) => {
           const current = invoiceBackfills.get(invoiceId) || {};
           invoiceBackfills.set(invoiceId, { ...current, ...updates });
+        };
+        const queueJournalDescriptionBackfill = (journalEntryId: string, description: string) => {
+          const nextDescription = String(description || '').trim();
+          if (!journalEntryId || !nextDescription) return;
+          journalDescriptionBackfills.set(journalEntryId, nextDescription);
+        };
+        const queueJournalLineBackfill = (journalLineId: string, updates: Partial<JournalLine>) => {
+          if (!journalLineId) return;
+          const current = journalLineBackfills.get(journalLineId) || {};
+          journalLineBackfills.set(journalLineId, { ...current, ...updates });
+        };
+        const syncInvoiceArLineMemo = (journalEntryId: string, inv: any, description: string) => {
+          if (!journalEntryId || !description) return;
+
+          const preferredAccountId = sourceSponsors.find(s => s.id === inv.sponsorId)?.arAccountId;
+          const entryLines = normalizedJournalLines.filter((line: any) => line.journalEntryId === journalEntryId);
+          if (!entryLines.length) return;
+
+          const arLine = resolveInvoiceArJournalLine(
+            entryLines as JournalLine[],
+            {
+              sponsorId: inv.sponsorId,
+              studentId: inv.studentId
+            },
+            sourceAccounts,
+            preferredAccountId
+          );
+
+          if (!arLine) return;
+          const currentMemo = String(arLine.memo || arLine.description || '').trim();
+          if (currentMemo === description) return;
+
+          arLine.memo = description;
+          arLine.description = description;
+          queueJournalLineBackfill(arLine.id, { memo: description, description });
         };
         const findMatchingInvoiceEntry = (inv: any) => {
           const sourceMatch = postedInvoiceEntries.find((e: any) => e.sourceRef === inv.id);
@@ -638,6 +782,7 @@ export default function App() {
         let normalizedInvoices: any[] = (data.invoices || []).map((inv: any) => {
           const next = { ...inv };
           const status = String(inv.status || '').toUpperCase();
+          const invoiceDescription = String(inv.notes || '').trim();
 
           if (inv.journalEntryId) {
             const je = normalizedEntries.find(e => e.id === inv.journalEntryId);
@@ -646,6 +791,11 @@ export default function App() {
               queueInvoiceBackfill(inv.id, { glEntryNumber: jeGl });
               next.glEntryNumber = jeGl;
             }
+            if (invoiceDescription && je && je.description?.trim() !== invoiceDescription) {
+              queueJournalDescriptionBackfill(je.id, invoiceDescription);
+              je.description = invoiceDescription;
+            }
+            syncInvoiceArLineMemo(je?.id || '', inv, invoiceDescription);
             if (je?.postedBy && !next.postedBy) {
               queueInvoiceBackfill(inv.id, { postedBy: je.postedBy });
               next.postedBy = je.postedBy;
@@ -663,6 +813,11 @@ export default function App() {
               };
 
               next.journalEntryId = matchingEntry.id;
+              if (invoiceDescription && matchingEntry.description?.trim() !== invoiceDescription) {
+                queueJournalDescriptionBackfill(matchingEntry.id, invoiceDescription);
+                matchingEntry.description = invoiceDescription;
+              }
+              syncInvoiceArLineMemo(matchingEntry.id, inv, invoiceDescription);
 
               if (matchedGl && inv.glEntryNumber !== matchedGl) {
                 backfillUpdates.glEntryNumber = matchedGl;
@@ -684,6 +839,23 @@ export default function App() {
           return next;
         });
 
+        if (journalLineBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(journalLineBackfills.entries()).map(([id, updates]) => {
+              return dataService.updateJournalLine(id, updates);
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some invoice journal line backfills failed', failures);
+              } else {
+                console.info('[App] backfilled invoice journal line descriptions');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill invoice journal line descriptions', err));
+        }
+
         if (invoiceBackfills.size > 0) {
           Promise.allSettled(
             Array.from(invoiceBackfills.entries()).map(([id, updates]) => {
@@ -700,16 +872,34 @@ export default function App() {
             })
             .catch(err => console.warn('[App] failed to backfill invoice journal references', err));
         }
+
+        if (journalDescriptionBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(journalDescriptionBackfills.entries()).map(([id, description]) => {
+              return dataService.updateJournalEntry(id, { description });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some invoice journal description backfills failed', failures);
+              } else {
+                console.info('[App] backfilled invoice journal descriptions');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill invoice journal descriptions', err));
+        }
+        setJournalLines(normalizedJournalLines);
         setInvoices(normalizedInvoices);
 
         // Debug: Log journal data to help diagnose AR invoice issue
         console.info('[App] Loaded journal data:', {
           entriesCount: data.journalEntries?.length || 0,
-          linesCount: data.journalLines?.length || 0,
+          linesCount: normalizedJournalLines.length,
           sampleEntry: data.journalEntries?.[0],
-          sampleLine: data.journalLines?.[0],
+          sampleLine: normalizedJournalLines?.[0],
           invoiceEntries: data.journalEntries?.filter((e: any) => e.sourceType === 'INVOICE')?.length || 0,
-          invoiceLines: data.journalLines?.filter((l: any) => {
+          invoiceLines: normalizedJournalLines?.filter((l: any) => {
             const entry = data.journalEntries?.find((e: any) => e.id === l.journalEntryId);
             return entry?.sourceType === 'INVOICE';
           })?.length || 0
@@ -720,14 +910,161 @@ export default function App() {
         setAuditLogs(data.auditLogs);
         setPurchaseOrders(data.purchaseOrders);
         const loadedPayments = (data.payments || []).filter(p => !p.isDeleted) as Payment[];
-        const loadedPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        const rawPaymentApplications = (data.paymentApplications || []) as PaymentApplication[];
+        const paymentMap = new Map(loadedPayments.map(payment => [payment.id, payment]));
+        const paymentApplicationNumberCounters = new Map<string, number>();
+        const paymentApplicationNumberBackfills: Array<{ id: string; applicationNo: string }> = [];
+        const paymentApplicationGlBackfills: Array<{ id: string; glReference: string }> = [];
+        const paymentApplicationJournalBackfills = new Map<string, { reference: string; description: string }>();
+
+        rawPaymentApplications.forEach(application => {
+          const payment = paymentMap.get(application.paymentId);
+          if (!payment?.orgId) return;
+          const year = application.createdAt
+            ? new Date(application.createdAt).getFullYear()
+            : new Date().getFullYear();
+          const sequence = extractPaymentApplicationSequence(application.applicationNo, year);
+          if (sequence <= 0) return;
+          const key = getPaymentApplicationSequenceKey(payment.orgId, year);
+          paymentApplicationNumberCounters.set(key, Math.max(paymentApplicationNumberCounters.get(key) || 0, sequence));
+        });
+
+        const loadedPaymentApplications = rawPaymentApplications
+          .slice()
+          .sort((a, b) => {
+            const createdAtDiff = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+            if (createdAtDiff !== 0) return createdAtDiff;
+            return String(a.id || '').localeCompare(String(b.id || ''));
+          })
+          .map(application => {
+            const payment = paymentMap.get(application.paymentId);
+            const orgId = payment?.orgId || currentOrgId;
+            const year = application.createdAt
+              ? new Date(application.createdAt).getFullYear()
+              : new Date().getFullYear();
+            const key = getPaymentApplicationSequenceKey(orgId, year);
+
+            let applicationNo = String(application.applicationNo || '').trim();
+            if (!applicationNo) {
+              const nextSequence = (paymentApplicationNumberCounters.get(key) || 0) + 1;
+              paymentApplicationNumberCounters.set(key, nextSequence);
+              applicationNo = formatPaymentApplicationNo(year, nextSequence);
+              paymentApplicationNumberBackfills.push({ id: application.id, applicationNo });
+            }
+
+            const applicationJournalDetail = applicationNo;
+            const applicationDescription = application.description || applicationJournalDetail;
+            const journalEntry = application.journalEntryId
+              ? normalizedEntries.find(entry => entry.id === application.journalEntryId)
+              : undefined;
+
+            if (
+              journalEntry &&
+              String(journalEntry.sourceType || '').toUpperCase() === 'APPLICATION' &&
+              (
+                String(journalEntry.reference || '').trim() !== applicationJournalDetail ||
+                String(journalEntry.description || '').trim() !== applicationDescription
+              )
+            ) {
+              journalEntry.reference = applicationJournalDetail;
+              journalEntry.description = applicationDescription;
+              paymentApplicationJournalBackfills.set(journalEntry.id, {
+                reference: applicationJournalDetail,
+                description: applicationDescription
+              });
+            }
+
+            let glReference = application.glReference;
+            if (!glReference && journalEntry) {
+              const resolvedGlRef = String(journalEntry?.glEntryNumber || journalEntry?.reference || '').trim();
+              if (resolvedGlRef) {
+                glReference = resolvedGlRef;
+                paymentApplicationGlBackfills.push({ id: application.id, glReference: resolvedGlRef });
+              }
+            }
+
+            return {
+              ...application,
+              orgId,
+              applicationNo,
+              glReference
+            } as PaymentApplication;
+          });
+
+        if (paymentApplicationNumberBackfills.length > 0) {
+          Promise.allSettled(
+            paymentApplicationNumberBackfills.map((applicationBackfill) =>
+              dataService.updateEntity('payment_applications', applicationBackfill.id, {
+                applicationNo: applicationBackfill.applicationNo,
+                updatedAt: new Date().toISOString()
+              })
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application number backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application numbers');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application numbers', err));
+        }
+
+        if (paymentApplicationGlBackfills.length > 0) {
+          Promise.allSettled(
+            paymentApplicationGlBackfills.map((applicationBackfill) =>
+              dataService.updateEntity('payment_applications', applicationBackfill.id, {
+                glReference: applicationBackfill.glReference,
+                updatedAt: new Date().toISOString()
+              })
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application GL reference backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application GL references');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application GL references', err));
+        }
+
+        if (paymentApplicationJournalBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(paymentApplicationJournalBackfills.entries()).map(([id, updates]) =>
+              dataService.updateJournalEntry(id, updates)
+            )
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment application journal reference/details backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment application journal reference/details');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment application journal reference/details', err));
+        }
         // backfill payment records with glEntryNumber from their journal entries
         const paymentGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
+        const paymentStatusBackfills: Array<{ id: string; status: Payment['status'] }> = [];
+        const paymentJournalDescriptionBackfills = new Map<string, string>();
+        const paymentLineBackfills = new Map<string, Partial<JournalLine>>();
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
           const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
           const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
-          
+          const paymentTransactionDescription = resolvePaymentTransactionDescription(payment);
+          const resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0);
+          const resolvedStatus = resolveAppliedPaymentStatus(
+            payment,
+            payment.totalApplied ?? appliedTotal,
+            resolvedBalance
+          );
+          const persistableResolvedStatus = getPersistablePaymentStatus(resolvedStatus);
+
           let glEntryNumber = payment.glEntryNumber;
           if (!glEntryNumber && payment.journalEntryId) {
             const je = normalizedEntries.find(e => e.id === payment.journalEntryId);
@@ -737,12 +1074,57 @@ export default function App() {
             }
           }
 
+          if (resolvedStatus !== 'CLOSED' && persistableResolvedStatus !== payment.status) {
+            paymentStatusBackfills.push({ id: payment.id, status: persistableResolvedStatus });
+          }
+
+          if (payment.journalEntryId) {
+            const paymentJournalEntry = normalizedEntries.find(e => e.id === payment.journalEntryId);
+            if (paymentJournalEntry && String(paymentJournalEntry.description || '').trim() !== paymentTransactionDescription) {
+              paymentJournalEntry.description = paymentTransactionDescription;
+              paymentJournalDescriptionBackfills.set(paymentJournalEntry.id, paymentTransactionDescription);
+            }
+            if (paymentJournalEntry && glEntryNumber && String(paymentJournalEntry.reference || '').trim() !== glEntryNumber) {
+              paymentJournalEntry.reference = glEntryNumber;
+            }
+          }
+
+          if (payment.journalEntryId) {
+            const entryLines = normalizedJournalLines.filter((line: any) => line.journalEntryId === payment.journalEntryId);
+            const amountReceived = Number(payment.amountReceived || 0);
+            const ewtAmount = Number(payment.ewtAmountCertified || 0);
+            const totalCredit = amountReceived + ewtAmount;
+            const cashLine = entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - amountReceived) < 0.001 && Number(line.credit || 0) === 0);
+            const depositsLine = entryLines.find((line: any) => Math.abs(Number(line.credit || 0) - totalCredit) < 0.001);
+            const ewtLine = ewtAmount > 0
+              ? entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - ewtAmount) < 0.001 && Number(line.credit || 0) === 0)
+              : null;
+
+            const queuePaymentLineBackfill = (line: any, description: string) => {
+              if (!line || !description) return;
+              const currentMemo = String(line.memo || line.description || '').trim();
+              if (currentMemo === description) return;
+              line.memo = description;
+              line.description = description;
+              const current = paymentLineBackfills.get(line.id) || {};
+              paymentLineBackfills.set(line.id, { ...current, memo: description, description });
+            };
+
+            queuePaymentLineBackfill(cashLine, paymentTransactionDescription);
+            queuePaymentLineBackfill(depositsLine, paymentTransactionDescription);
+            if (ewtLine) {
+              const ewtDescription = `Creditable Withholding Tax (CWT 2307) for ${payment.paymentNo}`;
+              queuePaymentLineBackfill(ewtLine, ewtDescription);
+            }
+          }
+
           return {
             ...payment,
+            status: resolvedStatus,
             glEntryNumber,
             applications: apps,
             totalApplied: payment.totalApplied ?? appliedTotal,
-            customerDepositBalance: payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0)
+            customerDepositBalance: resolvedBalance
           } as Payment;
         });
 
@@ -755,6 +1137,85 @@ export default function App() {
             .then(() => console.info('[App] backfilled missing payment GL references'))
             .catch(err => console.warn('[App] failed to backfill payment GL references', err));
         }
+        if (paymentStatusBackfills.length > 0) {
+          Promise.allSettled(
+            paymentStatusBackfills.map((paymentBackfill) => {
+              return dataService.updateEntity('payments', paymentBackfill.id, {
+                status: paymentBackfill.status,
+                updatedAt: new Date().toISOString()
+              });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment status backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment lifecycle statuses');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment lifecycle statuses', err));
+        }
+        if (paymentLineBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(paymentLineBackfills.entries()).map(([id, updates]) => {
+              return dataService.updateJournalLine(id, updates);
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment journal line backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment journal line descriptions');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment journal line descriptions', err));
+        }
+        if (paymentJournalDescriptionBackfills.size > 0) {
+          Promise.allSettled(
+            Array.from(paymentJournalDescriptionBackfills.entries()).map(([id, description]) => {
+              return dataService.updateJournalEntry(id, { description });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment journal description backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment journal descriptions');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment journal descriptions', err));
+        }
+        const paymentJournalReferenceBackfills = paymentsWithApplications
+          .filter(payment => payment.journalEntryId && payment.glEntryNumber)
+          .filter(payment => {
+            const entry = normalizedEntries.find(e => e.id === payment.journalEntryId);
+            return !!entry && String(entry.reference || '').trim() !== String(payment.glEntryNumber || '').trim();
+          })
+          .map(payment => ({
+            id: payment.journalEntryId as string,
+            reference: String(payment.glEntryNumber || '').trim()
+          }));
+        if (paymentJournalReferenceBackfills.length > 0) {
+          Promise.allSettled(
+            paymentJournalReferenceBackfills.map((item: any) => {
+              return dataService.updateJournalEntry(item.id, { reference: item.reference });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some payment journal reference backfills failed', failures);
+              } else {
+                console.info('[App] backfilled payment journal references');
+              }
+            })
+            .catch(err => console.warn('[App] failed to backfill payment journal references', err));
+        }
+        setJournalEntries([...normalizedEntries]);
+        setJournalLines(normalizedJournalLines);
         setPayments(paymentsWithApplications);
         setFixedAssets(data.fixedAssets);
         setPayables(data.payables || []);
@@ -941,19 +1402,48 @@ export default function App() {
     return `GL${String(next).padStart(8, '0')}`;
   };
 
-  // AR invoice approvals use their own reference format so the posted journal
-  // entry and the invoice module show the exact same GL reference.
+  // AR invoices now share the same system-wide GL sequence as every other
+  // posted transaction so GL references reflect true posting order.
   const generateNextInvoiceGlRef = (): string => {
-    const key = getGlSequenceKey(currentOrgId);
-    const stateMax = getHighestInvoiceGlSequenceForOrg(journalEntries, currentOrgId);
-    const currentMax = invoiceGlSequenceRef.current[key] || 0;
-    const next = Math.max(currentMax, stateMax) + 1;
-    invoiceGlSequenceRef.current[key] = next;
-    return `GL No. ${String(next).padStart(8, '0')}`;
+    return generateNextGlRef();
   };
 
   const resolveJournalRef = (entry?: Pick<JournalEntry, 'glEntryNumber' | 'reference'> | null): string =>
     (entry ? (entry.glEntryNumber || entry.reference || '').trim() : '');
+
+  const resolveInvoiceTransactionDescription = (invoice?: Pick<Invoice, 'invoiceNo' | 'notes'> | null): string => {
+    const note = String(invoice?.notes || '').trim();
+    if (note) return note;
+    return invoice ? `Sales Invoice: ${invoice.invoiceNo}` : '';
+  };
+
+  const DEFAULT_RECEIVABLE_CLASSIFICATION_CODE = '00000-00000';
+
+  const resolveInvoiceArJournalLine = (
+    lines: Pick<JournalLine, 'id' | 'accountId' | 'debit' | 'memo' | 'description'>[],
+    invoice: Pick<Invoice, 'sponsorId' | 'studentId'>,
+    accountsList: ChartOfAccount[] = filteredAccounts,
+    preferredAccountId?: string
+  ): JournalLine | null => {
+    const arAccount = resolveReceivableAccount(
+      {
+        sponsorId: invoice.sponsorId,
+        studentId: invoice.studentId,
+        preferredAccountId
+      },
+      accountsList
+    );
+
+    if (arAccount?.id) {
+      const arLine = lines.find(line => line.accountId === arAccount.id);
+      if (arLine) return arLine as JournalLine;
+    }
+
+    const debitLines = lines
+      .filter(line => Number(line.debit || 0) > 0)
+      .sort((a, b) => Number(b.debit || 0) - Number(a.debit || 0));
+    return (debitLines[0] as JournalLine) || null;
+  };
 
   const findPostedInvoiceJournalEntry = (invoice: Invoice): JournalEntry | null => {
     const invoiceGlRef = (invoice.glEntryNumber || '').trim();
@@ -1052,6 +1542,54 @@ export default function App() {
     return latestPeriod?.id || '';
   };
 
+  const DEFAULT_JOURNAL_CLASSIFICATION_CODE = '00000-00000';
+  const isDefaultJournalClassificationAccount = (account?: ChartOfAccount | null): boolean =>
+    !!account && !account.isHeader && account.class !== AccountClass.REVENUE && account.class !== AccountClass.EXPENSE;
+
+  const resolveJournalLineClassificationCode = (
+    line: Pick<JournalLine, 'accountId' | 'classificationCode'> & { qualificationId?: string },
+    accountsList: ChartOfAccount[] = filteredAccounts
+  ): string => {
+    const account = accountsList.find(a => a.id === line.accountId);
+    if (!account) return String(line.classificationCode || '').trim();
+
+    if (isDefaultJournalClassificationAccount(account)) {
+      return DEFAULT_JOURNAL_CLASSIFICATION_CODE;
+    }
+
+    if (account.class === AccountClass.REVENUE || account.class === AccountClass.EXPENSE) {
+      const selectedQualificationId = String((line as any).qualificationId || account.qualificationId || '').trim();
+      const selectedQualificationCode = selectedQualificationId
+        ? (qualifications.find(q => q.id === selectedQualificationId)?.code || '')
+        : '';
+      if (selectedQualificationCode) return selectedQualificationCode;
+
+      const existingCode = String(line.classificationCode || '').trim();
+      if (existingCode && existingCode !== DEFAULT_JOURNAL_CLASSIFICATION_CODE) {
+        return existingCode;
+      }
+      return '';
+    }
+
+    return String(line.classificationCode || '').trim();
+  };
+
+  const normalizeJournalLineForSave = (line: JournalLine): JournalLine & { qualificationId?: string; classificationCode?: string } => {
+    const account = filteredAccounts.find(a => a.id === line.accountId);
+    const classificationCode = resolveJournalLineClassificationCode(line, filteredAccounts);
+    const qualificationId = isDefaultJournalClassificationAccount(account)
+      ? ''
+      : (classificationCode
+          ? (qualifications.find(q => q.code === classificationCode)?.id || (line as any).qualificationId || account?.qualificationId || '')
+          : (line as any).qualificationId || account?.qualificationId || '');
+
+    return {
+      ...line,
+      classificationCode,
+      qualificationId
+    } as JournalLine & { qualificationId?: string; classificationCode?: string };
+  };
+
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const sourceType = String(entry.sourceType || '').toUpperCase();
     let resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
@@ -1080,6 +1618,7 @@ export default function App() {
     try {
       console.info('[App] Posting journal entry:', fullEntry.id, fullEntry.sourceType);
       console.info('[App] Lines to save:', lines.length, 'Sample line:', lines[0]);
+      const normalizedLines = lines.map(normalizeJournalLineForSave);
 
       const savedEntry = await dataService.createJournalEntry(fullEntry);
       const normalizedSavedEntry = {
@@ -1097,7 +1636,7 @@ export default function App() {
       }
 
       // Update lines with the actual saved entry ID (UUID generated by Supabase)
-      const linesWithActualId = lines.map(line => ({
+      const linesWithActualId = normalizedLines.map(line => ({
         ...line,
         journalEntryId: normalizedSavedEntry.id,
         orgId: currentOrgId
@@ -1105,10 +1644,10 @@ export default function App() {
 
       const savedLines = await dataService.createJournalLines(linesWithActualId);
       const sourceLineClassMap = new Map(
-        lines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
+        normalizedLines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
       );
       const savedLinesWithSourceClass = savedLines.map((savedLine, idx) => {
-        const sourceLine = lines.find(line => line.id === savedLine.id) || lines[idx];
+        const sourceLine = normalizedLines.find(line => line.id === savedLine.id) || normalizedLines[idx];
         const classificationCode = String(
           (sourceLine && sourceLineClassMap.get(sourceLine.id)) || (savedLine as any).classificationCode || ''
         ).trim();
@@ -1180,6 +1719,7 @@ export default function App() {
 
     try {
       console.info('[App] Saving journal entry draft:', fullEntry.id, fullEntry.sourceType);
+      const normalizedLines = lines.map(normalizeJournalLineForSave);
       const savedEntry = await dataService.createJournalEntry(fullEntry);
       const normalizedSavedEntry = {
         ...savedEntry,
@@ -1193,16 +1733,31 @@ export default function App() {
         normalizedSavedEntry.reference = fullEntry.reference;
       }
 
-      const linesWithActualId = lines.map(line => ({
+      const linesWithActualId = normalizedLines.map(line => ({
         ...line,
         journalEntryId: normalizedSavedEntry.id,
         orgId: currentOrgId
       }));
 
       const savedLines = await dataService.createJournalLines(linesWithActualId);
+      const sourceLineClassMap = new Map(
+        normalizedLines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
+      );
+      const savedLinesWithSourceClass = savedLines.map((savedLine, idx) => {
+        const sourceLine = normalizedLines.find(line => line.id === savedLine.id) || normalizedLines[idx];
+        const classificationCode = String(
+          (sourceLine && sourceLineClassMap.get(sourceLine.id)) || (savedLine as any).classificationCode || ''
+        ).trim();
+        const qualificationId = classificationCode
+          ? (qualifications.find(q => q.code === classificationCode)?.id || (savedLine as any).qualificationId || '')
+          : (savedLine as any).qualificationId || '';
+        return classificationCode
+          ? ({ ...savedLine, classificationCode, qualificationId } as JournalLine & { classificationCode?: string; qualificationId?: string })
+          : savedLine;
+      });
 
       setJournalEntries(prev => [...prev, normalizedSavedEntry]);
-      setJournalLines(prev => [...prev, ...savedLines]);
+      setJournalLines(prev => [...prev, ...savedLinesWithSourceClass]);
 
       AuditService.create(
         currentOrgId,
@@ -1286,18 +1841,31 @@ export default function App() {
     );
     if (!entry) return;
 
-    setJournalFormEntry(entry);
+    const sourceType = String(entry.sourceType || '').toUpperCase();
+    const sourceInvoice = sourceType === 'INVOICE'
+      ? invoices.find(inv =>
+          inv.orgId === currentOrgId &&
+          (
+            inv.id === entry.sourceRef ||
+            inv.invoiceNo === entry.sourceRef ||
+            inv.glEntryNumber === entry.sourceRef
+          )
+        )
+      : null;
+
+    setJournalFormEntry(
+      sourceInvoice?.notes
+        ? { ...entry, description: sourceInvoice.notes }
+        : entry
+    );
+
     const entryLines = journalLines.filter(line => line.journalEntryId === entry.id);
-    const enrichedLines = String(entry.sourceType || '').toUpperCase() === 'INVOICE'
+    const enrichedLines = sourceType === 'INVOICE'
       ? (() => {
           const sourceInvoiceLines = (sourceLines && sourceLines.length > 0)
             ? sourceLines
             : (() => {
-                const invoice = invoices.find(inv =>
-                  inv.orgId === currentOrgId &&
-                  (inv.id === entry.sourceRef || inv.invoiceNo === entry.sourceRef || inv.glEntryNumber === entry.sourceRef)
-                );
-                return invoice?.lines || [];
+                return sourceInvoice?.lines || [];
               })();
           const invoiceLines = (sourceInvoiceLines || [])
             .slice()
@@ -3230,6 +3798,41 @@ export default function App() {
   };
 
   // ===== Invoice CRUD Handlers =====
+  const isMissingInvoiceTaxCategory = (value?: string | null) => {
+    const normalized = String(value || '').trim();
+    return !normalized || normalized.toLowerCase() === 'none';
+  };
+
+  const validateInvoiceRequiredFields = (invoiceDraft?: Pick<Invoice, 'notes' | 'lines'> | null) => {
+    const missingFields: string[] = [];
+    if (!String(invoiceDraft?.notes || '').trim()) {
+      missingFields.push('Transaction Description');
+    }
+    if ((invoiceDraft?.lines || []).some(line => isMissingInvoiceTaxCategory(line.taxCategoryId))) {
+      missingFields.push('Tax Category');
+    }
+    return missingFields;
+  };
+
+  const buildInvoiceRequiredFieldMessage = (missingFields: string[]) => {
+    if (missingFields.length === 0) return '';
+    if (missingFields.length === 2) {
+      return 'Transaction Description and Tax Category for every line item are required before saving or approving the invoice.';
+    }
+    if (missingFields[0] === 'Tax Category') {
+      return 'Tax Category must be selected for every line item before saving or approving the invoice.';
+    }
+    return 'Transaction Description is required before saving or approving the invoice.';
+  };
+
+  const isInvoiceAlreadyPosted = (invoice?: Pick<Invoice, 'status' | 'journalEntryId' | 'postedAt' | 'glEntryNumber'> | null) =>
+    !!invoice && (
+      invoice.status === 'OPEN' ||
+      !!invoice.journalEntryId ||
+      !!invoice.postedAt ||
+      !!String(invoice.glEntryNumber || '').trim()
+    );
+
   const handleAddInvoice = async (invoice: Invoice) => {
     try {
       console.info('[App] Creating invoice:', invoice.invoiceNo);
@@ -3240,6 +3843,12 @@ export default function App() {
         createdBy: creatorId,
         createdAt
       };
+
+      const requiredFieldIssues = validateInvoiceRequiredFields(invoice);
+      if (requiredFieldIssues.length > 0) {
+        handleNotify('error', buildInvoiceRequiredFieldMessage(requiredFieldIssues));
+        return;
+      }
 
       // ── Accounting Posting: trigger if status is OPEN ──────────
       const matchedPostedJournal = invoice.status === 'OPEN' ? findPostedInvoiceJournalEntry(invoice) : null;
@@ -3301,8 +3910,11 @@ export default function App() {
     }
   };
 
-  const resolveReceivableAccount = (params: { sponsorId?: string; studentId?: string; preferredAccountId?: string }) => {
-    const coa = filteredAccounts;
+  const resolveReceivableAccount = (
+    params: { sponsorId?: string; studentId?: string; preferredAccountId?: string },
+    accountsList: ChartOfAccount[] = filteredAccounts
+  ) => {
+    const coa = accountsList;
     const byName = (patterns: string[]) => coa.find(a => {
       const name = (a.name || '').toLowerCase();
       return patterns.every(p => name.includes(p));
@@ -3341,6 +3953,13 @@ export default function App() {
   const postInvoiceToGL = async (invoice: Invoice): Promise<{ jeId: string, glRef: string, now: string } | null> => {
     const now = new Date().toISOString();
     const jeId = crypto.randomUUID();
+    const requiredFieldIssues = validateInvoiceRequiredFields(invoice);
+
+    if (requiredFieldIssues.length > 0) {
+      handleNotify('error', buildInvoiceRequiredFieldMessage(requiredFieldIssues));
+      return null;
+    }
+    const invoiceTransactionDescription = String(invoice.notes || '').trim();
 
     // ── Generate sequential AR invoice GL reference number scoped to org ──
     // if the invoice already contains a reference use it, otherwise allocate
@@ -3382,8 +4001,9 @@ export default function App() {
       accountId: arAccountId,
       debit: invoice.grandTotal,
       credit: 0,
-      description: `AR: ${glRef}`,
-      memo: `AR: ${glRef}`,
+      classificationCode: DEFAULT_RECEIVABLE_CLASSIFICATION_CODE,
+      description: invoiceTransactionDescription,
+      memo: invoiceTransactionDescription,
       contactId: invoice.sponsorId || invoice.studentId || undefined,
       contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
     } as JournalLine);
@@ -3449,7 +4069,7 @@ export default function App() {
       date: invoice.invoiceDate,
       reference: glRef,
       glEntryNumber: glRef,
-      description: `Sales Invoice: ${invoice.invoiceNo} `,
+      description: invoiceTransactionDescription,
       sourceType: 'INVOICE',
       sourceRef: invoice.id,
       status: 'POSTED',
@@ -3469,6 +4089,10 @@ export default function App() {
     try {
       console.info('[App] Updating invoice:', invoice.id);
       const existing = invoices.find(i => i.id === invoice.id);
+      if (isInvoiceAlreadyPosted(existing)) {
+        handleNotify('error', 'This invoice is already posted and can no longer be updated.');
+        return;
+      }
       const existingJournalEntryId = invoice.journalEntryId || existing?.journalEntryId;
       const existingGlEntryNumber = invoice.glEntryNumber || existing?.glEntryNumber;
       invoice = {
@@ -3477,6 +4101,13 @@ export default function App() {
         createdAt: invoice.createdAt || existing?.createdAt || new Date().toISOString()
       };
 
+      const requiredFieldIssues = validateInvoiceRequiredFields(invoice);
+      if (requiredFieldIssues.length > 0) {
+        handleNotify('error', buildInvoiceRequiredFieldMessage(requiredFieldIssues));
+        return;
+      }
+
+      const transactionDescription = String(invoice.notes || '').trim();
       const matchedPostedJournal = invoice.status === 'OPEN' ? findPostedInvoiceJournalEntry(invoice) : null;
       if (invoice.status === 'OPEN' && !existingJournalEntryId && matchedPostedJournal) {
         const resolvedGlRef = resolveJournalRef(matchedPostedJournal) || invoice.glEntryNumber || existingGlEntryNumber || generateNextInvoiceGlRef();
@@ -3490,6 +4121,62 @@ export default function App() {
       }
 
       // ── Accounting Posting: trigger when status transitions to OPEN ──────────
+      const invoiceTransactionDescription = transactionDescription;
+      const linkedPostedJournal = matchedPostedJournal || (
+        existingJournalEntryId
+          ? journalEntries.find(entry => entry.id === existingJournalEntryId && entry.orgId === currentOrgId)
+          : null
+      );
+      if (invoice.status === 'OPEN' && linkedPostedJournal && String(linkedPostedJournal.description || '').trim() !== invoiceTransactionDescription) {
+        try {
+          const updatedJournal = await dataService.updateJournalEntry(linkedPostedJournal.id, {
+            description: invoiceTransactionDescription
+          });
+          setJournalEntries(prev => prev.map(entry =>
+            entry.id === linkedPostedJournal.id
+              ? { ...entry, ...(updatedJournal as JournalEntry), description: invoiceTransactionDescription }
+              : entry
+          ));
+        } catch (descriptionError) {
+          console.warn('[App] Failed to sync invoice journal description:', descriptionError);
+        }
+      }
+      if (invoice.status === 'OPEN' && linkedPostedJournal) {
+        const linkedSponsor = invoice.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : null;
+        const linkedInvoiceLines = journalLines.filter(line =>
+          line.journalEntryId === linkedPostedJournal.id && line.orgId === currentOrgId
+        );
+        const linkedArLine = resolveInvoiceArJournalLine(
+          linkedInvoiceLines,
+          {
+            sponsorId: invoice.sponsorId,
+            studentId: invoice.studentId
+          },
+          filteredAccounts,
+          (linkedSponsor as any)?.arAccountId
+        );
+
+        if (linkedArLine && String(linkedArLine.memo || linkedArLine.description || '').trim() !== invoiceTransactionDescription) {
+          try {
+            const updatedLine = await dataService.updateJournalLine(linkedArLine.id, {
+              memo: invoiceTransactionDescription,
+              description: invoiceTransactionDescription
+            });
+            setJournalLines(prev => prev.map(line =>
+              line.id === linkedArLine.id
+                ? {
+                    ...line,
+                    ...(updatedLine as JournalLine),
+                    memo: invoiceTransactionDescription,
+                    description: invoiceTransactionDescription
+                  }
+                : line
+            ));
+          } catch (lineSyncError) {
+            console.warn('[App] Failed to sync invoice journal line description:', lineSyncError);
+          }
+        }
+      }
       if (invoice.status === 'OPEN' && !existingJournalEntryId && !matchedPostedJournal) {
         const postingResult = await postInvoiceToGL(invoice);
         if (postingResult) {
@@ -3678,6 +4365,8 @@ export default function App() {
   };
 
   // ===== Payment CRUD Handlers =====
+  type PaymentWithSource = Payment & { sourceInvoiceId?: string };
+
   const resolvePaymentPostingAccounts = (payment: Payment) => {
     const coa = accounts.filter(a => a.orgId === currentOrgId);
     const byName = (patterns: string[]) => coa.find(a => {
@@ -3795,7 +4484,71 @@ export default function App() {
     return `PAY-${year}-${String(next).padStart(5, '0')}`;
   };
 
-  const handleAddPayment = async (payment: Payment) => {
+  const getConflictingInvoiceLinkedPayment = (sourceInvoiceId?: string, excludePaymentId?: string) => {
+    const normalizedInvoiceId = String(sourceInvoiceId || '').trim();
+    if (!normalizedInvoiceId) return undefined;
+
+    return payments.find(existingPayment =>
+      existingPayment.orgId === currentOrgId &&
+      existingPayment.id !== excludePaymentId &&
+      !existingPayment.isDeleted &&
+      existingPayment.status !== 'VOIDED' &&
+      String(existingPayment.sourceInvoiceId || '').trim() === normalizedInvoiceId
+    );
+  };
+
+  const formatPaymentWorkflowStatus = (status?: Payment['status']) => {
+    switch (status) {
+      case 'DRAFT':
+        return 'Draft';
+      case 'OPEN':
+      case 'POSTED':
+      case 'CLOSED':
+        return 'Approved';
+      case 'VOIDED':
+        return 'Voided';
+      default:
+        return 'Saved';
+    }
+  };
+
+  const validatePaymentInvoiceLink = (payment?: PaymentWithSource, excludePaymentId?: string): string => {
+    const sourceInvoiceId = String(payment?.sourceInvoiceId || '').trim();
+    if (!sourceInvoiceId) {
+      return 'Invoice No. is required before saving or approving payment.';
+    }
+
+    const sourceInvoice = invoices.find(invoice =>
+      invoice.id === sourceInvoiceId &&
+      invoice.orgId === currentOrgId &&
+      !invoice.isDeleted
+    );
+
+    if (!sourceInvoice) {
+      return 'Selected invoice could not be found for this organization.';
+    }
+
+    if (sourceInvoice.status === 'VOIDED') {
+      return `Invoice ${sourceInvoice.invoiceNo} has been voided and cannot be tagged to a payment.`;
+    }
+
+    const payorMatches = (
+      (sourceInvoice.sponsorId || '') === (payment?.sponsorId || '') &&
+      (sourceInvoice.studentId || '') === (payment?.studentId || '')
+    );
+    if (!payorMatches) {
+      return `Invoice ${sourceInvoice.invoiceNo} is linked to a different payor. Select the matching sponsor or student before saving this payment.`;
+    }
+
+    const conflictingPayment = getConflictingInvoiceLinkedPayment(sourceInvoiceId, excludePaymentId ?? payment?.id);
+    if (conflictingPayment) {
+      return `A payment already exists for invoice ${sourceInvoice.invoiceNo} (${conflictingPayment.paymentNo}, ${formatPaymentWorkflowStatus(conflictingPayment.status)}). Review, edit, or complete the existing payment instead of creating a new one.`;
+    }
+
+    return '';
+  };
+
+  const handleAddPayment = async (payment: PaymentWithSource) => {
     try {
       console.info('[App] Creating payment:', payment.paymentNo);
       
@@ -3811,7 +4564,7 @@ export default function App() {
         return;
       }
 
-      const paymentToCreate = {
+      const paymentToCreate: PaymentWithSource = {
         ...payment,
         // orgId is already set by PaymentsView - do not override
         createdBy: payment.createdBy || currentUser?.id || 'system',
@@ -3819,9 +4572,29 @@ export default function App() {
         // Note: paymentNo will be server-generated atomically by payments-write edge function
       };
 
-      console.debug('[App] Payment object before save:', paymentToCreate);
-      const savedPayment = await dataService.createEntity('payments', paymentToCreate);
-      const persistedPayment = savedPayment as Payment;
+      const invoiceLinkError = validatePaymentInvoiceLink(paymentToCreate);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
+        return;
+      }
+
+      if (paymentToCreate.status === 'DRAFT' || paymentToCreate.status === 'OPEN') {
+        const requiredFieldsError = validatePaymentRequiredFields(paymentToCreate);
+        if (requiredFieldsError) {
+          handleNotify('error', requiredFieldsError);
+          return;
+        }
+      }
+
+      const paymentToSave = paymentToCreate;
+      console.debug('[App] Payment object before save:', paymentToSave);
+      const savedPayment = await dataService.createEntity('payments', paymentToSave);
+      const persistedPayment = {
+        ...paymentToSave,
+        ...(savedPayment as PaymentWithSource),
+        crNo: (savedPayment as Payment)?.crNo ?? paymentToSave.crNo,
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? paymentToSave.sourceInvoiceId
+      } as PaymentWithSource;
       setPayments(prev => [...prev, persistedPayment]);
 
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', persistedPayment.id, persistedPayment.paymentNo);
@@ -3841,7 +4614,7 @@ export default function App() {
     }
   };
 
-  const handleUpdatePayment = async (payment: Payment) => {
+  const handleUpdatePayment = async (payment: PaymentWithSource) => {
     try {
       console.info('[App] Updating payment:', payment.id);
       const existing = payments.find(p => p.id === payment.id);
@@ -3853,10 +4626,34 @@ export default function App() {
         handleNotify('error', 'Cross-organization payment update is not allowed.');
         return;
       }
+      if (existing.status === 'DRAFT') {
+        const requiredFieldsError = validatePaymentRequiredFields(payment);
+        if (requiredFieldsError) {
+          handleNotify('error', requiredFieldsError);
+          return;
+        }
+      }
 
-      const updates = { ...payment, orgId: currentOrgId, updatedAt: new Date().toISOString() };
+      const updates: PaymentWithSource = {
+        ...payment,
+        orgId: currentOrgId,
+        sourceInvoiceId: payment.sourceInvoiceId ?? (existing as PaymentWithSource).sourceInvoiceId,
+        updatedAt: new Date().toISOString()
+      };
+      const invoiceLinkError = validatePaymentInvoiceLink(updates, existing.id);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
+        return;
+      }
       const savedPayment = await dataService.updateEntity('payments', payment.id, updates);
-      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...(savedPayment as Payment) } : p));
+      const persistedPayment = {
+        ...existing,
+        ...updates,
+        ...(savedPayment as PaymentWithSource),
+        crNo: (savedPayment as Payment)?.crNo ?? updates.crNo ?? existing.crNo,
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? updates.sourceInvoiceId
+      } as PaymentWithSource;
+      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, ...persistedPayment } : p));
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', payment.id, payment.paymentNo, existing, payment);
       handleNotify('success', `Payment ${payment.paymentNo} updated successfully`);
@@ -3870,18 +4667,50 @@ export default function App() {
     useExistingRecord?: boolean;
   };
 
-  const handlePostPayment = async (payment: Payment, options: PostPaymentOptions = {}) => {
+  const resolvePaymentTransactionDescription = (payment?: Pick<Payment, 'paymentNo' | 'notes'> | null): string => {
+    const note = String(payment?.notes || '').trim();
+    if (note) return note;
+    return payment ? `Payment ${payment.paymentNo}` : '';
+  };
+
+  const validatePaymentRequiredFields = (payment?: Pick<PaymentWithSource, 'crNo' | 'notes' | 'sourceInvoiceId'> | null): string => {
+    const missingFields: string[] = [];
+    if (!String(payment?.sourceInvoiceId || '').trim()) missingFields.push('Invoice No.');
+    if (!String(payment?.notes || '').trim()) missingFields.push('Transaction Description');
+    if (!String(payment?.crNo || '').trim()) missingFields.push('C.R. No.');
+
+    if (missingFields.length === 0) return '';
+    if (missingFields.length === 1) {
+      return `${missingFields[0]} is required before saving or approving payment.`;
+    }
+    return `${missingFields.join(' and ')} are required before saving or approving payment.`;
+  };
+
+  const handlePostPayment = async (payment: PaymentWithSource, options: PostPaymentOptions = {}) => {
     try {
       const existing = options.useExistingRecord ? payment : payments.find(p => p.id === payment.id);
       const postingTs = new Date().toISOString();
-      const paymentToApprove: Payment = {
+      const paymentToApprove: PaymentWithSource = {
         ...payment,
         orgId: payment.orgId || currentOrgId,
+        sourceInvoiceId: payment.sourceInvoiceId,
         status: 'OPEN',
         postedAt: payment.postedAt || postingTs,
         postedBy: payment.postedBy || currentUser?.id || 'system',
         updatedAt: postingTs
       };
+      const paymentToApproveRecord = paymentToApprove;
+      const paymentRequiredFieldsError = validatePaymentRequiredFields(paymentToApproveRecord);
+      if (paymentRequiredFieldsError) {
+        handleNotify('error', paymentRequiredFieldsError);
+        return;
+      }
+      const invoiceLinkError = validatePaymentInvoiceLink(paymentToApproveRecord, paymentToApprove.id);
+      if (invoiceLinkError) {
+        handleNotify('error', invoiceLinkError);
+        return;
+      }
+      const paymentTransactionDescription = resolvePaymentTransactionDescription(paymentToApproveRecord);
       if (paymentToApprove.orgId !== currentOrgId || (existing && existing.orgId !== currentOrgId)) {
         handleNotify('error', 'Cross-organization payment approval is not allowed.');
         return;
@@ -3889,13 +4718,19 @@ export default function App() {
 
       // Skip GL if already posted before and linked.
       if (existing?.journalEntryId) {
-        const savedPayment = await dataService.updateEntity('payments', paymentToApprove.id, paymentToApprove);
+        const savedPayment = await dataService.updateEntity('payments', paymentToApprove.id, paymentToApproveRecord);
+        const persistedPayment = {
+          ...paymentToApproveRecord,
+          ...(savedPayment as PaymentWithSource),
+          crNo: (savedPayment as Payment)?.crNo ?? paymentToApproveRecord.crNo,
+          sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? paymentToApproveRecord.sourceInvoiceId
+        } as PaymentWithSource;
         if (existing) {
-          setPayments(prev => prev.map(p => p.id === paymentToApprove.id ? { ...p, ...(savedPayment as Payment) } : p));
+          setPayments(prev => prev.map(p => p.id === paymentToApprove.id ? { ...p, ...persistedPayment } : p));
         } else {
-          setPayments(prev => [...prev, savedPayment as Payment]);
+          setPayments(prev => [...prev, persistedPayment]);
         }
-        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentToApprove.id, paymentToApprove.paymentNo, existing, paymentToApprove);
+        AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYMENT', paymentToApprove.id, paymentToApprove.paymentNo, existing, paymentToApproveRecord);
         handleNotify('success', `Payment ${paymentToApprove.paymentNo} approved successfully`);
         return;
       }
@@ -3918,12 +4753,14 @@ export default function App() {
       }
 
       const totalCredit = amountReceived + ewtAmount;
+      const paymentGlRef = (paymentToApproveRecord.glEntryNumber || '').trim() || generateNextGlRef();
       const paymentEntry: Partial<JournalEntry> = {
         orgId: currentOrgId,
         periodId: '',
-        date: paymentToApprove.paymentDate,
-        description: `Payment ${paymentToApprove.paymentNo} approved`,
-        reference: paymentToApprove.paymentNo,
+        date: paymentToApproveRecord.paymentDate,
+        description: paymentTransactionDescription,
+        reference: paymentGlRef,
+        glEntryNumber: paymentGlRef,
         status: 'POSTED',
         sourceType: 'PAYMENT',
         sourceRef: paymentToApprove.id,
@@ -3939,7 +4776,9 @@ export default function App() {
           accountId: cashAccount.id,
           debit: amountReceived,
           credit: 0,
-          description: `Cash receipt for ${paymentToApprove.paymentNo}`
+          description: paymentTransactionDescription,
+          memo: paymentTransactionDescription,
+          classificationCode: DEFAULT_RECEIVABLE_CLASSIFICATION_CODE
         },
         ...(ewtAmount > 0 && ewtReceivableAccount ? [{
           id: `jl-${Date.now()}-2`,
@@ -3948,7 +4787,8 @@ export default function App() {
           accountId: ewtReceivableAccount.id,
           debit: ewtAmount,
           credit: 0,
-          description: `Creditable Withholding Tax (CWT 2307) for ${paymentToApprove.paymentNo}`
+          description: `Creditable Withholding Tax (CWT 2307) for ${paymentToApproveRecord.paymentNo}`,
+          memo: `Creditable Withholding Tax (CWT 2307) for ${paymentToApproveRecord.paymentNo}`
         }] : []),
         {
           id: `jl-${Date.now()}-3`,
@@ -3957,7 +4797,9 @@ export default function App() {
           accountId: customerDepositsAccount.id,
           debit: 0,
           credit: totalCredit,
-          description: `Customer deposits for ${paymentToApprove.paymentNo}`
+          description: paymentTransactionDescription,
+          memo: paymentTransactionDescription,
+          classificationCode: DEFAULT_RECEIVABLE_CLASSIFICATION_CODE
         }
       ];
 
@@ -3968,7 +4810,7 @@ export default function App() {
       }
 
       const finalizedPayment = {
-        ...paymentToApprove,
+        ...paymentToApproveRecord,
         journalEntryId: savedEntry.id,
         glEntryNumber: savedEntry.glEntryNumber || generateNextGlRef(),
         postedBy: currentUser?.id || 'system',
@@ -3978,10 +4820,16 @@ export default function App() {
       const savedPayment = existing
         ? await dataService.updateEntity('payments', finalizedPayment.id, finalizedPayment)
         : await dataService.createEntity('payments', finalizedPayment);
+      const persistedPayment = {
+        ...finalizedPayment,
+        ...(savedPayment as PaymentWithSource),
+        crNo: (savedPayment as Payment)?.crNo ?? finalizedPayment.crNo,
+        sourceInvoiceId: (savedPayment as PaymentWithSource)?.sourceInvoiceId ?? finalizedPayment.sourceInvoiceId
+      } as PaymentWithSource;
       if (existing) {
-        setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...finalizedPayment, ...(savedPayment as Payment) } : p));
+        setPayments(prev => prev.map(p => p.id === finalizedPayment.id ? { ...finalizedPayment, ...persistedPayment } : p));
       } else {
-        setPayments(prev => [...prev, { ...finalizedPayment, ...(savedPayment as Payment) }]);
+        setPayments(prev => [...prev, persistedPayment]);
       }
 
       if (existing) {
@@ -4045,8 +4893,13 @@ export default function App() {
   };
 
   // ===== Payment Application Handler (APPL) =====
-  const handleApplyToInvoice = async (paymentId: string, invoiceId: string, amount: number) => {
-    const payment = payments.find(p => p.id === paymentId);
+  const handleApplyToInvoice = async (
+    paymentId: string,
+    invoiceId: string,
+    amount: number,
+    paymentOverride?: PaymentWithSource
+  ) => {
+    const payment = paymentOverride || payments.find(p => p.id === paymentId);
     const invoice = invoices.find(i => i.id === invoiceId);
     if (!payment || !invoice) return;
     if (payment.orgId !== currentOrgId || invoice.orgId !== currentOrgId) {
@@ -4055,6 +4908,15 @@ export default function App() {
     }
     if (amount <= 0) {
       handleNotify('error', 'Apply amount must be greater than zero.');
+      return;
+    }
+    if (!isFinalizedPaymentStatus(payment.status)) {
+      handleNotify('error', 'Only posted or finalized payments can be applied to invoices.');
+      return;
+    }
+    const availablePaymentBalance = getPaymentAvailableBalance(payment);
+    if (availablePaymentBalance + 0.01 < amount) {
+      handleNotify('error', 'Apply amount exceeds the remaining unapplied balance of this payment.');
       return;
     }
     const applyKey = `${paymentId}:${invoiceId}`;
@@ -4080,6 +4942,7 @@ export default function App() {
 
       const applicationId = generateUUID();
       const applicationTs = new Date().toISOString();
+      const generatedApplicationNo = generateNextPaymentApplicationNo(currentOrgId, applicationTs);
 
       // Persist application first to avoid duplicate GL posting on retries.
       const newApplication = {
@@ -4087,12 +4950,18 @@ export default function App() {
         orgId: currentOrgId,
         paymentId,
         invoiceId,
+        applicationNo: generatedApplicationNo,
         amountApplied: amount,
+        description: `Payment application for invoice ${invoice.invoiceNo}`,
         isReversed: false,
+        createdBy: currentUser?.id || 'system',
         createdAt: applicationTs,
         updatedAt: applicationTs
       };
       const savedApplication = await dataService.createEntity('payment_applications', newApplication) as PaymentApplication;
+      const applicationNo = String(savedApplication.applicationNo || generatedApplicationNo).trim() || generatedApplicationNo;
+      const applicationJournalDetail = applicationNo;
+      const applicationDescription = `Payment application for invoice ${invoice.invoiceNo}`;
 
       // Reuse an existing GL entry for this application id if present (idempotent)
       let savedApplicationEntry = journalEntries.find(
@@ -4103,7 +4972,8 @@ export default function App() {
           orgId: currentOrgId,
           periodId: invoice.periodId || '',
           date: new Date().toISOString().split('T')[0],
-          description: `Payment Application to Invoice ${invoice.invoiceNo}`,
+          reference: applicationJournalDetail,
+          description: applicationDescription,
           status: 'POSTED',
           sourceType: 'APPLICATION',
           sourceRef: savedApplication.id,
@@ -4118,7 +4988,8 @@ export default function App() {
             accountId: depositsAcct.id,
             debit: amount,
             credit: 0,
-            description: 'Apply from Customer Deposits'
+            description: applicationJournalDetail,
+            memo: applicationJournalDetail
           },
           {
             id: `jl-${Date.now()}-2`,
@@ -4127,7 +4998,8 @@ export default function App() {
             accountId: arAcct.id,
             debit: 0,
             credit: amount,
-            description: 'Reduce Accounts Receivable'
+            description: applicationJournalDetail,
+            memo: applicationJournalDetail
           }
         ];
         const posted = await handlePostJournal(applEntry, applLines);
@@ -4138,28 +5010,67 @@ export default function App() {
         savedApplicationEntry = posted;
       }
 
+      if (
+        savedApplicationEntry &&
+        (
+          String(savedApplicationEntry.reference || '').trim() !== applicationJournalDetail ||
+          String(savedApplicationEntry.description || '').trim() !== applicationDescription
+        )
+      ) {
+        try {
+          const alignedApplicationEntry = await dataService.updateJournalEntry(savedApplicationEntry.id, {
+            reference: applicationJournalDetail,
+            description: applicationDescription
+          });
+          savedApplicationEntry = {
+            ...savedApplicationEntry,
+            ...alignedApplicationEntry
+          };
+        } catch (journalAlignErr) {
+          console.warn('[App] Payment application journal reference/details alignment skipped:', journalAlignErr);
+        }
+      }
+
       // Best-effort linkage update (auto-stripped if columns are missing in DB schema)
+      const applicationUpdatedAt = new Date().toISOString();
       try {
         await dataService.updateEntity('payment_applications', savedApplication.id, {
+          applicationNo,
           glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
           journalEntryId: savedApplicationEntry.id,
-          updatedAt: new Date().toISOString()
+          updatedAt: applicationUpdatedAt
         });
       } catch (linkErr) {
         console.warn('[App] Payment application GL linkage update skipped due schema mismatch:', linkErr);
       }
 
+      const persistedApplication: PaymentApplication = {
+        ...savedApplication,
+        orgId: currentOrgId,
+        applicationNo,
+        glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
+        journalEntryId: savedApplicationEntry.id,
+        updatedAt: applicationUpdatedAt
+      };
+
       // 2. Persist Payment application totals.
       const updatedPayment = {
         ...payment,
-        applications: [...(payment.applications || []), savedApplication],
+        applications: [...(payment.applications || []), persistedApplication],
         totalApplied: (payment.totalApplied || 0) + amount,
-        customerDepositBalance: (payment.customerDepositBalance || 0) - amount,
+        customerDepositBalance: Math.max(availablePaymentBalance - amount, 0),
+        status: resolveAppliedPaymentStatus(
+          payment,
+          (payment.totalApplied || 0) + amount,
+          Math.max(availablePaymentBalance - amount, 0)
+        ),
         updatedAt: new Date().toISOString()
       };
+      const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
       await dataService.updateEntity('payments', paymentId, {
         totalApplied: updatedPayment.totalApplied,
         customerDepositBalance: updatedPayment.customerDepositBalance,
+        status: persistedPaymentStatus,
         updatedAt: updatedPayment.updatedAt
       });
       setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
@@ -4167,7 +5078,7 @@ export default function App() {
       // 3. Persist Invoice balance/status update.
       const newAmountPaid = (invoice.amountPaid || 0) + amount;
       const newBalanceDue = Math.max((invoice.balanceDue || 0) - amount, 0);
-      const newStatus = newBalanceDue === 0 ? 'CLOSED' : invoice.status;
+      const newStatus = resolvePaidInvoiceStatus(invoice, newBalanceDue);
       const updatedInvoice = await dataService.updateInvoice(invoiceId, {
         amountPaid: newAmountPaid,
         balanceDue: newBalanceDue,
@@ -4176,7 +5087,7 @@ export default function App() {
       });
       setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, ...(updatedInvoice as Invoice) } : i));
 
-      handleNotify('success', `Applied ${invoice.invoiceNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
+      handleNotify('success', `Applied ${invoice.invoiceNo} via ${applicationNo}. GL Ref: ${savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference}`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes('idx_unique_active_application') || msg.includes('duplicate key value')) {
@@ -4219,9 +5130,15 @@ export default function App() {
       ...payment,
       applications: updatedApplications,
       totalApplied: (payment.totalApplied || 0) - reversedAmount,
-      customerDepositBalance: (payment.customerDepositBalance || 0) + reversedAmount,
+      customerDepositBalance: getPaymentAvailableBalance(payment) + reversedAmount,
+      status: resolveAppliedPaymentStatus(
+        payment,
+        (payment.totalApplied || 0) - reversedAmount,
+        getPaymentAvailableBalance(payment) + reversedAmount
+      ),
       updatedAt: new Date().toISOString()
     };
+    const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
     await dataService.updateEntity('payment_applications', applicationId, {
       isReversed: true,
       reversalReason: reason,
@@ -4232,14 +5149,15 @@ export default function App() {
     await dataService.updateEntity('payments', paymentId, {
       totalApplied: updatedPayment.totalApplied,
       customerDepositBalance: updatedPayment.customerDepositBalance,
+      status: persistedPaymentStatus,
       updatedAt: updatedPayment.updatedAt
     });
     setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
     // 2. Update Invoice Balance and Status
-    const newAmountPaid = (invoice.amountPaid || 0) - reversedAmount;
+    const newAmountPaid = Math.max((invoice.amountPaid || 0) - reversedAmount, 0);
     const newBalanceDue = (invoice.balanceDue || 0) + reversedAmount;
-    const newStatus = invoice.status === 'CLOSED' ? 'OPEN' : invoice.status;
+    const newStatus = resolvePaidInvoiceStatus(invoice, newBalanceDue);
     const updatedInvoice = {
       ...invoice,
       amountPaid: newAmountPaid,
@@ -4786,7 +5704,7 @@ export default function App() {
               <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
               <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
@@ -4828,7 +5746,7 @@ export default function App() {
               {userCanAccess('revenue-recognition') && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => navigateTo('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('customers') && <NavItem icon={<Users size={18} />} label="Learners & Customers" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('invoices') && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('enrollments') && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => navigateTo('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -4988,6 +5906,7 @@ export default function App() {
                 items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
                 qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
                 entries={activeJournalEntries}
+                payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
                 entryToEdit={journalFormEntry || undefined}
                 linesToEdit={journalFormLines}
                 mode={journalFormMode}
@@ -5050,7 +5969,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
@@ -5115,6 +6034,7 @@ export default function App() {
           {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
           {activeTab === 'invoices' && <InvoicesView
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
@@ -5140,12 +6060,15 @@ export default function App() {
           />}
           {activeTab === 'payments' && <PaymentsView
             currentOrgId={currentOrgId}
+            organization={currentOrg}
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
             accounts={filteredAccounts}
+            journalEntries={activeJournalEntries}
             currency={currentOrg?.currency || 'PHP'}
             onAddPayment={handleAddPayment}
             onUpdatePayment={handleUpdatePayment}
