@@ -271,9 +271,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
   const getStatusBadge = (status: BatchStatus) => {
     const styles = {
-      [BatchStatus.PLANNED]: 'bg-orange-50 text-orange-700 border-orange-100',
+      [BatchStatus.PLANNED]: 'bg-brand/10 text-brand border-brand-light',
       [BatchStatus.ONGOING]: 'bg-amber-50 text-amber-700 border-amber-100',
-      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-orange-700 border-emerald-100',
+      [BatchStatus.COMPLETED]: 'bg-emerald-50 text-emerald-700 border-emerald-100',
       [BatchStatus.CANCELLED]: 'bg-gray-100 text-gray-600 border-gray-200'
     };
     const labels = {
@@ -388,11 +388,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             onClick={downloadCsv}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded hover:bg-gray-50 transition-all font-semibold text-sm"
           >
-            <Download size={18} className="text-orange-600" /> Export CSV
+            <Download size={18} className="text-brand" /> Export CSV
           </button>
           <button
             onClick={() => { resetForm(); setShowModal(true); }}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-sm active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm active:scale-95"
           >
             <Plus size={18} /> Initialize Batch
           </button>
@@ -405,7 +405,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           <input
             type="text"
             placeholder="Search by batch identifier..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -440,9 +440,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <td className="px-6 py-5">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-[#F47721] bg-orange-50 px-2 py-0.5 rounded border border-orange-100 uppercase tracking-wide">FY {batch.year}</span>
+                          <span className="text-xs font-semibold text-brand bg-brand/10 px-2 py-0.5 rounded border border-brand-light uppercase tracking-wide">FY {batch.year}</span>
                         </div>
-                        <p className="text-sm font-semibold text-gray-800 group-hover:text-[#F47721] transition-colors">{batch.name}</p>
+                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand transition-colors">{batch.name}</p>
                       </div>
                     </td>
                     <td className="px-6 py-5">
@@ -453,31 +453,31 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <GraduationCap className="text-orange-500 shrink-0" size={16} />
+                        <GraduationCap className="text-brand shrink-0" size={16} />
                         <span className="text-sm text-gray-700">{trainer ? `${trainer.lastName}, ${trainer.firstName}` : 'Not Assigned'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${sponsor ? 'bg-orange-50 border border-orange-100 text-[#F47721]' : 'bg-amber-50 border border-amber-100 text-amber-600'}`}>
+                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${sponsor ? 'bg-brand/10 border border-brand-light text-brand' : 'bg-amber-50 border border-amber-100 text-amber-600'}`}>
                         {sponsor ? <Handshake size={12} /> : <Users size={12} />}
                         {sponsor ? 'Sponsored' : 'Private'}
                       </div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <MapPin className="text-orange-500 shrink-0" size={16} />
+                        <MapPin className="text-brand shrink-0" size={16} />
                         <span className="text-sm text-gray-700">{location?.code || 'TBD'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${batch.currentStudents >= 5 ? 'bg-emerald-50 border border-emerald-100 text-[#F47721]' : 'bg-rose-50 border border-rose-100 text-rose-600'}`}>
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${batch.currentStudents >= 5 ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-rose-50 border border-rose-100 text-rose-600'}`}>
                         <Users size={12} />
                         {batch.currentStudents}/{batch.maxStudents}
                       </div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <CalendarRange className="text-orange-400 shrink-0" size={16} />
+                        <CalendarRange className="text-brand shrink-0" size={16} />
                         <span className="text-sm text-gray-700">{batch.endDate}</span>
                       </div>
                     </td>
@@ -499,7 +499,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         </button>
                       )}
                       {batch.status === 'ONGOING' && (
-                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-[#F47721]/20 text-orange-400 text-xs font-semibold rounded">
+                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-brand text-xs font-semibold rounded border border-brand-light">
                           <Play size={12} /> In Progress
                         </span>
                       )}
@@ -513,7 +513,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
-                          className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
+                          className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
                           title="Edit Batch"
                         >
                           <Edit2 size={16} />
@@ -528,7 +528,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         </button>
                         <button
                           onClick={() => setViewingBatch(batch)}
-                          className="p-2 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
                           title="View Details"
                         >
                           <ChevronRight size={16} />
@@ -550,7 +550,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             <div className="flex-1 overflow-y-auto border-r p-8">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-[#F47721] text-white rounded shadow-sm shadow-gray-100">
+                  <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
                     <Layers size={24} />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
@@ -565,7 +565,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Batch Code</label>
                     <input
                       placeholder="e.g. BATCH-001"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
                       value={formData.batchCode} onChange={e => setFormData({ ...formData, batchCode: e.target.value })}
                     />
                   </div>
@@ -574,7 +574,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <input
                       required
                       placeholder="e.g. CSS-2024-B1"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
                       value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
@@ -582,7 +582,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Fiscal Year</label>
                     <input
                       required type="number"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold text-gray-800"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
                       value={formData.year} onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
                     />
                   </div>
@@ -611,7 +611,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1.5">
-                      <GraduationCap size={12} className="text-[#F47721]" /> Lead Instructor
+                      <GraduationCap size={12} className="text-brand" /> Lead Instructor
                     </label>
                     <select
                       required
@@ -659,19 +659,19 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Commencement Date</label>
                     <input
                       required type="date"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-bold"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold"
                       value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide px-1 flex items-center gap-1.5">
+                    <label className="text-xs font-semibold text-brand uppercase tracking-wide px-1 flex items-center gap-1.5">
                       <ShieldCheck size={12} /> Projected Completion
                     </label>
                     <div className="relative">
                       <input
                         readOnly
                         placeholder="Pending schedule input..."
-                        className="w-full px-5 py-3.5 bg-orange-50 border border-orange-100 rounded text-orange-700 font-semibold outline-none text-sm"
+                        className="w-full px-5 py-3.5 bg-brand/10 border border-brand-light rounded text-brand font-semibold outline-none text-sm"
                         value={formData.endDate}
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -683,19 +683,19 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                 {projection && (
                   <div className="p-6 bg-gray-800 rounded space-y-4 shadow-md border border-gray-700 animate-in fade-in slide-in-from-top-2 duration-500">
-                    <div className="flex items-center gap-2 mb-2 text-orange-400">
+                    <div className="flex items-center gap-2 mb-2 text-brand">
                       <Calculator size={18} />
                       <h4 className="text-xs font-semibold uppercase tracking-wide">Compliance Forecast Breakdown</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Required Units</p>
-                        <p className="text-xl font-mono font-semibold text-white">{projection.trainingDays.toFixed(1)} <span className="text-xs text-orange-400">Full Days</span></p>
+                        <p className="text-xl font-mono font-semibold text-white">{projection.trainingDays.toFixed(1)} <span className="text-xs text-brand">Full Days</span></p>
                         <p className="text-xs text-gray-500 italic mt-1">(Totaling {projection.totalHours} Instructional Hours)</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wait Duration</p>
-                        <p className="text-xl font-mono font-semibold text-white">{projection.calendarDays} <span className="text-xs text-orange-400">Calendar Days</span></p>
+                        <p className="text-xl font-mono font-semibold text-white">{projection.calendarDays} <span className="text-xs text-brand">Calendar Days</span></p>
                         <p className="text-xs text-gray-500 italic mt-1">Reflecting Half-Day and Off-Day shifts.</p>
                       </div>
                     </div>
@@ -713,7 +713,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                 <div className="pt-4 flex gap-4">
                   <button type="button" onClick={() => setShowModal(false)} disabled={isSaving} className="flex-1 py-4 text-sm font-semibold text-gray-500 hover:bg-gray-50 rounded transition-all disabled:opacity-50">Cancel</button>
-                  <button type="submit" disabled={isSaving} className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  <button type="submit" disabled={isSaving} className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center gap-2">
                     {isSaving && <Loader2 size={16} className="animate-spin" />}
                     {editingBatch ? 'Sync Record' : 'Begin Training Program'}
                   </button>
@@ -724,7 +724,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             <div className="w-full md:w-80 bg-gray-50 overflow-y-auto flex flex-col">
               <div className="p-8 border-b bg-white shrink-0">
                 <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                  <Users size={20} className="text-[#F47721]" />
+                  <Users size={20} className="text-brand" />
                   Enrollment Registry
                 </h4>
               </div>
@@ -743,12 +743,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         key={student.id}
                         type="button"
                         onClick={() => toggleStudent(student.id)}
-                        className={`w-full flex items-center gap-3 p-4 rounded transition-all border group ${isSelected ? 'bg-[#F47721] border-orange-600 text-white shadow-sm' :
-                            'bg-white border-gray-100 hover:border-orange-200'
+                        className={`w-full flex items-center gap-3 p-4 rounded transition-all border group ${isSelected ? 'bg-brand border-brand text-white shadow-sm shadow-brand/20' :
+                            'bg-white border-gray-100 hover:border-brand-light'
                           }`}
                       >
                         <div className={`w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected ? 'bg-white/20 text-white' :
-                            'bg-gray-100 text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721]'
+                            'bg-gray-100 text-gray-400 group-hover:bg-brand-light group-hover:text-brand'
                           }`}>
                           {student.lastName[0]}
                         </div>
@@ -756,7 +756,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                           <div className={`text-xs font-semibold truncate uppercase ${isSelected ? 'text-white' : 'text-gray-800'}`}>
                             {student.lastName}, {student.firstName}
                           </div>
-                          <div className={`text-xs font-mono mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-400'}`}>
+                          <div className={`text-xs font-mono mt-0.5 ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>
                             ULI: {student.uli.slice(-6)}
                           </div>
                         </div>
@@ -774,7 +774,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               <div className="p-8 bg-white border-t mt-auto">
                 <div className="flex justify-between items-center text-xs font-semibold text-gray-800 uppercase tracking-wide">
                   <span>Enrolled Learners</span>
-                  <span className="text-[#F47721]">{formData.studentIds?.length || 0}</span>
+                  <span className="text-brand">{formData.studentIds?.length || 0}</span>
                 </div>
               </div>
             </div>
@@ -788,7 +788,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/70 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
-            <div className="bg-gradient-to-r from-[#F47721] to-purple-600 px-5 py-8 text-white relative overflow-hidden">
+            <div
+              className="px-5 py-8 text-white relative overflow-hidden"
+              style={{ backgroundImage: 'linear-gradient(90deg, var(--acm-primary), var(--acm-primary-hover))' }}
+            >
               <div className="absolute top-0 right-0 opacity-10">
                 <Layers size={200} strokeWidth={1} />
               </div>
@@ -799,7 +802,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-lg border border-white/30 uppercase tracking-wide">{viewingBatch.batchCode}</span>
                   </div>
                   <h2 className="text-xl font-semibold uppercase tracking-tight mb-2">{viewingBatch.name}</h2>
-                  <p className="text-orange-200 text-sm font-bold">Comprehensive Batch Intelligence Report</p>
+                  <p className="text-white/80 text-sm font-bold">Comprehensive Batch Intelligence Report</p>
                 </div>
                 <button
                   onClick={() => setViewingBatch(null)}
@@ -812,17 +815,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
             <div className="p-5 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gradient-to-br from-orange-50 to-purple-50 p-6 rounded-md border border-orange-100">
+                <div className="p-6 rounded-md border" style={{ backgroundImage: 'linear-gradient(135deg, rgba(var(--acm-primary-rgb), 0.08), rgba(var(--acm-primary-rgb), 0.16))', borderColor: 'rgba(var(--acm-primary-rgb), 0.18)' }}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-[#F47721] text-white rounded shadow-lg">
+                    <div className="p-3 bg-brand text-white rounded shadow-lg shadow-brand/20">
                       {getStatusBadge(viewingBatch.status)}
                     </div>
                   </div>
-                  <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">Current Status</p>
+                  <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Current Status</p>
                   <p className="text-lg font-semibold text-gray-800 capitalize">{viewingBatch.status.toLowerCase()}</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-50 to-orange-50 p-6 rounded-md border border-emerald-100">
+                <div
+                  className="p-6 rounded-md border border-emerald-100"
+                  style={{ backgroundImage: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(var(--acm-primary-rgb), 0.08))' }}
+                >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-3 bg-emerald-600 text-white rounded shadow-lg">
                       <Users size={24} />
@@ -838,7 +844,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-md border border-amber-100">
+                <div
+                  className="p-6 rounded-md border border-amber-100"
+                  style={{ backgroundImage: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(var(--acm-primary-rgb), 0.08))' }}
+                >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-3 bg-amber-600 text-white rounded shadow-lg">
                       <CalendarDays size={24} />
@@ -854,7 +863,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <Award size={16} className="text-[#F47721]" />
+                    <Award size={16} className="text-brand" />
                     Qualification Details
                   </h3>
                   <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
@@ -880,7 +889,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <GraduationCap size={16} className="text-[#F47721]" />
+                    <GraduationCap size={16} className="text-brand" />
                     Lead Instructor
                   </h3>
                   <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
@@ -889,7 +898,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       return trainer ? (
                         <>
                           <div className="flex items-center gap-4 mb-4">
-                            <div className="w-14 h-14 rounded bg-[#F47721] text-white flex items-center justify-center font-semibold text-lg shadow-sm">
+                            <div className="w-14 h-14 rounded bg-brand text-white flex items-center justify-center font-semibold text-lg shadow-sm shadow-brand/20">
                               {trainer.lastName[0]}{trainer.firstName[0]}
                             </div>
                             <div>
@@ -915,7 +924,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <MapPin size={16} className="text-[#F47721]" />
+                    <MapPin size={16} className="text-brand" />
                     Location & Sponsor
                   </h3>
                   <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-4">
@@ -936,7 +945,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <Calculator size={16} className="text-[#F47721]" />
+                    <Calculator size={16} className="text-brand" />
                     Projected Metrics
                   </h3>
                   <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-md border border-gray-600 shadow-sm text-white">
@@ -959,7 +968,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                             </div>
                             <div className="pt-4 border-t border-white/10">
                               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Training Days</p>
-                              <p className="text-lg font-mono font-semibold text-orange-400">{projected.trainingDays}</p>
+                              <p className="text-lg font-mono font-semibold text-brand">{projected.trainingDays}</p>
                             </div>
                           </div>
                         );
@@ -972,7 +981,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
               <div className="space-y-4">
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                  <Users size={16} className="text-[#F47721]" />
+                  <Users size={16} className="text-brand" />
                   Enrolled Students ({viewingBatch.studentIds?.length || 0})
                 </h3>
                 <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
@@ -982,7 +991,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         const student = students.find(s => s.id === studentId);
                         return student ? (
                           <div key={student.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded border border-gray-100">
-                            <div className="w-10 h-10 rounded bg-[#F47721] text-white flex items-center justify-center text-xs font-semibold shrink-0">
+                            <div className="w-10 h-10 rounded bg-brand text-white flex items-center justify-center text-xs font-semibold shrink-0">
                               {student.lastName[0]}
                             </div>
                             <div className="flex-1 overflow-hidden">
@@ -1014,7 +1023,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     setFormData(viewingBatch);
                     setShowModal(true);
                   }}
-                  className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-[#E06610] transition-all flex items-center justify-center gap-2 shadow-sm shadow-gray-100"
+                  className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand/20"
                 >
                   <Edit2 size={18} /> Edit Batch
                 </button>

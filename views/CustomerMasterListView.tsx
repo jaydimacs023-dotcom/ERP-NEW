@@ -251,13 +251,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                         <button
                             onClick={() => handleTabChange('sponsors')}
-                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'sponsors' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all ${activeSubTab === 'sponsors' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Sponsors
                         </button>
                         <button
                             onClick={() => handleTabChange('students')}
-                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'students' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all ${activeSubTab === 'students' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Learners
                         </button>
@@ -265,14 +265,14 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                     {activeSubTab === 'sponsors' ? (
                         <button
                             onClick={() => { resetSponsorForm(); setShowSponsorModal(true); }}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 font-black text-[10px] uppercase tracking-widest"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-hover transition-all shadow-xl shadow-brand/20 font-semibold text-[10px] uppercase tracking-widest"
                         >
                             <Plus size={16} /> New Sponsor
                         </button>
                     ) : (
                         <button
                             onClick={() => { resetStudentForm(); setShowStudentModal(true); }}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 font-black text-[10px] uppercase tracking-widest"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-hover transition-all shadow-xl shadow-brand/20 font-semibold text-[10px] uppercase tracking-widest"
                         >
                             <Plus size={16} /> Register Learner
                         </button>
@@ -304,22 +304,22 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                                 {activeSubTab === 'sponsors' ? 'Sponsor Identification' : 'Learner Identification'}
                             </th>
                             {activeSubTab === 'sponsors' ? (
                                 <>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Person</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Details</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Person</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Details</th>
                                 </>
                             ) : (
                                 <>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Number</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Residence</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Number</th>
+                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Residence</th>
                                 </>
                             )}
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Billing Status</th>
-                            <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Action</th>
+                            <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Billing Status</th>
+                            <th className="px-6 py-4 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -331,13 +331,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                     <tr key={sponsor.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 border border-orange-100 shrink-0">
+                                                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center text-brand border border-brand-light shrink-0">
                                                     <Building size={20} />
                                                 </div>
                                                 <div>
                                                     <button
                                                         onClick={() => setSelectedSponsor(sponsor)}
-                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight hover:text-indigo-600 transition-colors text-left"
+                                                        className="text-sm font-semibold text-slate-900 uppercase tracking-tight hover:text-brand transition-colors text-left"
                                                     >
                                                         {sponsor.name}
                                                     </button>
@@ -366,21 +366,21 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => { setSponsorFormData(sponsor); setEditingSponsor(sponsor); setShowSponsorModal(true); }}
-                                                    className="p-2 text-slate-400 hover:text-amber-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="Edit"
                                                 >
                                                     <Edit2 size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteSponsor(sponsor.id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="Delete"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => setSelectedSponsor(sponsor)}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="View"
                                                 >
                                                     <Eye size={18} />
@@ -402,11 +402,11 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                                 <div>
                                                     <button
                                                         onClick={() => setSelectedStudent(student)}
-                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight hover:text-indigo-600 transition-colors text-left"
+                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight hover:text-brand transition-colors text-left"
                                                     >
                                                         {student.lastName.toUpperCase()}, {student.firstName}
                                                     </button>
-                                                    <div className="text-[10px] font-mono font-bold text-orange-500 uppercase">ULI: {student.uli}</div>
+                                                    <div className="text-[10px] font-mono font-bold text-brand uppercase">ULI: {student.uli}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -424,7 +424,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                                 </span>
                                             )}
                                             {status === 'UNBILLED' && (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-100">
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand/10 text-brand rounded-full text-[10px] font-black uppercase tracking-widest border border-brand-light">
                                                     <AlertCircle size={12} /> Unbilled
                                                 </span>
                                             )}
@@ -443,21 +443,21 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => { setStudentFormData(student); setEditingStudent(student); setShowStudentModal(true); }}
-                                                    className="p-2 text-slate-400 hover:text-amber-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="Edit"
                                                 >
                                                     <Edit2 size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteStudent(student.id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="Delete"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => setSelectedStudent(student)}
-                                                    className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
                                                     title="View"
                                                 >
                                                     <Eye size={18} />
@@ -918,7 +918,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                         {selectedStudent.lastName.toUpperCase()}, {selectedStudent.firstName}
                                     </h3>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-[10px] font-mono font-black text-orange-500 uppercase tracking-widest bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">ULI: {selectedStudent.uli}</span>
+                                        <span className="text-[10px] font-mono font-black text-brand uppercase tracking-widest bg-brand/10 px-2 py-0.5 rounded-full border border-brand-light">ULI: {selectedStudent.uli}</span>
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Learner Profile</span>
                                     </div>
                                 </div>
@@ -959,7 +959,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 
                             <div className="space-y-8">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <div className="p-1.5 bg-orange-50 text-orange-500 rounded-lg"><LayoutDashboard size={14} /></div>
+                                    <div className="p-1.5 bg-brand/10 text-brand rounded-lg"><LayoutDashboard size={14} /></div>
                                     <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Enrollment Details</h4>
                                 </div>
                                 <div className="space-y-4">
@@ -971,7 +971,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                                 <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-1">{qual?.name || 'Unknown Batch'}</p>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-[10px] font-bold text-slate-400 capitalize">{enr.enrollmentStatus}</span>
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${enr.billingStatus === 'BILLED' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${enr.billingStatus === 'BILLED' ? 'text-emerald-500' : 'text-brand'}`}>
                                                         {enr.billingStatus}
                                                     </span>
                                                 </div>
@@ -997,7 +997,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 <div className="w-16 h-16 rounded-2xl bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden shrink-0">
-                                    <Building size={32} className="text-orange-500" />
+                                    <Building size={32} className="text-brand" />
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">
@@ -1020,7 +1020,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         <div className="p-8 grid grid-cols-2 gap-12 max-h-[60vh] overflow-y-auto">
                             <div className="space-y-8">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <div className="p-1.5 bg-orange-50 text-orange-500 rounded-lg"><Building size={14} /></div>
+                                    <div className="p-1.5 bg-brand/10 text-brand rounded-lg"><Building size={14} /></div>
                                     <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Organization Details</h4>
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
@@ -1054,7 +1054,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                             <div className="flex justify-between items-center">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Open Balance</span>
                                                 <span className="text-sm font-black text-rose-500">
-                                                    â‚±{invoices.filter(i => i.sponsorId === selectedSponsor.id && i.status === 'OPEN')
+                                                    {"\u20B1"}{invoices.filter(i => i.sponsorId === selectedSponsor.id && i.status === 'OPEN')
                                                         .reduce((acc, inv) => acc + inv.balanceDue, 0).toLocaleString()}
                                                 </span>
                                             </div>

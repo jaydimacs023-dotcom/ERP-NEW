@@ -68,7 +68,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
     switch (status) {
       case 'PAID': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'OVERDUE': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'PENDING': return 'bg-[#025959]/5 text-[#025959] border-[#025959]/20';
+      case 'PENDING': return 'bg-brand/10 text-brand border-brand-light';
       case 'CANCELLED': return 'bg-gray-50 text-gray-700 border-gray-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
@@ -101,7 +101,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
         </div>
         <button 
           onClick={exportToCSV}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-md font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm active:scale-95"
         >
           <Download size={18} /> Export Report
         </button>
@@ -113,9 +113,9 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Paid</p>
-              <p className="text-lg font-mono font-bold text-[#025959] mt-2">{currency} {stats.paid.toLocaleString()}</p>
+              <p className="text-lg font-mono font-bold text-brand mt-2">{currency} {stats.paid.toLocaleString()}</p>
             </div>
-            <CheckCircle2 size={32} className="text-[#025959]/20" />
+            <CheckCircle2 size={32} className="text-brand opacity-20" />
           </div>
         </div>
 
@@ -146,7 +146,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             placeholder="Search by description or invoice..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-[#025959] outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -156,7 +156,7 @@ const PaymentHistoryView: React.FC<PaymentHistoryViewProps> = ({ payments, curre
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
-            className="px-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-[#025959] outline-none"
+            className="px-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none"
           >
             <option value="ALL">All Statuses</option>
             <option value="PAID">Paid</option>

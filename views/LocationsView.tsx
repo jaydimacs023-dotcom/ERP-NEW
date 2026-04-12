@@ -154,7 +154,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> Add New Facility
         </button>
@@ -166,7 +166,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
           <input 
             type="text" 
             placeholder="Search by facility name or code..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -190,7 +190,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                 <tr key={loc.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded bg-orange-50 text-[#F47721] flex items-center justify-center group-hover:bg-[#F47721] group-hover:text-white transition-colors">
+                      <div className="w-10 h-10 rounded bg-brand/10 text-brand flex items-center justify-center group-hover:bg-brand-light group-hover:text-brand transition-colors">
                         <Building size={20} />
                       </div>
                       <div>
@@ -227,7 +227,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => openEditModal(loc)}
-                        className="p-2 hover:bg-orange-50 rounded text-gray-400 hover:text-[#F47721] transition-colors"
+                        className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
                         title="Edit Facility"
                       >
                         <Edit2 size={16} />
@@ -283,7 +283,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20">
                   <MapPin size={20} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
@@ -303,7 +303,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     required 
                     autoFocus
                     placeholder="e.g. Skills Development Hub"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold text-gray-800"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold text-gray-800"
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
@@ -315,7 +315,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     required 
                     rows={3}
                     placeholder="Provide exact location for learner navigation..."
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium resize-none"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium resize-none"
                     value={formData.address}
                     onChange={e => setFormData({...formData, address: e.target.value})}
                   />
@@ -327,16 +327,16 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                     type="number"
                     min="0"
                     placeholder="e.g. 50"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none font-semibold text-gray-800"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold text-gray-800"
                     value={formData.capacity || ''}
                     onChange={e => setFormData({...formData, capacity: e.target.value === '' ? 0 : Number(e.target.value)})}
                   />
                 </div>
               </div>
 
-              <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                 <Globe className="text-[#F47721] shrink-0" size={20} />
-                 <p className="text-xs text-orange-800 leading-relaxed font-medium">
+              <div className="bg-brand/10 p-4 rounded border border-brand-light flex gap-3">
+                 <Globe className="text-brand shrink-0" size={20} />
+                 <p className="text-xs text-brand leading-relaxed font-medium">
                    Training locations are linked to scheduling and attendance tracking. Ensure addresses are verifiable for accreditation purposes.
                  </p>
               </div>
@@ -346,7 +346,7 @@ const LocationsView: React.FC<LocationsViewProps> = ({
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="flex-1 py-3.5 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-3.5 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                   {editingLocation ? 'Apply Updates' : 'Confirm Registration'}
@@ -364,15 +364,15 @@ const LocationsView: React.FC<LocationsViewProps> = ({
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
               toast.type === 'success'
-                ? 'bg-emerald-50 border border-orange-200 text-orange-800'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-orange-50 border border-orange-200 text-orange-800'
+                : 'bg-brand/10 border border-brand-light text-brand'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-[#F47721]" />}
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-[#F47721]" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-brand" />}
             <span>{toast.message}</span>
             <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}

@@ -88,7 +88,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
         <div className="flex gap-3">
           {budgets.length > 0 && (
             <select 
-              className="px-4 py-2.5 bg-white border border-gray-200 rounded text-xs font-semibold uppercase text-[#F47721] outline-none"
+              className="px-4 py-2.5 bg-white border border-brand-light rounded text-xs font-semibold uppercase text-brand outline-none focus:border-brand"
               value={selectedBudgetId}
               onChange={e => setSelectedBudgetId(e.target.value)}
             >
@@ -97,7 +97,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
           )}
           <button 
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-xs"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-xs"
           >
             <Plus size={16} /> Define New Budget
           </button>
@@ -126,7 +126,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
           <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
              <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-[#F47721] text-white rounded"><BarChart3 size={18} /></div>
+                   <div className="p-2 bg-brand/10 text-brand border border-brand-light rounded"><BarChart3 size={18} /></div>
                    <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Detailed Variance Analysis</h3>
                 </div>
                 <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
@@ -163,7 +163,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                              </td>
                              <td className="px-5 py-6 text-right font-mono text-xs font-bold text-gray-600">{formatCurrency(line.budgetedAmount)}</td>
                              <td className="px-5 py-6 text-right font-mono text-xs font-semibold text-gray-900">{formatCurrency(actual)}</td>
-                             <td className={`px-5 py-6 text-right font-mono text-xs font-semibold ${isFavorable ? 'text-[#F47721]' : 'text-rose-600'}`}>
+                             <td className={`px-5 py-6 text-right font-mono text-xs font-semibold ${isFavorable ? 'text-brand' : 'text-rose-600'}`}>
                                 {variance > 0 ? '+' : ''}{formatCurrency(variance)}
                              </td>
                              <td className="px-5 py-6 text-right">
@@ -174,7 +174,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                                         style={{ width: `${Math.min(100, Math.abs(percentUsed))}%` }} 
                                       />
                                    </div>
-                                   <span className={`text-xs font-semibold uppercase tracking-wide ${isFavorable ? 'text-[#F47721]' : 'text-rose-600'}`}>
+                                   <span className={`text-xs font-semibold uppercase tracking-wide ${isFavorable ? 'text-brand' : 'text-rose-600'}`}>
                                       {percentUsed.toFixed(1)}% Usage
                                    </span>
                                 </div>
@@ -194,7 +194,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
            <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Establish fiscal targets to unlock automated variance analysis and utilization monitoring.</p>
            <button 
              onClick={() => setShowModal(true)}
-             className="mt-8 px-8 py-3 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-gray-100 active:scale-95 transition-all"
+             className="mt-8 px-8 py-3 bg-brand text-white rounded text-xs font-semibold uppercase tracking-wide shadow-sm shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all"
            >
               Create FY {fiscalYear} Target
            </button>
@@ -207,7 +207,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col h-[85vh]">
             <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><Target size={24} /></div>
+                  <div className="p-3 bg-brand/10 text-brand border border-brand-light rounded shadow-sm"><Target size={24} /></div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Budget Definition</h3>
                </div>
                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
@@ -219,14 +219,14 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Budget Internal Title</label>
                      <input 
                        required autoFocus placeholder="e.g. FY 2024 Core Operations"
-                       className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-orange-500"
+                       className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-800 outline-none focus:border-brand"
                        value={budgetName} onChange={e => setBudgetName(e.target.value)}
                      />
                   </div>
                   <div className="space-y-2">
                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Fiscal Year Targeting</label>
                      <input 
-                       type="number" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-[#F47721] outline-none"
+                       type="number" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-brand outline-none focus:border-brand"
                        value={fiscalYear} onChange={e => setFiscalYear(Number(e.target.value))}
                      />
                   </div>
@@ -234,21 +234,21 @@ const BudgetView: React.FC<BudgetViewProps> = ({
 
                <div className="space-y-6">
                   <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                     <Scale size={16} className="text-[#F47721]" />
+                     <Scale size={16} className="text-brand" />
                      Nominal Account Targets
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                      {accounts.filter(a => (a.class === AccountClass.REVENUE || a.class === AccountClass.EXPENSE) && !a.isHeader).map(acc => (
-                       <div key={acc.id} className="flex items-center justify-between gap-4 p-4 bg-gray-50 rounded border border-gray-100 group hover:border-orange-200 transition-all">
+                       <div key={acc.id} className="flex items-center justify-between gap-4 p-4 bg-gray-50 rounded border border-gray-100 group hover:border-brand-light transition-all">
                           <div className="min-w-0">
                              <p className="text-xs font-semibold text-gray-400 uppercase truncate">{acc.name}</p>
-                             <p className="text-xs font-mono text-orange-400 uppercase mt-0.5">{acc.class}</p>
+                             <p className="text-xs font-mono text-brand uppercase mt-0.5">{acc.class}</p>
                           </div>
                           <div className="relative shrink-0">
                              <input 
                                type="number"
                                placeholder="0.00"
-                               className="w-32 pl-8 pr-4 py-2 bg-white border border-gray-200 rounded text-right text-xs font-mono font-semibold outline-none focus:border-orange-500"
+                               className="w-32 pl-8 pr-4 py-2 bg-white border border-gray-200 rounded text-right text-xs font-mono font-semibold outline-none focus:border-brand"
                                value={editingLines[acc.id] || ''}
                                onChange={e => setEditingLines({...editingLines, [acc.id]: Number(e.target.value)})}
                              />
@@ -273,7 +273,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({
                   <button 
                     onClick={handleSubmit}
                     disabled={!budgetName || Object.keys(editingLines).length === 0}
-                    className="flex-1 px-5 py-3 bg-[#F47721] text-white rounded text-sm font-semibold shadow-sm shadow-gray-300/30 hover:bg-[#F47721] active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                    className="flex-1 px-5 py-3 bg-brand text-white rounded text-sm font-semibold shadow-sm shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
                   >
                      Commit Targets
                   </button>
@@ -322,14 +322,14 @@ const SummaryWidget: React.FC<{ label: string, budget: number, actual: number, t
              </div>
           </div>
 
-          <div className={`p-4 rounded flex items-center justify-between border ${isFavorable ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'}`}>
+          <div className={`p-4 rounded flex items-center justify-between border ${isFavorable ? 'bg-brand/5 border-brand-light' : 'bg-rose-50/50 border-rose-100'}`}>
              <div className="flex items-center gap-2">
-                {isFavorable ? <ArrowUpRight size={18} className="text-[#F47721]" /> : <ArrowDownRight size={18} className="text-rose-600" />}
-                <span className={`text-xs font-semibold uppercase tracking-wide ${isFavorable ? 'text-orange-700' : 'text-rose-700'}`}>
+                {isFavorable ? <ArrowUpRight size={18} className="text-brand" /> : <ArrowDownRight size={18} className="text-rose-600" />}
+                <span className={`text-xs font-semibold uppercase tracking-wide ${isFavorable ? 'text-brand' : 'text-rose-700'}`}>
                    {isFavorable ? 'Favorable' : 'Over-Limit'} Variance
                 </span>
              </div>
-             <span className={`text-xs font-mono font-semibold ${isFavorable ? 'text-orange-700' : 'text-rose-700'}`}>
+             <span className={`text-xs font-mono font-semibold ${isFavorable ? 'text-brand' : 'text-rose-700'}`}>
                 {variance >= 0 ? '+' : '-'}{"\u20B1"} {varianceDisplay}
              </span>
           </div>
@@ -339,7 +339,7 @@ const SummaryWidget: React.FC<{ label: string, budget: number, actual: number, t
 };
 
 const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void, icon: React.ReactNode }> = ({ active, label, onClick, icon }) => (
-  <button onClick={onClick} className={`flex items-center gap-2 px-6 py-2 rounded text-xs font-semibold uppercase tracking-wide transition-all ${active ? 'bg-[#F47721] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}>{icon} {label}</button>
+  <button onClick={onClick} className={`flex items-center gap-2 px-6 py-2 rounded text-xs font-semibold uppercase tracking-wide transition-all ${active ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-gray-400 hover:text-gray-600'}`}>{icon} {label}</button>
 );
 
 export default BudgetView;

@@ -91,6 +91,38 @@ import {
   ArrowDownToLine, UserCheck
 } from 'lucide-react';
 
+function hexToRgb(hex: string): [number, number, number] {
+  const cleaned = hex.replace('#', '').trim();
+  const normalized = cleaned.length === 3
+    ? cleaned.split('').map(c => c + c).join('')
+    : cleaned;
+
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return [79, 70, 229];
+  }
+
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return [r, g, b];
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function darkenHex(hex: string, amount: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  const factor = Math.max(0, Math.min(1, 1 - amount));
+  return `rgb(${Math.round(r * factor)}, ${Math.round(g * factor)}, ${Math.round(b * factor)})`;
+}
+
+function rgbString(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  return `${r}, ${g}, ${b}`;
+}
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -100,7 +132,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
+  const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   // Navigation section state
   const [openSections, setOpenSections] = useState<{ financial: boolean; operations: boolean; registries: boolean; inventory: boolean; administration: boolean }>({ financial: true, operations: true, registries: true, inventory: true, administration: true });
 
@@ -211,6 +243,9 @@ export default function App() {
     processUrlTokens();
   }, []);
 
+  useEffect(() => {
+  document.documentElement.setAttribute("data-theme", selectedTheme);
+}, [selectedTheme]);
   // Email verification handler
   const handleVerifyEmailToken = async (token: string) => {
     const { emailVerificationService } = await import('./services/EmailVerificationService');
@@ -1309,6 +1344,19 @@ export default function App() {
   // Derived Accounting Context
   const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
   const brandColor = currentOrg?.primaryColor || '#4f46e5';
+  const brandColorHover = useMemo(() => darkenHex(brandColor, 0.12), [brandColor]);
+  const brandColorLight = useMemo(() => hexToRgba(brandColor, 0.08), [brandColor]);
+  const brandColorRgb = useMemo(() => rgbString(brandColor), [brandColor]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--acm-primary', brandColor);
+    root.style.setProperty('--acm-primary-hover', brandColorHover);
+    root.style.setProperty('--acm-primary-light', brandColorLight);
+    root.style.setProperty('--acm-primary-rgb', brandColorRgb);
+    root.style.setProperty('--acm-sidebar-active', brandColor);
+    root.style.setProperty('--acm-sidebar-hover', brandColorLight);
+  }, [brandColor, brandColorHover, brandColorLight, brandColorRgb]);
 
   const filteredAccounts = useMemo(() => accounts.filter(a => a.orgId === currentOrgId && !a.isDeleted), [accounts, currentOrgId]);
   const activeJournalEntries = useMemo(() => journalEntries.filter(e => e.orgId === currentOrgId && !e.isDeleted), [journalEntries, currentOrgId]);
@@ -5629,12 +5677,12 @@ export default function App() {
         {toasts.map(toast => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+            className={`px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right duration-300 flex items-center gap-3 ${toast.type === 'success' ? 'bg-brand/10 border-brand-light text-brand' :
               toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
                 'bg-blue-50 border-blue-200 text-blue-800'
               }`}
           >
-            {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />}
+            {toast.type === 'success' && <CheckCircle2 size={18} className="text-brand shrink-0" />}
             {toast.type === 'error' && <AlertCircle size={18} className="text-red-500 shrink-0" />}
             {toast.type === 'info' && <AlertCircle size={18} className="text-blue-500 shrink-0" />}
             <span className="text-sm font-medium">{toast.message}</span>
@@ -6308,10 +6356,10 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'} `}
+      className={`w-full text-left flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-brand hover:bg-brand/10'} `}
       style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
     >
-      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110' : 'group-hover:scale-110'} `}>{icon}</div>
+      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110 text-white' : 'group-hover:scale-110 text-slate-500 group-hover:text-brand'} `}>{icon}</div>
       {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
     </button>
   );
@@ -6333,7 +6381,7 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
         className="w-full flex items-center justify-between mb-4 px-4 group"
       >
         {!compact && (
-          <p className="text-left text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-slate-700 transition-colors">
+          <p className="text-left text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-brand transition-colors">
             {label}
           </p>
         )}

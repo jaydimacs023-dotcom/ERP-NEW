@@ -72,7 +72,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
         </div>
         <button
           onClick={() => { resetForm(); setEditingItem(null); setShowModal(true); }}
-          className="flex items-center gap-2 px-8 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/10 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95"
+          className="flex items-center gap-2 px-8 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5 transition-all active:scale-95"
         >
           <Plus className="w-5 h-5" />
           Define Specification
@@ -92,10 +92,10 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
         </div>
         
         <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm relative overflow-hidden group">
-           <p className="text-xs font-semibold text-[#F47721] uppercase tracking-wide mb-1.5">Taxable Nodes</p>
+           <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1.5">Taxable Nodes</p>
            <div className="flex items-end justify-between relative z-10">
               <p className="text-xl font-semibold text-gray-800 tracking-tight">{items.filter(i => i.taxCategoryId).length}</p>
-              <div className="p-3 bg-orange-50 rounded text-[#F47721] border border-orange-100"><Percent size={20} /></div>
+              <div className="p-3 bg-brand/10 rounded text-brand border border-brand-light"><Percent size={20} /></div>
            </div>
         </div>
 
@@ -106,7 +106,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Integration Mappings</p>
           <div className="flex items-end justify-between relative z-10">
             <p className="text-xl font-semibold text-white tracking-tight leading-none">{items.filter(i => i.incomeAccountId || i.expenseAccountId).length}</p>
-            <div className="p-3 bg-white/5 rounded text-orange-400 border border-white/10"><ShieldCheck size={20} /></div>
+            <div className="p-3 bg-white/5 rounded text-brand border border-white/10"><ShieldCheck size={20} /></div>
           </div>
         </div>
       </div>
@@ -116,7 +116,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
             <Info size={120} />
          </div>
          <div className="flex items-center gap-8 relative z-10">
-             <div className="p-6 bg-orange-50 rounded-md text-[#F47721] border border-orange-100">
+             <div className="p-6 bg-brand/10 rounded-md text-brand border border-brand-light">
                 <ShieldCheck size={40} />
              </div>
              <div>
@@ -137,7 +137,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
             placeholder="Query catalog indices by nomenclature or SKU code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-gray-50 border-2 border-transparent rounded text-sm font-bold text-gray-800 focus:bg-white focus:border-orange-400/10 outline-none transition-all"
+            className="w-full pl-14 pr-6 py-4 bg-gray-50 border-2 border-transparent rounded text-sm font-bold text-gray-800 focus:bg-white focus:border-brand-light outline-none transition-all"
           />
         </div>
         <div className="px-6 py-2 bg-gray-100 rounded-full text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -173,7 +173,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-5 py-6">
                         <div className="flex items-center gap-5">
-                           <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721] transition-all border border-gray-200">
+                           <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-brand-light group-hover:text-brand transition-all border border-gray-200">
                               <Tag size={20} />
                            </div>
                            <div>
@@ -206,7 +206,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                       </td>
                       <td className="px-6 py-6">
                          {item.taxCategoryId ? (
-                            <span className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-semibold uppercase tracking-wide border border-orange-100">
+                            <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-semibold uppercase tracking-wide border border-brand-light">
                                <Percent size={10} /> VAT_ACTIVE
                             </span>
                          ) : (
@@ -221,7 +221,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                               setFormData(item);
                               setShowModal(true);
                             }}
-                            className="p-3 bg-white border border-gray-200 text-gray-400 hover:text-[#F47721] rounded transition-all shadow-sm hover:shadow-md"
+                            className="p-3 bg-white border border-gray-200 text-gray-400 hover:text-brand rounded transition-all shadow-sm hover:shadow-md"
                           >
                             <Edit2 size={16} />
                           </button>
@@ -242,14 +242,14 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
 
         <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
             <div className="flex items-center gap-5">
-               <div className="p-4 bg-white rounded border border-gray-100 shadow-sm text-[#F47721]"><Database size={24} /></div>
+               <div className="p-4 bg-white rounded border border-gray-100 shadow-sm text-brand"><Database size={24} /></div>
                <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-2">Non-Stock Registry Status</p>
                   <p className="text-xs font-bold text-gray-600">Total of {filteredItems.length} active service definitions mapped to G/L nodes.</p>
                </div>
             </div>
             <div className="text-right">
-               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-2"><ShieldCheck size={14} className="text-[#F47721]" /> CATALOG_ATTESTED</p>
+               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-2"><ShieldCheck size={14} className="text-brand" /> CATALOG_ATTESTED</p>
                <p className="text-xs font-semibold text-gray-300 italic mt-2 uppercase tracking-tighter">Verified Timestamp: {new Date().toISOString()}</p>
             </div>
         </div>
@@ -262,7 +262,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#F47721]/10 rounded-lg text-[#F47721]">
+                <div className="p-3 bg-brand/10 rounded-lg text-brand border border-brand-light">
                   <Box size={24} />
                 </div>
                 <div>
@@ -291,7 +291,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                     value={formData.code || ''}
                     onChange={e => setFormData({ ...formData, code: e.target.value })}
                     placeholder="e.g., SVC-001"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -307,7 +307,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                       value={formData.unitPrice || ''}
                       onChange={e => setFormData({ ...formData, unitPrice: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00"
-                      className="w-full pl-14 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                      className="w-full pl-14 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -323,7 +323,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Training Fee, Assessment Fee, Registration Fee"
                   required
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                 />
               </div>
 
@@ -336,13 +336,13 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   placeholder="Optional description for this item..."
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all resize-none"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 focus:border-brand outline-none transition-all resize-none"
                 />
               </div>
 
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-4 flex items-center gap-2">
-                  <LinkIcon size={14} className="text-[#F47721]" />
+                  <LinkIcon size={14} className="text-brand" />
                   G/L Account Mapping
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -354,7 +354,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                       value={formData.incomeAccountId || ''}
                       onChange={e => setFormData({ ...formData, incomeAccountId: e.target.value })}
                       required
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                     >
                       <option value="">Select income account...</option>
                       {accounts
@@ -373,7 +373,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                     <select
                       value={formData.expenseAccountId || ''}
                       onChange={e => setFormData({ ...formData, expenseAccountId: e.target.value })}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                     >
                       <option value="">Select expense account (optional)...</option>
                       {accounts
@@ -398,7 +398,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                 </button>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-[#F47721] text-white rounded-lg font-semibold text-sm uppercase tracking-wide shadow-sm hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-2"
+                  className="px-8 py-3 bg-brand text-white rounded-lg font-semibold text-sm uppercase tracking-wide shadow-sm shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-2"
                 >
                   <ShieldCheck size={16} />
                   {editingItem ? 'Update Specification' : 'Register Specification'}

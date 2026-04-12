@@ -304,7 +304,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> New Enrollment
         </button>
@@ -317,7 +317,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <p className="text-2xl font-bold text-gray-800">{totalEnrollments}</p>
         </div>
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Active</p>
+          <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Active</p>
           <p className="text-2xl font-bold text-gray-800">{activeEnrollments}</p>
         </div>
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
@@ -337,7 +337,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <input 
             type="text" 
             placeholder="Search student, batch, sponsor..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -346,7 +346,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <select
             value={filterBatch}
             onChange={(e) => setFilterBatch(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
           >
             <option value="">All Batches</option>
             {batches.filter(b => !b.isDeleted).map(b => (
@@ -356,7 +356,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <select
             value={filterBillingStatus}
             onChange={(e) => setFilterBillingStatus(e.target.value as BillingStatus | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
           >
             <option value="">All Billing Status</option>
             {BILLING_STATUS_OPTIONS.map(opt => (
@@ -366,7 +366,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <select
             value={filterEnrollmentStatus}
             onChange={(e) => setFilterEnrollmentStatus(e.target.value as EnrollmentStatus | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
           >
             <option value="">All Status</option>
             {ENROLLMENT_STATUS_OPTIONS.map(opt => (
@@ -400,14 +400,14 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                 <tr key={enrollment.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded bg-orange-50 flex items-center justify-center text-[#F47721] border border-orange-100 shadow-sm shrink-0">
+                      <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                         <UserCheck size={20} />
                       </div>
                       <div>
                         <div className="text-sm font-bold text-gray-800 leading-tight">{getStudentName(enrollment.studentId)}</div>
                         <div className="text-xs text-gray-500 font-mono mt-0.5">{getStudentULI(enrollment.studentId)}</div>
                         {enrollment.enrollmentCode && (
-                          <div className="text-xs text-[#F47721] font-mono mt-0.5">{enrollment.enrollmentCode}</div>
+                          <div className="text-xs text-brand font-mono mt-0.5">{enrollment.enrollmentCode}</div>
                         )}
                       </div>
                     </div>
@@ -463,7 +463,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                       <button 
                         onClick={() => openEditModal(enrollment)}
                         disabled={deletingId === enrollment.id}
-                        className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                        className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
                       >
                         <Edit2 size={16} />
                       </button>
@@ -492,7 +492,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><UserCheck size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20"><UserCheck size={20} /></div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
                   {editingEnrollment ? 'Edit Enrollment' : 'New Enrollment'}
                 </h3>
@@ -507,7 +507,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Training Batch *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.batchId || ''}
                     onChange={e => setFormData({...formData, batchId: e.target.value, studentId: ''})}
                     disabled={!!editingEnrollment}
@@ -529,7 +529,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Student *</label>
                   <select 
                     required
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.studentId || ''}
                     onChange={e => setFormData({...formData, studentId: e.target.value})}
                     disabled={!formData.batchId || !!editingEnrollment}
@@ -550,7 +550,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sponsor (Optional)</label>
                   <select 
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.sponsorId || ''}
                     onChange={e => setFormData({...formData, sponsorId: e.target.value})}
                   >
@@ -568,7 +568,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Enrollment Date</label>
                     <input 
                       type="date"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                       value={formData.enrollmentDate || ''} 
                       onChange={e => setFormData({...formData, enrollmentDate: e.target.value})} 
                     />
@@ -577,7 +577,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Enrollment Code</label>
                     <input 
                       placeholder="Auto-generated if blank" 
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium font-mono"
                       value={formData.enrollmentCode || ''} 
                       onChange={e => setFormData({...formData, enrollmentCode: e.target.value})} 
                     />
@@ -640,7 +640,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Enrollment Status</label>
                   <select 
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.enrollmentStatus || 'ACTIVE'}
                     onChange={e => setFormData({...formData, enrollmentStatus: e.target.value as EnrollmentStatus})}
                   >
@@ -656,7 +656,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                   <textarea 
                     placeholder="Optional notes about this enrollment..." 
                     rows={2}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium resize-none"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium resize-none"
                     value={formData.notes || ''} 
                     onChange={e => setFormData({...formData, notes: e.target.value})} 
                   />
@@ -674,7 +674,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                 <button 
                   type="submit" 
                   disabled={isSubmitting || !formData.studentId || !formData.batchId}
-                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
@@ -703,7 +703,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-orange-50 text-orange-800 border-orange-200'
+                  : 'bg-brand/10 text-brand border-brand-light'
               }`}
             >
               {toast.type === 'success' ? (
@@ -711,7 +711,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (
-                <AlertCircle size={18} className="text-[#F47721]" />
+                <AlertCircle size={18} className="text-brand" />
               )}
               <span className="text-sm font-semibold">{toast.message}</span>
               <button

@@ -44,7 +44,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     switch (status) {
       case PurchaseOrderStatus.DRAFT: return 'bg-gray-100 text-gray-600 border-gray-200';
       case PurchaseOrderStatus.PENDING_APPROVAL: return 'bg-amber-50 text-amber-700 border-amber-200';
-      case PurchaseOrderStatus.APPROVED: return 'bg-orange-50 text-orange-700 border-orange-200';
+      case PurchaseOrderStatus.APPROVED: return 'bg-brand/10 text-brand border-brand-light';
       case PurchaseOrderStatus.REJECTED: return 'bg-rose-50 text-rose-700 border-rose-200';
       case PurchaseOrderStatus.BILLED: return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case PurchaseOrderStatus.CLOSED: return 'bg-gray-700 text-white border-gray-800';
@@ -97,7 +97,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-8 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/10 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95"
+          className="flex items-center gap-2 px-8 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5 transition-all active:scale-95"
         >
           <Plus className="w-5 h-5" /> Initialize PO
         </button>
@@ -108,7 +108,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Active Commitments</p>
             <div className="flex items-end justify-between">
                <p className="text-xl font-semibold text-gray-800 tracking-tight">{purchaseOrders.filter(p => p.status === PurchaseOrderStatus.APPROVED).length}</p>
-               <div className="p-3 bg-orange-50 rounded text-[#F47721]"><CheckCircle size={20} /></div>
+               <div className="p-3 bg-brand/10 rounded text-brand border border-brand-light"><CheckCircle size={20} /></div>
             </div>
          </div>
          <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm">
@@ -127,7 +127,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                <p className="text-xl font-semibold text-white tracking-tight leading-none pt-1">
                   PHP {purchaseOrders.reduce((sum, p) => sum + (p.status !== PurchaseOrderStatus.CLOSED ? p.totalAmount : 0), 0).toLocaleString()}
                </p>
-               <div className="p-3 bg-white/5 rounded text-orange-400 border border-white/10"><ShieldCheck size={20} /></div>
+               <div className="p-3 bg-white/5 rounded text-brand border border-white/10"><ShieldCheck size={20} /></div>
             </div>
          </div>
       </div>
@@ -140,11 +140,11 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             placeholder="Search obligations by reference, vendor, or project code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-gray-50 border-2 border-transparent rounded text-sm font-bold text-gray-800 focus:bg-white focus:border-orange-400/10 outline-none transition-all"
+            className="w-full pl-14 pr-6 py-4 bg-gray-50 border-2 border-transparent rounded text-sm font-bold text-gray-800 focus:bg-white focus:border-brand outline-none transition-all"
           />
         </div>
         <div className="flex items-center gap-3 bg-gray-100 p-2 rounded">
-           <button className="p-2.5 text-gray-500 hover:text-[#F47721] bg-white rounded shadow-sm border border-gray-200"><Filter size={18} /></button>
+           <button className="p-2.5 text-gray-500 hover:text-brand bg-white rounded shadow-sm border border-gray-200"><Filter size={18} /></button>
            <div className="w-[1px] h-6 bg-gray-200" />
            <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">{filteredPOs.length} Records</p>
         </div>
@@ -171,7 +171,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                   <tr key={po.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-5 py-6">
                       <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721] transition-all border border-gray-200 shadow-sm">
+                         <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-brand-light group-hover:text-brand transition-all border border-gray-200 shadow-sm">
                             <FileStack size={18} />
                          </div>
                          <div className="text-sm font-semibold text-gray-900 font-mono tracking-tight">{po.reference}</div>
@@ -193,7 +193,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     </td>
                     <td className="px-6 py-6 text-center">
                       <span className={`px-3 py-1 border rounded-full text-xs font-semibold uppercase tracking-wide ${
-                        po.status === 'APPROVED' ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                        po.status === 'APPROVED' ? 'bg-brand/10 border-brand-light text-brand' :
                         po.status === 'PENDING_APPROVAL' ? 'bg-amber-50 border-amber-200 text-amber-700' :
                         'bg-gray-50 border-gray-200 text-gray-500'
                       }`}>
@@ -203,7 +203,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     <td className="px-5 py-6 text-right">
                        <button 
                         onClick={() => setViewPO(po)}
-                        className="p-3 bg-white border border-gray-200 text-gray-400 hover:text-[#F47721] rounded transition-all shadow-sm hover:shadow-md"
+                        className="p-3 bg-white border border-gray-200 text-gray-400 hover:text-brand rounded transition-all shadow-sm hover:shadow-md"
                        >
                           <ChevronRight size={18} />
                        </button>
@@ -219,14 +219,14 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
 
         <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
             <div className="flex items-center gap-5">
-               <div className="p-4 bg-white rounded border border-gray-100 shadow-sm text-[#F47721]"><Database size={24} /></div>
+               <div className="p-4 bg-white rounded border border-gray-100 shadow-sm text-brand"><Database size={24} /></div>
                <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-2">Obligation State</p>
                   <p className="text-xs font-bold text-gray-600">Total of {purchaseOrders.length} purchase orders recorded in the current lifecycle.</p>
                </div>
             </div>
             <div className="text-right">
-               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-2"><ShieldCheck size={14} className="text-[#F47721]" /> PROCUREMENT_VERIFIED</p>
+               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-2"><ShieldCheck size={14} className="text-brand" /> PROCUREMENT_VERIFIED</p>
                <p className="text-xs font-semibold text-gray-300 italic mt-2 uppercase tracking-tighter">Verified Timestamp: {new Date().toISOString()}</p>
             </div>
         </div>
@@ -239,7 +239,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#F47721]/10 rounded-lg text-[#F47721]">
+                <div className="p-3 bg-brand/10 rounded-lg text-brand border border-brand-light">
                   <FileStack size={24} />
                 </div>
                 <div>
@@ -265,7 +265,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     value={formData.vendorId || ''}
                     onChange={e => setFormData({ ...formData, vendorId: e.target.value })}
                     required
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                   >
                     <option value="">Select vendor...</option>
                     {vendors.map(v => (
@@ -283,7 +283,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     onChange={e => setFormData({ ...formData, reference: e.target.value })}
                     placeholder="e.g., PO-2026-0001"
                     required
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                   />
                 </div>
               </div>
@@ -297,7 +297,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     type="date"
                     value={formData.date || ''}
                     onChange={e => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -309,7 +309,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                     value={formData.memo || ''}
                     onChange={e => setFormData({ ...formData, memo: e.target.value })}
                     placeholder="Optional notes..."
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-[#F47721] focus:ring-2 focus:ring-[#F47721]/20 outline-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-semibold text-gray-800 focus:border-brand outline-none transition-all"
                   />
                 </div>
               </div>
@@ -318,7 +318,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-2">
-                    <Box size={14} className="text-[#F47721]" />
+                    <Box size={14} className="text-brand" />
                     Line Items
                   </h4>
                   <button
@@ -327,7 +327,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                       ...formData,
                       lines: [...(formData.lines || []), { id: `${Date.now()}`, itemId: '', description: '', qty: 1, unitPrice: 0, taxAmount: 0 }]
                     })}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#F47721] hover:bg-orange-50 rounded transition-all"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand-light rounded transition-all"
                   >
                     <Plus size={14} /> Add Line
                   </button>
@@ -346,7 +346,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                             newLines[idx] = { ...newLines[idx], description: e.target.value };
                             setFormData({ ...formData, lines: newLines });
                           }}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-[#F47721] outline-none"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-brand outline-none"
                         />
                       </div>
                       <div className="w-20">
@@ -360,7 +360,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                             newLines[idx] = { ...newLines[idx], qty: parseInt(e.target.value) || 0 };
                             setFormData({ ...formData, lines: newLines });
                           }}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-[#F47721] outline-none text-center"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-brand outline-none text-center"
                         />
                       </div>
                       <div className="w-32">
@@ -375,7 +375,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                             newLines[idx] = { ...newLines[idx], unitPrice: parseFloat(e.target.value) || 0 };
                             setFormData({ ...formData, lines: newLines });
                           }}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-[#F47721] outline-none text-right"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm font-medium focus:border-brand outline-none text-right"
                         />
                       </div>
                       <div className="w-28 text-right py-2 text-sm font-bold text-gray-700">
@@ -415,7 +415,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-[#F47721] text-white rounded-lg font-semibold text-sm uppercase tracking-wide shadow-sm hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-2"
+                  className="px-8 py-3 bg-brand text-white rounded-lg font-semibold text-sm uppercase tracking-wide shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5 transition-all active:scale-95 flex items-center gap-2"
                 >
                   <Save size={16} />
                   Create Purchase Order

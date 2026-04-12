@@ -81,7 +81,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm"
         >
           <Plus size={18} /> Register Staff
         </button>
@@ -92,7 +92,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             placeholder="Search staff by name or role..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-orange-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -129,7 +129,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </div>
                       <div>
                         <div className="text-sm font-bold text-gray-800">{emp.lastName.toUpperCase()}, {emp.firstName}</div>
-                        <div className="text-xs font-mono text-[#F47721] uppercase">EMP_ID: {emp.id.slice(-6)}</div>
+                        <div className="text-xs font-mono text-brand uppercase">EMP_ID: {emp.id.slice(-6)}</div>
                       </div>
                     </div>
                   </td>
@@ -143,7 +143,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     {emp.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-5 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase border ${emp.isActive ? 'bg-emerald-50 text-[#F47721] border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase border ${emp.isActive ? 'bg-brand/10 text-brand border-brand-light' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
                       {emp.isActive ? 'Active' : 'Archived'}
                     </span>
                   </td>
@@ -151,7 +151,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => { setEditingEmp(emp); setFormData(emp); setShowModal(true); }}
-                        className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg"
+                        className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg"
                       >
                         <ChevronRight size={18} />
                       </button>
@@ -176,7 +176,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><Users size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20"><Users size={20} /></div>
                 <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">{editingEmp ? 'Update Profile' : 'Register Staff Member'}</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -185,7 +185,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             <form onSubmit={handleSubmit} className="p-8 space-y-10">
               <section className="space-y-6">
                 <div className="flex items-center gap-2">
-                   <Fingerprint size={16} className="text-[#F47721]" />
+                   <Fingerprint size={16} className="text-brand" />
                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal & Job Info</h4>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
@@ -205,14 +205,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wide px-1">Basic Monthly Salary</label>
-                    <input type="number" step="0.01" required className="w-full px-4 py-3 bg-white border-2 border-orange-100 rounded text-lg font-mono font-semibold text-[#F47721]" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: Number(e.target.value)})} />
+                    <input type="number" step="0.01" required className="w-full px-4 py-3 bg-white border-2 border-brand-light rounded text-lg font-mono font-semibold text-brand focus:border-brand outline-none" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: Number(e.target.value)})} />
                   </div>
                 </div>
               </section>
 
               <section className="space-y-6">
                 <div className="flex items-center gap-2">
-                   <CreditCard size={16} className="text-[#F47721]" />
+                   <CreditCard size={16} className="text-brand" />
                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Statutory & Disbursement</h4>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -247,7 +247,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
               <div className="pt-8 flex gap-4">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-sm font-bold text-gray-400 hover:bg-gray-100 rounded transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-sm shadow-gray-100 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-sm shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Save size={18} /> {editingEmp ? 'Apply Record Sync' : 'Finalize Registration'}
                 </button>
               </div>

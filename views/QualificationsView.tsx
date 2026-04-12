@@ -186,7 +186,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-all shadow-sm font-medium text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-sm shadow-brand/20 font-medium text-sm"
         >
           <Plus size={18} /> Add New Qualification
         </button>
@@ -198,7 +198,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           <input
             type="text"
             placeholder="Search by code, name, or sector..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -207,13 +207,13 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded transition-all ${viewMode === 'list' ? 'bg-white text-orange-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`p-2 rounded transition-all ${viewMode === 'list' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <List size={18} />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded transition-all ${viewMode === 'grid' ? 'bg-white text-orange-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`p-2 rounded transition-all ${viewMode === 'grid' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <LayoutGrid size={18} />
             </button>
@@ -240,7 +240,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 <tr key={qual.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
-                      <div className="text-xs font-mono font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded inline-block border border-orange-100 w-fit">
+                      <div className="text-xs font-mono font-semibold text-brand bg-brand/10 px-2 py-0.5 rounded inline-block border border-brand-light w-fit">
                         {qual.code}
                       </div>
                       <div className="flex items-center gap-1 text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -273,7 +273,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => openEditModal(qual)}
-                        className="p-2 hover:bg-orange-50 text-gray-300 hover:text-orange-500 rounded transition-all"
+                        className="p-2 hover:bg-brand-light text-gray-300 hover:text-brand rounded transition-all"
                         title="Edit"
                       >
                         <Edit2 size={18} />
@@ -320,7 +320,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           {filteredQuals.map(qual => {
             const color = getSectorColor(qual.sector || '');
             return (
-              <div key={qual.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-md hover:border-orange-200 transition-all group overflow-hidden flex flex-col">
+              <div key={qual.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-md hover:border-brand-light transition-all group overflow-hidden flex flex-col">
                 <div className="p-5 flex-1">
                   <div className="flex justify-between items-start mb-4">
                     <div className={`w-12 h-12 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center border border-${color}-100 transition-all group-hover:scale-110`}>
@@ -332,10 +332,10 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                   </div>
 
                   <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-gray-800 leading-tight group-hover:text-orange-500 transition-colors">
+                    <h3 className="text-base font-semibold text-gray-800 leading-tight group-hover:text-brand transition-colors">
                       {qual.name}
                     </h3>
-                    <p className="text-xs font-mono font-semibold text-orange-500 uppercase">{qual.code}</p>
+                    <p className="text-xs font-mono font-semibold text-brand uppercase">{qual.code}</p>
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-end">
@@ -353,7 +353,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                   <div className="flex gap-2">
                     <button
                       onClick={() => openEditModal(qual)}
-                      className="p-2 hover:bg-white text-gray-400 hover:text-orange-500 rounded transition-all border border-transparent hover:border-gray-200"
+                      className="p-2 hover:bg-white text-gray-400 hover:text-brand rounded transition-all border border-transparent hover:border-brand-light"
                       title="Edit"
                     >
                       <Edit2 size={16} />
@@ -367,7 +367,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       {deletingId === qual.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>
                   </div>
-                  <button className="text-orange-500 text-xs font-medium uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
+                  <button className="text-brand text-xs font-medium uppercase tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
                     Details <ChevronRight size={16} strokeWidth={3} />
                   </button>
                 </div>
@@ -389,12 +389,12 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
               : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-orange-50 border border-orange-200 text-orange-800'
+                : 'bg-brand/10 border border-brand-light text-brand'
               }`}
           >
             {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-orange-500" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-brand" />}
             <span>{toast.message}</span>
             <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
@@ -413,7 +413,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           <div className="bg-white rounded-md shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500 text-white rounded shadow-sm">
+                <div className="p-2 bg-brand text-white rounded shadow-sm shadow-brand/20">
                   <Award size={20} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">
@@ -433,7 +433,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                     required
                     autoFocus
                     placeholder="e.g., Computer Systems Servicing NC II"
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-gray-800 font-medium"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-gray-800 font-medium"
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                   />
@@ -445,7 +445,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                     <input
                       required
                       placeholder="e.g., CSS211-1218"
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none font-mono text-orange-500 font-semibold"
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-mono text-brand font-semibold"
                       value={formData.code}
                       onChange={e => setFormData({ ...formData, code: e.target.value })}
                     />
@@ -453,7 +453,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Industry Sector</label>
                     <select
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-medium appearance-none"
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium appearance-none"
                       value={formData.sector}
                       onChange={e => setFormData({ ...formData, sector: e.target.value })}
                     >
@@ -469,7 +469,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       required
                       type="number"
                       placeholder="e.g., 35"
-                      className="w-full pl-3 pr-14 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-2 focus:ring-orange-500 outline-none text-gray-800 font-semibold text-lg"
+                      className="w-full pl-3 pr-14 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-gray-800 font-semibold text-lg"
                       value={formData.durationDays || ''}
                       onChange={e => setFormData({ ...formData, durationDays: e.target.value === '' ? 0 : Number(e.target.value) })}
                     />
@@ -478,9 +478,9 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 </div>
               </div>
 
-              <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                <ShieldCheck size={20} className="text-orange-500 shrink-0" />
-                <p className="text-xs text-orange-900 leading-relaxed font-medium">
+              <div className="bg-brand/10 p-4 rounded border border-brand-light flex gap-3">
+                <ShieldCheck size={20} className="text-brand shrink-0" />
+                <p className="text-xs text-brand leading-relaxed font-medium">
                   Registration into the institutional catalog enables this qualification for batch enrollment and automated curriculum planning within the MIS system.
                 </p>
               </div>
@@ -490,7 +490,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-orange-500 text-white rounded text-sm font-medium shadow-sm hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-brand text-white rounded text-sm font-medium shadow-sm shadow-brand/20 hover:bg-brand-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting && <Loader2 size={18} className="animate-spin" />}
                   {editingQual ? 'Update Program' : 'Register Program'}

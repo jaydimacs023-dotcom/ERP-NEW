@@ -285,7 +285,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
   const getStatusBadge = (status: BankDepositStatus) => {
     switch (status) {
       case 'DRAFT': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 flex items-center gap-1"><Clock size={12} />Draft</span>;
-      case 'POSTED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-600 flex items-center gap-1"><CheckCircle size={12} />Posted</span>;
+      case 'POSTED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-brand/10 text-brand flex items-center gap-1"><CheckCircle size={12} />Posted</span>;
       case 'VOIDED': return <span className="px-2 py-1 text-xs font-medium rounded-full bg-rose-100 text-rose-600 flex items-center gap-1"><XCircle size={12} />Voided</span>;
     }
   };
@@ -303,8 +303,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
         </div>
         <button
           onClick={handleNew}
-          className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
-          style={{ backgroundColor: brandColor }}
+          className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover shadow-sm shadow-brand/20 transition-all"
         >
           <Plus size={20} />
           New Deposit
@@ -326,45 +325,45 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
         </div>
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100">
-              <CheckCircle size={20} className="text-green-600" />
+            <div className="p-2 rounded-lg bg-brand/10">
+              <CheckCircle size={20} className="text-brand" />
             </div>
             <div>
               <p className="text-xs text-gray-500">Posted</p>
-              <p className="text-xl font-bold text-green-600">{stats.posted.length}</p>
+              <p className="text-xl font-bold text-brand">{stats.posted.length}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: `${brandColor}20` }}>
-              <Landmark size={20} style={{ color: brandColor }} />
+            <div className="p-2 rounded-lg bg-brand/10 text-brand">
+              <Landmark size={20} />
             </div>
             <div>
               <p className="text-xs text-gray-500">Total Deposited</p>
-              <p className="text-lg font-bold" style={{ color: brandColor }}>{formatCurrency(stats.totalDeposited)}</p>
+              <p className="text-lg font-bold text-brand">{formatCurrency(stats.totalDeposited)}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100">
-              <Wallet size={20} className="text-green-600" />
+            <div className="p-2 rounded-lg bg-brand/10">
+              <Wallet size={20} className="text-brand" />
             </div>
             <div>
               <p className="text-xs text-gray-500">Cash</p>
-              <p className="text-lg font-bold text-green-600">{formatCurrency(stats.totalCash)}</p>
+              <p className="text-lg font-bold text-brand">{formatCurrency(stats.totalCash)}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100">
-              <Receipt size={20} className="text-blue-600" />
+            <div className="p-2 rounded-lg bg-brand/10">
+              <Receipt size={20} className="text-brand" />
             </div>
             <div>
               <p className="text-xs text-gray-500">Checks</p>
-              <p className="text-lg font-bold text-blue-600">{formatCurrency(stats.totalChecks)}</p>
+              <p className="text-lg font-bold text-brand">{formatCurrency(stats.totalChecks)}</p>
             </div>
           </div>
         </div>
@@ -392,7 +391,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                 placeholder="Search deposits..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
           </div>
@@ -401,7 +400,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as BankDepositStatus | 'ALL')}
-              className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+              className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
             >
               <option value="ALL">All Statuses</option>
               <option value="DRAFT">Draft</option>
@@ -455,20 +454,20 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{dep.referenceNo || '-'}</td>
                     <td className="px-4 py-3">{getStatusBadge(dep.status)}</td>
-                    <td className="px-4 py-3 text-right text-green-600">{formatCurrency(dep.cashAmount)}</td>
-                    <td className="px-4 py-3 text-right text-blue-600">{formatCurrency(dep.checkAmount)}</td>
+                    <td className="px-4 py-3 text-right text-brand">{formatCurrency(dep.cashAmount)}</td>
+                    <td className="px-4 py-3 text-right text-brand">{formatCurrency(dep.checkAmount)}</td>
                     <td className="px-4 py-3 text-right font-bold" style={{ color: brandColor }}>{formatCurrency(dep.totalAmount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => handleView(dep)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="View">
+                        <button onClick={() => handleView(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="View">
                           <Eye size={16} />
                         </button>
                         {dep.status === 'DRAFT' && (
                           <>
-                            <button onClick={() => handleEdit(dep)} className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded" title="Edit">
+                            <button onClick={() => handleEdit(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Edit">
                               <Edit3 size={16} />
                             </button>
-                            <button onClick={() => handlePost(dep)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded" title="Post">
+                            <button onClick={() => handlePost(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Post">
                               <CheckCircle size={16} />
                             </button>
                             <button onClick={() => onDeleteDeposit(dep.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Delete">
@@ -528,7 +527,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
+            <div className="flex items-center justify-between p-4 border-b bg-brand/10">
               <h3 className="text-lg font-bold text-gray-800">
                 {editingDeposit ? 'Edit Deposit' : 'New Bank Deposit'}
               </h3>
@@ -556,7 +555,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     type="date"
                     value={formData.depositDate}
                     onChange={e => setFormData({ ...formData, depositDate: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
                 <div>
@@ -564,7 +563,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                   <select
                     value={formData.bankAccountId}
                     onChange={e => setFormData({ ...formData, bankAccountId: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
                   >
                     <option value="">-- Select Bank --</option>
                     {bankAccounts.map(b => (
@@ -579,7 +578,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     value={formData.referenceNo}
                     onChange={e => setFormData({ ...formData, referenceNo: e.target.value })}
                     placeholder="Deposit slip #"
-                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
               </div>
@@ -588,7 +587,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
               <div className="bg-green-50 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Wallet size={20} className="text-green-600" />
+                    <Wallet size={20} className="text-brand" />
                     <span className="font-medium text-gray-700">Cash Amount</span>
                   </div>
                   <input
@@ -597,7 +596,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     min="0"
                     value={formData.cashAmount}
                     onChange={e => setFormData({ ...formData, cashAmount: parseFloat(e.target.value) || 0 })}
-                    className="w-40 px-3 py-2 border rounded-lg text-right focus:ring-2 focus:ring-green-200"
+                    className="w-40 px-3 py-2 border rounded-lg text-right focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
               </div>
@@ -606,7 +605,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
               <div className="bg-blue-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Receipt size={20} className="text-blue-600" />
+                    <Receipt size={20} className="text-brand" />
                     <span className="font-medium text-gray-700">Checks & Other Items</span>
                   </div>
                   <div className="flex gap-2">
@@ -627,7 +626,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     )}
                     <button
                       onClick={handleAddManualLine}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 rounded-lg"
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-brand bg-brand/10 hover:bg-brand/20 rounded-lg"
                     >
                       <PlusCircle size={16} />
                       Manual Entry
@@ -656,7 +655,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                               type="text"
                               value={line.description}
                               onChange={e => handleUpdateLine(line.id, 'description', e.target.value)}
-                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-blue-200"
+                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-brand/20"
                               placeholder="Description"
                             />
                           </td>
@@ -665,7 +664,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                               type="text"
                               value={line.checkNumber || ''}
                               onChange={e => handleUpdateLine(line.id, 'checkNumber', e.target.value)}
-                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-blue-200"
+                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-brand/20"
                               placeholder="Check #"
                             />
                           </td>
@@ -674,7 +673,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                               type="text"
                               value={line.payerName || ''}
                               onChange={e => handleUpdateLine(line.id, 'payerName', e.target.value)}
-                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-blue-200"
+                              className="w-full px-2 py-1 border rounded focus:ring-1 focus:ring-brand/20"
                               placeholder="Payer"
                             />
                           </td>
@@ -685,7 +684,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                               min="0"
                               value={line.amount}
                               onChange={e => handleUpdateLine(line.id, 'amount', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-1 border rounded text-right focus:ring-1 focus:ring-blue-200"
+                              className="w-full px-2 py-1 border rounded text-right focus:ring-1 focus:ring-brand/20"
                             />
                           </td>
                           <td className="py-2 px-2">
@@ -702,7 +701,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                     <tfoot>
                       <tr className="font-medium">
                         <td colSpan={3} className="py-2 px-2 text-right">Subtotal Checks:</td>
-                        <td className="py-2 px-2 text-right text-blue-600">{formatCurrency(checkAmount)}</td>
+                        <td className="py-2 px-2 text-right text-brand">{formatCurrency(checkAmount)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -723,7 +722,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                   value={formData.notes}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
                   rows={2}
-                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200"
+                  className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
                   placeholder="Deposit notes..."
                 />
               </div>
@@ -738,8 +737,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg"
-                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-all"
               >
                 <Save size={18} />
                 {editingDeposit ? 'Update Deposit' : 'Save as Draft'}
@@ -785,11 +783,11 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Cash:</span>
-                  <span className="font-medium text-green-600">{formatCurrency(viewingDeposit.cashAmount)}</span>
+                  <span className="font-medium text-brand">{formatCurrency(viewingDeposit.cashAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Checks:</span>
-                  <span className="font-medium text-blue-600">{formatCurrency(viewingDeposit.checkAmount)}</span>
+                  <span className="font-medium text-brand">{formatCurrency(viewingDeposit.checkAmount)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="font-bold">Total Deposit:</span>

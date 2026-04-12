@@ -168,23 +168,23 @@ const PayrollView: React.FC<PayrollViewProps> = ({
             </div>
             <button
                onClick={() => setShowModal(true)}
-               className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-xs"
+               className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-xs"
             >
                <Play size={16} fill="currentColor" /> Initiate Payroll Run
             </button>
          </header>
 
          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <StatWidget label="Headcount" value={employees.filter(e => e.isActive).length.toString()} icon={<Briefcase size={18} />} color="orange" />
+            <StatWidget label="Headcount" value={employees.filter(e => e.isActive).length.toString()} icon={<Briefcase size={18} />} color="brand" />
             <StatWidget label="Total Gross (YTD)" value={formatCurrency(payrollRuns.reduce((s, r) => s + r.totalGross, 0))} icon={<TrendingUp size={18} />} color="emerald" />
-            <StatWidget label="Active Benefits" value="4" icon={<ShieldCheck size={18} />} color="orange" />
+            <StatWidget label="Active Benefits" value="4" icon={<ShieldCheck size={18} />} color="brand" />
             <StatWidget label="Next Pay Cycle" value="30 Jun 2024" icon={<Calendar size={18} />} color="amber" />
          </div>
 
          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#F47721] text-white rounded"><History size={18} /></div>
+                  <div className="p-2 bg-brand/10 text-brand border border-brand-light rounded"><History size={18} /></div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Recent Payroll History</h3>
                </div>
             </div>
@@ -212,7 +212,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                            <td className="px-5 py-6 text-center">
                               <button
                                  onClick={() => setViewingRunId(run.id)}
-                                 className="px-4 py-1.5 bg-orange-50 text-[#F47721] border border-orange-100 rounded-lg text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-[#F47721] hover:text-white transition-all mx-auto"
+                                 className="px-4 py-1.5 bg-brand/5 text-brand border border-brand-light rounded-lg text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-brand hover:text-white transition-all mx-auto"
                               >
                                  <Eye size={12} /> View Advice
                               </button>
@@ -233,7 +233,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col h-[80vh]">
                   <div className="p-8 border-b flex justify-between items-center bg-gray-50">
                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><FileText size={24} /></div>
+                        <div className="p-3 bg-brand/10 text-brand border border-brand-light rounded shadow-sm"><FileText size={24} /></div>
                         <div>
                            <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">Run Details: {viewingRun.periodStart} to {viewingRun.periodEnd}</h3>
                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Staff Processed: {viewingLines.length}</p>
@@ -268,7 +268,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                                     <td className="px-5 py-5 text-right">
                                        <button
                                           onClick={() => setViewingPaystub({ run: viewingRun, line: line })}
-                                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded transition-all"
+                                          className="p-2 hover:bg-brand/10 text-brand rounded transition-all"
                                        >
                                           <Printer size={18} />
                                        </button>
@@ -300,7 +300,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                <div className="bg-white rounded-md shadow-md w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-300 border border-gray-200 my-8 flex flex-col no-print">
                   <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-[#F47721] text-white rounded shadow-sm shadow-gray-100"><Receipt size={24} /></div>
+                        <div className="p-3 bg-brand/10 text-brand border border-brand-light rounded shadow-sm shadow-brand/10"><Receipt size={24} /></div>
                         <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">Pay Advice Preview</h3>
                      </div>
                      <div className="flex items-center gap-2">
@@ -322,7 +322,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-1">Official Payment Advice</p>
                            </div>
                            <div className="text-right">
-                              <div className="inline-block p-2 bg-[#F47721] text-white rounded mb-2"><Building2 size={24} /></div>
+                              <div className="inline-block p-2 bg-brand/10 text-brand border border-brand-light rounded mb-2"><Building2 size={24} /></div>
                               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">System Generated</p>
                            </div>
                         </div>
@@ -334,7 +334,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                                  <p className="text-lg font-semibold text-gray-900 uppercase">
                                     {employees.find(e => e.id === viewingPaystub.line.employeeId)?.lastName}, {employees.find(e => e.id === viewingPaystub.line.employeeId)?.firstName}
                                  </p>
-                                 <p className="text-xs font-bold text-[#F47721] uppercase tracking-tight">{employees.find(e => e.id === viewingPaystub.line.employeeId)?.designation}</p>
+                                 <p className="text-xs font-bold text-brand uppercase tracking-tight">{employees.find(e => e.id === viewingPaystub.line.employeeId)?.designation}</p>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                  <PayDetail label="SSS #" value={employees.find(e => e.id === viewingPaystub.line.employeeId)?.sss || 'N/A'} />
@@ -465,7 +465,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
                   <div className="p-8 border-b flex justify-between items-center bg-gray-50 shrink-0">
                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-[#F47721] text-white rounded shadow-sm"><Calculator size={24} /></div>
+                        <div className="p-3 bg-brand/10 text-brand border border-brand-light rounded shadow-sm"><Calculator size={24} /></div>
                         <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">New Payroll Execution</h3>
                      </div>
                      <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={28} /></button>
@@ -518,34 +518,34 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
                      <div className="w-full md:w-[400px] bg-gray-50 p-5 flex flex-col shrink-0">
                         <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2 mb-8">
-                           <ShieldCheck size={18} className="text-[#F47721]" />
+                           <ShieldCheck size={18} className="text-brand" />
                            Execution Summary
                         </h4>
 
                         <div className="space-y-6">
                            <div className="space-y-1 mb-4">
                               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Register Reference</label>
-                              <p className="text-sm font-semibold text-orange-700 font-mono bg-orange-50 px-3 py-1 rounded-lg border border-orange-100">{payrollRef}</p>
+                              <p className="text-sm font-semibold text-brand font-mono bg-brand/5 px-3 py-1 rounded-lg border border-brand-light">{payrollRef}</p>
                            </div>
                            <SummaryRow label="Gross Labor Cost" value={currentRunSummary.gross} />
                            <SummaryRow label="Statutory Liabilities" value={currentRunSummary.depr} isNegative />
                            <div className="pt-6 border-t-2 border-gray-200 mt-4 flex justify-between items-end">
                               <span className="text-xs font-semibold text-gray-800 uppercase tracking-wide">NET PAYABLE</span>
-                              <span className="text-lg font-mono font-semibold text-orange-700">{"\u20B1"} {currentRunSummary.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              <span className="text-lg font-mono font-semibold text-brand">{"\u20B1"} {currentRunSummary.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                            </div>
                         </div>
 
                         <div className="mt-12 space-y-4">
                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Disbursement Source</label>
-                           <select className="w-full px-5 py-3.5 bg-white border-2 border-orange-100 rounded font-semibold text-sm text-orange-700 outline-none" value={bankId} onChange={e => setBankId(e.target.value)}>
+                           <select className="w-full px-5 py-3.5 bg-white border-2 border-brand-light rounded font-semibold text-sm text-brand outline-none focus:border-brand" value={bankId} onChange={e => setBankId(e.target.value)}>
                               <option value="">Select Treasury...</option>
                               {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>)}
                            </select>
                         </div>
 
-                        <div className="bg-orange-50 p-6 rounded border border-orange-100 flex gap-4 mt-8">
-                           <Info size={24} className="text-[#F47721] shrink-0" />
-                           <p className="text-xs text-orange-900 leading-relaxed font-bold">
+                        <div className="bg-brand/5 p-6 rounded border border-brand-light flex gap-4 mt-8">
+                           <Info size={24} className="text-brand shrink-0" />
+                           <p className="text-xs text-gray-900 leading-relaxed font-bold">
                               Executing this run will generate an automatic Journal Entry. Salaries Expense will be debited, while Benefits Payables and Cash will be credited.
                            </p>
                         </div>
@@ -554,7 +554,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                            <button
                               onClick={handlePostRun}
                               disabled={!periodStart || !periodEnd || !bankId || activeEmployees.length === 0}
-                              className="w-full py-5 bg-[#F47721] text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm hover:bg-[#E06610] active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                              className="w-full py-5 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
                            >
                               Confirm & Post Ledger
                            </button>
@@ -569,17 +569,27 @@ const PayrollView: React.FC<PayrollViewProps> = ({
    );
 };
 
-const StatWidget: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string }> = ({ label, value, icon, color }) => (
-   <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex items-center gap-5">
-      <div className={`w-12 h-12 rounded bg-${color}-50 text-${color}-600 flex items-center justify-center border border-${color}-100 shrink-0 shadow-sm`}>
-         {icon}
+const StatWidget: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string }> = ({ label, value, icon, color }) => {
+   const palette = color === 'brand'
+      ? 'bg-brand/10 text-brand border-brand-light'
+      : color === 'emerald'
+         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+         : color === 'amber'
+            ? 'bg-amber-50 text-amber-600 border-amber-100'
+            : 'bg-gray-50 text-gray-600 border-gray-200';
+
+   return (
+      <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex items-center gap-5">
+         <div className={`w-12 h-12 rounded flex items-center justify-center border shrink-0 shadow-sm ${palette}`}>
+            {icon}
+         </div>
+         <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+            <p className="text-lg font-semibold text-gray-900 tracking-tight">{value}</p>
+         </div>
       </div>
-      <div>
-         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-         <p className="text-lg font-semibold text-gray-900 tracking-tight">{value}</p>
-      </div>
-   </div>
-);
+   );
+};
 
 const SummaryRow: React.FC<{ label: string, value: number, isNegative?: boolean }> = ({ label, value, isNegative }) => (
    <div className="flex justify-between items-center">
