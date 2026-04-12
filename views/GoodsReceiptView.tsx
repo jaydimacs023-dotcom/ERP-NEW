@@ -27,7 +27,7 @@ interface GoodsReceiptViewProps {
 
 const STATUS_CONFIG: Record<GoodsReceiptStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
   DRAFT: { label: 'Draft', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: <FileText size={14} /> },
-  POSTED: { label: 'Posted', color: 'text-[#F47721]', bgColor: 'bg-emerald-50', icon: <CheckCircle size={14} /> },
+  POSTED: { label: 'Posted', color: 'text-brand', bgColor: 'bg-brand/10', icon: <CheckCircle size={14} /> },
   CANCELLED: { label: 'Cancelled', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: <XCircle size={14} /> },
 };
 
@@ -303,45 +303,45 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
         </div>
         <button
           onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all"
+          className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5 transition-all"
         >
           <Plus size={18} /> New Goods Receipt
         </button>
       </header>
 
       {/* GR/IR Explanation Card */}
-      <div className="bg-gradient-to-r from-orange-50 to-cyan-50 border border-orange-200 rounded-md p-8 shadow-sm">
+      <div className="bg-gradient-to-r from-brand/10 to-cyan-50 border border-brand-light rounded-md p-8 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-orange-100 rounded">
-            <Link className="text-[#F47721]" size={24} />
+          <div className="p-3 bg-brand/10 rounded border border-brand-light">
+            <Link className="text-brand" size={24} />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-orange-800 mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
-            <p className="text-sm text-orange-700 leading-relaxed font-medium">
+            <h3 className="text-lg font-semibold text-brand mb-1 uppercase tracking-tight">GR/IR Clearing Account</h3>
+            <p className="text-sm text-brand leading-relaxed font-medium">
               When goods are received, the system debits <strong className="font-semibold">Inventory</strong> and credits <strong className="font-semibold">GR/IR Clearing</strong>.
               When the vendor invoice is posted, it debits <strong className="font-semibold">GR/IR Clearing</strong> and credits <strong className="font-semibold">Accounts Payable</strong>.
               This ensures proper matching between receipts and invoices.
             </p>
-            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-orange-200/50">
+            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-brand-light">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
-                  <Package size={14} className="text-orange-700" />
+                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center border border-brand-light">
+                  <Package size={14} className="text-brand" />
                 </div>
-                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Goods Receipt</span>
+                <span className="text-xs font-semibold text-brand uppercase tracking-wide">Goods Receipt</span>
               </div>
-              <ArrowRight size={14} className="text-orange-400" />
+              <ArrowRight size={14} className="text-brand" />
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100/50 flex items-center justify-center">
-                  <FileText size={14} className="text-orange-700" />
+                <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center border border-brand-light">
+                  <FileText size={14} className="text-brand" />
                 </div>
-                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Invoice Match</span>
+                <span className="text-xs font-semibold text-brand uppercase tracking-wide">Invoice Match</span>
               </div>
-              <ArrowRight size={14} className="text-orange-400" />
+              <ArrowRight size={14} className="text-brand" />
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#F47721] text-white flex items-center justify-center shadow-lg shadow-gray-300/20">
+                <div className="w-8 h-8 rounded-lg bg-brand text-white flex items-center justify-center shadow-brand/20">
                   <CheckCircle size={14} />
                 </div>
-                <span className="text-xs font-semibold text-orange-800 uppercase tracking-wide">Clearing Complete</span>
+                <span className="text-xs font-semibold text-brand uppercase tracking-wide">Clearing Complete</span>
               </div>
             </div>
           </div>
@@ -350,7 +350,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-brand-light transition-all">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
             <Clock size={12} className="text-gray-400" /> Draft Index
           </p>
@@ -370,28 +370,28 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
         </div>
 
         <div className="bg-gray-800 p-6 rounded-md shadow-sm shadow-gray-300/20 flex flex-col justify-between group relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#F47721]/10 rounded-full -mr-8 -mt-8 blur-2xl" />
-          <p className="text-xs font-semibold text-orange-400/80 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-            <CheckCircle size={12} className="text-orange-400" /> Posted Ledger
+          <div className="absolute top-0 right-0 w-24 h-24 bg-brand/10 rounded-full -mr-8 -mt-8 blur-2xl" />
+          <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+            <CheckCircle size={12} className="text-brand" /> Posted Ledger
           </p>
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xl font-semibold text-white tracking-tighter">
                 {summaryMetrics.postedCount}
               </p>
-              <p className="text-xs font-bold text-orange-500 uppercase mt-1">CLEARED_RECORDS</p>
+              <p className="text-xs font-bold text-brand uppercase mt-1">CLEARED_RECORDS</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-orange-400 font-mono">
+              <p className="text-sm font-semibold text-brand font-mono">
                 {"\u20B1"}{formatCurrency(summaryMetrics.postedValue)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-orange-200 transition-all">
+        <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col justify-between group hover:border-brand-light transition-all">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-            <Layers size={12} className="text-[#F47721]" /> Total Lines
+            <Layers size={12} className="text-brand" /> Total Lines
           </p>
           <div className="flex items-end justify-between">
             <div>
@@ -403,16 +403,16 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-[#F47721] p-6 rounded-md shadow-sm shadow-gray-300/30 flex flex-col justify-between group">
-          <p className="text-xs font-semibold text-orange-100 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-            <ShoppingCart size={12} className="text-orange-100" /> Open POs
+        <div className="bg-brand p-6 rounded-md shadow-brand/20 flex flex-col justify-between group">
+          <p className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+            <ShoppingCart size={12} className="text-white/80" /> Open POs
           </p>
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xl font-semibold text-white tracking-tighter">
                 {orgPOs.length}
               </p>
-              <p className="text-xs font-bold text-orange-200 uppercase mt-1">ELIGIBLE_FOR_GR</p>
+              <p className="text-xs font-bold text-white/70 uppercase mt-1">ELIGIBLE_FOR_GR</p>
             </div>
           </div>
         </div>
@@ -425,7 +425,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           <input
             type="text"
             placeholder="Search goods receipts..."
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-brand focus:bg-white transition-all text-sm font-bold text-gray-800"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -436,7 +436,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as GoodsReceiptStatus | 'all')}
-              className="pl-10 pr-10 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-xs font-semibold uppercase tracking-wide text-gray-600 appearance-none min-w-[160px]"
+              className="pl-10 pr-10 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-brand focus:bg-white transition-all text-xs font-semibold uppercase tracking-wide text-gray-600 appearance-none min-w-[160px]"
             >
               <option value="all">All Statuses</option>
               {Object.entries(STATUS_CONFIG).map(([value, config]) => (
@@ -472,7 +472,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                   return (
                     <tr key={gr.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <span className="font-mono font-bold text-[#F47721]">{gr.grNumber}</span>
+                        <span className="font-mono font-bold text-brand">{gr.grNumber}</span>
                         {gr.deliveryNote && (
                           <p className="text-xs text-gray-400 mt-0.5">DN: {gr.deliveryNote}</p>
                         )}
@@ -509,7 +509,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
                             <>
                               <button
                                 onClick={() => handlePost(gr)}
-                                className="p-1.5 hover:bg-emerald-50 rounded-lg text-[#F47721] transition-colors"
+                                className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
                                 title="Post"
                               >
                                 <CheckCircle size={16} />
@@ -551,7 +551,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
             <tr className="bg-gray-50">
               <td colSpan={4} className="px-8 py-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-[#F47721] animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
                   <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Institutional Receipt Intelligence Active</p>
                 </div>
               </td>
@@ -581,7 +581,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20">
                   <Package size={20} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">New Goods Receipt</h3>
@@ -723,7 +723,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
               <button
                 onClick={handleCreate as any}
                 disabled={!formData.purchaseOrderId || formData.lines.length === 0}
-                className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold shadow-brand/20 hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Goods Receipt
               </button>
@@ -740,7 +740,7 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in duration-200 flex flex-col">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20">
                   <Package size={20} />
                 </div>
                 <div>
@@ -808,9 +808,9 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
 
               {/* Audit Info */}
               {selectedGR.status === 'POSTED' && (
-                <div className="mt-6 bg-emerald-50 border border-orange-200 rounded p-4">
-                  <p className="text-xs font-semibold text-orange-700 mb-1">Posted</p>
-                  <p className="text-sm text-[#F47721]">
+                <div className="mt-6 bg-brand/10 border border-brand-light rounded p-4">
+                  <p className="text-xs font-semibold text-brand mb-1">Posted</p>
+                  <p className="text-sm text-brand">
                     {selectedGR.postedAt && new Date(selectedGR.postedAt).toLocaleString()}
                   </p>
                 </div>

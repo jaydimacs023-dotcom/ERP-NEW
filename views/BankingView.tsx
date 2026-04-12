@@ -232,25 +232,25 @@ const BankingView: React.FC<BankingViewProps> = ({
         <div className="flex flex-wrap gap-2 no-print">
           <button
             onClick={() => { resetEntryForm(); setShowEntryModal('IN'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 border border-orange-100 rounded hover:bg-orange-100 transition-all font-bold text-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-brand/10 text-brand border border-brand-light rounded hover:bg-brand/20 transition-all font-bold text-xs"
           >
             <ArrowDownToLine size={16} /> Record Receipt
           </button>
           <button
             onClick={() => { resetEntryForm(); setShowEntryModal('OUT'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-700 border border-rose-100 rounded hover:bg-rose-100 transition-all font-bold text-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-brand/10 text-brand border border-brand-light rounded hover:bg-brand/20 transition-all font-bold text-xs"
           >
             <ArrowUpFromLine size={16} /> Record Payment
           </button>
           <button
             onClick={() => { resetEntryForm(); setShowTransferModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded hover:bg-gray-50 transition-all font-bold text-xs shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-white text-brand border border-brand-light rounded hover:bg-brand/10 transition-all font-bold text-xs shadow-sm"
           >
-            <ArrowRightLeft size={16} className="text-[#F47721]" /> Transfer
+            <ArrowRightLeft size={16} className="text-brand" /> Transfer
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-bold text-xs"
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-gray-100 font-bold text-xs"
           >
             <Plus size={16} /> Link Account
           </button>
@@ -338,7 +338,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                 <>
                   <button
                     onClick={() => openEditModal(selectedBank)}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded hover:bg-orange-100 transition-all font-bold text-xs"
+                    className="flex items-center gap-2 px-4 py-2 bg-brand/10 text-brand border border-brand-light rounded hover:bg-brand/20 transition-all font-bold text-xs"
                   >
                     <Save size={14} /> Edit Account
                   </button>
@@ -353,13 +353,13 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div className="flex bg-gray-100 rounded p-1 border border-gray-200">
                 <button
                   onClick={() => setActiveTab('ledger')}
-                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'ledger' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'ledger' ? 'bg-brand/10 text-brand shadow-sm' : 'text-gray-500 hover:text-brand'}`}
                 >
                   <History size={14} /> Account History
                 </button>
                 <button
                   onClick={() => setActiveTab('reconcile')}
-                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'reconcile' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'reconcile' ? 'bg-brand/10 text-brand shadow-sm' : 'text-gray-500 hover:text-brand'}`}
                 >
                   <Scale size={14} /> Reconciliation
                 </button>
@@ -586,9 +586,9 @@ const BankingView: React.FC<BankingViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
-            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-8 border-b flex justify-between items-center bg-brand/5">
               <div className="flex items-center gap-4">
-                <div className={`p-3 ${showEntryModal === 'IN' ? 'bg-[#F47721]' : 'bg-rose-600'} text-white rounded shadow-sm`}>
+                <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
                   {showEntryModal === 'IN' ? <ArrowDownToLine size={24} /> : <ArrowUpFromLine size={24} />}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Record {showEntryModal === 'IN' ? 'Receipt' : 'Payment'}</h3>
@@ -600,12 +600,12 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Txn Date</label>
-                  <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm"
+                  <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"
                     value={entryDate} onChange={e => setEntryDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{showEntryModal === 'IN' ? 'Target Account' : 'Source Account'}</label>
-                  <select required className="w-full px-4 py-3 bg-white border-2 border-orange-100 rounded outline-none font-semibold text-sm text-orange-700"
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide">{showEntryModal === 'IN' ? 'Target Account' : 'Source Account'}</label>
+                  <select required className="w-full px-4 py-3 bg-brand/10 border border-brand-light rounded outline-none font-semibold text-sm text-brand focus:border-brand appearance-none"
                     value={targetBankId} onChange={e => setTargetBankId(e.target.value)}>
                     <option value="">Select Account...</option>
                     {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}
@@ -614,17 +614,17 @@ const BankingView: React.FC<BankingViewProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transaction Amount</label>
+                <label className="text-xs font-semibold text-brand uppercase tracking-wide">Transaction Amount</label>
                 <div className="relative">
-                  <input type="number" step="0.01" required className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded outline-none text-xl font-mono font-semibold text-gray-900 tracking-tighter"
+                  <input type="number" step="0.01" required className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded outline-none text-xl font-mono font-semibold text-gray-900 tracking-tighter focus:border-brand focus:ring-2 focus:ring-brand/20"
                     value={entryAmount || ''} onChange={e => setEntryAmount(Number(e.target.value))} placeholder="0.00" />
-                  <div className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-300">PHP</div>
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 text-lg font-semibold text-brand">PHP</div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked G/L Category (Offset)</label>
-                <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm"
+                <label className="text-xs font-semibold text-brand uppercase tracking-wide">Linked G/L Category (Offset)</label>
+                <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm focus:border-brand"
                   value={entryAccountId} onChange={e => setEntryAccountId(e.target.value)}>
                   <option value="">Choose G/L Account...</option>
                   {showEntryModal === 'IN'
@@ -636,13 +636,13 @@ const BankingView: React.FC<BankingViewProps> = ({
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Narration / Memo</label>
-                <textarea rows={2} required placeholder="State the purpose of this entry..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-medium text-sm resize-none"
+                <textarea rows={2} required placeholder="State the purpose of this entry..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-medium text-sm resize-none focus:border-brand"
                   value={entryMemo} onChange={e => setEntryMemo(e.target.value)} />
               </div>
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowEntryModal(null)} className="flex-1 py-4 text-sm font-semibold text-gray-400 hover:bg-gray-50 rounded transition-all">Discard</button>
-                <button type="submit" className={`flex-1 py-4 ${showEntryModal === 'IN' ? 'bg-[#F47721] shadow-gray-100' : 'bg-rose-600 shadow-rose-100'} text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all`}>
+                <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover">
                   Commit Entry
                 </button>
               </div>
@@ -656,9 +656,9 @@ const BankingView: React.FC<BankingViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
-            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-8 border-b flex justify-between items-center bg-brand/5">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#F47721] text-white rounded shadow-sm">
+                <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
                   <ArrowRightLeft size={24} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Internal Transfer</h3>
@@ -669,22 +669,22 @@ const BankingView: React.FC<BankingViewProps> = ({
             <form onSubmit={handleTransferSubmit} className="p-5 space-y-8">
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transfer Date</label>
-                <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm"
+                <input type="date" required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"
                   value={entryDate} onChange={e => setEntryDate(e.target.value)} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">From Source</label>
-                  <select required className="w-full px-4 py-3 bg-rose-50 border border-rose-100 rounded outline-none font-bold text-xs text-rose-700"
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide">From Source</label>
+                  <select required className="w-full px-4 py-3 bg-brand/10 border border-brand-light rounded outline-none font-bold text-xs text-brand focus:border-brand appearance-none"
                     value={targetBankId} onChange={e => setTargetBankId(e.target.value)}>
                     <option value="">Choose Origin...</option>
                     {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">To Destination</label>
-                  <select required className="w-full px-4 py-3 bg-orange-50 border border-orange-100 rounded outline-none font-bold text-xs text-orange-700"
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide">To Destination</label>
+                  <select required className="w-full px-4 py-3 bg-brand/10 border border-brand-light rounded outline-none font-bold text-xs text-brand focus:border-brand appearance-none"
                     value={entryAccountId} onChange={e => setEntryAccountId(e.target.value)}>
                     <option value="">Choose Target...</option>
                     {bankAccounts.filter(b => b.id !== targetBankId).map(b => <option key={b.id} value={b.id}>{b.bankName}</option>)}
@@ -693,27 +693,27 @@ const BankingView: React.FC<BankingViewProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transfer Amount</label>
-                <input type="number" step="0.01" required className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded outline-none text-xl font-mono font-semibold text-gray-900 tracking-tighter"
+                <label className="text-xs font-semibold text-brand uppercase tracking-wide">Transfer Amount</label>
+                <input type="number" step="0.01" required className="w-full px-6 py-5 bg-gray-50 border border-gray-100 rounded outline-none text-xl font-mono font-semibold text-gray-900 tracking-tighter focus:border-brand focus:ring-2 focus:ring-brand/20"
                   value={entryAmount || ''} onChange={e => setEntryAmount(Number(e.target.value))} placeholder="0.00" />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Internal Transfer Memo</label>
-                <input placeholder="e.g. Funding Petty Cash..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-medium text-sm"
+                <input placeholder="e.g. Funding Petty Cash..." className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-medium text-sm focus:border-brand"
                   value={entryMemo} onChange={e => setEntryMemo(e.target.value)} />
               </div>
 
-              <div className="bg-amber-50 p-5 rounded-md border border-amber-100 flex gap-4">
-                <AlertCircle className="text-[#F47721] shrink-0" size={24} />
-                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+              <div className="bg-brand/10 p-5 rounded-md border border-brand-light flex gap-4">
+                <AlertCircle className="text-brand shrink-0" size={24} />
+                <p className="text-xs text-brand leading-relaxed font-medium">
                   Fund transfers generate dual journal entries impacting both G/L accounts. This action is atomic and irreversible once committed to the ledger.
                 </p>
               </div>
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowTransferModal(false)} className="flex-1 py-4 text-sm font-semibold text-gray-400 hover:bg-gray-50 rounded transition-all">Discard</button>
-                <button type="submit" disabled={entryAmount <= 0 || !targetBankId || !entryAccountId} className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale">Post Transfer</button>
+                <button type="submit" disabled={entryAmount <= 0 || !targetBankId || !entryAccountId} className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:grayscale">Post Transfer</button>
               </div>
             </form>
           </div>
@@ -725,9 +725,9 @@ const BankingView: React.FC<BankingViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
-            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-8 border-b flex justify-between items-center bg-brand/5">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#F47721] text-white rounded shadow-sm">
+                <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
                   <Plus size={24} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Connect Account</h3>
@@ -739,18 +739,18 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank Title</label>
-                  <input required placeholder="e.g. Metrobank Corporate" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm text-gray-800"
+                  <input required placeholder="e.g. Metrobank Corporate" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-bold text-sm text-gray-800 focus:border-brand"
                     value={newBank.bankName} onChange={e => setNewBank({ ...newBank, bankName: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Acc # / Identifier</label>
-                    <input placeholder="Optional Ref" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-xs font-bold"
+                    <input placeholder="Optional Ref" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-xs font-bold focus:border-brand"
                       value={newBank.accountNumber} onChange={e => setNewBank({ ...newBank, accountNumber: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Liquidity Type</label>
-                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-semibold text-xs"
+                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none font-semibold text-xs focus:border-brand appearance-none"
                       value={newBank.type} onChange={e => setNewBank({ ...newBank, type: e.target.value as any })}>
                       <option value="SAVINGS">Savings</option>
                       <option value="CHECKING">Checking</option>
@@ -759,10 +759,10 @@ const BankingView: React.FC<BankingViewProps> = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide flex items-center gap-2">
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide flex items-center gap-2">
                     <BookOpen size={16} /> G/L Ledger Mapping
                   </label>
-                  <select required className="w-full px-4 py-3 bg-orange-50/50 border-2 border-orange-100 rounded outline-none font-semibold text-sm text-orange-700 appearance-none"
+                  <select required className="w-full px-4 py-3 bg-brand/10 border border-brand-light rounded outline-none font-semibold text-sm text-brand appearance-none focus:border-brand"
                     value={newBank.glAccountId} onChange={e => setNewBank({ ...newBank, glAccountId: e.target.value })}>
                     <option value="">Select Asset Account...</option>
                     {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
@@ -772,16 +772,16 @@ const BankingView: React.FC<BankingViewProps> = ({
                 </div>
               </div>
 
-              <div className="bg-orange-50 p-5 rounded-md border border-orange-100 flex gap-4">
-                <ShieldCheck className="text-[#F47721] shrink-0" size={24} />
-                <p className="text-xs text-orange-800 leading-relaxed font-medium">
+              <div className="bg-brand/10 p-5 rounded-md border border-brand-light flex gap-4">
+                <ShieldCheck className="text-brand shrink-0" size={24} />
+                <p className="text-xs text-brand leading-relaxed font-medium">
                   Establishing this link creates a dedicated sub-ledger. All General Ledger postings to the selected account will automatically populate this bank's transaction history.
                 </p>
               </div>
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 text-sm font-semibold text-gray-400 hover:bg-gray-50 rounded transition-all">Discard</button>
-                <button type="submit" className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 transition-all active:scale-95">Link Ledger</button>
+                <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 transition-all active:scale-95 hover:bg-brand-hover">Link Ledger</button>
               </div>
             </form>
           </div>

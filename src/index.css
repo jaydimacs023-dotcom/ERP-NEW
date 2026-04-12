@@ -12,6 +12,17 @@
   --acm-primary: #F47721;
   --acm-primary-hover: #E06610;
   --acm-primary-light: #FFF3E8;
+  --acm-primary-rgb: 244, 119, 33;
+  --emerald-50: rgba(var(--acm-primary-rgb), 0.08);
+  --emerald-100: rgba(var(--acm-primary-rgb), 0.16);
+  --emerald-200: rgba(var(--acm-primary-rgb), 0.24);
+  --emerald-300: rgba(var(--acm-primary-rgb), 0.32);
+  --emerald-400: rgba(var(--acm-primary-rgb), 0.55);
+  --emerald-500: rgba(var(--acm-primary-rgb), 0.75);
+  --emerald-600: var(--acm-primary);
+  --emerald-700: var(--acm-primary-hover);
+  --emerald-800: var(--acm-primary-hover);
+  --emerald-900: var(--acm-primary-hover);
   --acm-sidebar-bg: #3B3F51;
   --acm-sidebar-hover: #4A4E62;
   --acm-sidebar-active: #F47721;
@@ -45,7 +56,21 @@
   --app-text-size-14: calc(14px * var(--app-font-scale));
   --app-text-size-16: calc(16px * var(--app-font-scale));
 }
+/* :root,
+:root[data-theme="acumatica"] {
+  --acm-primary: #F47721;
+  --acm-primary-hover: #E06610;
+  --acm-primary-light: #FFF3E8;
+}
+:root[data-theme="emerald"] {
+  --acm-primary: #059669;
+  --acm-primary-hover: #047857;
+  --acm-primary-light: #ECFDF5;
 
+  --acm-sidebar-active: #059669;
+
+  --acm-info: #10B981;
+} */
 /* ---- Base Reset ---- */
 * {
   margin: 0;
@@ -191,6 +216,80 @@ button, input, select, textarea {
     border-color: #D1D5DB;
   }
 
+  .text-brand {
+    color: var(--acm-primary) !important;
+  }
+  .border-brand {
+    border-color: var(--acm-primary) !important;
+  }
+  .border-brand-light {
+    border-color: var(--acm-primary-light) !important;
+  }
+  .bg-brand {
+    background-color: var(--acm-primary) !important;
+  }
+  .bg-brand-hover {
+    background-color: var(--acm-primary-hover) !important;
+  }
+  .bg-brand-light {
+    background-color: var(--acm-primary-light) !important;
+  }
+  .bg-brand\/5 {
+    background-color: rgba(var(--acm-primary-rgb), 0.05) !important;
+  }
+  .bg-brand\/10 {
+    background-color: rgba(var(--acm-primary-rgb), 0.10) !important;
+  }
+  .bg-brand\/30 {
+    background-color: rgba(var(--acm-primary-rgb), 0.30) !important;
+  }
+  .bg-brand\/90 {
+    background-color: rgba(var(--acm-primary-rgb), 0.90) !important;
+  }
+  .hover\:bg-brand:hover {
+    background-color: var(--acm-primary) !important;
+  }
+  .hover\:bg-brand-hover:hover {
+    background-color: var(--acm-primary-hover) !important;
+  }
+  .hover\:bg-brand-light:hover {
+    background-color: var(--acm-primary-light) !important;
+  }
+  .hover\:text-brand:hover {
+    color: var(--acm-primary) !important;
+  }
+  .hover\:border-brand:hover {
+    border-color: var(--acm-primary) !important;
+  }
+  .hover\:border-brand-light:hover {
+    border-color: var(--acm-primary-light) !important;
+  }
+  .group:hover .group-hover\:bg-brand-light {
+    background-color: var(--acm-primary-light) !important;
+  }
+  .group:hover .group-hover\:text-brand {
+    color: var(--acm-primary) !important;
+  }
+  .focus\:border-brand:focus {
+    border-color: var(--acm-primary) !important;
+    box-shadow: 0 0 0 4px rgba(var(--acm-primary-rgb), 0.18);
+  }
+  .ring-brand {
+    box-shadow: 0 0 0 2px var(--acm-primary);
+  }
+  .ring-brand-light {
+    box-shadow: 0 0 0 2px var(--acm-primary-light);
+  }
+  .shadow-brand\/20 {
+    box-shadow: 0 20px 25px -5px rgba(var(--acm-primary-rgb), 0.2);
+  }
+  .shadow-brand\/30 {
+    box-shadow: 0 20px 25px -5px rgba(var(--acm-primary-rgb), 0.3);
+  }
+  .shadow-brand\/40 {
+    box-shadow: 0 20px 25px -5px rgba(var(--acm-primary-rgb), 0.4);
+  }
+
   /* Card container */
   .acm-card {
     background-color: var(--acm-card-bg);
@@ -251,6 +350,100 @@ button, input, select, textarea {
   .acm-input::placeholder {
     color: var(--acm-text-muted);
   }
+
+
+@layer utilities {
+  .bg-emerald-50 {
+    background-color: var(--emerald-50) !important;
+  }
+  .bg-emerald-100 {
+    background-color: var(--emerald-100) !important;
+  }
+  .bg-emerald-200 {
+    background-color: var(--emerald-200) !important;
+  }
+  .bg-emerald-300 {
+    background-color: var(--emerald-300) !important;
+  }
+  .bg-emerald-400 {
+    background-color: var(--emerald-400) !important;
+  }
+  .bg-emerald-500 {
+    background-color: var(--emerald-500) !important;
+  }
+  .bg-emerald-600 {
+    background-color: var(--emerald-600) !important;
+  }
+  .bg-emerald-700 {
+    background-color: var(--emerald-700) !important;
+  }
+  .bg-emerald-900 {
+    background-color: var(--emerald-900) !important;
+  }
+  .bg-emerald-500\/20 {
+    background-color: rgba(var(--acm-primary-rgb), 0.2) !important;
+  }
+  .border-emerald-100 {
+    border-color: var(--emerald-100) !important;
+  }
+  .border-emerald-200 {
+    border-color: var(--emerald-200) !important;
+  }
+  .border-emerald-300 {
+    border-color: var(--emerald-300) !important;
+  }
+  .border-emerald-500 {
+    border-color: var(--emerald-500) !important;
+  }
+  .text-emerald-400 {
+    color: var(--emerald-400) !important;
+  }
+  .text-emerald-500 {
+    color: var(--emerald-500) !important;
+  }
+  .text-emerald-600 {
+    color: var(--emerald-600) !important;
+  }
+  .text-emerald-700 {
+    color: var(--emerald-700) !important;
+  }
+  .text-emerald-800 {
+    color: var(--emerald-800) !important;
+  }
+  .text-emerald-900 {
+    color: var(--emerald-900) !important;
+  }
+  .hover\:bg-emerald-50:hover {
+    background-color: var(--emerald-50) !important;
+  }
+  .hover\:bg-emerald-100:hover {
+    background-color: var(--emerald-100) !important;
+  }
+  .hover\:bg-emerald-200:hover {
+    background-color: var(--emerald-200) !important;
+  }
+  .hover\:bg-emerald-500:hover {
+    background-color: var(--emerald-500) !important;
+  }
+  .hover\:bg-emerald-700:hover {
+    background-color: var(--emerald-700) !important;
+  }
+  .hover\:text-emerald-500:hover {
+    color: var(--emerald-500) !important;
+  }
+  .hover\:text-emerald-600:hover {
+    color: var(--emerald-600) !important;
+  }
+  .hover\:border-emerald-200:hover {
+    border-color: var(--emerald-200) !important;
+  }
+  .shadow-emerald-900\/10 {
+    box-shadow: 0 20px 25px -5px rgba(var(--acm-primary-rgb), 0.10) !important;
+  }
+  .shadow-emerald-900\/30 {
+    box-shadow: 0 20px 25px -5px rgba(var(--acm-primary-rgb), 0.30) !important;
+  }
+}
 
   /* Form label */
   .acm-label {

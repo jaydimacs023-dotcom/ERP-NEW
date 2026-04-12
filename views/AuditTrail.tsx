@@ -18,7 +18,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs }) => {
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Organization Audit Trail</h2>
           <p className="text-sm italic text-gray-500">{orgLogs.length} audit records for this organization</p>
         </div>
-        <div className="bg-emerald-50 text-orange-700 px-4 py-2 rounded-lg border border-orange-200 flex items-center gap-2 text-sm font-medium">
+        <div className="bg-brand/10 text-brand px-4 py-2 rounded-lg border border-brand-light flex items-center gap-2 text-sm font-medium">
           <ShieldCheck size={18} />
           {orgLogs.length} Events
         </div>
@@ -63,9 +63,9 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${log.action === 'POST' ? 'bg-orange-100 text-orange-700' :
-                        log.action === 'CREATE' ? 'bg-emerald-100 text-orange-700' :
-                          log.action === 'REVERSE' ? 'bg-orange-100 text-orange-700' :
+                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${log.action === 'POST' ? 'bg-brand/10 text-brand' :
+                        log.action === 'CREATE' ? 'bg-brand/10 text-brand' :
+                          log.action === 'REVERSE' ? 'bg-brand/10 text-brand' :
                             'bg-gray-100 text-gray-700'
                       }`}>
                       {log.action}

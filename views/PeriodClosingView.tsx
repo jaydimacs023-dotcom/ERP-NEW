@@ -28,9 +28,9 @@ interface PeriodClosingViewProps {
 }
 
 const STATUS_CONFIG: Record<PeriodStatus, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
-  OPEN: { label: 'Open', color: 'text-[#F47721]', bgColor: 'bg-orange-50', icon: Unlock },
-  SOFT_CLOSE: { label: 'Soft Close', color: 'text-[#F47721]', bgColor: 'bg-amber-50', icon: Clock },
-  HARD_CLOSE: { label: 'Hard Close', color: 'text-[#F47721]', bgColor: 'bg-orange-50', icon: Shield },
+  OPEN: { label: 'Open', color: 'text-brand', bgColor: 'bg-brand/10', icon: Unlock },
+  SOFT_CLOSE: { label: 'Soft Close', color: 'text-brand', bgColor: 'bg-brand/10', icon: Clock },
+  HARD_CLOSE: { label: 'Hard Close', color: 'text-brand', bgColor: 'bg-brand/10', icon: Shield },
   LOCKED: { label: 'Locked', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: Lock },
 };
 
@@ -516,7 +516,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-medium text-sm"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-medium text-sm"
           >
             <Plus size={18} /> New Period
           </button>
@@ -525,12 +525,12 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
 
       {/* Current Period Card */}
       {currentPeriod && (
-        <div className="bg-gradient-to-r from-[#F47721] to-violet-600 rounded p-6 text-white shadow-lg">
+        <div className="bg-brand rounded p-6 text-white shadow-lg shadow-brand/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-orange-200">Current Open Period</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-white/75">Current Open Period</p>
               <p className="text-xl font-semibold mt-1">{currentPeriod.name}</p>
-              <p className="text-sm text-orange-200 mt-1">
+              <p className="text-sm text-white/75 mt-1">
                 {currentPeriod.startDate} — {currentPeriod.endDate}
               </p>
             </div>
@@ -543,7 +543,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               </button>
               <button
                 onClick={() => { setSelectedPeriod(currentPeriod); setShowClosingWizard(true); }}
-                className="px-4 py-2 bg-white text-[#F47721] hover:bg-orange-50 rounded text-sm font-bold transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-white text-brand hover:bg-brand-light rounded text-sm font-bold transition-colors flex items-center gap-2"
               >
                 <Lock size={16} /> Close Period
               </button>
@@ -563,7 +563,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
             return (
               <div
                 key={period.id}
-                className={`bg-white rounded border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${selectedPeriod?.id === period.id ? 'ring-2 ring-orange-400' : ''
+                className={`bg-white rounded border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${selectedPeriod?.id === period.id ? 'ring-2 ring-brand' : ''
                   }`}
                 onClick={() => setSelectedPeriod(period)}
               >
@@ -588,9 +588,9 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                     <p className="text-gray-400 font-medium">Journals</p>
                     <p className="font-bold text-gray-700">{stats.journalCount}</p>
                   </div>
-                  <div className="bg-amber-50 rounded-lg p-2">
-                    <p className="text-[#F47721] font-medium">Unpaid</p>
-                    <p className="font-bold text-orange-700">{stats.unpaidCount}</p>
+                  <div className="bg-brand/10 rounded-lg p-2">
+                    <p className="text-brand font-medium">Unpaid</p>
+                    <p className="font-bold text-brand">{stats.unpaidCount}</p>
                   </div>
                   <div className="bg-rose-50 rounded-lg p-2">
                     <p className="text-rose-600 font-medium">Unposted</p>
@@ -600,13 +600,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
 
                 {/* Closing Status */}
                 <div className="mt-3 flex gap-2">
-                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.apClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.apClosed ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-500'}`}>
                     AP {period.apClosed ? '?' : '?'}
                   </span>
-                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.arClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.arClosed ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-500'}`}>
                     AR {period.arClosed ? '?' : '?'}
                   </span>
-                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.glClosed ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${period.glClosed ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-500'}`}>
                     GL {period.glClosed ? '?' : '?'}
                   </span>
                 </div>
@@ -631,7 +631,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20">
                   <Calendar size={20} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">Create Accounting Period</h3>
@@ -664,8 +664,8 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                       type="button"
                       onClick={() => setFormData({ ...formData, periodType: type, periodNumber: type === 'ANNUAL' ? 1 : formData.periodNumber })}
                       className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${formData.periodType === type
-                        ? 'bg-[#F47721] text-white border-orange-500'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                        ? 'bg-brand text-white border-brand shadow-brand/20'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-brand-light'
                         }`}
                     >
                       {type}
@@ -716,13 +716,13 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                 <button
                   type="button"
                   onClick={handleGenerateYear}
-                  className="flex-1 py-3 border-2 border-orange-500 text-[#F47721] rounded text-sm font-bold hover:bg-orange-50 transition-colors"
+                  className="flex-1 py-3 border-2 border-brand text-brand rounded text-sm font-bold hover:bg-brand-light transition-colors"
                 >
                   Generate Year
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100"
+                  className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold shadow-lg shadow-brand/20 hover:bg-brand-hover"
                 >
                   Create
                 </button>
@@ -740,7 +740,7 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md">
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20">
                   <Lock size={20} />
                 </div>
                 <div>
@@ -758,15 +758,15 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
               <div className="space-y-2">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Closing Checklist</p>
                 {getClosingChecklist(selectedPeriod).map(item => (
-                  <div key={item.id} className={`flex items-center gap-3 p-3 rounded border ${item.isComplete ? 'bg-orange-50 border-orange-100' : 'bg-amber-50 border-amber-100'}`}>
+                  <div key={item.id} className={`flex items-center gap-3 p-3 rounded border ${item.isComplete ? 'bg-brand/10 border-brand-light' : 'bg-amber-50 border-amber-100'}`}>
                     {item.isComplete ? (
-                      <CheckSquare className="text-[#F47721]" size={18} />
+                      <CheckSquare className="text-brand" size={18} />
                     ) : (
                       <Square className="text-orange-500" size={18} />
                     )}
                     <div className="flex-1">
-                      <p className={`text-sm font-semibold ${item.isComplete ? 'text-orange-700' : 'text-orange-700'}`}>{item.label}</p>
-                      <p className={`text-xs ${item.isComplete ? 'text-[#F47721]' : 'text-[#F47721]'}`}>{item.description}</p>
+                      <p className={`text-sm font-semibold ${item.isComplete ? 'text-brand' : 'text-orange-700'}`}>{item.label}</p>
+                      <p className={`text-xs ${item.isComplete ? 'text-brand' : 'text-orange-700'}`}>{item.description}</p>
                     </div>
                   </div>
                 ))}
@@ -789,14 +789,14 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
                     {!selectedPeriod.apClosed && (
                       <button
                         onClick={handleCloseAP}
-                        className="w-full py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#F47721] transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors flex items-center justify-center gap-2"
                       >
                         <CheckCircle size={16} /> Close AP Module
                       </button>
                     )}
                     <button
                       onClick={handleSoftClose}
-                      className="w-full py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#F47721] transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors flex items-center justify-center gap-2"
                     >
                       <Shield size={16} /> Soft Close Period
                     </button>

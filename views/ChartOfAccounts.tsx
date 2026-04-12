@@ -156,7 +156,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
           <td className="px-6 py-3 whitespace-nowrap">
             <div className="flex items-center" style={{ paddingLeft: `${depth * 1.5}rem` }}>
               {acc.isHeader ? (
-                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-gray-400 hover:text-[#F47721] transition-colors">
+                <button onClick={() => toggleExpand(acc.id)} className="mr-2 text-gray-400 hover:text-brand transition-colors">
                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
               ) : (
@@ -168,13 +168,13 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                     {acc.name}
                   </span>
                   {linkedQual && (
-                    <span className="text-xs font-bold bg-amber-50 text-orange-700 border border-amber-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span className="text-xs font-bold bg-brand/10 text-brand border border-brand-light px-1.5 py-0.5 rounded flex items-center gap-1">
                       <Award size={8} /> {linkedQual.code}
                     </span>
                   )}
                 </div>
                 {hasPostings && acc.isHeader && (
-                  <span className="text-xs text-[#F47721] font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
+                  <span className="text-xs text-brand font-bold uppercase tracking-tighter">* Legacy Postings Attached</span>
                 )}
               </div>
             </div>
@@ -182,9 +182,9 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
           <td className="px-6 py-3 whitespace-nowrap">
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
               !acc.isActive ? 'bg-gray-200 text-gray-500' :
-              acc.class === AccountClass.ASSET ? 'bg-orange-100 text-orange-700' :
+              acc.class === AccountClass.ASSET ? 'bg-brand/10 text-brand' :
               acc.class === AccountClass.LIABILITY ? 'bg-rose-100 text-rose-700' :
-              acc.class === AccountClass.EQUITY ? 'bg-amber-100 text-orange-700' :
+              acc.class === AccountClass.EQUITY ? 'bg-brand/10 text-brand' :
               acc.class === AccountClass.REVENUE ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-700'
             }`}>
               {acc.class}
@@ -197,7 +197,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 </span>
                 <button 
                   onClick={() => handleToggleClick(acc)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-[#F47721]' : 'bg-gray-200'}`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${acc.isActive ? 'bg-brand' : 'bg-gray-200'}`}
                 >
                   <span
                     aria-hidden="true"
@@ -211,7 +211,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               {!acc.isHeader && (
                  <button 
                   onClick={() => handleEditClick(acc)}
-                  className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-brand rounded-lg transition-colors"
                   title="Edit Account"
                 >
                   <Edit2 size={16} />
@@ -221,7 +221,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 <>
                   <button 
                     onClick={() => handleAddClick(acc.id, false)}
-                    className="p-1.5 hover:bg-orange-50 text-[#F47721] rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-brand-light text-brand rounded-lg transition-colors"
                     title="Add Sub-account"
                   >
                     <FilePlus size={16} />
@@ -235,7 +235,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   </button>
                   <button 
                     onClick={() => handleEditClick(acc)}
-                    className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-brand rounded-lg transition-colors"
                     title="Edit Folder"
                   >
                     <Edit2 size={16} />
@@ -270,7 +270,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
         </div>
         <button 
           onClick={() => handleAddClick(undefined, true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg shadow-gray-100 font-bold text-sm active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-lg shadow-brand/20 font-bold text-sm active:scale-95"
         >
           <Plus size={18} /> New Root Category
         </button>
@@ -302,8 +302,8 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
-            <div className={`p-6 flex flex-col items-center text-center ${confirmation.type === 'delete' ? 'bg-rose-50/30' : 'bg-amber-50/30'}`}>
-              <div className={`w-16 h-16 rounded flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-[#F47721]'}`}>
+            <div className={`p-6 flex flex-col items-center text-center ${confirmation.type === 'delete' ? 'bg-rose-50/30' : 'bg-brand/5'}`}>
+              <div className={`w-16 h-16 rounded flex items-center justify-center mb-4 ${confirmation.type === 'delete' ? 'bg-rose-100 text-rose-600' : 'bg-brand text-white'}`}>
                 <AlertTriangle size={32} />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 uppercase tracking-tight">
@@ -320,7 +320,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             <div className="p-8 space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 rounded bg-gray-50 border border-gray-100">
-                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-orange-500'}`}>
+                  <div className={`shrink-0 ${confirmation.hasEntries ? 'text-rose-500' : 'text-brand'}`}>
                     {confirmation.hasEntries ? <X size={20} /> : <ShieldCheck size={20} />}
                   </div>
                   <div className="flex-1">
@@ -335,7 +335,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
                 {confirmation.account.isHeader && (
                   <div className="flex items-center gap-3 p-3 rounded bg-gray-50 border border-gray-100">
-                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-orange-500'}`}>
+                    <div className={`shrink-0 ${confirmation.hasChildren ? 'text-rose-500' : 'text-brand'}`}>
                       {confirmation.hasChildren ? <X size={20} /> : <ShieldCheck size={20} />}
                     </div>
                     <div className="flex-1">
@@ -363,7 +363,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   className={`flex-1 py-3 rounded text-sm font-bold text-white shadow-lg transition-all ${
                     confirmation.type === 'delete' 
                       ? (confirmation.hasEntries || confirmation.hasChildren ? 'bg-gray-300 shadow-none cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-100') 
-                      : 'bg-[#F47721] hover:bg-[#E06610] shadow-gray-100'
+                      : 'bg-brand hover:bg-brand-hover shadow-brand/20'
                   }`}
                 >
                   {confirmation.type === 'delete' ? 'Delete Permanently' : 'Deactivate'}
@@ -393,11 +393,11 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                   <Link size={12} /> Hierarchical Path
                 </label>
-                <div className="flex flex-wrap items-center gap-1 text-xs font-bold text-[#F47721] bg-orange-50 p-2 rounded-lg border border-orange-100">
+                <div className="flex flex-wrap items-center gap-1 text-xs font-bold text-brand bg-brand/10 p-2 rounded-lg border border-brand-light">
                   <span>Root</span>
                   {parentPath.map((p, i) => (
                     <React.Fragment key={i}>
-                      <ChevronRight size={10} className="text-orange-300" />
+                      <ChevronRight size={10} className="text-brand opacity-50" />
                       <span className="truncate max-w-[120px]">{p}</span>
                     </React.Fragment>
                   ))}
@@ -409,7 +409,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   <input 
                     required 
                     placeholder="1000"
-                    className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none font-mono text-sm"
+                    className="w-full px-3 py-2.5 border rounded focus:border-brand outline-none font-mono text-sm"
                     value={formData.code || ''}
                     onChange={e => setFormData({...formData, code: e.target.value})}
                   />
@@ -419,7 +419,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                   <input 
                     required 
                     placeholder="e.g. Savings - Main"
-                    className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm font-medium"
+                    className="w-full px-3 py-2.5 border rounded focus:border-brand outline-none text-sm font-medium"
                     value={formData.name || ''}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                   />
@@ -429,7 +429,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Financial Classification</label>
                 <select 
-                  className="w-full px-3 py-2.5 border rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm appearance-none bg-white"
+                  className="w-full px-3 py-2.5 border rounded focus:border-brand outline-none text-sm appearance-none bg-white"
                   value={formData.class}
                   onChange={e => setFormData({...formData, class: e.target.value as AccountClass})}
                 >
@@ -443,7 +443,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
                     <Award size={12} /> Link to Qualification
                   </label>
                   <select 
-                    className="w-full px-3 py-2.5 border border-orange-100 bg-orange-50/30 rounded focus:ring-2 focus:ring-orange-500 outline-none text-sm appearance-none"
+                    className="w-full px-3 py-2.5 border border-brand-light bg-brand/5 rounded focus:border-brand outline-none text-sm appearance-none"
                     value={formData.qualificationId}
                     onChange={e => setFormData({...formData, qualificationId: e.target.value})}
                   >
@@ -458,7 +458,7 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
 
               <div className="pt-6 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors">Discard</button>
-                <button type="submit" className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 active:scale-95 transition-all">
+                <button type="submit" className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold shadow-lg shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all">
                   {editingAccountId ? 'Update Account' : 'Create Account'}
                 </button>
               </div>

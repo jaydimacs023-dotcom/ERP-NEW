@@ -191,7 +191,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> Register Trainer
         </button>
@@ -203,7 +203,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
           <input 
             type="text" 
             placeholder="Search by name or specialization..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -249,7 +249,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                     {trainer.qualificationIds.length > 0 ? trainer.qualificationIds.map(id => {
                       const qual = qualifications.find(q => q.id === id);
                       return qual ? (
-                        <div key={id} className="px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-100 rounded-md text-xs font-semibold uppercase tracking-tight">
+                        <div key={id} className="px-2 py-0.5 bg-brand/10 text-brand border border-brand-light rounded-md text-xs font-semibold uppercase tracking-tight">
                           {qual.code}
                         </div>
                       ) : null;
@@ -258,7 +258,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                     )}
                     <button 
                       onClick={() => setShowAssignModal(trainer)}
-                      className="p-1 hover:bg-orange-50 text-orange-400 hover:text-[#F47721] rounded transition-colors"
+                      className="p-1 hover:bg-brand-light text-brand hover:text-brand rounded transition-colors"
                       title="Assign Qualifications"
                     >
                       <PlusCircle size={14} />
@@ -269,7 +269,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => openEditModal(trainer)}
-                      className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                      className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
                       title="Edit Trainer"
                     >
                       <Edit2 size={16} />
@@ -319,7 +319,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                   <div className="bg-white rounded-md shadow-md w-full max-w-lg overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
                     <div className="p-6 border-b flex justify-between items-center bg-gray-50">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 ${editingTrainer ? 'bg-amber-600' : 'bg-[#F47721]'} text-white rounded shadow-md`}>
+                        <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20">
                           {editingTrainer ? <Edit2 size={20} /> : <GraduationCap size={20} />}
                         </div>
                         <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
@@ -335,43 +335,43 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                       <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">First Name</label>
-                          <input required placeholder="Elena" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          <input required placeholder="Elena" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                             value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Middle Name</label>
-                          <input placeholder="Santos" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          <input placeholder="Santos" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                             value={formData.middleName} onChange={e => setFormData({...formData, middleName: e.target.value})} />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Name</label>
-                          <input required placeholder="Reyes" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          <input required placeholder="Reyes" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                             value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email Address</label>
-                        <input required type="email" placeholder="trainer@institution.edu" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                        <input required type="email" placeholder="trainer@institution.edu" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                           value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact Number</label>
-                          <input placeholder="+63 9xx xxx xxxx" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          <input placeholder="+63 9xx xxx xxxx" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                             value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Specialization</label>
-                          <input placeholder="e.g. IT, Automotive" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:ring-1 focus:ring-orange-500 outline-none text-sm font-medium"
+                          <input placeholder="e.g. IT, Automotive" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-medium"
                             value={formData.specialization} onChange={e => setFormData({...formData, specialization: e.target.value})} />
                         </div>
                       </div>
 
-                      <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                        <ShieldCheck className="text-[#F47721] shrink-0" size={20} />
-                        <p className="text-xs text-orange-800 leading-relaxed font-medium">
+                      <div className="bg-brand/10 p-4 rounded border border-brand-light flex gap-3">
+                        <ShieldCheck className="text-brand shrink-0" size={20} />
+                        <p className="text-xs text-brand leading-relaxed font-medium">
                           Trainer records are linked to the NTTC (National TVET Trainer Certificate) database for compliance verification during audit.
                         </p>
                       </div>
@@ -388,7 +388,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                         <button 
                           type="submit" 
                           disabled={isSubmitting}
-                          className={`flex-1 py-3 ${editingTrainer ? 'bg-amber-600 shadow-amber-100' : 'bg-[#F47721] shadow-gray-100'} text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
+                          className="flex-1 py-3 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           {isSubmitting ? (
                             <>
@@ -430,15 +430,15 @@ const TrainersView: React.FC<TrainersViewProps> = ({
                     key={qual.id}
                     onClick={() => toggleQualificationAssignment(showAssignModal, qual.id)}
                     className={`w-full flex items-center justify-between p-4 rounded border transition-all text-left group ${
-                      isAssigned ? 'bg-[#F47721] border-orange-600 text-white shadow-md shadow-gray-100' : 'bg-white border-gray-100 hover:border-orange-200'
+                      isAssigned ? 'bg-brand border-brand text-white shadow-md shadow-brand/20' : 'bg-white border-gray-100 hover:border-brand-light'
                     }`}
                   >
                     <div className="flex-1">
-                      <div className={`text-xs font-semibold uppercase tracking-tight ${isAssigned ? 'text-orange-100' : 'text-[#F47721]'}`}>{qual.code}</div>
+                      <div className={`text-xs font-semibold uppercase tracking-tight ${isAssigned ? 'text-white/80' : 'text-brand'}`}>{qual.code}</div>
                       <div className={`text-sm font-medium mt-0.5 ${isAssigned ? 'text-white' : 'text-gray-900'}`}>{qual.name}</div>
                     </div>
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      isAssigned ? 'bg-white border-white text-[#F47721]' : 'bg-gray-50 border-gray-100 text-transparent group-hover:border-orange-200'
+                      isAssigned ? 'bg-white border-white text-brand' : 'bg-gray-50 border-gray-100 text-transparent group-hover:border-brand-light'
                     }`}>
                       <Check size={14} strokeWidth={4} />
                     </div>
@@ -452,7 +452,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
             <div className="p-6 bg-gray-50 border-t flex justify-end">
               <button 
                 onClick={() => setShowAssignModal(null)}
-                className="px-8 py-2.5 bg-gray-800 text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all"
+                className="px-8 py-2.5 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover"
               >
                 Close & Save Changes
               </button>
@@ -469,15 +469,15 @@ const TrainersView: React.FC<TrainersViewProps> = ({
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300 ${
               toast.type === 'success'
-                ? 'bg-emerald-50 border border-orange-200 text-orange-800'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                 : toast.type === 'error'
                 ? 'bg-red-50 border border-red-200 text-red-800'
-                : 'bg-orange-50 border border-orange-200 text-orange-800'
+                : 'bg-brand/10 border border-brand-light text-brand'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-[#F47721]" />}
+            {toast.type === 'success' && <CheckCircle size={18} className="flex-shrink-0 text-emerald-600" />}
             {toast.type === 'error' && <AlertCircle size={18} className="flex-shrink-0 text-red-600" />}
-            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-[#F47721]" />}
+            {toast.type === 'info' && <AlertCircle size={18} className="flex-shrink-0 text-brand" />}
             <span>{toast.message}</span>
             <button
               onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}

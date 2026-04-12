@@ -496,16 +496,16 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           <p className="text-sm text-gray-500 font-normal italic">Design and generate custom analytical and compliance reports.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={() => setShowLoadModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide">
+          <button onClick={() => setShowLoadModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-brand transition-colors text-xs font-semibold uppercase tracking-wide">
             <FolderOpen size={16} /> Load
           </button>
-          <button onClick={() => setShowSaveModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-[#F47721] transition-colors text-xs font-semibold uppercase tracking-wide">
+          <button onClick={() => setShowSaveModal(true)} className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-brand transition-colors text-xs font-semibold uppercase tracking-wide">
             <Save size={16} /> Save
           </button>
           <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
-            <Printer size={18} className="text-[#F47721]" /> Print
+            <Printer size={18} className="text-brand" /> Print
           </button>
-          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-lg font-bold text-sm">
+          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-bold text-sm">
             <Download size={18} /> Export CSV
           </button>
         </div>
@@ -520,7 +520,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
               <button
                 key={source.id}
                 onClick={() => handleDataSourceChange(source.id as any)}
-                className={`flex-1 min-w-[150px] p-4 rounded border-2 text-left transition-all ${dataSource === source.id ? 'border-orange-400 bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                className={`flex-1 min-w-[150px] p-4 rounded border-2 text-left transition-all ${dataSource === source.id ? 'border-brand bg-brand/5' : 'border-gray-100 hover:border-gray-300'}`}
               >
                 <div className="text-sm font-bold text-gray-900">{source.label}</div>
                 <div className="text-xs text-gray-500 mt-1">{source.description}</div>
@@ -552,7 +552,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <button
               key={tab.id}
               onClick={() => setActivePanel(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-orange-400 text-[#F47721] bg-orange-50/50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors ${activePanel === tab.id ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               {tab.icon}
               {tab.label}
@@ -572,9 +572,9 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                   <button
                     key={col.id}
                     onClick={() => toggleColumn(col.id)}
-                    className={`flex items-center gap-3 p-3 rounded border-2 text-left transition-all ${col.visible ? 'border-orange-400 bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                    className={`flex items-center gap-3 p-3 rounded border-2 text-left transition-all ${col.visible ? 'border-brand bg-brand/5' : 'border-gray-100 hover:border-gray-300'}`}
                   >
-                    {col.visible ? <Eye size={14} className="text-[#F47721]" /> : <EyeOff size={14} className="text-gray-400" />}
+                    {col.visible ? <Eye size={14} className="text-brand" /> : <EyeOff size={14} className="text-gray-400" />}
                     <div>
                       <div className="text-sm font-bold text-gray-900">{col.label}</div>
                       <div className="text-xs text-gray-500 uppercase">{col.type}</div>
@@ -590,7 +590,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-sm text-gray-600">Add conditions to filter your report data.</p>
-                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded text-xs font-bold hover:bg-[#E06610] transition-colors">
+                <button onClick={addFilter} className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded text-xs font-bold hover:bg-brand-hover transition-colors">
                   <Plus size={14} /> Add Filter
                 </button>
               </div>
@@ -741,7 +741,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-gray-600">
-                  Showing <span className="font-bold text-[#F47721]">{totalRows}</span> records
+                  Showing <span className="font-bold text-brand">{totalRows}</span> records
                   {groups.length > 0 && <span> in <span className="font-bold">{Object.keys(groupedData).length}</span> groups</span>}
                 </p>
               </div>
@@ -762,11 +762,11 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                       {Object.entries(groupedData).map(([groupKey, rows]) => (
                         <React.Fragment key={groupKey}>
                           {groups.length > 0 && groupKey !== 'ungrouped' && (
-                            <tr className="bg-orange-50">
-                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-orange-900">
+                            <tr className="bg-brand/5">
+                              <td colSpan={visibleColumns.length} className="px-4 py-3 text-sm font-bold text-brand">
                                 <ChevronRight size={14} className="inline mr-2" />
                                 {groupKey}
-                                <span className="ml-2 text-xs font-normal text-[#F47721]">({(rows as any[]).length} items)</span>
+                                <span className="ml-2 text-xs font-normal text-brand">({(rows as any[]).length} items)</span>
                               </td>
                             </tr>
                           )}
@@ -852,7 +852,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                 <button onClick={() => setShowSaveModal(false)} className="flex-1 px-4 py-3 border border-gray-200 rounded text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
-                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-[#F47721] text-white rounded text-sm font-bold hover:bg-[#E06610] transition-colors">
+                <button onClick={saveTemplate} className="flex-1 px-4 py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors">
                   Save Template
                 </button>
               </div>
@@ -892,7 +892,7 @@ const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                           {template.filters.length} filters
                         </div>
                       </div>
-                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-bold hover:bg-[#E06610] transition-colors">
+                      <button onClick={() => loadTemplate(template)} className="px-4 py-2 bg-brand text-white rounded-lg text-xs font-bold hover:bg-brand-hover transition-colors">
                         Load
                       </button>
                       <button onClick={() => deleteTemplate(template.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">

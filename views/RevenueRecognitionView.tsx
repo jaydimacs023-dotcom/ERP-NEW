@@ -403,7 +403,7 @@ export default function RevenueRecognitionView({
           {summary.dueForRecognition > 0 && (
             <button
               onClick={handleRunAllDue}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               Run All Due ({summary.dueForRecognition})
@@ -411,7 +411,7 @@ export default function RevenueRecognitionView({
           )}
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Schedule
@@ -426,7 +426,7 @@ export default function RevenueRecognitionView({
             <DollarSign className="w-4 h-4" />
             Deferred Balance
           </div>
-          <div className="text-lg font-bold text-[#F47721]">
+          <div className="text-lg font-bold text-brand">
             {formatCurrency(summary.totalDeferred)}
           </div>
         </div>
@@ -435,7 +435,7 @@ export default function RevenueRecognitionView({
             <TrendingUp className="w-4 h-4" />
             Total Recognized
           </div>
-          <div className="text-lg font-bold text-green-600">
+          <div className="text-lg font-bold text-brand">
             {formatCurrency(summary.totalRecognized)}
           </div>
         </div>
@@ -444,7 +444,7 @@ export default function RevenueRecognitionView({
             <Calendar className="w-4 h-4" />
             Active Schedules
           </div>
-          <div className="text-lg font-bold text-[#F47721]">
+          <div className="text-lg font-bold text-brand">
             {summary.activeCount}
           </div>
         </div>
@@ -453,7 +453,7 @@ export default function RevenueRecognitionView({
             <Clock className="w-4 h-4" />
             Due for Recognition
           </div>
-          <div className="text-lg font-bold text-purple-600">
+          <div className="text-lg font-bold text-brand">
             {summary.dueForRecognition}
           </div>
         </div>
@@ -472,7 +472,7 @@ export default function RevenueRecognitionView({
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-orange-500 text-[#F47721]'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -493,7 +493,7 @@ export default function RevenueRecognitionView({
               placeholder="Search schedules..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ export default function RevenueRecognitionView({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
             >
               <option value="ALL">All Status</option>
               {STATUS_OPTIONS.map(opt => (
@@ -550,7 +550,7 @@ export default function RevenueRecognitionView({
 
                   return (
                     <React.Fragment key={schedule.id}>
-                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-orange-50' : ''}`}>
+                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-brand/10' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -573,11 +573,11 @@ export default function RevenueRecognitionView({
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {formatCurrency(schedule.totalAmount)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-green-600">
+                        <td className="px-4 py-3 text-sm text-brand">
                           {formatCurrency(schedule.recognizedAmount)}
                           <div className="text-xs text-gray-400">{progressPercent}%</div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
+                        <td className="px-4 py-3 text-sm font-medium text-brand">
                           {formatCurrency(schedule.deferredBalance)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
@@ -592,7 +592,7 @@ export default function RevenueRecognitionView({
                             {statusInfo.label}
                           </span>
                           {periodsDue.length > 0 && schedule.status === 'ACTIVE' && (
-                            <span className="ml-1 inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                            <span className="ml-1 inline-flex px-2 py-1 text-xs font-medium rounded-full bg-brand/10 text-brand">
                               {periodsDue.length} due
                             </span>
                           )}
@@ -602,7 +602,7 @@ export default function RevenueRecognitionView({
                             {schedule.status === 'ACTIVE' && periodsDue.length > 0 && (
                               <button
                                 onClick={() => handleRunRecognition(schedule)}
-                                className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg"
+                                className="p-1.5 text-brand hover:bg-brand-light rounded-lg"
                                 title="Run Recognition"
                               >
                                 <Play className="w-4 h-4" />
@@ -610,11 +610,7 @@ export default function RevenueRecognitionView({
                             )}
                             <button
                               onClick={() => handleToggleStatus(schedule)}
-                              className={`p-1.5 rounded-lg ${
-                                schedule.status === 'ACTIVE' 
-                                  ? 'text-yellow-600 hover:bg-yellow-100' 
-                                  : 'text-green-600 hover:bg-green-100'
-                              }`}
+                              className="p-1.5 rounded-lg text-brand hover:bg-brand-light"
                               title={schedule.status === 'ACTIVE' ? 'Pause' : 'Resume'}
                               disabled={schedule.status === 'COMPLETED' || schedule.status === 'CANCELLED'}
                             >
@@ -622,7 +618,7 @@ export default function RevenueRecognitionView({
                             </button>
                             <button
                               onClick={() => handleEdit(schedule)}
-                              className="p-1.5 text-[#F47721] hover:bg-orange-100 rounded-lg"
+                              className="p-1.5 text-brand hover:bg-brand-light rounded-lg"
                               title="Edit"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -675,7 +671,7 @@ export default function RevenueRecognitionView({
                                   </div>
                                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                     <div 
-                                      className="h-full bg-green-500 transition-all"
+                                      className="h-full bg-brand transition-all"
                                       style={{ width: `${progressPercent}%` }}
                                     />
                                   </div>
@@ -696,7 +692,7 @@ export default function RevenueRecognitionView({
                                         <span className="text-gray-400">•</span>
                                         <span className="font-medium">{formatCurrency(entry.amount)}</span>
                                         <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                          entry.status === 'POSTED' ? 'bg-green-100 text-green-700' :
+                                          entry.status === 'POSTED' ? 'bg-brand/10 text-brand' :
                                           entry.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                                           'bg-gray-100 text-gray-700'
                                         }`}>
@@ -755,12 +751,12 @@ export default function RevenueRecognitionView({
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {schedule?.description || 'Unknown'}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-green-600">
+                        <td className="px-4 py-3 text-sm font-medium text-brand">
                           {formatCurrency(entry.amount)}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                            entry.status === 'POSTED' ? 'bg-green-100 text-green-800' :
+                            entry.status === 'POSTED' ? 'bg-brand/10 text-brand' :
                             entry.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
                           }`}>
@@ -816,7 +812,7 @@ export default function RevenueRecognitionView({
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {formatCurrency(summary.totalDeferred)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-green-600">
+                      <td className="px-4 py-3 text-sm text-brand">
                         {formatCurrency(summary.totalRecognized)}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
@@ -826,7 +822,7 @@ export default function RevenueRecognitionView({
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden max-w-[100px]">
                             <div 
-                              className="h-full bg-green-500"
+                              className="h-full bg-brand"
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
@@ -863,7 +859,7 @@ export default function RevenueRecognitionView({
                 <select
                   value={formData.customerId}
                   onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   required
                 >
                   <option value="">Select Customer</option>
@@ -880,7 +876,7 @@ export default function RevenueRecognitionView({
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   placeholder="e.g., Tuition Fee - First Semester"
                   required
                 />
@@ -894,7 +890,7 @@ export default function RevenueRecognitionView({
                     type="number"
                     value={formData.totalAmount}
                     onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     min="0"
                     step="0.01"
                     required
@@ -906,7 +902,7 @@ export default function RevenueRecognitionView({
                     type="text"
                     value={formData.currency}
                     onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     placeholder="PHP"
                   />
                 </div>
@@ -918,7 +914,7 @@ export default function RevenueRecognitionView({
                 <select
                   value={formData.recognitionMethod}
                   onChange={(e) => setFormData({ ...formData, recognitionMethod: e.target.value as RecognitionMethod })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                 >
                   {RECOGNITION_METHODS.map(m => (
                     <option key={m.value} value={m.value}>{m.label}</option>
@@ -936,7 +932,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.recognitionPeriod}
                     onChange={(e) => setFormData({ ...formData, recognitionPeriod: e.target.value as RecognitionPeriod })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     {RECOGNITION_PERIODS.map(p => (
                       <option key={p.value} value={p.value}>{p.label}</option>
@@ -953,7 +949,7 @@ export default function RevenueRecognitionView({
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     required
                   />
                 </div>
@@ -963,7 +959,7 @@ export default function RevenueRecognitionView({
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     required
                   />
                 </div>
@@ -976,7 +972,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.deferredRevenueAccountId}
                     onChange={(e) => setFormData({ ...formData, deferredRevenueAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     required
                   >
                     <option value="">Select Liability Account</option>
@@ -990,7 +986,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.revenueAccountId}
                     onChange={(e) => setFormData({ ...formData, revenueAccountId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     required
                   >
                     <option value="">Select Revenue Account</option>
@@ -1008,7 +1004,7 @@ export default function RevenueRecognitionView({
                   <select
                     value={formData.sourceType}
                     onChange={(e) => setFormData({ ...formData, sourceType: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     <option value="MANUAL">Manual Entry</option>
                     <option value="INVOICE">From Invoice</option>
@@ -1021,7 +1017,7 @@ export default function RevenueRecognitionView({
                     type="text"
                     value={formData.sourceReference}
                     onChange={(e) => setFormData({ ...formData, sourceReference: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     placeholder="e.g., INV-2024-001"
                   />
                 </div>
@@ -1033,7 +1029,7 @@ export default function RevenueRecognitionView({
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   rows={2}
                   placeholder="Internal notes..."
                 />
@@ -1050,7 +1046,7 @@ export default function RevenueRecognitionView({
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors"
                 >
                   <Check className="w-4 h-4" />
                   {editingSchedule ? 'Update Schedule' : 'Create Schedule'}

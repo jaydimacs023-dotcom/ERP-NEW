@@ -307,22 +307,22 @@ const APView: React.FC<APViewProps> = ({
         </div>
         <div className="flex flex-wrap items-center gap-3">
            <div className="flex bg-gray-100 p-1 rounded border border-gray-200 flex-wrap">
-             <button onClick={() => setActiveTab('bills')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'bills' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('bills')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'bills' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <FileText size={14} className="inline mr-1.5" /> Bills
              </button>
-             <button onClick={() => setActiveTab('matching')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'matching' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('matching')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'matching' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <GitCompare size={14} className="inline mr-1.5" /> 3-Way Match
              </button>
-             <button onClick={() => setActiveTab('payments')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'payments' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('payments')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'payments' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <CreditCard size={14} className="inline mr-1.5" /> Payments
              </button>
-             <button onClick={() => setActiveTab('checks')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'checks' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('checks')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'checks' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <Printer size={14} className="inline mr-1.5" /> Check Register
              </button>
-             <button onClick={() => setActiveTab('recurring')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'recurring' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('recurring')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'recurring' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <Clock size={14} className="inline mr-1.5" /> Recurring Bills
              </button>
-             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('aging')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'aging' ? 'bg-white text-brand shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                <BarChart3 size={14} className="inline mr-1.5" /> Aging
              </button>
            </div>
@@ -334,7 +334,7 @@ const APView: React.FC<APViewProps> = ({
           </button>
            <button 
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-bold text-sm active:scale-95"
           >
             <Plus size={18} /> Record Bill
           </button>
@@ -354,7 +354,7 @@ const APView: React.FC<APViewProps> = ({
             <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input placeholder="Find bill by ref or vendor..." className="pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none w-64 focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input placeholder="Find bill by ref or vendor..." className="pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none w-64 focus:border-brand" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
             </div>
             <table className="min-w-full divide-y divide-gray-200">
@@ -379,10 +379,10 @@ const APView: React.FC<APViewProps> = ({
                   return (
                     <tr key={bill.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-5 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-400 flex items-center justify-center font-bold text-xs">V</div>
+                        <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold text-xs border border-brand-light">V</div>
                         <div className="text-sm font-bold text-gray-800">{bill.description.split(': ')[1]}</div>
                       </td>
-                      <td className="px-6 py-5 text-xs font-mono font-semibold text-[#F47721]">{bill.reference}</td>
+                      <td className="px-6 py-5 text-xs font-mono font-semibold text-brand">{bill.reference}</td>
                       <td className="px-6 py-5 text-xs text-gray-600">{bill.date}</td>
                       <td className="px-6 py-5 text-right font-mono font-bold text-gray-800">{formatCurrency(amount)}</td>
                       <td className="px-6 py-5 text-center">
@@ -391,7 +391,7 @@ const APView: React.FC<APViewProps> = ({
                       <td className="px-6 py-5 text-right">
                         <button 
                           onClick={() => { setSelectedJournalId(bill.id); setShowJournalModal(true); }}
-                          className="p-2 hover:bg-gray-100 rounded-lg text-orange-500 transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-2 hover:bg-brand-light rounded-lg text-brand transition-colors opacity-0 group-hover:opacity-100"
                           title="View Journal Entry"
                         >
                           <FileText size={16} />
@@ -414,7 +414,7 @@ const APView: React.FC<APViewProps> = ({
             <h3 className="text-xs font-semibold uppercase text-gray-400 tracking-wide px-2">Payment Journal Registry</h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input placeholder="Find payment by ref or vendor..." className="pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none w-64 focus:ring-1 focus:ring-orange-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input placeholder="Find payment by ref or vendor..." className="pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded text-xs outline-none w-64 focus:border-brand" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           <table className="min-w-full divide-y divide-gray-200">
@@ -435,10 +435,10 @@ const APView: React.FC<APViewProps> = ({
                 return (
                   <tr key={pymt.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-5 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#F47721] flex items-center justify-center font-bold text-xs"><CheckCircle size={14} /></div>
+                      <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand border border-brand-light flex items-center justify-center font-bold text-xs"><CheckCircle size={14} /></div>
                       <div className="text-sm font-bold text-gray-800">{pymt.description.split(': ')[1]}</div>
                     </td>
-                    <td className="px-6 py-5 text-xs font-mono font-semibold text-[#F47721]">{pymt.reference}</td>
+                    <td className="px-6 py-5 text-xs font-mono font-semibold text-brand">{pymt.reference}</td>
                     <td className="px-6 py-5 text-xs text-gray-600">{pymt.date}</td>
                     <td className="px-6 py-5 text-right font-mono font-bold text-rose-600">{formatCurrency(bankLine?.credit || 0)}</td>
                     <td className="px-6 py-5 text-center">
@@ -499,7 +499,7 @@ const APView: React.FC<APViewProps> = ({
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-50 text-[#F47721] rounded"><Calendar size={20} /></div>
+                <div className="p-2 bg-brand/10 text-brand rounded border border-brand-light"><Calendar size={20} /></div>
                 <div>
                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Effective Aging Date</p>
                    <input type="date" className="bg-transparent border-none outline-none font-bold text-gray-800 text-lg p-0 focus:ring-0" value={agingAsOf} onChange={e => setAgingAsOf(e.target.value)} />
@@ -522,12 +522,12 @@ const APView: React.FC<APViewProps> = ({
                 {agingReport.length > 0 ? agingReport.map((row, idx) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-5 flex items-center gap-3">
-                       <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#F47721] flex items-center justify-center font-bold text-xs uppercase">V</div>
+                       <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold text-xs uppercase border border-brand-light">V</div>
                        <div className="text-sm font-bold text-gray-800">{row.name}</div>
                     </td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-[#F47721] font-bold">{formatCurrency(row.current)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-brand font-bold">{formatCurrency(row.current)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-amber-600 font-bold">{formatCurrency(row.thirty)}</td>
-                    <td className="px-6 py-5 text-right font-mono text-xs text-orange-600 font-bold">{formatCurrency(row.sixty)}</td>
+                    <td className="px-6 py-5 text-right font-mono text-xs text-brand font-bold">{formatCurrency(row.sixty)}</td>
                     <td className="px-6 py-5 text-right font-mono text-xs text-rose-600 font-semibold bg-rose-50/30">{formatCurrency(row.ninety)}</td>
                     <td className="px-6 py-5 text-right font-mono text-sm text-gray-900 font-semibold">{formatCurrency(row.total)}</td>
                   </tr>
@@ -567,7 +567,7 @@ const APView: React.FC<APViewProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Vendor to Pay</label>
-                <select required className="w-full px-4 py-2.5 bg-white border border-orange-200 rounded text-sm font-semibold text-orange-700 appearance-none" value={payVendorId} onChange={e => setPayVendorId(e.target.value)}>
+                <select required className="w-full px-4 py-2.5 bg-white border border-brand-light rounded text-sm font-semibold text-brand appearance-none focus:border-brand outline-none" value={payVendorId} onChange={e => setPayVendorId(e.target.value)}>
                   <option value="">Choose Supplier...</option>
                   {vendors.map(v => (
                     <option key={v.id} value={v.id}>{v.name} (Outstanding: {formatCurrency(vendorBalances[v.id] || 0)})</option>
@@ -594,9 +594,9 @@ const APView: React.FC<APViewProps> = ({
                  <textarea rows={2} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded text-sm outline-none resize-none" value={payMemo} onChange={e => setPayMemo(e.target.value)} placeholder="e.g. Settlement for Bill..." />
               </div>
 
-              <div className="bg-orange-50 p-4 rounded border border-orange-100 flex gap-3">
-                 <AlertCircle className="text-[#F47721] shrink-0" size={20} />
-                 <p className="text-xs text-orange-800 leading-relaxed font-medium">
+              <div className="bg-brand/10 p-4 rounded border border-brand-light flex gap-3">
+                 <AlertCircle className="text-brand shrink-0" size={20} />
+                 <p className="text-xs text-brand leading-relaxed font-medium">
                    Recording a payment will Debit your Accounts Payable subsidiary and Credit the selected Cash account. This will reduce your total liabilities.
                  </p>
               </div>
@@ -620,7 +620,7 @@ const APView: React.FC<APViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><Truck size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20"><Truck size={20} /></div>
                 <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">Record Supplier Bill</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -629,17 +629,17 @@ const APView: React.FC<APViewProps> = ({
             <form onSubmit={handlePost} className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="space-y-1.5"><label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bill Date</label><input type="date" required className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded text-sm font-medium" value={billDate} onChange={e => setBillDate(e.target.value)} /></div>
-                <div className="space-y-1.5"><label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bill Reference (Sequential)</label><input readOnly className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono font-semibold text-[#F47721]" value={billRef} /></div>
-                <div className="space-y-1.5"><label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Vendor</label><select required className="w-full px-4 py-2.5 bg-white border border-orange-200 rounded text-sm font-semibold text-[#F47721] appearance-none" value={vendorId} onChange={e => setVendorId(e.target.value)}><option value="">Choose Supplier...</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></div>
+                <div className="space-y-1.5"><label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bill Reference (Sequential)</label><input readOnly className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded text-sm font-mono font-semibold text-brand" value={billRef} /></div>
+                <div className="space-y-1.5"><label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Vendor</label><select required className="w-full px-4 py-2.5 bg-white border border-brand-light rounded text-sm font-semibold text-brand appearance-none focus:border-brand outline-none" value={vendorId} onChange={e => setVendorId(e.target.value)}><option value="">Choose Supplier...</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</select></div>
               </div>
 
               <div className="space-y-4 mb-8">
                 {billLines.map((line, idx) => {
                   const item = items.find(i => i.id === line.itemId);
                   return (
-                    <div key={idx} className="grid grid-cols-12 gap-3 items-center p-3 bg-white rounded border border-gray-100 hover:border-orange-200 shadow-sm">
-                      <div className="col-span-4"><select required className="w-full px-3 py-2 bg-orange-50/50 border border-orange-100 rounded text-xs font-bold text-orange-700 outline-none" value={line.itemId} onChange={e => updateBillLine(idx, { itemId: e.target.value })}><option value="">Select Item...</option>{items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
-                      <div className="col-span-2 text-center"><div className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide inline-block ${item?.taxCategoryId ? 'bg-[#F47721] text-white' : 'bg-gray-200 text-gray-500'}`}>{item?.taxCategoryId ? 'VAT' : 'NO-VAT'}</div></div>
+                    <div key={idx} className="grid grid-cols-12 gap-3 items-center p-3 bg-white rounded border border-gray-100 hover:border-brand-light shadow-sm">
+                      <div className="col-span-4"><select required className="w-full px-3 py-2 bg-brand/10 border border-brand-light rounded text-xs font-bold text-brand outline-none focus:border-brand" value={line.itemId} onChange={e => updateBillLine(idx, { itemId: e.target.value })}><option value="">Select Item...</option>{items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select></div>
+                      <div className="col-span-2 text-center"><div className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide inline-block ${item?.taxCategoryId ? 'bg-brand text-white' : 'bg-gray-200 text-gray-500'}`}>{item?.taxCategoryId ? 'VAT' : 'NO-VAT'}</div></div>
                       <div className="col-span-1"><input type="number" min="1" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-center text-sm font-bold" value={line.qty} onChange={e => updateBillLine(idx, { qty: Number(e.target.value) })} /></div>
                       <div className="col-span-2"><input type="number" step="0.01" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-right text-xs font-mono font-medium" value={line.price} onChange={e => updateBillLine(idx, { price: Number(e.target.value) })} /></div>
                       <div className="col-span-2 text-right text-xs font-mono font-bold text-gray-800">{(line.qty * line.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
@@ -647,13 +647,13 @@ const APView: React.FC<APViewProps> = ({
                     </div>
                   );
                 })}
-                <button type="button" onClick={handleAddLine} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#F47721] hover:bg-orange-50 rounded transition-colors"><Plus size={16} /> Add Procurement Row</button>
+                <button type="button" onClick={handleAddLine} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-brand hover:bg-brand-light rounded transition-colors"><Plus size={16} /> Add Procurement Row</button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8 bg-gray-50 rounded-md border border-gray-200">
                 <div className="space-y-2"><SummaryRow label="Input VAT (12%)" value={totalInputVat} isHighlighted /><SummaryRow label="Non-VAT / Exempt" value={nonVatPurchases} /></div>
                 <div className="space-y-2"><div className="flex justify-between items-center text-xs font-bold text-rose-600"><span>Less: Withheld Tax (EWT)</span><span>({formatCurrency(totalEwt)})</span></div><div className="pt-2 border-t border-gray-200 mt-2"><SummaryRow label="Net Amount to Vendor" value={netPayableToVendor} isBig /></div></div>
-                <div className="flex flex-col justify-end gap-3"><button type="button" onClick={() => setShowModal(false)} className="py-3.5 text-sm font-bold text-gray-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">Discard</button><button type="submit" disabled={netPayableToVendor <= 0 || !vendorId} className="py-3.5 bg-[#F47721] text-white rounded text-sm font-bold shadow-sm shadow-gray-100 hover:bg-[#E06610] transition-all flex items-center justify-center gap-2"><Save size={18} /> Post to Payables</button></div>
+                <div className="flex flex-col justify-end gap-3"><button type="button" onClick={() => setShowModal(false)} className="py-3.5 text-sm font-bold text-gray-500 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">Discard</button><button type="submit" disabled={netPayableToVendor <= 0 || !vendorId} className="py-3.5 bg-brand text-white rounded text-sm font-bold shadow-brand/20 hover:bg-brand-hover transition-all flex items-center justify-center gap-2"><Save size={18} /> Post to Payables</button></div>
               </div>
             </form>
           </div>
@@ -692,7 +692,7 @@ const APView: React.FC<APViewProps> = ({
                       </div>
                       <div>
                         <p className="text-xs text-gray-400 uppercase font-bold">Source Type</p>
-                        <p className="text-sm font-semibold text-[#F47721] mt-1">{entry?.sourceType}</p>
+                        <p className="text-sm font-semibold text-brand mt-1">{entry?.sourceType}</p>
                       </div>
                     </div>
 
@@ -751,8 +751,8 @@ const APView: React.FC<APViewProps> = ({
 
 const SummaryRow: React.FC<{ label: string, value: number, isHighlighted?: boolean, isBig?: boolean }> = ({ label, value, isHighlighted, isBig }) => (
   <div className="flex justify-between items-center">
-     <span className={`text-xs font-medium ${isHighlighted ? 'text-orange-700' : 'text-gray-500'}`}>{label}</span>
-     <span className={`font-mono font-bold ${isBig ? 'text-lg text-gray-900' : isHighlighted ? 'text-orange-700 text-xs' : 'text-gray-700 text-xs'}`}>
+     <span className={`text-xs font-medium ${isHighlighted ? 'text-brand' : 'text-gray-500'}`}>{label}</span>
+     <span className={`font-mono font-bold ${isBig ? 'text-lg text-gray-900' : isHighlighted ? 'text-brand text-xs' : 'text-gray-700 text-xs'}`}>
         {value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
      </span>
   </div>
@@ -763,7 +763,7 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-emerald-50 text-emerald-600',
     red: 'bg-rose-50 text-rose-600',
-    orange: 'bg-orange-50 text-orange-600',
+    orange: 'bg-brand/10 text-brand',
     amber: 'bg-amber-50 text-amber-600',
     gray: 'bg-gray-100 text-gray-600',
     rose: 'bg-rose-50 text-rose-600',

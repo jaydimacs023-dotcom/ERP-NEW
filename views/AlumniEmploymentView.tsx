@@ -157,11 +157,11 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                         onClick={handleExport}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded hover:bg-gray-50 transition-all font-semibold text-sm"
                     >
-                        <Download size={18} className="text-orange-600" /> Export CSV
+                        <Download size={18} className="text-brand" /> Export CSV
                     </button>
                     <button
                         onClick={() => { setShowModal(true); setEditingReport(null); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-all font-bold text-sm shadow-md"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded hover:bg-brand-hover transition-all font-bold text-sm shadow-md shadow-brand/20"
                     >
                         <Plus size={18} /> Add Record
                     </button>
@@ -185,7 +185,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                     </div>
                 </div>
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div className="p-3 bg-orange-50 text-orange-600 rounded-lg"><Briefcase size={24} /></div>
+                    <div className="p-3 bg-brand/10 text-brand rounded-lg border border-brand-light"><Briefcase size={24} /></div>
                     <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Course Related</p>
                         <p className="text-2xl font-bold text-gray-900">{stats.relatedRate}%</p>
@@ -200,7 +200,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                     <input
                         type="text"
                         placeholder="Search by student or employer..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 outline-none text-sm transition-all"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:border-brand outline-none text-sm transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -209,7 +209,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value as any)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/20 transition-all font-medium text-gray-600"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand transition-all font-medium text-gray-600"
                     >
                         <option value="ALL">All Status</option>
                         {Object.values(AlumniEmploymentStatus).map(s => (
@@ -219,7 +219,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                     <select
                         value={relevanceFilter}
                         onChange={(e) => setRelevanceFilter(e.target.value as any)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/20 transition-all font-medium text-gray-600"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand transition-all font-medium text-gray-600"
                     >
                         <option value="ALL">Course Relevance</option>
                         <option value="YES">Related</option>
@@ -259,7 +259,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                     <tr key={report.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center font-bold text-xs border border-orange-100 shadow-sm">
+                                                <div className="w-9 h-9 bg-brand/10 text-brand rounded-full flex items-center justify-center font-bold text-xs border border-brand-light shadow-sm">
                                                     {student?.firstName[0]}{student?.lastName[0]}
                                                 </div>
                                                 <div>
@@ -298,7 +298,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     </p>
                                                 )}
                                                 {report.isRelatedToCourse && (
-                                                    <span className="text-[10px] font-bold text-orange-600 flex items-center gap-1">
+                                                    <span className="text-[10px] font-bold text-brand flex items-center gap-1">
                                                         <CheckCircle2 size={10} /> Related to Training
                                                     </span>
                                                 )}
@@ -308,7 +308,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                             <div className="flex justify-end items-center gap-2">
                                                 <button
                                                     onClick={() => { setEditingReport(report); setFormData(report); setShowModal(true); }}
-                                                    className="p-1.5 hover:bg-orange-50 text-gray-400 hover:text-orange-600 rounded transition-all"
+                                                    className="p-1.5 hover:bg-brand-light text-gray-400 hover:text-brand rounded transition-all"
                                                 >
                                                     <ExternalLink size={16} />
                                                 </button>
@@ -337,28 +337,28 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                             <button
                                 onClick={() => setCurrentPage(1)}
                                 disabled={currentPage === 1}
-                                className="p-1.5 text-gray-400 hover:text-orange-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                                 <ChevronsLeft size={16} />
                             </button>
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="p-1.5 text-gray-400 hover:text-orange-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                                 <ChevronLeft size={16} />
                             </button>
                             <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
-                                className="p-1.5 text-gray-400 hover:text-orange-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                                 <ChevronRight size={16} />
                             </button>
                             <button
                                 onClick={() => setCurrentPage(totalPages)}
                                 disabled={currentPage === totalPages}
-                                className="p-1.5 text-gray-400 hover:text-orange-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-brand disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                             >
                                 <ChevronsRight size={16} />
                             </button>
@@ -374,7 +374,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-100 flex flex-col h-full max-h-[90vh]">
                         <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0 z-10 shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-orange-600 text-white rounded-lg"><Plus size={20} /></div>
+                                <div className="p-2 bg-brand text-white rounded-lg shadow-brand/20"><Plus size={20} /></div>
                                 <h3 className="text-lg font-bold text-gray-800 tracking-tight uppercase">
                                     {editingReport ? 'Edit Employment Record' : 'Add New Tracer Entry'}
                                 </h3>
@@ -386,7 +386,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                             <div className="p-8 space-y-8">
                                 {/* Section 1: Alumni Identity */}
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-orange-600 border-b border-orange-100 pb-2">
+                                    <div className="flex items-center gap-2 text-brand border-b border-brand-light pb-2">
                                         <GraduationCap size={18} />
                                         <h4 className="text-xs font-bold uppercase tracking-widest">Learner Identification</h4>
                                     </div>
@@ -398,7 +398,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                 disabled={!!editingReport}
                                                 value={formData.studentId || ''}
                                                 onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                             >
                                                 <option value="">-- Choose Alumni (Graduates Only) --</option>
                                                 {graduates.map(s => (
@@ -411,7 +411,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
 
                                 {/* Section 2: Employment Status */}
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-orange-600 border-b border-orange-100 pb-2">
+                                    <div className="flex items-center gap-2 text-brand border-b border-brand-light pb-2">
                                         <Briefcase size={18} />
                                         <h4 className="text-xs font-bold uppercase tracking-widest">Current Career Status</h4>
                                     </div>
@@ -422,7 +422,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                 required
                                                 value={formData.employmentStatus}
                                                 onChange={(e) => setFormData({ ...formData, employmentStatus: e.target.value as any })}
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                             >
                                                 {Object.values(AlumniEmploymentStatus).map(s => (
                                                     <option key={s} value={s}>{s}</option>
@@ -435,7 +435,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                 <select
                                                     value={formData.employmentType}
                                                     onChange={(e) => setFormData({ ...formData, employmentType: e.target.value as any })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 >
                                                     {Object.values(AlumniEmploymentType).map(t => (
                                                         <option key={t} value={t}>{t}</option>
@@ -449,7 +449,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                 {/* Section 3: Job Details - Conditioned */}
                                 {(formData.employmentStatus === AlumniEmploymentStatus.EMPLOYED || formData.employmentStatus === AlumniEmploymentStatus.SELF_EMPLOYED) && (
                                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex items-center gap-2 text-orange-600 border-b border-orange-100 pb-2">
+                                        <div className="flex items-center gap-2 text-brand border-b border-brand-light pb-2">
                                             <Building2 size={18} />
                                             <h4 className="text-xs font-bold uppercase tracking-widest">Professional Details</h4>
                                         </div>
@@ -460,7 +460,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     type="text"
                                                     value={formData.employerName || ''}
                                                     onChange={(e) => setFormData({ ...formData, employerName: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
@@ -469,7 +469,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     type="text"
                                                     value={formData.position || ''}
                                                     onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
@@ -478,7 +478,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     type="date"
                                                     value={formData.dateHired || ''}
                                                     onChange={(e) => setFormData({ ...formData, dateHired: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
@@ -488,7 +488,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     placeholder="e.g. 20k - 30k"
                                                     value={formData.salaryRange || ''}
                                                     onChange={(e) => setFormData({ ...formData, salaryRange: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div className="flex items-center pt-8">
@@ -497,9 +497,10 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                         type="checkbox"
                                                         checked={formData.isRelatedToCourse}
                                                         onChange={(e) => setFormData({ ...formData, isRelatedToCourse: e.target.checked })}
-                                                        className="w-5 h-5 rounded border-gray-300 text-orange-600 focus:ring-orange-500/20 transition-all cursor-pointer"
+                                                        className="w-5 h-5 rounded border-gray-300 text-brand transition-all cursor-pointer"
+                                                        style={{ accentColor: 'var(--acm-primary)' }}
                                                     />
-                                                    <span className="text-sm font-bold text-gray-700 group-hover:text-orange-600 transition-colors uppercase">Related to Training Program</span>
+                                                    <span className="text-sm font-bold text-gray-700 group-hover:text-brand transition-colors uppercase">Related to Training Program</span>
                                                 </label>
                                             </div>
                                             <div className="md:col-span-2">
@@ -508,7 +509,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     rows={2}
                                                     value={formData.employerAddress || ''}
                                                     onChange={(e) => setFormData({ ...formData, employerAddress: e.target.value })}
-                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-semibold"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                         </div>
@@ -516,9 +517,9 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                 )}
 
                                 {/* Info Note */}
-                                <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 flex gap-3">
-                                    <Info size={18} className="text-orange-600 shrink-0" />
-                                    <p className="text-[11px] text-orange-800 leading-relaxed font-semibold uppercase tracking-tight">
+                                <div className="p-4 bg-brand/10 rounded-lg border border-brand-light flex gap-3">
+                                    <Info size={18} className="text-brand shrink-0" />
+                                    <p className="text-[11px] text-brand leading-relaxed font-semibold uppercase tracking-tight">
                                         This information is part of the institutional tracer system. ensure data accuracy as it contributes to periodic employment reporting and compliance audits.
                                     </p>
                                 </div>
@@ -535,7 +536,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-8 py-2.5 bg-orange-600 text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-md hover:bg-orange-700 transition-all active:scale-95"
+                                    className="px-8 py-2.5 bg-brand text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-md shadow-brand/20 hover:bg-brand-hover transition-all active:scale-95"
                                 >
                                     {editingReport ? 'Update Record' : 'Save Tracer Entry'}
                                 </button>

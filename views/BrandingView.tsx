@@ -51,7 +51,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) =
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 max-w-full mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header>
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Identity & Motif</h2>
@@ -166,7 +166,7 @@ const BrandingView: React.FC<BrandingViewProps> = ({ organization, onUpdate }) =
                  </div>
                  <div className="space-y-6">
                     <div className="flex items-center gap-6">
-                       <div className="w-[1in] h-[1in] rounded-full border-4 border-brand bg-white flex items-center justify-center shadow-md shadow-brand/20 text-[#F47721] overflow-hidden shrink-0">
+                       <div className="w-[1in] h-[1in] rounded-full border-4 border-brand bg-white flex items-center justify-center shadow-md shadow-brand/20 text-brand overflow-hidden shrink-0">
                           {organization.logoUrl ? (
                             <img src={organization.logoUrl} className="w-full h-full object-cover" alt="Preview" />
                           ) : (

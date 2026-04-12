@@ -364,13 +364,13 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={openBulkModal}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-[#F47721] border border-[#F47721] rounded hover:bg-orange-50 transition-all font-medium text-sm active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-brand border border-brand rounded hover:bg-brand-light transition-all font-medium text-sm active:scale-95"
           >
             <Copy size={16} /> Bulk Create
           </button>
           <button
             onClick={() => { resetForm(); setShowModal(true); }}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md shadow-gray-100 font-medium text-sm active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-medium text-sm active:scale-95"
           >
             <Plus size={18} /> New Course Fee
           </button>
@@ -384,11 +384,11 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <p className="text-2xl font-bold text-gray-800">{totalFees}</p>
         </div>
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">Active</p>
+          <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Active</p>
           <p className="text-2xl font-bold text-gray-800">{activeFees}</p>
         </div>
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Total Value</p>
+          <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Total Value</p>
           <p className="text-2xl font-bold text-gray-800">{formatCurrency(totalAmount)}</p>
         </div>
         <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
@@ -404,7 +404,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <input
             type="text"
             placeholder="Search by name, code, description..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-orange-400 outline-none text-sm transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -413,7 +413,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <select
             value={filterQualification}
             onChange={(e) => setFilterQualification(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
           >
             <option value="">All Courses</option>
             {qualifications.filter(q => !q.isDeleted).map(q => (
@@ -423,7 +423,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value as CourseFeeCategory | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
           >
             <option value="">All Categories</option>
             {CATEGORY_OPTIONS.map(cat => (
@@ -452,12 +452,12 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               <tr key={fee.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-orange-50 flex items-center justify-center text-[#F47721] border border-orange-100 shadow-sm shrink-0">
+                    <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                       <DollarSign size={20} />
                     </div>
                     <div>
                       <div className="text-sm font-bold text-gray-800 leading-tight">{fee.feeName}</div>
-                      <div className="text-xs text-[#F47721] font-mono mt-0.5">{fee.feeCode}</div>
+                      <div className="text-xs text-brand font-mono mt-0.5">{fee.feeCode}</div>
                       {fee.category && <div className="mt-1">{getCategoryBadge(fee.category)}</div>}
                     </div>
                   </div>
@@ -494,7 +494,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </td>
                 <td className="px-6 py-5">
                   {fee.isActive ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded border border-brand-light">
                       <CheckCircle size={12} /> Active
                     </span>
                   ) : (
@@ -508,7 +508,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     <button
                       onClick={() => openEditModal(fee)}
                       disabled={deletingId === fee.id}
-                      className="p-2 hover:bg-orange-50 text-gray-400 hover:text-[#F47721] rounded-lg transition-colors"
+                      className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -536,7 +536,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><DollarSign size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20"><DollarSign size={20} /></div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
                   {editingFee ? 'Edit Course Fee' : 'New Course Fee'}
                 </h3>
@@ -551,7 +551,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Course / Qualification *</label>
                   <select
                     required
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.qualificationId || ''}
                     onChange={e => {
                       const qualId = e.target.value;
@@ -577,7 +577,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                       <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         placeholder="Auto-generated if blank"
-                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium font-mono"
                         value={formData.feeCode || ''}
                         onChange={e => setFormData({ ...formData, feeCode: e.target.value })}
                       />
@@ -588,7 +588,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     <input
                       required
                       placeholder="e.g. Tuition Fee - First Semester"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                       value={formData.feeName || ''}
                       onChange={e => setFormData({ ...formData, feeName: e.target.value })}
                     />
@@ -607,7 +607,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                         step="0.01"
                         min="0"
                         placeholder="0.00"
-                        className="w-full pl-14 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium font-mono"
+                        className="w-full pl-14 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium font-mono"
                         value={formData.amount || ''}
                         onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                       />
@@ -616,7 +616,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</label>
                     <select
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                       value={formData.category || ''}
                       onChange={e => setFormData({ ...formData, category: e.target.value as CourseFeeCategory || undefined })}
                     >
@@ -633,7 +633,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">G/L Revenue Account *</label>
                   <select
                     required
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.glAccountId || ''}
                     onChange={e => setFormData({ ...formData, glAccountId: e.target.value })}
                   >
@@ -651,7 +651,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <textarea
                     placeholder="Optional description of this fee..."
                     rows={2}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:ring-1 focus:ring-orange-500 text-sm font-medium resize-none"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium resize-none"
                     value={formData.description || ''}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                   />
@@ -686,7 +686,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                             min="0"
                             max="100"
                             placeholder="2"
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-amber-500 text-sm font-medium pr-8"
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium pr-8"
                             value={formData.ewtRate !== undefined ? (formData.ewtRate * 100) : ''}
                             onChange={e => {
                               const val = e.target.value;
@@ -732,7 +732,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.glAccountId}
-                  className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
@@ -757,7 +757,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><Copy size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-brand/20"><Copy size={20} /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Bulk Create Course Fees</h3>
                   <p className="text-xs text-gray-500">Add multiple fee entries at once. Only rows with Name, Course, and GL Account will be saved.</p>
@@ -768,22 +768,22 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
             {/* Shared Defaults */}
             <div className="px-6 pt-5 pb-3">
-              <div className="p-4 bg-orange-50/60 border border-orange-100 rounded space-y-3">
+              <div className="p-4 bg-brand/10 border border-brand-light rounded space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">Shared Defaults (apply to all rows)</label>
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide">Shared Defaults (apply to all rows)</label>
                   <button
                     type="button"
                     onClick={applyDefaultsToAll}
-                    className="text-xs font-semibold text-[#F47721] hover:text-[#E06610] px-3 py-1 border border-[#F47721] rounded hover:bg-orange-100 transition-colors"
+                    className="text-xs font-semibold text-brand hover:text-brand px-3 py-1 border border-brand rounded hover:bg-white transition-colors"
                   >
-                    Apply to All â†“
+                    Apply to All
                   </button>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <select
                     value={bulkDefaults.qualificationId}
                     onChange={e => setBulkDefaults({ ...bulkDefaults, qualificationId: e.target.value })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
                   >
                     <option value="">Default Course...</option>
                     {qualifications.filter(q => !q.isDeleted).map(q => (
@@ -793,7 +793,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <select
                     value={bulkDefaults.glAccountId}
                     onChange={e => setBulkDefaults({ ...bulkDefaults, glAccountId: e.target.value })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
                   >
                     <option value="">Default GL Account...</option>
                     {revenueAccounts.map(acc => (
@@ -803,7 +803,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <select
                     value={bulkDefaults.category}
                     onChange={e => setBulkDefaults({ ...bulkDefaults, category: e.target.value as CourseFeeCategory | '' })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
                   >
                     <option value="">Default Category...</option>
                     {CATEGORY_OPTIONS.map(cat => (
@@ -837,14 +837,14 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                         <td className="py-2 px-2">
                           <input
                             placeholder="e.g. Tuition Fee"
-                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
                             value={row.feeName || ''}
                             onChange={e => updateBulkRow(row._key, 'feeName', e.target.value)}
                           />
                         </td>
                         <td className="py-2 px-2">
                           <select
-                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
                             value={row.qualificationId || ''}
                             onChange={e => updateBulkRow(row._key, 'qualificationId', e.target.value)}
                           >
@@ -860,14 +860,14 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm font-mono focus:ring-1 focus:ring-orange-400 outline-none"
+                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm font-mono focus:border-brand outline-none"
                             value={row.amount || ''}
                             onChange={e => updateBulkRow(row._key, 'amount', parseFloat(e.target.value) || 0)}
                           />
                         </td>
                         <td className="py-2 px-2">
                           <select
-                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
                             value={row.category || ''}
                             onChange={e => updateBulkRow(row._key, 'category', e.target.value || undefined)}
                           >
@@ -879,7 +879,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                         </td>
                         <td className="py-2 px-2">
                           <select
-                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-orange-400 outline-none"
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
                             value={row.glAccountId || ''}
                             onChange={e => updateBulkRow(row._key, 'glAccountId', e.target.value)}
                           >
@@ -908,7 +908,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               <button
                 type="button"
                 onClick={addBulkRow}
-                className="mt-3 flex items-center gap-1.5 text-sm text-[#F47721] hover:text-[#E06610] font-medium transition-colors"
+                className="mt-3 flex items-center gap-1.5 text-sm text-brand hover:text-brand font-medium transition-colors"
               >
                 <Plus size={16} /> Add Row
               </button>
@@ -931,7 +931,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   type="button"
                   onClick={handleBulkSubmit}
                   disabled={isBulkSubmitting || bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length === 0}
-                  className="px-8 py-2.5 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-2.5 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isBulkSubmitting ? (
                     <><Loader2 size={16} className="animate-spin" /> Creating...</>
@@ -956,7 +956,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-orange-50 text-orange-800 border-orange-200'
+                  : 'bg-brand/10 text-brand border-brand-light'
                 }`}
             >
               {toast.type === 'success' ? (
@@ -964,7 +964,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (
-                <AlertCircle size={18} className="text-[#F47721]" />
+                <AlertCircle size={18} className="text-brand" />
               )}
               <span className="text-sm font-semibold">{toast.message}</span>
               <button

@@ -150,18 +150,18 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
               key={toast.id}
               className={`px-4 py-3 rounded shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${
                 toast.type === 'success'
-                  ? 'bg-emerald-50 text-orange-800 border-orange-200'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
-                  : 'bg-orange-50 text-orange-800 border-orange-200'
+                  : 'bg-brand/10 text-brand border-brand-light'
               }`}
             >
               {toast.type === 'success' ? (
-                <CheckCircle size={18} className="text-[#F47721]" />
+                <CheckCircle size={18} className="text-emerald-600" />
               ) : toast.type === 'error' ? (
                 <AlertCircle size={18} className="text-rose-600" />
               ) : (
-                <Info size={18} className="text-[#F47721]" />
+                <Info size={18} className="text-brand" />
               )}
               <span className="text-sm font-semibold">{toast.message}</span>
               <button
@@ -184,16 +184,16 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
         </div>
         <div className="flex items-center gap-3">
            <div className="flex bg-gray-100 p-1 rounded border border-gray-200">
-             <button onClick={() => setActiveTab('registry')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'registry' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('registry')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'registry' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-500 hover:text-gray-700'}`}>
                <Layers size={14} className="inline mr-1.5" /> Registry
              </button>
-             <button onClick={() => setActiveTab('depreciation_log')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'depreciation_log' ? 'bg-white text-[#F47721] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+             <button onClick={() => setActiveTab('depreciation_log')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'depreciation_log' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-500 hover:text-gray-700'}`}>
                <History size={14} className="inline mr-1.5" /> Depr. Log
              </button>
            </div>
            <button 
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#F47721] text-white rounded hover:bg-[#E06610] transition-all shadow-md font-bold text-sm active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm active:scale-95"
           >
             <Plus size={18} /> Register Asset
           </button>
@@ -213,7 +213,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
                   placeholder="Search assets by code or description..." 
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-1 focus:ring-orange-500 outline-none"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -242,14 +242,14 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                     <tr key={asset.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200 shadow-sm shrink-0 group-hover:bg-[#F47721] group-hover:text-white transition-all">
+                          <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200 shadow-sm shrink-0 group-hover:bg-brand-light group-hover:text-brand transition-all">
                             <Box size={20} />
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-gray-800 leading-tight truncate">{asset.name}</div>
                             <div className="flex items-center gap-2 mt-1">
                                <div className="text-xs font-mono text-gray-400 uppercase tracking-tighter">{asset.code}</div>
-                               <span className="text-xs font-bold text-[#F47721] bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 uppercase tracking-tighter">
+                               <span className="text-xs font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand-light uppercase tracking-tighter">
                                  {getCategoryLabel(asset.category)}
                                </span>
                             </div>
@@ -262,7 +262,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                       <td className="px-6 py-5">
                         <div className="flex flex-col items-center">
                            <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
-                              <div className="h-full bg-[#F47721] rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, deprPercent)}%` }}></div>
+                              <div className="h-full bg-brand rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, deprPercent)}%` }}></div>
                            </div>
                            <span className="text-xs font-bold text-gray-400 uppercase tracking-tighter">{Math.min(100, deprPercent).toFixed(0)}% Utilized</span>
                         </div>
@@ -271,14 +271,14 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                         <div className="flex items-center gap-2 justify-end">
                           <button 
                             onClick={() => handleEditAccumulated(asset)}
-                            className="p-2 bg-orange-50 text-[#F47721] rounded-lg hover:bg-[#F47721] hover:text-white transition-all shadow-sm active:scale-95"
+                            className="p-2 bg-brand/10 text-brand rounded-lg hover:bg-brand hover:text-white transition-all shadow-sm shadow-brand/20 active:scale-95"
                             title="Edit Accumulated Depreciation"
                           >
                              <AlertCircle size={16} />
                           </button>
                           <button 
                             onClick={() => onDepreciate(asset.id)}
-                            className="p-2 bg-orange-50 text-[#F47721] rounded-lg hover:bg-[#F47721] hover:text-white transition-all shadow-sm active:scale-95"
+                            className="p-2 bg-brand/10 text-brand rounded-lg hover:bg-brand hover:text-white transition-all shadow-sm shadow-brand/20 active:scale-95"
                             title="Run Monthly Depreciation for this Asset"
                           >
                              <Play size={16} fill="currentColor" />
@@ -300,7 +300,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
         <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
            <div className="p-6 border-b flex justify-between items-center bg-gray-50/20">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 uppercase tracking-tight">
-                <History size={16} className="text-[#F47721]" />
+                <History size={16} className="text-brand" />
                 Asset Depreciation Journal History
               </h3>
            </div>
@@ -320,7 +320,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                   return (
                     <tr key={entry.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-xs text-gray-600">{entry.date}</td>
-                      <td className="px-6 py-4 text-xs font-mono font-bold text-[#F47721]">{entry.reference}</td>
+                      <td className="px-6 py-4 text-xs font-mono font-bold text-brand">{entry.reference}</td>
                       <td className="px-6 py-4 text-xs text-gray-600">{entry.description}</td>
                       <td className="px-6 py-4 text-right font-mono text-xs font-bold text-rose-600">
                         {deprLine?.debit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -342,7 +342,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
           <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><Box size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20"><Box size={20} /></div>
                 <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">Register Capital Acquisition</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -354,7 +354,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Asset Category</label>
                   <select 
                     required 
-                    className="w-full px-4 py-2.5 bg-orange-50 border border-orange-100 rounded text-sm font-bold text-orange-700 outline-none appearance-none"
+                    className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded text-sm font-bold text-brand outline-none appearance-none"
                     value={formData.category}
                     onChange={e => setFormData({...formData, category: e.target.value})}
                   >
@@ -369,7 +369,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Asset Code</label>
-                  <input required className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded text-sm font-mono font-bold text-[#F47721]" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} />
+                  <input required className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded text-sm font-mono font-bold text-brand" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Asset Description</label>
@@ -402,7 +402,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
               <div className="space-y-4 mb-8">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                  <BarChart3 size={14} className="text-[#F47721]" /> General Ledger Mappings
+                  <BarChart3 size={14} className="text-brand" /> General Ledger Mappings
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
@@ -419,13 +419,13 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 </div>
               </div>
 
-              <div className="bg-orange-50 p-6 rounded-md border border-orange-100 flex gap-4">
-                 <Info className="text-[#F47721] shrink-0" size={24} />
+              <div className="bg-brand/10 p-6 rounded-md border border-brand-light flex gap-4">
+                 <Info className="text-brand shrink-0" size={24} />
                  <div>
-                    <h5 className="text-xs font-bold text-orange-900 uppercase tracking-tight mb-1">Depreciation Strategy</h5>
-                    <p className="text-xs text-orange-800 leading-relaxed font-medium">
+                    <h5 className="text-xs font-bold text-brand uppercase tracking-tight mb-1">Depreciation Strategy</h5>
+                    <p className="text-xs text-brand leading-relaxed font-medium">
                       System defaults to <strong>Straight-Line Depreciation</strong>. This configuration will automatically compute an annual charge of 
-                      <span className="font-bold text-orange-700 mx-1">
+                      <span className="font-bold text-brand mx-1">
                         {(Number(formData.purchaseCost || 0) / Number(formData.usefulLifeYears || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                       across the defined useful life.
@@ -435,7 +435,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
               <div className="pt-8 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3.5 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded">Discard</button>
-                <button type="submit" className="flex-1 py-3.5 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg shadow-gray-100 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button type="submit" className="flex-1 py-3.5 bg-brand text-white rounded text-sm font-bold shadow-lg shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Save size={18} /> Finish Registration
                 </button>
               </div>
@@ -452,7 +452,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F47721] text-white rounded shadow-md"><AlertCircle size={20} /></div>
+                <div className="p-2 bg-brand text-white rounded shadow-md shadow-brand/20"><AlertCircle size={20} /></div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Edit Accumulated Depreciation</h3>
               </div>
               <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={24} /></button>
@@ -474,7 +474,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                 <input 
                   type="number" 
                   step="0.01" 
-                  className="w-full px-4 py-2.5 bg-orange-50 border border-orange-200 rounded text-sm font-mono font-bold text-orange-700 focus:ring-2 focus:ring-orange-400 outline-none"
+                  className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded text-sm font-mono font-bold text-brand focus:border-brand outline-none"
                   value={editingAsset.accumulatedDepreciation || 0}
                   onChange={e => setEditingAsset({...editingAsset, accumulatedDepreciation: Number(e.target.value)})}
                 />
@@ -490,7 +490,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
-                <button type="button" onClick={handleSaveAccumulated} className="flex-1 py-3 bg-[#F47721] text-white rounded text-sm font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                <button type="button" onClick={handleSaveAccumulated} className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold shadow-lg shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all flex items-center justify-center gap-2">
                   <Save size={16} /> Save Changes
                 </button>
               </div>

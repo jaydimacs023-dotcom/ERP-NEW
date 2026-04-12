@@ -166,9 +166,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               {reportType !== 'CUSTOM' && (
                 <>
                   <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
-                    <Printer size={18} className="text-[#025959]" /> Print
+                    <Printer size={18} className="text-brand" /> Print
                   </button>
-                  <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-[#025959] text-white rounded hover:bg-[#014242] transition-all shadow-lg font-bold text-sm">
+                  <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-bold text-sm">
                     <Download size={18} /> Export CSV
                   </button>
                 </>
@@ -192,12 +192,12 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
               {reportType === 'IS' && (
                 <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4">
-                  <div className="p-2 bg-[#025959]/5 rounded-lg"><Award size={18} className={`text-[#025959] ${selectedQualificationId ? 'animate-pulse' : ''}`} /></div>
+                  <div className="p-2 bg-brand/5 rounded-lg"><Award size={18} className={`text-brand ${selectedQualificationId ? 'animate-pulse' : ''}`} /></div>
                   <div>
-                    <p className="text-xs font-bold text-[#025959] uppercase tracking-wide leading-none mb-1">Functional Segment</p>
+                    <p className="text-xs font-bold text-brand uppercase tracking-wide leading-none mb-1">Functional Segment</p>
                     <div className="relative">
                       <select
-                        className="bg-transparent border-none outline-none text-xs text-[#025959] font-bold p-0 pr-6 focus:ring-0 appearance-none cursor-pointer"
+                        className="bg-transparent border-none outline-none text-xs text-brand font-bold p-0 pr-6 focus:ring-0 appearance-none cursor-pointer"
                         value={selectedQualificationId}
                         onChange={(e) => setSelectedQualificationId(e.target.value)}
                       >
@@ -206,7 +206,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                           <option key={q.id} value={q.id}>{q.name}</option>
                         ))}
                       </select>
-                      <ChevronRight size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-[#025959]/60 pointer-events-none rotate-90" />
+                      <ChevronRight size={10} className="absolute right-0 top-1/2 -translate-y-1/2 text-brand pointer-events-none rotate-90" />
                     </div>
                   </div>
                 </div>
@@ -214,14 +214,14 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
               <div className="flex-1 flex justify-end">
                 {selectedQualificationId ? (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-[#025959]/5 rounded border border-[#025959]/20 animate-in zoom-in duration-300">
-                    <Filter size={16} className="text-[#025959]" />
-                    <span className="text-xs font-bold text-[#025959] uppercase tracking-wide">Segment Filter Active</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand/5 rounded border border-brand-light animate-in zoom-in duration-300">
+                    <Filter size={16} className="text-brand" />
+                    <span className="text-xs font-bold text-brand uppercase tracking-wide">Segment Filter Active</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-[#025959]/5 rounded border border-[#025959]/20">
-                    <CheckCircle2 size={16} className="text-[#025959]" />
-                    <span className="text-xs font-bold text-[#025959] uppercase tracking-wide">Consolidated & Reconciled</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand/5 rounded border border-brand-light">
+                    <CheckCircle2 size={16} className="text-brand" />
+                    <span className="text-xs font-bold text-brand uppercase tracking-wide">Consolidated & Reconciled</span>
                   </div>
                 )}
               </div>
@@ -245,9 +245,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
           <div className="p-16 border-b border-gray-50 bg-gray-50/20 text-center print:bg-white print:p-8">
             <div className="flex items-center justify-center gap-2 mb-4 no-print">
-              <div className="w-12 h-1 bg-[#025959] rounded-full"></div>
-              <div className="w-2 h-2 bg-[#025959] rounded-full"></div>
-              <div className="w-12 h-1 bg-[#025959] rounded-full"></div>
+              <div className="w-12 h-1 bg-brand rounded-full"></div>
+              <div className="w-2 h-2 bg-brand rounded-full"></div>
+              <div className="w-12 h-1 bg-brand rounded-full"></div>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 tracking-tight">{orgName.toUpperCase()}</h2>
             <div className="text-xs text-gray-400 mt-2 font-bold uppercase tracking-wide flex items-center justify-center gap-2">
@@ -255,13 +255,13 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               {activeQualification && (
                 <>
                   <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                  <span className="text-[#025959]">Qualification: {activeQualification.name}</span>
+                  <span className="text-brand">Qualification: {activeQualification.name}</span>
                 </>
               )}
             </div>
 
             <div className="mt-8">
-              <h1 className="text-lg font-bold text-[#025959] uppercase tracking-wide print:text-gray-900">
+              <h1 className="text-lg font-bold text-brand uppercase tracking-wide print:text-gray-900">
                 {reportType === 'BS' ? 'Statement of Financial Position' :
                   reportType === 'IS' ? 'Statement of Comprehensive Income' :
                     reportType === 'CFS' ? 'Statement of Cash Flows' :
@@ -304,7 +304,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                     <FinancialSection title="REVENUE SOURCES" items={isReport.revenue} total={isReport.totalRevenue} symbol={currencySymbol} />
                     <FinancialSection title="OPERATING EXPENSES" items={isReport.expenses} total={isReport.totalExpenses} symbol={currencySymbol} />
 
-                    <div className={`pt-10 mt-6 border-t-2 border-gray-800 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-[#025959] print:text-gray-900' : 'text-rose-700 print:text-gray-900'}`}>
+                    <div className={`pt-10 mt-6 border-t-2 border-gray-800 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-brand print:text-gray-900' : 'text-rose-700 print:text-gray-900'}`}>
                       <span className="text-sm font-semibold uppercase tracking-wide">NET COMPREHENSIVE INCOME / (LOSS)</span>
                       <span className="text-lg font-mono font-semibold underline decoration-double underline-offset-4">
                         {formatCurrency(isReport.netIncome)}
@@ -317,7 +317,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                   <div className="space-y-12 max-w-3xl mx-auto">
                     <div>
                       <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-6 flex items-center gap-3">
-                        <div className="w-2 h-2 bg-[#025959] rounded-full no-print"></div>
+                        <div className="w-2 h-2 bg-brand rounded-full no-print"></div>
                         CASH FLOW FROM OPERATING ACTIVITIES
                       </h4>
                       <div className="space-y-4 px-5">
@@ -353,7 +353,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
                     <div>
                       <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-6 flex items-center gap-3">
-                        <div className="w-2 h-2 bg-[#F47721] rounded-full no-print"></div>
+                        <div className="w-2 h-2 bg-brand rounded-full no-print"></div>
                         CASH FLOW FROM INVESTING ACTIVITIES
                       </h4>
                       <div className="space-y-4 px-5">
@@ -370,7 +370,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
                     <div>
                       <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-6 flex items-center gap-3">
-                        <div className="w-2 h-2 bg-[#F47721] rounded-full no-print"></div>
+                        <div className="w-2 h-2 bg-brand rounded-full no-print"></div>
                         CASH FLOW FROM FINANCING ACTIVITIES
                       </h4>
                       <div className="space-y-4 px-5">
@@ -387,7 +387,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
                     <div className="pt-10 mt-6 border-t-4 border-double border-gray-800 bg-gray-50 p-8 rounded-md print:bg-white print:p-0">
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center text-sm font-bold text-[#025959] uppercase tracking-wide print:text-gray-900">
+                        <div className="flex justify-between items-center text-sm font-bold text-brand uppercase tracking-wide print:text-gray-900">
                           <span>NET INCREASE / (DECREASE) IN CASH</span>
                           <span className="font-mono">{formatCurrency(cfsReport.netCashFlow)}</span>
                         </div>
@@ -452,7 +452,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
           <div className="px-16 py-10 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-white print:border-gray-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#025959]/10 flex items-center justify-center text-[#025959] print:bg-white print:border print:border-gray-800">
+              <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand print:bg-white print:border print:border-gray-800">
                 <ShieldCheck size={20} />
               </div>
               <div>
@@ -463,7 +463,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             <div className="flex items-center gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wide print:text-gray-900">
               <div className="flex items-center gap-1.5"><Clock size={14} /> SYS_SYNC: {new Date().toLocaleTimeString()}</div>
               <div className="w-1 h-1 bg-gray-200 rounded-full print:bg-gray-800"></div>
-              <div className="italic text-[#025959] print:text-gray-900">AccounTech Engine v4.0.1</div>
+              <div className="italic text-brand print:text-gray-900">AccounTech Engine v4.0.1</div>
             </div>
           </div>
         </div>
@@ -496,7 +496,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void, icon?: React.ReactNode }> = ({ active, label, onClick, icon }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-6 py-2.5 rounded text-xs font-bold uppercase tracking-wide transition-all ${active ? 'bg-white text-[#025959] shadow-md shadow-gray-50 border border-[#025959]/20' : 'text-gray-400 hover:text-gray-600'}`}
+    className={`flex items-center gap-1.5 px-6 py-2.5 rounded text-xs font-bold uppercase tracking-wide transition-all ${active ? 'bg-white text-brand shadow-md shadow-gray-50 border border-brand-light' : 'text-gray-400 hover:text-gray-600'}`}
   >
     {icon}{label}
   </button>
@@ -516,7 +516,7 @@ const FinancialSection: React.FC<{ title: string, items: TransactionSummary[], t
         {visibleItems.length > 0 ? visibleItems.map(item => (
           <div key={item.accountId} className="flex justify-between items-center group">
             <div className="flex items-center gap-3">
-              <ChevronRight size={12} className="text-gray-200 group-hover:text-orange-400 transition-colors print:text-gray-900" />
+              <ChevronRight size={12} className="text-gray-200 group-hover:text-brand transition-colors print:text-gray-900" />
               <span className="text-sm font-bold text-gray-600 group-hover:text-gray-900 transition-colors tracking-tight print:text-gray-900">{item.accountName}</span>
             </div>
             <span className="font-mono text-xs font-medium text-gray-500 group-hover:text-gray-800 transition-colors print:text-gray-900">
