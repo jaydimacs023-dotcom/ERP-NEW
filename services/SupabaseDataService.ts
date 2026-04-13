@@ -25,17 +25,12 @@ export class SupabaseDataService implements IDataService {
     return `${this.supabaseUrl}/rest/v1`;
   }
 
-  // Helper method to get standard headers for Supabase requests
-  // Now asynchronous to allow fetching the latest JWT token
-  private async getHeaders(): Promise<Record<string, string>> {
-    // Try to get authenticated token first
-    const accessToken = await TokenManager.getAccessToken();
-
-    // IMPORTANT: If using custom JWTs with Supabase, the tokens must be signed
-    // with the Supabase Project JWT Secret. If not configured, Supabase will
-    // reject the tokens with 401/PGRST301. Defaulting to anonKey for now
-    // to ensure data visibility and resolve "erased data" issues.
-    const effectiveToken = this.supabaseKey;
+  // Helper method to get standard headers for Supabase requests.
+  // Reads default to anon for broad visibility, while writes can prefer the
+  // authenticated AT-ERP token when RLS depends on user claims.
+  private async getHeaders(preferUserToken: boolean = false): Promise<Record<string, string>> {
+    const accessToken = preferUserToken ? await TokenManager.getAccessToken() : null;
+    const effectiveToken = accessToken || this.supabaseKey;
 
     return {
       'apikey': this.supabaseKey,
@@ -803,17 +798,40 @@ export class SupabaseDataService implements IDataService {
     if ((filteredOrg as any).id && !this.isValidUUID((filteredOrg as any).id)) {
       delete (filteredOrg as any).id;
     }
-    return this.insertToSupabaseRaw('organizations', filteredOrg);
+    try {
+      return await this.writeOrganizationViaEdgeFunction('create_organization', {
+        organization: filteredOrg
+      });
+    } catch (error) {
+      if (!this.isRecoverableOrganizationWriteError(error)) throw error;
+      console.warn('[Supabase] organizations-write unavailable from browser; falling back to direct organizations insert');
+      return this.insertToSupabaseRaw('organizations', filteredOrg);
+    }
   }
 
   async updateOrganization(id: string, updates: Partial<any>): Promise<any> {
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('organizations', snakeCaseUpdates);
-    return this.updateInSupabaseRaw('organizations', id, filteredUpdates);
+    try {
+      return await this.writeOrganizationViaEdgeFunction('update_organization', {
+        id,
+        updates: filteredUpdates
+      });
+    } catch (error) {
+      if (!this.isRecoverableOrganizationWriteError(error)) throw error;
+      console.warn('[Supabase] organizations-write unavailable from browser; falling back to direct organizations update');
+      return this.updateInSupabaseRaw('organizations', id, filteredUpdates);
+    }
   }
 
   async deleteOrganization(id: string): Promise<void> {
-    return this.deleteFromSupabase('organizations', id);
+    try {
+      await this.writeOrganizationViaEdgeFunction('delete_organization', { id });
+    } catch (error) {
+      if (!this.isRecoverableOrganizationWriteError(error)) throw error;
+      console.warn('[Supabase] organizations-write unavailable from browser; falling back to direct organizations delete');
+      await this.deleteFromSupabase('organizations', id);
+    }
   }
 
   // ============================================================================
@@ -1827,9 +1845,71 @@ export class SupabaseDataService implements IDataService {
   }
 
   /**
+   * Create/update/delete organizations through an edge function so writes can
+   * run with server-side credentials while browser clients keep RLS enabled.
+   */
+  private async writeOrganizationViaEdgeFunction(
+    action: 'create_organization' | 'update_organization' | 'delete_organization',
+    payload: Record<string, any>
+  ): Promise<any> {
+    try {
+      const token = await this.getAuthToken();
+      const organizationsWriteUrl = `${this.supabaseUrl}/functions/v1/organizations-write`;
+
+      const response = await fetch(organizationsWriteUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          ...payload,
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMsg = `Organizations edge function error: ${response.status}`;
+        try {
+          const jsonError = JSON.parse(errorBody);
+          errorMsg = jsonError.error || jsonError.message || errorMsg;
+        } catch {
+          errorMsg = errorBody || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      if (!result.organization) {
+        return result;
+      }
+
+      return this.snakeToCamel(result.organization);
+    } catch (error) {
+      console.error('[SupabaseDataService] Error writing organization via edge function:', error);
+      throw error;
+    }
+  }
+
+  private isRecoverableOrganizationWriteError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
+  }
+
+  /**
    * Get authentication token for edge function calls
    */
   private async getAuthToken(): Promise<string> {
+    try {
+      const jwtToken = await TokenManager.getAccessToken();
+      if (jwtToken) {
+        return jwtToken;
+      }
+    } catch (err) {
+      console.warn('[SupabaseDataService] Could not load AT-ERP JWT from TokenManager:', err);
+    }
+
     try {
       // Try to get token from localStorage where Supabase stores it
       const authData = localStorage.getItem('sb-auth-token');
