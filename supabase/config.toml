@@ -1,0 +1,2 @@
+[functions.organizations-write]
+verify_jwt = false
