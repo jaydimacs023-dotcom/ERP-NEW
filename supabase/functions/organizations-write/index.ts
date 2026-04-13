@@ -100,6 +100,23 @@ function requireSystemAdmin(payload: JwtPayload | null): Response | null {
   return null;
 }
 
+function requireOrgAdminOrSystemAdmin(payload: JwtPayload | null, orgId: string): Response | null {
+  if (!payload?.sub) {
+    return json(401, { error: "Authentication required" });
+  }
+
+  if (payload.role === "SYSTEM_ADMIN") {
+    return null;
+  }
+
+  const actorOrgId = payload.orgId || payload.org_id;
+  if (payload.role === "ADMIN" && actorOrgId === orgId) {
+    return null;
+  }
+
+  return json(403, { error: "ADMIN for this organization or SYSTEM_ADMIN role required" });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("OK", {
@@ -158,11 +175,10 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === "update_organization") {
-    const authError = requireSystemAdmin(actor);
-    if (authError) return authError;
-
     const id = body.id;
     if (!id) return json(400, { error: "Missing organization id" });
+    const authError = requireOrgAdminOrSystemAdmin(actor, id);
+    if (authError) return authError;
 
     const updates = camelToSnakeKeys(body.updates || {});
     delete updates.id;
