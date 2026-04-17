@@ -92,7 +92,7 @@ export interface IDataService {
   deleteOrganization(id: string): Promise<void>;
 
   // User CRUD
-  createUser(user: User): Promise<User>;
+  createUser(user: User, options?: { preferUserToken?: boolean }): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   deleteUser(id: string): Promise<void>;
 
@@ -325,6 +325,7 @@ export interface IDataService {
   // Journal Entry CRUD
   createJournalEntry(entry: JournalEntry): Promise<JournalEntry>;
   updateJournalEntry(id: string, updates: Partial<JournalEntry>): Promise<JournalEntry>;
+  reverseJournalEntry(entryId: string): Promise<JournalEntry>;
   deleteJournalEntry(id: string): Promise<void>;
   getJournalEntriesByOrg(orgId: string): Promise<JournalEntry[]>;
   getJournalEntryById(id: string): Promise<JournalEntry | null>;

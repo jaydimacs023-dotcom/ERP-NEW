@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../types';
 import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
@@ -179,6 +179,19 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
     return `${(rate * 100).toFixed(1)}%`;
   };
 
+  if (showSOAFor) {
+    return (
+      <SponsorSOAView
+        sponsor={showSOAFor}
+        entries={entries}
+        lines={lines}
+        accounts={accounts}
+        currency={currency}
+        onClose={() => setShowSOAFor(null)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20 relative animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -316,7 +329,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     </button>
                     <button
                       onClick={() => setShowSOAFor(sponsor)}
-                      className="p-2 hover:bg-blue-50 text-blue-500 hover:text-blue-700 rounded-lg transition-colors border border-blue-100"
+                      className="p-2 hover:bg-brand-light text-brand hover:text-brand rounded-lg transition-colors border border-brand-light"
                       title="View Statement of Account"
                     >
                       <FileText size={16} />
@@ -330,16 +343,6 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           </tbody>
         </table>
       </div>
-      {showSOAFor && (
-        <SponsorSOAView
-          sponsor={showSOAFor}
-          entries={entries}
-          lines={lines}
-          accounts={accounts}
-          currency={currency}
-          onClose={() => setShowSOAFor(null)}
-        />
-      )}
 
       {showModal && (
         <ModalPortal>
@@ -567,4 +570,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
 };
 
 export default SponsorsView;
+
+
+
 

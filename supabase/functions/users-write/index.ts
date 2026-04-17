@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 type JwtPayload = {
@@ -36,20 +35,6 @@ function bytesToB64Url(bytes: Uint8Array): string {
   let str = "";
   bytes.forEach((b) => (str += String.fromCharCode(b)));
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function camelToSnakeKeys(value: any): any {
-  if (value === null || value === undefined) return value;
-  if (typeof value !== "object") return value;
-  if (Array.isArray(value)) return value.map((item) => camelToSnakeKeys(item));
-  if (value instanceof Date) return value;
-
-  const result: Record<string, any> = {};
-  for (const key of Object.keys(value)) {
-    const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-    result[snakeKey] = camelToSnakeKeys(value[key]);
-  }
-  return result;
 }
 
 async function verifyHs256Jwt(token: string, secret: string): Promise<JwtPayload | null> {
@@ -94,34 +79,14 @@ function getActorRole(payload: JwtPayload | null): string | undefined {
   return payload?.appRole || payload?.app_role || payload?.role;
 }
 
-function requireSystemAdmin(payload: JwtPayload | null): Response | null {
-  if (!payload?.sub) {
-    return json(401, { error: "Authentication required" });
-  }
-
-  if (getActorRole(payload) !== "SYSTEM_ADMIN") {
-    return json(403, { error: "SYSTEM_ADMIN role required" });
-  }
-
-  return null;
-}
-
-function requireOrgAdminOrSystemAdmin(payload: JwtPayload | null, orgId: string): Response | null {
-  if (!payload?.sub) {
-    return json(401, { error: "Authentication required" });
-  }
+function canManageOrgUsers(payload: JwtPayload | null, orgId: string): boolean {
+  if (!payload?.sub) return false;
 
   const actorRole = getActorRole(payload);
-  if (actorRole === "SYSTEM_ADMIN") {
-    return null;
-  }
+  if (actorRole === "SYSTEM_ADMIN") return true;
 
   const actorOrgId = payload.orgId || payload.org_id;
-  if (actorRole === "ADMIN" && actorOrgId === orgId) {
-    return null;
-  }
-
-  return json(403, { error: "ADMIN for this organization or SYSTEM_ADMIN role required" });
+  return actorRole === "ADMIN" && actorOrgId === orgId;
 }
 
 Deno.serve(async (req) => {
@@ -149,89 +114,50 @@ Deno.serve(async (req) => {
     actor = await verifyHs256Jwt(auth.slice(7), AT_ERP_JWT_SECRET);
   }
 
-  if (body.action === "create_organization") {
-    const authError = requireSystemAdmin(actor);
-    if (authError) return authError;
+  if (!AT_ERP_JWT_SECRET) {
+    return json(500, { error: "AT_ERP_JWT_SECRET is not configured for users-write" });
+  }
 
-    const organization = camelToSnakeKeys(body.organization || {});
-    if (!organization.name || !organization.currency || !organization.subscription_status || !organization.plan_type) {
-      return json(400, { error: "Missing required organization fields" });
+  if (body.action === "create_user") {
+    const user = body.user || {};
+    const userOrgId = user.org_id || user.orgId;
+
+    if (!userOrgId) {
+      return json(400, { error: "Missing user.org_id" });
+    }
+
+    if (!user.email || !user.name || !user.role) {
+      return json(400, { error: "Missing required user fields" });
+    }
+
+    if (!canManageOrgUsers(actor, userOrgId)) {
+      return json(403, { error: "ADMIN for this organization or SYSTEM_ADMIN role required" });
     }
 
     const insertPayload = {
-      ...organization,
-      created_at: organization.created_at ?? new Date().toISOString(),
+      ...user,
+      org_id: userOrgId,
+      created_at: user.created_at ?? new Date().toISOString(),
+      updated_at: user.updated_at ?? new Date().toISOString(),
     };
 
     const { data, error } = await admin
-      .from("organizations")
+      .from("users")
       .insert(insertPayload)
       .select("*")
       .single();
 
     if (error) {
-      console.error("[organizations-write] Create error:", error);
+      console.error("[users-write] Create error:", error);
       return json(400, {
-        error: `Failed to create organization: ${error.message}`,
+        error: `Failed to create user: ${error.message}`,
         code: error.code,
         details: error.details,
       });
     }
 
-    return json(200, { organization: data });
+    return json(200, { user: data });
   }
 
-  if (body.action === "update_organization") {
-    const id = body.id;
-    if (!id) return json(400, { error: "Missing organization id" });
-    const authError = requireOrgAdminOrSystemAdmin(actor, id);
-    if (authError) return authError;
-
-    const updates = camelToSnakeKeys(body.updates || {});
-    delete updates.id;
-
-    const { data, error } = await admin
-      .from("organizations")
-      .update(updates)
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("[organizations-write] Update error:", error);
-      return json(400, {
-        error: `Failed to update organization: ${error.message}`,
-        code: error.code,
-        details: error.details,
-      });
-    }
-
-    return json(200, { organization: data });
-  }
-
-  if (body.action === "delete_organization") {
-    const authError = requireSystemAdmin(actor);
-    if (authError) return authError;
-
-    const id = body.id;
-    if (!id) return json(400, { error: "Missing organization id" });
-
-    const { error } = await admin
-      .from("organizations")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("[organizations-write] Delete error:", error);
-      return json(400, {
-        error: `Failed to delete organization: ${error.message}`,
-        code: error.code,
-        details: error.details,
-      });
-    }
-
-    return json(200, { success: true });
-  }
-
-  return json(400, { error: "Unsupported action" });
+  return json(400, { error: `Unsupported action: ${body.action}` });
 });

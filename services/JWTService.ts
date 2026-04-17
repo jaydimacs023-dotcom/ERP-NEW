@@ -38,6 +38,8 @@ export interface JWTPayload {
   email: string;
   name: string;
   role: string;
+  appRole?: string;
+  app_role?: string;
   orgId: string;
   studentId?: string;
   trainerId?: string;
@@ -82,6 +84,10 @@ const JWT_CONFIG = {
   issuer: 'AT-ERP',
   audience: 'AT-ERP-Client',
 };
+
+function resolveAppUserRole(payload: Pick<JWTPayload, 'appRole' | 'app_role' | 'role'>): User['role'] {
+  return (payload.appRole || payload.app_role || payload.role) as User['role'];
+}
 
 // ============================================================================
 // CRYPTO UTILITIES (Browser-compatible HMAC-SHA256)
@@ -296,7 +302,8 @@ class JWTServiceClass {
       jti: accessTokenId,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: 'authenticated',
+      appRole: user.role,
       orgId: user.orgId,
       studentId: user.studentId,
       trainerId: user.trainerId,
@@ -314,7 +321,8 @@ class JWTServiceClass {
       jti: refreshTokenId,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: 'authenticated',
+      appRole: user.role,
       orgId: user.orgId,
       studentId: user.studentId,
       trainerId: user.trainerId,
@@ -380,7 +388,7 @@ class JWTServiceClass {
       id: payload.sub,
       email: payload.email,
       name: payload.name,
-      role: payload.role as User['role'],
+      role: resolveAppUserRole(payload),
       orgId: payload.orgId,
       studentId: payload.studentId,
       trainerId: payload.trainerId
@@ -451,7 +459,7 @@ class JWTServiceClass {
       id: validation.payload.sub,
       email: validation.payload.email,
       name: validation.payload.name,
-      role: validation.payload.role as User['role'],
+      role: resolveAppUserRole(validation.payload),
       orgId: validation.payload.orgId,
       studentId: validation.payload.studentId,
       trainerId: validation.payload.trainerId

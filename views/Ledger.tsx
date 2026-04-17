@@ -65,6 +65,16 @@ const Ledger: React.FC<LedgerProps> = ({
     return totals;
   }, [lines]);
 
+  const reversedOriginalIds = useMemo(() => {
+    const ids = new Set<string>();
+    entries.forEach(entry => {
+      if (entry.originalEntryId) {
+        ids.add(entry.originalEntryId);
+      }
+    });
+    return ids;
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     const hasLetters = /[a-z]/i.test(term);
@@ -780,6 +790,9 @@ const Ledger: React.FC<LedgerProps> = ({
           entry={selectedEntry}
           lines={lines.filter(l => l.journalEntryId === selectedEntry.id)}
           accounts={accounts}
+          createdByName={getCreatedByName(selectedEntry.createdBy)}
+          statusLabel={getDisplayStatusLabel(selectedEntry.status || 'ON_HOLD')}
+          hasExistingReversal={reversedOriginalIds.has(selectedEntry.id)}
           onClose={() => setSelectedEntry(null)}
           onApprove={onApproveJournal}
           onReverse={onReverseJournal}
@@ -795,6 +808,9 @@ interface JournalEntryDetailProps {
   entry: JournalEntry;
   lines: JournalLine[];
   accounts: ChartOfAccount[];
+  createdByName: string;
+  statusLabel: string;
+  hasExistingReversal?: boolean;
   onClose: () => void;
   onApprove?: (id: string) => void;
   onReverse?: (id: string) => void;
@@ -802,9 +818,11 @@ interface JournalEntryDetailProps {
 }
 
 const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({ 
-  entry, lines, accounts, onClose, onApprove, onReverse, currentUser 
+  entry, lines, accounts, createdByName, statusLabel, hasExistingReversal = false, onClose, onApprove, onReverse, currentUser 
 }) => {
   const controlTotal = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+  const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
+  const canReverse = entry.status === 'POSTED' && !isReversalEntry && !hasExistingReversal;
   
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -841,10 +859,10 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                 entry.status === 'REVERSED' ? 'bg-rose-100 text-rose-600' :
                 'bg-blue-100 text-blue-700'
               }`}>
-                {getDisplayStatusLabel(entry.status || 'ON_HOLD')}
+                {statusLabel}
               </span>
             } />
-            <DetailItem label="Created By" value={getCreatedByName(entry.createdBy)} />
+            <DetailItem label="Created By" value={createdByName} />
             <DetailItem label="Entry ID" value={entry.id} muted />
           </div>
 
@@ -911,10 +929,15 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                {(entry.status === 'DRAFT' || entry.status === 'ON_HOLD') && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
                   <button onClick={() => { onApprove?.(entry.id); onClose(); }} className="px-10 py-3 bg-[#F47721] text-white rounded-2xl text-sm font-bold shadow-xl shadow-orange-100 hover:bg-[#E06610] active:scale-95 transition-all">Authorize Posting</button>
                )}
-               {entry.status === 'POSTED' && !entry.description.startsWith('REV:') && (
+               {canReverse && (
                  <button onClick={() => { onReverse?.(entry.id); onClose(); }} className="px-10 py-3 bg-rose-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all flex items-center gap-2">
-                    <RotateCcw size={16} /> Post Reversal
+                    <RotateCcw size={16} /> Reverse Entry
                  </button>
+               )}
+               {entry.status === 'POSTED' && hasExistingReversal && !isReversalEntry && (
+                 <span className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl">
+                   Already Reversed
+                 </span>
                )}
                <button onClick={onClose} className="px-8 py-3 bg-slate-800 text-white rounded-2xl text-sm font-bold shadow-lg shadow-slate-200 hover:bg-slate-900 active:scale-95 transition-all">Back to List</button>
             </div>

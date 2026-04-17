@@ -72,7 +72,7 @@ export class MockDataService implements IDataService {
     console.warn('[MockDataService] Organizations persist to memory only; changes lost on refresh');
   }
 
-  async createUser(user: User): Promise<User> {
+  async createUser(user: User, _options?: { preferUserToken?: boolean }): Promise<User> {
     console.warn('[MockDataService] Users persist to memory only; changes lost on refresh');
 
     // Hash password if provided (for consistency with SupabaseDataService)
@@ -735,6 +735,10 @@ export class MockDataService implements IDataService {
   async updateJournalEntry(id: string, updates: any): Promise<any> {
     console.warn('[MockDataService] updateJournalEntry - data not persisted.');
     return { id, ...updates, updatedAt: new Date().toISOString() };
+  }
+  async reverseJournalEntry(entryId: string): Promise<any> {
+    console.warn('[MockDataService] reverseJournalEntry is not supported.');
+    throw new Error('reverseJournalEntry is not supported in MockDataService.');
   }
   async deleteJournalEntry(id: string): Promise<void> {
     console.warn('[MockDataService] deleteJournalEntry - data not persisted.');

@@ -289,6 +289,10 @@ class AuditServiceClass {
     return this.log({ orgId, userId, userName, action: 'POST', entityType, entityId, entityName, details });
   }
 
+  reverse(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string, details?: string): AuditLog {
+    return this.log({ orgId, userId, userName, action: 'REVERSE', entityType, entityId, entityName, details });
+  }
+
   approve(orgId: string, userId: string, userName: string, entityType: EntityType, entityId: string, entityName?: string): AuditLog {
     return this.log({ orgId, userId, userName, action: 'APPROVE', entityType, entityId, entityName });
   }

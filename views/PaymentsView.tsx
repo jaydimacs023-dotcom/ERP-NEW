@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
@@ -114,7 +114,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   onClearContext
 }) => {
   const CASH_ON_HAND_UNDEPOSITED_ID = 'CASH_ON_HAND_UNDEPOSITED_FUNDS';
-  const brandColor = '#F47721';
+  const brandColor = organization?.primaryColor || 'var(--acm-primary)';
 
   // View mode management
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -213,7 +213,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const formatPesoKpiAmount = (amount: number) => {
     if ((currency || 'PHP') === 'PHP') {
-      return `₱${formatInputCurrency(amount)}`;
+      return `?${formatInputCurrency(amount)}`;
     }
     return formatCurrency(amount);
   };
@@ -1156,9 +1156,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   };
 
   const invoiceLabelClass = 'text-xs font-medium text-gray-500';
-  const invoiceInputClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed';
-  const invoiceReadOnlyClass = 'w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 bg-gray-50 text-gray-900';
-  const invoicePostPeriodClass = 'w-full mt-1 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 bg-orange-50 text-gray-900';
+  const invoiceInputClass = 'w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:border-brand disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-50';
+  const invoiceReadOnlyClass = 'w-full mt-1 px-3 py-2 border border-brand-light rounded-lg bg-gray-50 text-gray-900 focus:border-brand';
+  const invoicePostPeriodClass = 'w-full mt-1 px-3 py-2 border border-brand-light rounded-lg bg-brand/10 text-gray-900 focus:border-brand';
   const previewSectionTitleClass = 'mb-4 text-xs font-medium uppercase tracking-wide text-gray-500';
   const previewLabelClass = 'text-xs font-medium uppercase tracking-wide text-gray-500';
   const previewValueClass = 'mt-1 text-[13px] font-medium text-gray-700';
@@ -2416,7 +2416,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           <div className="rounded-xl border bg-white p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-orange-100 p-2">
-                <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
+                <span className="block text-lg font-bold leading-none text-orange-600">?</span>
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-400">Unapplied Payments</p>
@@ -2550,7 +2550,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <div className="rounded-xl border bg-white p-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-orange-100 p-2">
-                    <span className="block text-lg font-bold leading-none text-orange-600">₱</span>
+                    <span className="block text-lg font-bold leading-none text-orange-600">?</span>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-400">Not Yet Applied Balance</p>
@@ -2572,7 +2572,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               <div className="rounded-xl border bg-white p-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-sky-100 p-2">
-                    <span className="block text-lg font-bold leading-none text-sky-600">₱</span>
+                    <span className="block text-lg font-bold leading-none text-sky-600">?</span>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-400">Amount Applied</p>
@@ -2856,7 +2856,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
+          <div className="flex items-center justify-between border-b bg-brand/10 p-4">
             <div>
               <h3 className="text-xl font-bold text-gray-800">
                 New Payment : {formData.paymentNo}
@@ -2898,7 +2898,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <button
               title="Add New Payment"
               onClick={startNewPayment}
-              className="p-2 text-gray-500 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-brand hover:bg-brand-light rounded-lg transition-colors"
             >
               <Plus size={20} />
             </button>
@@ -3128,7 +3128,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                             value={editingPayment?.glEntryNumber || ''}
                             readOnly
                             placeholder="Generated when payment is approved"
-                            className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-200 cursor-default"
+                            className="w-full mt-1 px-3 py-2 border border-brand-light rounded-lg bg-gray-50 cursor-default focus:border-brand"
                           />
                            <p className="text-xs text-gray-400 mt-1"></p>
                         </>
@@ -3327,7 +3327,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
+          <div className="flex items-center justify-between border-b bg-brand/10 p-4">
             <div className="flex items-center justify-between flex-1">
               <div>
                 <h3 className="text-xl font-bold text-gray-800">Apply Payment to Invoices</h3>
@@ -3725,5 +3725,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 };
 
 export default PaymentsView;
+
 
 

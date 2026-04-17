@@ -164,7 +164,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     lines: []
   });
 
-  const brandColor = '#F47721';
+const brandColor = organization?.primaryColor || '#059669';
+
+  useEffect(() => {
+    if (brandColor && brandColor !== '#059669') {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
   const isPaidInvoice = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
     !!invoice && (invoice.status === 'CLOSED' || Number(invoice.balanceDue ?? 0) <= 0);
   const resolvedViewingInvoice = React.useMemo(
@@ -2316,10 +2322,10 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
           {/* New/Edit Invoice Page */}
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col min-h-[80vh]">
 
-            <div className="flex items-center justify-between p-4 border-b" style={{ backgroundColor: `${brandColor}10` }}>
+            <div className="flex items-center justify-between p-4 border-b bg-brand/10">
               <div>
 
-                <h3 className="text-xl font-bold text-gray-800">
+                <h3 className="text-xl font-bold text-gray-800" style={{ color: brandColor }}>
                   Invoice No: {formData.invoiceNo}
                   {(formData.sponsorId || formData.studentId) && ` - ${formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId)}`}
                 </h3>
@@ -2423,17 +2429,17 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
 
             <div className="flex-1 p-6 space-y-8">
               {/* Batch / Sponsor / Dates row */}
-              <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+              <div className="bg-brand/5 rounded-lg p-4 border border-brand/20">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                   {/* batch in center */}
                   <div>
-                    <p className="text-xs text-orange-600 mt-1">Selecting a batch will auto-populate the sponsor and line items. Already billed batches are hidden.</p>
+                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Already billed batches are hidden.</p>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
                       disabled={isReadOnly}
-                      className="mt-2 px-3 py-2 border border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-200 w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="mt-2 px-3 py-2 border border-brand/20 rounded-lg focus:ring-2 focus:ring-brand/30 focus:border-brand w-full disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">-- Select Batch --</option>
                       {selectableBatches.map(b => (

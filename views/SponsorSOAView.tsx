@@ -1,9 +1,8 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Sponsor, JournalEntry, JournalLine, ChartOfAccount, AccountClass
 } from '../types';
 import { format } from 'date-fns';
-import ModalPortal from '../components/ModalPortal';
 
 interface SponsorSOAViewProps {
   sponsor: Sponsor;
@@ -169,134 +168,135 @@ const SponsorSOAView: React.FC<SponsorSOAViewProps> = ({
   };
 
   return (
-    <ModalPortal>
-<div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto p-8 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded hover:bg-gray-100 text-gray-400">
-          X
+    <div className="space-y-8 animate-in fade-in duration-300 pb-20">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <button
+          onClick={onClose}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+        >
+          Back
         </button>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Statement of Account</h2>
-            <div className="font-semibold text-lg text-gray-800">{sponsor.name}</div>
-            <div className="text-sm text-gray-500">{sponsor.address}</div>
-          </div>
-          <div className="bg-gray-50 rounded-lg border border-gray-100 px-4 py-3 text-sm">
-            <div className="text-gray-500">Statement Period</div>
-            <div className="font-semibold text-gray-800">
-              {format(new Date(fromDate), 'yyyy-MM-dd')} to {format(new Date(toDate), 'yyyy-MM-dd')}
-            </div>
+        <div className="rounded-lg border border-brand-light bg-brand/10 px-4 py-3 text-sm">
+          <div className="text-gray-500">Statement Period</div>
+          <div className="font-semibold text-gray-800">
+            {format(new Date(fromDate), 'yyyy-MM-dd')} to {format(new Date(toDate), 'yyyy-MM-dd')}
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 mb-6">
-          <div className="bg-white border rounded p-4">
-            <label className="text-xs text-gray-500 uppercase tracking-wide">From</label>
-            <input
-              type="date"
-              className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm"
-              value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
-            />
-          </div>
-          <div className="bg-white border rounded p-4">
-            <label className="text-xs text-gray-500 uppercase tracking-wide">To</label>
-            <input
-              type="date"
-              className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm"
-              value={toDate}
-              onChange={e => setToDate(e.target.value)}
-            />
-          </div>
-          <div className="bg-white border rounded p-4">
-            <label className="text-xs text-gray-500 uppercase tracking-wide">Aging As Of</label>
-            <input
-              type="date"
-              className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm"
-              value={asOfDate}
-              onChange={e => setAsOfDate(e.target.value)}
-            />
-          </div>
+      <div className="flex items-start justify-between gap-6 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold mb-2 text-gray-900">Statement of Account</h2>
+          <div className="font-semibold text-lg text-gray-800">{sponsor.name}</div>
+          <div className="text-sm text-gray-500">{sponsor.address}</div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gray-50 rounded p-4 text-center">
-            <div className="text-xs text-gray-500">Beginning Balance</div>
-            <div className="font-bold text-lg">{formatAmount(beginningBalance)}</div>
-          </div>
-          <div className="bg-gray-50 rounded p-4 text-center">
-            <div className="text-xs text-gray-500">New Charges</div>
-            <div className="font-bold text-lg">{formatAmount(newCharges)}</div>
-          </div>
-          <div className="bg-gray-50 rounded p-4 text-center">
-            <div className="text-xs text-gray-500">Payments</div>
-            <div className="font-bold text-lg">{formatAmount(-payments)}</div>
-          </div>
-          <div className="bg-orange-50 rounded p-4 text-center">
-            <div className="text-xs text-orange-600 font-bold">Ending Balance</div>
-            <div className="font-bold text-2xl text-orange-600">{formatAmount(endingBalance)}</div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border rounded p-4 shadow-sm">
+          <label className="text-xs text-gray-500 uppercase tracking-wide">From</label>
+          <input
+            type="date"
+            className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-brand outline-none"
+            value={fromDate}
+            onChange={e => setFromDate(e.target.value)}
+          />
         </div>
+        <div className="bg-white border rounded p-4 shadow-sm">
+          <label className="text-xs text-gray-500 uppercase tracking-wide">To</label>
+          <input
+            type="date"
+            className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-brand outline-none"
+            value={toDate}
+            onChange={e => setToDate(e.target.value)}
+          />
+        </div>
+        <div className="bg-white border rounded p-4 shadow-sm">
+          <label className="text-xs text-gray-500 uppercase tracking-wide">Aging As Of</label>
+          <input
+            type="date"
+            className="mt-2 w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-brand outline-none"
+            value={asOfDate}
+            onChange={e => setAsOfDate(e.target.value)}
+          />
+        </div>
+      </div>
 
-        <div className="mb-8">
-          <div className="font-semibold text-md mb-2">Activity Ledger</div>
-          <div className="border rounded overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-gray-50 rounded p-4 text-center">
+          <div className="text-xs text-gray-500">Beginning Balance</div>
+          <div className="font-bold text-lg">{formatAmount(beginningBalance)}</div>
+        </div>
+        <div className="bg-gray-50 rounded p-4 text-center">
+          <div className="text-xs text-gray-500">New Charges</div>
+          <div className="font-bold text-lg">{formatAmount(newCharges)}</div>
+        </div>
+        <div className="bg-gray-50 rounded p-4 text-center">
+          <div className="text-xs text-gray-500">Payments</div>
+          <div className="font-bold text-lg">{formatAmount(-payments)}</div>
+        </div>
+        <div className="bg-brand/10 rounded p-4 text-center border border-brand-light">
+          <div className="text-xs text-brand font-bold">Ending Balance</div>
+          <div className="font-bold text-2xl text-brand">{formatAmount(endingBalance)}</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="font-semibold text-md mb-2">Activity Ledger</div>
+        <div className="border rounded overflow-x-auto bg-white shadow-sm">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left">Date</th>
+                <th className="px-4 py-2 text-left">Type</th>
+                <th className="px-4 py-2 text-left">Reference</th>
+                <th className="px-4 py-2 text-left">Description</th>
+                <th className="px-4 py-2 text-right">Amount</th>
+                <th className="px-4 py-2 text-right">Running Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activity.length === 0 && (
                 <tr>
-                  <th className="px-4 py-2 text-left">Date</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Reference</th>
-                  <th className="px-4 py-2 text-left">Description</th>
-                  <th className="px-4 py-2 text-right">Amount</th>
-                  <th className="px-4 py-2 text-right">Running Balance</th>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400 italic">
+                    No activity for the selected period.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {activity.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400 italic">
-                      No activity for the selected period.
-                    </td>
-                  </tr>
-                )}
-                {activity.map((a, idx) => (
-                  <tr key={`${a.entryId}-${idx}`} className="border-t">
-                    <td className="px-4 py-2">{format(new Date(a.date), 'yyyy-MM-dd')}</td>
-                    <td className="px-4 py-2">{a.type}</td>
-                    <td className="px-4 py-2">{a.ref}</td>
-                    <td className="px-4 py-2">{a.desc}</td>
-                    <td className={`px-4 py-2 text-right ${a.amount < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                      {formatAmount(a.amount)}
-                    </td>
-                    <td className="px-4 py-2 text-right">{formatAmount(a.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              )}
+              {activity.map((a, idx) => (
+                <tr key={`${a.entryId}-${idx}`} className="border-t">
+                  <td className="px-4 py-2">{format(new Date(a.date), 'yyyy-MM-dd')}</td>
+                  <td className="px-4 py-2">{a.type}</td>
+                  <td className="px-4 py-2">{a.ref}</td>
+                  <td className="px-4 py-2">{a.desc}</td>
+                  <td className={`px-4 py-2 text-right ${a.amount < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {formatAmount(a.amount)}
+                  </td>
+                  <td className="px-4 py-2 text-right">{formatAmount(a.balance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        <div className="mt-8">
-          <div className="font-semibold text-md mb-2">Aging Summary</div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {agingBuckets.map((b, i) => (
-              <div key={b.label} className="bg-gray-50 rounded p-4 text-center">
-                <div className="text-xs text-gray-500">{b.label}</div>
-                <div className="font-bold text-lg">{formatAmount(aging.buckets[i])}</div>
-              </div>
-            ))}
-            <div className="bg-amber-50 rounded p-4 text-center">
-              <div className="text-xs text-amber-600 font-bold">Unapplied Credit</div>
-              <div className="font-bold text-lg text-amber-700">{formatAmount(-aging.unappliedCredit)}</div>
+      <div>
+        <div className="font-semibold text-md mb-2">Aging Summary</div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {agingBuckets.map((b, i) => (
+            <div key={b.label} className="bg-gray-50 rounded p-4 text-center">
+              <div className="text-xs text-gray-500">{b.label}</div>
+              <div className="font-bold text-lg">{formatAmount(aging.buckets[i])}</div>
             </div>
+          ))}
+          <div className="bg-amber-50 rounded p-4 text-center">
+            <div className="text-xs text-amber-600 font-bold">Unapplied Credit</div>
+            <div className="font-bold text-lg text-amber-700">{formatAmount(-aging.unappliedCredit)}</div>
           </div>
         </div>
       </div>
     </div>
-</ModalPortal>
   );
 };
 
 export default SponsorSOAView;
-

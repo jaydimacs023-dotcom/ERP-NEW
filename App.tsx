@@ -1879,6 +1879,56 @@ export default function App() {
     }
   };
 
+  const reverseJournalEntry = async (entryId: string): Promise<JournalEntry | null> => {
+    const originalEntry = journalEntries.find(entry => entry.id === entryId);
+
+    try {
+      const reversalEntry = await dataService.reverseJournalEntry(entryId);
+      const reversalLines = await dataService.getJournalLinesByEntry(reversalEntry.id);
+
+      const normalizedReversalEntry = {
+        ...reversalEntry,
+        sourceType: reversalEntry.sourceType === 'MANUAL' ? 'JOURNAL' : reversalEntry.sourceType
+      } as JournalEntry;
+
+      setJournalEntries(prev => (
+        prev.some(entry => entry.id === normalizedReversalEntry.id)
+          ? prev
+          : [...prev, normalizedReversalEntry]
+      ));
+
+      setJournalLines(prev => {
+        const existingIds = new Set(prev.map(line => line.id));
+        const newLines = reversalLines.filter(line => !existingIds.has(line.id));
+        return newLines.length > 0 ? [...prev, ...newLines] : prev;
+      });
+
+      AuditService.reverse(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        normalizedReversalEntry.id,
+        normalizedReversalEntry.glEntryNumber || normalizedReversalEntry.reference || normalizedReversalEntry.id,
+        `Reversed ${originalEntry?.glEntryNumber || originalEntry?.reference || entryId} with ${reversalLines.length} lines`
+      );
+
+      handleNotify(
+        'success',
+        `Reversal posted: ${normalizedReversalEntry.glEntryNumber || normalizedReversalEntry.reference || normalizedReversalEntry.id}`
+      );
+
+      return normalizedReversalEntry;
+    } catch (error) {
+      console.error('[App] Error reversing journal entry:', error);
+      handleNotify(
+        'error',
+        error instanceof Error ? error.message : 'Failed to reverse journal entry'
+      );
+      return null;
+    }
+  };
+
   const handleViewJournal = (journalEntryId: string, sourceLines?: InvoiceLine[]) => {
     const normalizedId = journalEntryId.trim();
     const entry = journalEntries.find(e =>
@@ -2211,7 +2261,7 @@ export default function App() {
       console.info('[App] Creating user:', user.email);
       // SYSTEM_ADMIN can set any orgId, ADMIN is forced to their own org
       const userWithOrg = isSysAdmin ? { ...user } : { ...user, orgId: session.user.orgId };
-      const savedUser = await dataService.createUser(userWithOrg);
+      const savedUser = await dataService.createUser(userWithOrg, { preferUserToken: true });
       setUsers(prev => [...prev, savedUser]);
       // Audit: User created
       AuditService.create(currentOrgId, auditUserId, auditUserName, 'USER', savedUser.id, user.name);
@@ -5855,7 +5905,7 @@ export default function App() {
             </NavSection>
           )}
 
-          {isTenantAdmin && currentUser.role !== 'AR_SPECIALIST' && (
+          {isAdmin && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Administration"
               isOpen={openSections.administration}
@@ -6017,7 +6067,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={(entryId) => { void reverseJournalEntry(entryId); }} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}

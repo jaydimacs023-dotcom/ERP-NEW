@@ -1,2 +1,8 @@
 [functions.organizations-write]
 verify_jwt = false
+
+[functions.payments-write]
+verify_jwt = false
+
+[functions.users-write]
+verify_jwt = false

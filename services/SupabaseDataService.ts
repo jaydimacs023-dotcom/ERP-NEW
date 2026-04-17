@@ -26,8 +26,8 @@ export class SupabaseDataService implements IDataService {
   }
 
   // Helper method to get standard headers for Supabase requests.
-  // Reads default to anon for broad visibility, while writes can prefer the
-  // authenticated AT-ERP token when RLS depends on user claims.
+  // Reads default to anon for broad visibility, while selected writes can prefer
+  // the authenticated AT-ERP token when RLS depends on user claims.
   private async getHeaders(preferUserToken: boolean = false): Promise<Record<string, string>> {
     const accessToken = preferUserToken ? await TokenManager.getAccessToken() : null;
     const effectiveToken = accessToken || this.supabaseKey;
@@ -503,7 +503,7 @@ export class SupabaseDataService implements IDataService {
    * Raw INSERT to Supabase - with schema filtering and conversion
    * Converts camelCase to snake_case, filters to valid columns, and returns camelCase result
    */
-  private async insertToSupabaseRaw<T>(table: string, data: any): Promise<T> {
+  private async insertToSupabaseRaw<T>(table: string, data: any, preferUserToken: boolean = false): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
       console.warn(`[Supabase] Missing credentials for table '${table}', falling back`);
       throw new Error(`Supabase not configured for ${table}`);
@@ -520,7 +520,7 @@ export class SupabaseDataService implements IDataService {
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          headers: { ...(await this.getHeaders(preferUserToken)), 'Prefer': 'return=representation' },
           body: JSON.stringify(payload),
         });
 
@@ -838,7 +838,7 @@ export class SupabaseDataService implements IDataService {
   // USER CRUD - With bcrypt password hashing
   // ============================================================================
 
-  async createUser(user: any): Promise<any> {
+  async createUser(user: any, options?: { preferUserToken?: boolean }): Promise<any> {
     console.debug('[Supabase] createUser() INPUT:', user);
 
     const snakeCaseUser = this.camelToSnake(user);
@@ -875,6 +875,21 @@ export class SupabaseDataService implements IDataService {
     if ((filteredUser as any).id && !this.isValidUUID((filteredUser as any).id)) {
       console.debug('[Supabase] Removing invalid UUID, will auto-generate');
       delete (filteredUser as any).id;
+    }
+
+    if (options?.preferUserToken) {
+      try {
+        return await this.writeUserViaEdgeFunction('create_user', { user: filteredUser });
+      } catch (error) {
+        if (this.isRecoverableUserWriteError(error)) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `Admin user creation requires the deployed Supabase edge function 'users-write'. ${message}. ` +
+            `Deploy supabase/functions/users-write and set AT_ERP_JWT_SECRET to the same secret used by services/JWTService.ts.`
+          );
+        }
+        throw error;
+      }
     }
 
     return this.insertToSupabaseRaw('users', filteredUser);
@@ -1893,6 +1908,59 @@ export class SupabaseDataService implements IDataService {
   }
 
   private isRecoverableOrganizationWriteError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
+  }
+
+  /**
+   * Create users through an edge function so browser clients can authenticate
+   * with the AT-ERP JWT while the server writes with the service role.
+   */
+  private async writeUserViaEdgeFunction(
+    action: 'create_user',
+    payload: Record<string, any>
+  ): Promise<any> {
+    try {
+      const token = await this.getAuthToken();
+      const usersWriteUrl = `${this.supabaseUrl}/functions/v1/users-write`;
+
+      const response = await fetch(usersWriteUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          ...payload,
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        let errorMsg = `Users edge function error: ${response.status}`;
+        try {
+          const jsonError = JSON.parse(errorBody);
+          errorMsg = jsonError.error || jsonError.message || errorMsg;
+        } catch {
+          errorMsg = errorBody || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      if (!result.user) {
+        return result;
+      }
+
+      return this.snakeToCamel(result.user);
+    } catch (error) {
+      console.error('[SupabaseDataService] Error writing user via edge function:', error);
+      throw error;
+    }
+  }
+
+  private isRecoverableUserWriteError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return /requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
   }
@@ -4021,6 +4089,48 @@ export class SupabaseDataService implements IDataService {
       return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
     } catch (error) {
       console.error('[Supabase] Error updating journal entry:', error);
+      throw error;
+    }
+  }
+
+  async reverseJournalEntry(entryId: string): Promise<any> {
+    console.debug('[Supabase] reverseJournalEntry called with id:', entryId);
+    try {
+      const url = `${this.baseUrl}/rpc/reverse_journal_entry`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: await this.getHeaders(true),
+        body: JSON.stringify({ p_entry_id: entryId })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const rpcMissing =
+          errorText.includes('PGRST202') ||
+          errorText.includes('Could not find the function public.reverse_journal_entry') ||
+          errorText.includes('reverse_journal_entry');
+
+        if (rpcMissing) {
+          throw new Error('Journal reversal RPC is missing. Run supabase/migrations/20260417_reverse_journal_entry.sql first.');
+        }
+
+        let message = `Failed to reverse journal entry: ${response.status}`;
+        try {
+          const parsed = JSON.parse(errorText);
+          message = parsed.message || parsed.error || parsed.details || message;
+        } catch {
+          if (errorText.trim()) {
+            message = errorText;
+          }
+        }
+
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
+    } catch (error) {
+      console.error('[Supabase] Error reversing journal entry:', error);
       throw error;
     }
   }
