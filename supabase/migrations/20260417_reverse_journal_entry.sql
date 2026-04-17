@@ -1,6 +1,17 @@
+alter table public.journal_entries
+  add column if not exists reversed_by text,
+  add column if not exists reversed_at timestamptz,
+  add column if not exists reversal_reason text,
+  add column if not exists original_entry_id uuid;
+
 create unique index if not exists journal_entries_one_reversal_per_original_idx
   on public.journal_entries (original_entry_id)
   where original_entry_id is not null;
+
+update public.journal_entries
+set description = regexp_replace(description, '^REV:\s*', 'Reversal: ')
+where upper(coalesce(source_type, '')) = 'REVERSAL'
+  and description ~ '^REV:\s*';
 
 create or replace function public.reverse_journal_entry(p_entry_id uuid)
 returns public.journal_entries
@@ -11,7 +22,6 @@ as $$
 declare
   v_original public.journal_entries%rowtype;
   v_reversal public.journal_entries%rowtype;
-  v_actor_id text;
   v_next_gl_seq bigint;
   v_new_gl text;
 begin
@@ -23,6 +33,10 @@ begin
 
   if not found then
     raise exception 'Journal entry not found: %', p_entry_id;
+  end if;
+
+  if upper(coalesce(v_original.status, '')) <> 'POSTED' then
+    raise exception 'Only posted journal entries can be reversed.';
   end if;
 
   if v_original.original_entry_id is not null
@@ -45,8 +59,6 @@ begin
   ) then
     raise exception 'Journal entry % has no lines to reverse.', p_entry_id;
   end if;
-
-  v_actor_id := nullif(current_setting('request.jwt.claim.sub', true), '');
 
   select coalesce(max(seq), 0) + 1
     into v_next_gl_seq
@@ -73,7 +85,6 @@ begin
     created_at,
     source_type,
     source_ref,
-    reversed_by,
     reversed_at,
     reversal_reason,
     original_entry_id
@@ -82,15 +93,14 @@ begin
     v_original.org_id,
     v_original.period_id,
     current_date,
-    'REV: ' || coalesce(nullif(v_original.description, ''), coalesce(v_original.gl_entry_number, v_original.reference, v_original.id::text)),
+    'Reversal: ' || coalesce(nullif(v_original.description, ''), coalesce(v_original.gl_entry_number, v_original.reference, v_original.id::text)),
     v_new_gl,
     v_new_gl,
     'POSTED',
-    coalesce(v_actor_id, v_original.created_by, 'system'),
+    v_original.created_by,
     timezone('utc', now()),
     'REVERSAL',
-    coalesce(v_original.source_ref, v_original.id::text),
-    coalesce(v_actor_id, v_original.created_by, 'system'),
+    v_original.id::text,
     timezone('utc', now()),
     'Auto-generated reversal for ' || coalesce(v_original.gl_entry_number, v_original.reference, v_original.id::text),
     v_original.id
@@ -99,7 +109,6 @@ begin
     into v_reversal;
 
   insert into public.journal_lines (
-    org_id,
     journal_entry_id,
     account_id,
     debit,
@@ -114,7 +123,6 @@ begin
     is_cleared
   )
   select
-    org_id,
     v_reversal.id,
     account_id,
     coalesce(credit, 0),
@@ -129,6 +137,13 @@ begin
     is_cleared
   from public.journal_lines
   where journal_entry_id = v_original.id;
+
+  update public.journal_entries
+  set
+    status = 'REVERSED',
+    reversed_at = timezone('utc', now()),
+    reversal_reason = 'Auto-generated reversal for ' || coalesce(v_original.gl_entry_number, v_original.reference, v_original.id::text)
+  where id = v_original.id;
 
   return v_reversal;
 end;

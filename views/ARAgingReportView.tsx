@@ -9,10 +9,11 @@ interface ARAgingReportViewProps {
   students: Student[];
   sponsors: Sponsor[];
   currency: string;
+  
 }
 
 const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
-  entries, lines, accounts, students, sponsors, currency
+  entries, lines, accounts, students, sponsors, currency, 
 }) => {
   const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
 
@@ -93,7 +94,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
       </div>
       <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50">
+          <thead >
             <tr>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Debtor Identity</th>
               <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Current (0-30)</th>

@@ -25,7 +25,7 @@ interface LedgerProps {
   currentUser?: any;
   onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onApproveJournal?: (entryId: string) => void;
-  onReverseJournal?: (entryId: string) => void;
+  onReverseJournal?: (entryId: string) => Promise<JournalEntry | null> | JournalEntry | null | void;
   initialSearchTerm?: string;
 }
 
@@ -74,6 +74,22 @@ const Ledger: React.FC<LedgerProps> = ({
     });
     return ids;
   }, [entries]);
+
+  const handleReverseOpenedEntry = async (): Promise<void> => {
+    if (!editingEntry?.id || !onReverseJournal) return;
+
+    const liveEntry = entries.find(entry => entry.id === editingEntry.id);
+    if (!liveEntry) return;
+    if (String(liveEntry.status || '').toUpperCase() !== 'POSTED') return;
+
+    const reversed = await onReverseJournal(liveEntry.id);
+    if (!reversed) return;
+
+    setShowEntryForm(false);
+    setEditingEntry(null);
+    setEditingLines([]);
+    setEntryFormMode('new');
+  };
 
   const filteredEntries = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -769,6 +785,7 @@ const Ledger: React.FC<LedgerProps> = ({
           entryToEdit={editingEntry || undefined}
           linesToEdit={editingLines}
           mode={editingEntry ? entryFormMode : 'new'}
+          onReverse={handleReverseOpenedEntry}
           onClose={() => {
             setShowEntryForm(false);
             setEditingEntry(null);
@@ -813,7 +830,7 @@ interface JournalEntryDetailProps {
   hasExistingReversal?: boolean;
   onClose: () => void;
   onApprove?: (id: string) => void;
-  onReverse?: (id: string) => void;
+  onReverse?: (id: string) => Promise<JournalEntry | null> | JournalEntry | null | void;
   currentUser?: any;
 }
 
@@ -823,6 +840,21 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
   const controlTotal = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
   const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
   const canReverse = entry.status === 'POSTED' && !isReversalEntry && !hasExistingReversal;
+  const [isReversing, setIsReversing] = useState(false);
+
+  const handleReverseClick = async () => {
+    if (!canReverse || !onReverse || isReversing) return;
+
+    setIsReversing(true);
+    try {
+      const result = await onReverse(entry.id);
+      if (result) {
+        onClose();
+      }
+    } finally {
+      setIsReversing(false);
+    }
+  };
   
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -930,7 +962,11 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                   <button onClick={() => { onApprove?.(entry.id); onClose(); }} className="px-10 py-3 bg-[#F47721] text-white rounded-2xl text-sm font-bold shadow-xl shadow-orange-100 hover:bg-[#E06610] active:scale-95 transition-all">Authorize Posting</button>
                )}
                {canReverse && (
-                 <button onClick={() => { onReverse?.(entry.id); onClose(); }} className="px-10 py-3 bg-rose-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all flex items-center gap-2">
+                 <button
+                   onClick={() => { void handleReverseClick(); }}
+                   disabled={isReversing}
+                   className="px-10 py-3 bg-rose-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-rose-100 hover:bg-rose-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                 >
                     <RotateCcw size={16} /> Reverse Entry
                  </button>
                )}

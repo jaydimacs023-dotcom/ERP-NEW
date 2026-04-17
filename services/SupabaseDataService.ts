@@ -4099,7 +4099,10 @@ export class SupabaseDataService implements IDataService {
       const url = `${this.baseUrl}/rpc/reverse_journal_entry`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: await this.getHeaders(true),
+        // This RPC is granted to anon/authenticated and runs as SECURITY DEFINER.
+        // Using the app's custom AT-ERP JWT here causes Supabase to reject the token
+        // before the RPC executes, so call it with the standard Supabase credentials.
+        headers: await this.getHeaders(),
         body: JSON.stringify({ p_entry_id: entryId })
       });
 

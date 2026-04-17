@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Building2, ChevronLeft, FileText, Filter, GraduationCap, Plus, Search } from 'lucide-react';
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, FileText, Filter, GraduationCap, Plus, RotateCcw, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
 import {
   Invoice,
@@ -23,6 +23,7 @@ interface ARWriteOffViewProps {
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
   initialContext?: { invoice?: Invoice };
   onClearContext?: () => void;
+  brandColor?: string;
 }
 
 type CustomerType = 'SPONSOR' | 'STUDENT';
@@ -40,7 +41,8 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
   onPostJournal,
   onNotify,
   initialContext,
-  onClearContext
+  onClearContext,
+  brandColor = '#4f46e5'
 }) => {
   const today = new Date().toISOString().split('T')[0];
   const getNextReference = () => AccountingService.getNextReference(entries, 'WO');
@@ -56,6 +58,11 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
   const [reason, setReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilter>('ALL');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   const arAccounts = useMemo(
     () =>
@@ -214,6 +221,23 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
       })
       .filter(record => customerTypeFilter === 'ALL' || record.customerType === customerTypeFilter)
       .filter(record => {
+        let matchesDate = true;
+        const currentDay = new Date().toISOString().split('T')[0];
+        const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+        if (dateFilterMode === 'TODAY') {
+          matchesDate = record.entry.date === currentDay;
+        } else if (dateFilterMode === 'THIS_MONTH') {
+          matchesDate = record.entry.date >= firstDayOfMonth && record.entry.date <= currentDay;
+        } else if (dateFilterMode === 'CUSTOM') {
+          matchesDate =
+            (!dateFrom || record.entry.date >= dateFrom) &&
+            (!dateTo || record.entry.date <= dateTo);
+        }
+
+        return matchesDate;
+      })
+      .filter(record => {
         const haystack = [
           record.entry.reference || '',
           record.entry.description || '',
@@ -227,7 +251,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
         return haystack.includes(searchTerm.toLowerCase());
       })
       .sort((a, b) => new Date(b.entry.date).getTime() - new Date(a.entry.date).getTime());
-  }, [accounts, customerTypeFilter, entries, lines, searchTerm, sponsors, students]);
+  }, [accounts, customerTypeFilter, dateFilterMode, dateFrom, dateTo, entries, lines, searchTerm, sponsors, students]);
 
   const totalWriteOffAmount = useMemo(
     () => writeOffRecords.reduce((sum, record) => sum + record.amount, 0),
@@ -250,6 +274,16 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
 
   const formatCurrency = (val: number) =>
     `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setCustomerTypeFilter('ALL');
+    setDateFilterMode('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setShowDateDropdown(false);
+    setShowCustomerDropdown(false);
+  };
 
   const handlePost = (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,7 +349,8 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
             <button
               type="button"
               onClick={openNewForm}
-              className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm"
+              className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg transition-all shadow-md font-bold text-sm"
+              style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
             >
               <Plus size={16} /> New Write Off
             </button>
@@ -333,53 +368,187 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
             <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">This Month / Customers</p>
               <div className="mt-2 flex items-baseline justify-between gap-4">
-                <p className="text-xl font-semibold text-brand">{formatCurrency(thisMonthWriteOffAmount)}</p>
+                <p className="text-xl font-semibold" style={{ color: brandColor }}>{formatCurrency(thisMonthWriteOffAmount)}</p>
                 <p className="text-sm font-semibold text-gray-500">{uniqueCustomers} customers</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-md border border-gray-200 shadow-sm p-4 flex flex-col lg:flex-row lg:items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-              <input
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm outline-none focus:border-brand"
-                placeholder="Search by reference, customer, memo, or account..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                <Filter size={14} /> Filter
+          <div className="bg-white border-y px-4 py-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-72">
+                <Search size={14} className="text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Search write-offs..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+                />
               </div>
-              <select
-                className="px-4 py-3 bg-white border border-gray-200 rounded text-sm font-semibold text-gray-700 outline-none focus:border-brand appearance-none"
-                value={customerTypeFilter}
-                onChange={e => setCustomerTypeFilter(e.target.value as CustomerTypeFilter)}
+
+              <div className="relative">
+                <div
+                  onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none max-w-[220px]"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1 truncate">Customer:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate">
+                    {customerTypeFilter === 'ALL' ? 'All' : customerTypeFilter === 'SPONSOR' ? 'Sponsors' : 'Students'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showCustomerDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowCustomerDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        <button
+                          onClick={() => { setCustomerTypeFilter('ALL'); setShowCustomerDropdown(false); }}
+                          className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${
+                            customerTypeFilter === 'ALL' ? 'font-bold bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          All Customers
+                        </button>
+                        <button
+                          onClick={() => { setCustomerTypeFilter('SPONSOR'); setShowCustomerDropdown(false); }}
+                          className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${
+                            customerTypeFilter === 'SPONSOR' ? 'font-bold text-white' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                          style={customerTypeFilter === 'SPONSOR' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          Sponsors
+                        </button>
+                        <button
+                          onClick={() => { setCustomerTypeFilter('STUDENT'); setShowCustomerDropdown(false); }}
+                          className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${
+                            customerTypeFilter === 'STUDENT' ? 'font-bold text-white' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                          style={customerTypeFilter === 'STUDENT' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          Students
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="relative">
+                <div
+                  onClick={() => setShowDateDropdown(!showDateDropdown)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                    {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showDateDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="border-b border-gray-100 p-1">
+                        <button
+                          onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100 rounded"
+                        >
+                          All Dates
+                        </button>
+                        <button
+                          onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] rounded ${dateFilterMode === 'TODAY' ? 'text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`}
+                          style={dateFilterMode === 'TODAY' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          Today
+                        </button>
+                        <button
+                          onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] rounded ${dateFilterMode === 'THIS_MONTH' ? 'text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`}
+                          style={dateFilterMode === 'THIS_MONTH' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          This Month
+                        </button>
+                      </div>
+
+                      <div className="p-3 space-y-2 bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                          <input
+                            type="date"
+                            value={dateTo}
+                            onChange={e => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none"
+                          />
+                        </div>
+                        <div className="flex justify-end items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowDateDropdown(false)}
+                            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowDateDropdown(false)}
+                            className="px-4 py-1 rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                            style={{ backgroundColor: brandColor }}
+                          >
+                            OK
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="p-2 text-gray-400 transition-colors"
+                style={{ color: searchTerm || customerTypeFilter !== 'ALL' || dateFilterMode !== 'ALL' ? brandColor : undefined }}
+                title="Clear all filters"
               >
-                <option value="ALL">All Customers</option>
-                <option value="SPONSOR">Sponsors</option>
-                <option value="STUDENT">Students</option>
-              </select>
+                <RotateCcw size={16} />
+              </button>
+
+              <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                <Filter size={14} />
+                <span>{writeOffRecords.length} record{writeOffRecords.length !== 1 ? 's' : ''}</span>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b bg-gray-50 flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* <div className="p-4 border-b bg-gray-50 flex items-center gap-2 text-sm font-semibold text-gray-700">
               <FileText size={16} /> Write-Off Registry
-            </div>
+            </div> */}
 
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
+                <thead style={{ backgroundColor: brandColor }}>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Reference</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Customer</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Description</th>
-                    <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Date</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Reference</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Customer</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Type</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Description</th>
+                    <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-white">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -392,11 +561,16 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
                         <div className="text-xs text-gray-400 uppercase tracking-wide">{record.arAccountName}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
-                          record.customerType === 'SPONSOR'
-                            ? 'bg-brand/10 text-brand border-brand-light'
-                            : 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                        }`}>
+                        <span
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
+                            record.customerType === 'SPONSOR'
+                              ? ''
+                              : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                          }`}
+                          style={record.customerType === 'SPONSOR'
+                            ? { backgroundColor: 'var(--acm-primary-light)', color: brandColor, borderColor: 'var(--acm-primary-light)' }
+                            : undefined}
+                        >
                           {record.customerType === 'SPONSOR' ? <Building2 size={12} /> : <GraduationCap size={12} />}
                           {record.customerType || 'Unknown'}
                         </span>
@@ -415,7 +589,8 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
                           <button
                             type="button"
                             onClick={openNewForm}
-                            className="mt-2 px-5 py-2 bg-brand text-white rounded text-sm font-semibold hover:bg-brand-hover transition-all"
+                            className="mt-2 px-5 py-2 text-white rounded text-sm font-semibold transition-all"
+                            style={{ backgroundColor: brandColor }}
                           >
                             Create First Write Off
                           </button>
@@ -435,14 +610,18 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
               <button
                 type="button"
                 onClick={handleBackToList}
-                className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-brand transition-colors"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide transition-colors"
+                style={{ color: brandColor }}
               >
                 <ChevronLeft size={14} /> Back to Write-Off Registry
               </button>
               <h2 className="mt-3 text-xl font-semibold text-gray-800 tracking-tight">New Write-Off</h2>
               <p className="text-sm text-gray-500 font-normal italic">Post a receivable balance to bad debt or write-off expense.</p>
             </div>
-            <div className="px-4 py-2 bg-brand/10 text-brand border border-brand-light rounded text-xs font-semibold uppercase tracking-wide">
+            <div
+              className="px-4 py-2 border rounded text-xs font-semibold uppercase tracking-wide"
+              style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, borderColor: 'var(--acm-primary-light)' }}
+            >
               {reference}
             </div>
           </div>

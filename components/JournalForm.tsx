@@ -22,11 +22,12 @@ interface JournalFormProps {
   linesToEdit?: JournalLine[];
   mode?: 'new' | 'edit' | 'view';
   onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onReverse?: () => void | Promise<void>;
   onClose: () => void;
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({
-  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onClose
+  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onReverse, onClose
 }) => {
   const brandColor = '#F47721';
   const buildEmptyEntry = (): Partial<JournalEntry> => ({
@@ -56,6 +57,12 @@ const JournalForm: React.FC<JournalFormProps> = ({
 
   const [displaySourceRef, setDisplaySourceRef] = useState('');
   const dataService = DataServiceFactory.getService();
+  const isViewMode = mode === 'view';
+  const normalizedStatus = String(entry.status || '').toUpperCase();
+  const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
+  const hasExistingReversal = Boolean(entry.id && entries.some(existingEntry => existingEntry.originalEntryId === entry.id));
+  const canReverseViewedEntry = isViewMode && Boolean(entry.id) && normalizedStatus === 'POSTED' && !isReversalEntry && !hasExistingReversal;
+
   const getQualificationCodeById = (qualificationId?: string) => {
     const id = String(qualificationId || '').trim();
     if (!id) return '';
@@ -103,6 +110,17 @@ const JournalForm: React.FC<JournalFormProps> = ({
   useEffect(() => {
     const loadDisplayRef = async () => {
       const sourceType = String(entry.sourceType || '').toUpperCase();
+      if (sourceType === 'REVERSAL') {
+        const originalEntry = entries.find(existingEntry =>
+          String(existingEntry.id || '').trim() === String(entry.originalEntryId || '').trim()
+        );
+        const originalReferenceNo = String(
+          originalEntry?.glEntryNumber || originalEntry?.reference || entry.sourceRef || ''
+        ).trim();
+        setDisplaySourceRef(originalReferenceNo);
+        return;
+      }
+
       if (sourceType === 'PAYMENT') {
         const paymentJournalRef = String(entry.reference || '').trim();
         const sourcePaymentId = String(entry.sourceRef || '').trim();
@@ -136,14 +154,13 @@ const JournalForm: React.FC<JournalFormProps> = ({
       }
     };
     loadDisplayRef();
-  }, [entry.sourceRef, entry.reference, entry.sourceType, entry.id, payments]);
+  }, [entry.sourceRef, entry.reference, entry.sourceType, entry.id, entry.originalEntryId, entries, payments]);
 
   const buildDefaultLines = (): Partial<JournalLine>[] => ([]);
 
   const [lines, setLines] = useState<Partial<JournalLine>[]>(buildDefaultLines());
 
   const [controlTotal, setControlTotal] = useState<number>(0);
-  const isViewMode = mode === 'view';
 
   const resetForm = () => {
     setEntry(buildEmptyEntry());
@@ -403,10 +420,24 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
           </button>
           <div className="h-6 w-px bg-gray-200 mx-2" />
           <button
-            title={isViewMode ? 'Reverse Journal Entry' : 'Reverse'}
+            title={
+              !isViewMode
+                ? 'Reverse'
+                : canReverseViewedEntry
+                  ? 'Reverse Journal Entry'
+                  : hasExistingReversal
+                    ? 'This journal entry has already been reversed'
+                    : normalizedStatus !== 'POSTED'
+                      ? 'Only posted journal entries can be reversed'
+                      : 'Reversal is not available for this journal entry'
+            }
             type="button"
-            onClick={() => alert('Reverse coming soon...')}
-            className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+            onClick={() => {
+              if (!canReverseViewedEntry) return;
+              void onReverse?.();
+            }}
+            disabled={!canReverseViewedEntry}
+            className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <CornerUpLeft size={20} />
           </button>

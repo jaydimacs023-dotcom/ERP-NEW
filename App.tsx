@@ -1881,21 +1881,58 @@ export default function App() {
 
   const reverseJournalEntry = async (entryId: string): Promise<JournalEntry | null> => {
     const originalEntry = journalEntries.find(entry => entry.id === entryId);
+    const normalizedStatus = String(originalEntry?.status || '').toUpperCase();
+    const isReversalEntry = String(originalEntry?.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(originalEntry?.originalEntryId);
+    const hasExistingReversal = journalEntries.some(entry => entry.originalEntryId === entryId);
+
+    if (!originalEntry) {
+      handleNotify('error', 'Journal entry not found.');
+      return null;
+    }
+
+    if (normalizedStatus !== 'POSTED') {
+      handleNotify('error', 'Only posted journal entries can be reversed.');
+      return null;
+    }
+
+    if (isReversalEntry) {
+      handleNotify('error', 'This journal entry is already a reversal and cannot be reversed again.');
+      return null;
+    }
+
+    if (hasExistingReversal) {
+      handleNotify('error', 'This journal entry has already been reversed.');
+      return null;
+    }
 
     try {
       const reversalEntry = await dataService.reverseJournalEntry(entryId);
       const reversalLines = await dataService.getJournalLinesByEntry(reversalEntry.id);
+      const originalReferenceNo =
+        String(originalEntry?.glEntryNumber || originalEntry?.reference || originalEntry?.id || '').trim();
 
       const normalizedReversalEntry = {
         ...reversalEntry,
+        sourceRef: originalReferenceNo || reversalEntry.sourceRef,
         sourceType: reversalEntry.sourceType === 'MANUAL' ? 'JOURNAL' : reversalEntry.sourceType
       } as JournalEntry;
 
-      setJournalEntries(prev => (
-        prev.some(entry => entry.id === normalizedReversalEntry.id)
-          ? prev
-          : [...prev, normalizedReversalEntry]
-      ));
+      setJournalEntries(prev => {
+        const reversalExists = prev.some(entry => entry.id === normalizedReversalEntry.id);
+        const reversedAt = normalizedReversalEntry.reversedAt || new Date().toISOString();
+        const reversedBy = normalizedReversalEntry.reversedBy || currentUser?.id || 'system';
+        const reversalReason =
+          normalizedReversalEntry.reversalReason ||
+          `Auto-generated reversal for ${originalEntry?.glEntryNumber || originalEntry?.reference || entryId}`;
+
+        const next = prev.map(entry => (
+          entry.id === entryId
+            ? { ...entry, status: 'REVERSED', reversedAt, reversedBy, reversalReason }
+            : entry
+        ));
+
+        return reversalExists ? next : [...next, normalizedReversalEntry];
+      });
 
       setJournalLines(prev => {
         const existingIds = new Set(prev.map(line => line.id));
@@ -1927,6 +1964,32 @@ export default function App() {
       );
       return null;
     }
+  };
+
+  const handleReverseOpenedJournal = async (): Promise<void> => {
+    if (!journalFormEntry?.id) {
+      handleNotify('error', 'No journal entry is currently open.');
+      return;
+    }
+
+    const liveEntry = journalEntries.find(entry => entry.id === journalFormEntry.id);
+    if (!liveEntry) {
+      handleNotify('error', 'The opened journal entry could not be found.');
+      return;
+    }
+
+    if (String(liveEntry.status || '').toUpperCase() !== 'POSTED') {
+      handleNotify('error', 'Only the opened posted journal entry can be reversed from this view.');
+      return;
+    }
+
+    const reversed = await reverseJournalEntry(liveEntry.id);
+    if (!reversed) return;
+
+    setShowJournalForm(false);
+    setJournalFormEntry(null);
+    setJournalFormLines([]);
+    setJournalFormMode('new');
   };
 
   const handleViewJournal = (journalEntryId: string, sourceLines?: InvoiceLine[]) => {
@@ -6008,6 +6071,7 @@ export default function App() {
                 entryToEdit={journalFormEntry || undefined}
                 linesToEdit={journalFormLines}
                 mode={journalFormMode}
+                onReverse={handleReverseOpenedJournal}
                 onClose={() => {
                   setShowJournalForm(false);
                   setJournalFormEntry(null);
@@ -6067,7 +6131,7 @@ export default function App() {
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={(entryId) => { void reverseJournalEntry(entryId); }} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
@@ -6328,6 +6392,7 @@ export default function App() {
               onNotify={handleNotify}
               initialContext={navigationContext}
               onClearContext={() => setNavigationContext(null)}
+              brandColor={brandColor}
             />
           )}
           {activeTab === 'credit-debit-memo' && (
@@ -6341,6 +6406,7 @@ export default function App() {
               currency={currentOrg?.currency || 'USD'}
               onPostJournal={handlePostJournal}
               onNotify={handleNotify}
+              brandColor={brandColor}
             />
           )}
           {activeTab === 'collection-receipt' && (
