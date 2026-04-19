@@ -3,6 +3,7 @@ import { IDataService, InitialData } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
 import { Invoice, TaxCategoryEntry } from '../types';
+import { normalizeStudentDocuments } from './StudentDocumentService';
 
 /**
  * SupabaseDataService
@@ -111,58 +112,79 @@ export class SupabaseDataService implements IDataService {
 
   private normalizeStudentDocumentsForDb(documents: any): any {
     if (!documents) return [];
-    if (Array.isArray(documents)) {
-      return documents.map((doc: any) => {
-        if (!doc) return doc;
-        if (typeof doc === 'string') {
-          // Preserve JSON content if already valid JSON string
+    const parsedDocuments = Array.isArray(documents)
+      ? documents.map((doc: any) => {
+          if (!doc) return doc;
+          if (typeof doc !== 'string') return doc;
+
           try {
-            JSON.parse(doc);
-            return doc;
+            return JSON.parse(doc);
           } catch {
-            return doc;
+            return { name: doc, status: 'UPLOADED' };
           }
-        }
-        // If object, store as JSON string to support TEXT[] field mapping
-        try {
-          return JSON.stringify(doc);
-        } catch {
-          return doc;
-        }
-      });
+        })
+      : typeof documents === 'object'
+        ? [documents]
+        : [];
+
+    return normalizeStudentDocuments(parsedDocuments).map((doc: any) => JSON.stringify(doc));
+  }
+
+  private buildStudentDocumentId(doc: any, index: number): string {
+    const explicitId = typeof doc?.id === 'string' ? doc.id.trim() : '';
+    if (explicitId) return explicitId;
+
+    const rawName = typeof doc?.name === 'string' ? doc.name : `document-${index + 1}`;
+    const slug = rawName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return `doc-${index}-${slug || 'item'}`;
+  }
+
+  private normalizeStudentDocument(doc: any, index: number): any {
+    if (!doc || typeof doc !== 'object') {
+      return {
+        id: `doc-${index}-item`,
+        name: `Document ${index + 1}`,
+        status: 'PENDING'
+      };
     }
 
-    // For object stored as map, keep as array of JSON strings
-    if (typeof documents === 'object') {
-      return [JSON.stringify(documents)];
-    }
-
-    return documents;
+    const normalized = this.snakeToCamel(doc);
+    return {
+      ...normalized,
+      id: this.buildStudentDocumentId(normalized, index),
+      name: typeof normalized.name === 'string' && normalized.name.trim()
+        ? normalized.name
+        : `Document ${index + 1}`,
+      status: normalized.status || 'PENDING'
+    };
   }
 
   private parseStudentDocumentsFromDb(documents: any): any[] {
     if (!documents) return [];
     if (Array.isArray(documents)) {
-      return documents.map((doc: any) => {
+      return normalizeStudentDocuments(documents.map((doc: any, index: number) => {
         if (!doc) return doc;
         if (typeof doc === 'string') {
           try {
-            return JSON.parse(doc);
+            return this.normalizeStudentDocument(JSON.parse(doc), index);
           } catch {
-            // Fallback: support legacy strings as document name
             return {
-              id: `doc-${Date.now()}`,
+              id: this.buildStudentDocumentId({ name: doc }, index),
               name: doc,
               status: 'UPLOADED'
             };
           }
         }
-        return doc;
-      });
+        return this.normalizeStudentDocument(doc, index);
+      }));
     }
-    // If single-object JSON, return as array
     if (typeof documents === 'object') {
-      return [documents];
+      return normalizeStudentDocuments([this.normalizeStudentDocument(documents, 0)]);
     }
     return [];
   }
@@ -653,7 +675,7 @@ export class SupabaseDataService implements IDataService {
         'sex', 'date_of_birth', 'birth_region', 'birth_province', 'birth_city',
         'civil_status', 'educational_attainment', 'nationality', 'email', 'contact_number',
         'street', 'barangay', 'city', 'district', 'province', 'guardian',
-        'location_id', 'sponsor_id', 'documents', 'created_at', 'updated_at'
+        'location_id', 'sponsor_id', 'profile_photo', 'documents', 'created_at', 'updated_at'
       ],
       organizations: ['id', 'name', 'currency', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'primary_color', 'logo_url'],
       users: ['id', 'name', 'email', 'password_hash', 'salt', 'role', 'org_id', 'student_id', 'trainer_id', 'is_active', 'auth_uid', 'created_at', 'updated_at'],

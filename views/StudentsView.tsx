@@ -3,6 +3,12 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Student, StudentDocument, Batch, Qualification } from '../types';
 import ModalPortal from '../components/ModalPortal';
 import {
+  REQUIRED_STUDENT_DOCUMENTS,
+  getComplianceDocuments,
+  getStudentProfilePhoto,
+  normalizeStudentDocuments,
+} from '../services/StudentDocumentService';
+import {
   Search, Plus, Filter, User, Calendar, Mail, Phone, FileText,
   Upload, CheckCircle, Clock, Trash2, X, Camera, RefreshCw,
   UserCircle, UploadCloud, ShieldCheck, AlertCircle, FileSpreadsheet,
@@ -31,12 +37,7 @@ interface StudentsViewProps {
   onBatchAddStudents: (students: Student[]) => void;
 }
 
-const MANDATORY_DOCS = [
-  'TOR (Transcript of Records)',
-  'Birth Certificate',
-  'Application Form',
-  'Passport Size Photo'
-];
+const MANDATORY_DOCS = REQUIRED_STUDENT_DOCUMENTS;
 
 const CSV_HEADERS = [
   'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Contact Number',
@@ -54,6 +55,13 @@ function withAlpha(hex: string, alpha: number): string {
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function normalizeStudentRecord(student: Student): Student {
+  return {
+    ...student,
+    documents: normalizeStudentDocuments(student.documents),
+  };
 }
 
 const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
@@ -75,10 +83,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
 
   const [mandatoryDocStatuses, setMandatoryDocStatuses] = useState<Record<string, 'PENDING' | 'UPLOADED' | 'VERIFIED'>>({
-    'TOR (Transcript of Records)': 'PENDING',
+    'Transcript of Records': 'PENDING',
     'Birth Certificate': 'PENDING',
-    'Application Form': 'PENDING',
-    'Passport Size Photo': 'PENDING'
+    'Application Form': 'PENDING'
   });
 
   const [mandatoryDocFiles, setMandatoryDocFiles] = useState<Record<string, string>>({});
@@ -309,8 +316,6 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
         context.drawImage(videoRef.current, 0, 0);
         const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
         setPhotoPreview(dataUrl);
-        setMandatoryDocStatuses(prev => ({ ...prev, 'Passport Size Photo': 'UPLOADED' }));
-        setMandatoryDocFiles(prev => ({ ...prev, 'Passport Size Photo': dataUrl }));
         stopCamera();
       }
     }
@@ -349,16 +354,15 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
         status: mandatoryDocStatuses[doc],
         fileData: mandatoryDocFiles[doc]
       }));
-      onAddStudent({ ...formData as Student, id: `stud-${Date.now()}`, orgId: 'temp', documents, createdAt: new Date().toISOString() });
+      onAddStudent({ ...formData as Student, id: `stud-${Date.now()}`, orgId: 'temp', profilePhoto: photoPreview || undefined, documents, createdAt: new Date().toISOString() });
       showToast(`Student ${formData.firstName} ${formData.lastName} registered successfully!`, 'success');
       setShowModal(false);
       // Reset form
       setFormData(defaultFormData);
       setMandatoryDocStatuses({
-        'TOR (Transcript of Records)': 'PENDING',
+        'Transcript of Records': 'PENDING',
         'Birth Certificate': 'PENDING',
-        'Application Form': 'PENDING',
-        'Passport Size Photo': 'PENDING'
+        'Application Form': 'PENDING'
       });
       setMandatoryDocFiles({});
       setPhotoPreview(null);
@@ -415,10 +419,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             <button onClick={() => {
               setFormData(defaultFormData);
               setMandatoryDocStatuses({
-                'TOR (Transcript of Records)': 'PENDING',
+                'Transcript of Records': 'PENDING',
                 'Birth Certificate': 'PENDING',
-                'Application Form': 'PENDING',
-                'Passport Size Photo': 'PENDING'
+                'Application Form': 'PENDING'
               });
               setMandatoryDocFiles({});
               setPhotoPreview(null);
@@ -536,17 +539,18 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 </td>
               </tr>
             ) : paginatedStudents.map(student => {
-              const pendingDocs = (student.documents || []).filter(d => d.status === 'UPLOADED').length;
-              const verifiedDocs = (student.documents || []).filter(d => d.status === 'VERIFIED').length;
-              const isCompliant = verifiedDocs === (student.documents || []).length || student.isEnrollmentOverridden;
+              const complianceDocuments = getComplianceDocuments(student);
+              const pendingDocs = complianceDocuments.filter(d => d.status === 'UPLOADED').length;
+              const verifiedDocs = complianceDocuments.filter(d => d.status === 'VERIFIED').length;
+              const isCompliant = verifiedDocs === complianceDocuments.length || student.isEnrollmentOverridden;
 
               return (
                 <tr key={student.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded overflow-hidden flex items-center justify-center border shadow-sm shrink-0" style={{ backgroundColor: withAlpha(brandColor, 0.1), borderColor: withAlpha(brandColor, 0.18) }}>
-                        {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                          <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="S" className="w-full h-full object-cover" />
+                        {getStudentProfilePhoto(student) ? (
+                          <img src={getStudentProfilePhoto(student)} alt="S" className="w-full h-full object-cover" />
                         ) : (
                           <UserCircle size={24} style={{ color: withAlpha(brandColor, 0.75) }} />
                         )}
@@ -582,10 +586,15 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingStudent(student); setShowEditModal(true); setFormData(student); }} className="p-2 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor }} title="Edit Student">
+                      <button onClick={() => {
+                        const normalizedStudent = normalizeStudentRecord(student);
+                        setEditingStudent(normalizedStudent);
+                        setShowEditModal(true);
+                        setFormData(normalizedStudent);
+                      }} className="p-2 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor }} title="Edit Student">
                         <RefreshCw size={16} />
                       </button>
-                      <button onClick={() => setAuditStudent(student)} className="p-2 text-white rounded transition-all" style={{ backgroundColor: brandColor }} title="View Audit">
+                      <button onClick={() => setAuditStudent(normalizeStudentRecord(student))} className="p-2 text-white rounded transition-all" style={{ backgroundColor: brandColor }} title="View Audit">
                         <Eye size={16} />
                       </button>
                     </div>
@@ -744,8 +753,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-6">
                 <div className="w-16 h-16 rounded overflow-hidden bg-white border-4 border-white shadow-sm flex items-center justify-center shrink-0">
-                  {auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                    <img src={auditStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Profile" className="w-full h-full object-cover" />
+                  {getStudentProfilePhoto(auditStudent) ? (
+                    <img src={getStudentProfilePhoto(auditStudent)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <UserCircle size={32} className="text-gray-300" />
                   )}
@@ -756,7 +765,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                   </h3>
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono font-semibold text-brand uppercase tracking-wide bg-brand/10 px-2 py-0.5 rounded">ULI: {auditStudent.uli}</span>
-                    <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded border ${(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                    <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded border ${(getComplianceDocuments(auditStudent).filter(d => d.status === 'VERIFIED').length === getComplianceDocuments(auditStudent).length || auditStudent.isEnrollmentOverridden)
                       ? 'bg-emerald-50 text-brand border-emerald-100'
                       : 'bg-brand/10 text-brand border-brand-light'
                       }`}>
@@ -837,7 +846,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 </div>
 
                 <div className="space-y-6">
-                  {auditStudent.documents.map(doc => {
+                  {getComplianceDocuments(auditStudent).map(doc => {
                     const isUploaded = doc.status === 'UPLOADED' || doc.status === 'VERIFIED';
                     const isVerified = doc.status === 'VERIFIED';
                     const isRejected = doc.status === 'REJECTED';
@@ -891,7 +900,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                       <div>
                         <p className="text-xs font-semibold text-brand uppercase tracking-wide">Enrollment Status</p>
                         <p className="text-base font-semibold uppercase">
-                          {(auditStudent.documents.filter(d => d.status === 'VERIFIED').length === auditStudent.documents.length || auditStudent.isEnrollmentOverridden)
+                          {(getComplianceDocuments(auditStudent).filter(d => d.status === 'VERIFIED').length === getComplianceDocuments(auditStudent).length || auditStudent.isEnrollmentOverridden)
                             ? 'Qualified for Deployment'
                             : 'Incomplete Compliance'}
                         </p>
@@ -1087,7 +1096,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
               </div>
 
               <div className="space-y-4 flex-1">
-                {MANDATORY_DOCS.filter(d => d !== 'Passport Size Photo').map(doc => {
+                {MANDATORY_DOCS.map(doc => {
                   const status = mandatoryDocStatuses[doc];
                   const hasFile = status === 'UPLOADED' || status === 'VERIFIED';
                   return (
@@ -1135,28 +1144,14 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       try {
-                        // Update documents with new photo if changed
-                        let updatedDocuments = editingStudent.documents || [];
-                        if (editPhotoPreview) {
-                          const photoDocIndex = updatedDocuments.findIndex(d => d.name === 'Passport Size Photo');
-                          const newPhotoDoc = {
-                            id: photoDocIndex >= 0 ? updatedDocuments[photoDocIndex].id : `doc-photo-${Date.now()}`,
-                            name: 'Passport Size Photo',
-                            status: 'UPLOADED' as const,
-                            fileData: editPhotoPreview
-                          };
-                          if (photoDocIndex >= 0) {
-                            updatedDocuments = updatedDocuments.map((d, i) => i === photoDocIndex ? newPhotoDoc : d);
-                          } else {
-                            updatedDocuments = [...updatedDocuments, newPhotoDoc];
-                          }
-                        }
+                        const updatedDocuments = editingStudent.documents || [];
 
                         const updatedStudent: Student = {
                           ...editingStudent,
                           ...formData,
                           id: editingStudent.id,
                           orgId: editingStudent.orgId,
+                          profilePhoto: editPhotoPreview ?? editingStudent.profilePhoto,
                           documents: updatedDocuments,
                           createdAt: editingStudent.createdAt,
                           createdBy: editingStudent.createdBy
@@ -1179,8 +1174,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                               <video ref={editVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                             ) : editPhotoPreview ? (
                               <img src={editPhotoPreview} alt="New Photo" className="w-full h-full object-cover" />
-                            ) : editingStudent.documents?.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                              <img src={editingStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
+                            ) : getStudentProfilePhoto(editingStudent) ? (
+                              <img src={getStudentProfilePhoto(editingStudent)} alt="Student" className="w-full h-full object-cover" />
                             ) : (
                               <User size={48} className="text-gray-300" />
                             )}

@@ -2435,17 +2435,30 @@ export default function App() {
     try {
       console.info('[App] Updating student:', student.id);
       const existing = students.find(s => s.id === student.id);
-      const updated = await dataService.updateStudent(student.id, student);
+      const mergedStudent = existing
+        ? {
+            ...existing,
+            ...student,
+            profilePhoto: student.profilePhoto ?? existing.profilePhoto,
+            documents: student.documents ?? existing.documents,
+          }
+        : student;
+      const updated = await dataService.updateStudent(student.id, mergedStudent);
       setStudents(prev => prev.map(s => s.id === student.id ? updated : s));
 
       // Audit: Student updated
-      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${student.firstName} ${student.lastName} `, existing, student);
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'STUDENT', student.id, `${mergedStudent.firstName} ${mergedStudent.lastName} `, existing, mergedStudent);
 
       handleNotify('success', 'Student record updated successfully');
     } catch (error) {
       console.error('[App] Error updating student:', error);
       handleNotify('error', 'Failed to update student. Falling back to memory storage.');
-      setStudents(prev => prev.map(s => s.id === student.id ? student : s));
+      setStudents(prev => prev.map(s => s.id === student.id ? {
+        ...s,
+        ...student,
+        profilePhoto: student.profilePhoto ?? s.profilePhoto,
+        documents: student.documents ?? s.documents,
+      } : s));
     }
   };
 
@@ -6102,7 +6115,7 @@ export default function App() {
               entries={activeJournalEntries}
               lines={journalLines}
               brandColor={brandColor}
-              onUpdateStudent={s => setStudents(prev => prev.map(x => x.id === s.id ? s : x))}
+              onUpdateStudent={handleUpdateStudent}
             />
           )}
 

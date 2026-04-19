@@ -10,7 +10,17 @@ import {
   Printer, Landmark, UserCheck, BadgeDollarSign,
   Lock, ArrowRight, Check
 } from 'lucide-react';
-import { Student, StudentDocument, Batch, Qualification, Trainer, Location, TrainerSchedule, JournalEntry, JournalLine } from '../types';
+import { Student, Batch, Qualification, Trainer, Location, TrainerSchedule, JournalEntry, JournalLine } from '../types';
+import { 
+  updateProfilePhoto, 
+  updateTOR, 
+  updateBirthCertificate, 
+  updateApplicationForm,
+  getComplianceDocuments,
+  getDocumentTypeFromName,
+  getStudentProfilePhoto,
+  normalizeStudentDocuments,
+} from '../services/StudentDocumentService';
 
 interface StudentPortalViewProps {
   student: Student;
@@ -32,6 +42,67 @@ function withAlpha(hex: string, alpha: number): string {
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const MAX_IMAGE_DIMENSION = 1280;
+const IMAGE_QUALITY = 0.78;
+const PROFILE_PHOTO_TARGET = '__profile_photo__';
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = dataUrl;
+  });
+}
+
+async function optimizeImageDataUrl(dataUrl: string): Promise<string> {
+  const image = await loadImage(dataUrl);
+  const scale = Math.min(
+    1,
+    MAX_IMAGE_DIMENSION / Math.max(image.width || 1, image.height || 1),
+  );
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) return dataUrl;
+
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', IMAGE_QUALITY);
+}
+
+async function prepareUploadData(file: File): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  if (!file.type.startsWith('image/')) return dataUrl;
+
+  try {
+    return await optimizeImageDataUrl(dataUrl);
+  } catch {
+    return dataUrl;
+  }
+}
+
+function isImageDataUrl(value?: string): boolean {
+  return Boolean(value && value.startsWith('data:image/'));
+}
+
+function isPdfDataUrl(value?: string): boolean {
+  return Boolean(value && value.startsWith('data:application/pdf'));
 }
 
 const StudentPortalView: React.FC<StudentPortalViewProps> = ({ 
@@ -74,26 +145,77 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
     return { history, totalInvoiced, totalPaid, balance, hasActivity: history.length > 0 };
   }, [lines, student.id, entries]);
 
-  const verifiedCount = student.documents.filter(d => d.status === 'VERIFIED').length;
-  const progressPercent = (verifiedCount / student.documents.length) * 100;
-  const isFullyCompliant = verifiedCount === student.documents.length;
+  const normalizedDocuments = useMemo(() => normalizeStudentDocuments(student.documents), [student.documents]);
+  const complianceDocuments = useMemo(() => getComplianceDocuments(student), [student]);
+  const verifiedCount = complianceDocuments.filter(d => d.status === 'VERIFIED').length;
+  const progressPercent = complianceDocuments.length ? (verifiedCount / complianceDocuments.length) * 100 : 0;
+  const isFullyCompliant = complianceDocuments.length > 0 && verifiedCount === complianceDocuments.length;
+  const profilePhoto = getStudentProfilePhoto(student);
 
-  const handleDocumentUpload = (docId: string, fileData: string) => {
-    const nextDocs = student.documents.map(d => 
-      d.id === docId ? { ...d, status: 'UPLOADED' as const, fileData } : d
-    );
-    onUpdateStudent({ ...student, documents: nextDocs });
+  /**
+   * Independent document upload handlers - each document type updates in isolation
+   */
+  const handleProfilePhotoUpload = (fileData: string) => {
+    const updatedStudent = updateProfilePhoto(student, fileData);
+    onUpdateStudent(updatedStudent);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTORUpload = (fileData: string) => {
+    const updatedStudent = updateTOR(student, fileData);
+    onUpdateStudent(updatedStudent);
+  };
+
+  const handleBirthCertificateUpload = (fileData: string) => {
+    const updatedStudent = updateBirthCertificate(student, fileData);
+    onUpdateStudent(updatedStudent);
+  };
+
+  const handleApplicationFormUpload = (fileData: string) => {
+    const updatedStudent = updateApplicationForm(student, fileData);
+    onUpdateStudent(updatedStudent);
+  };
+
+  // Generic handler that routes to specific document handlers based on document name
+  const handleDocumentUpload = (docId: string, fileData: string) => {
+    const doc = normalizedDocuments.find(d => d.id === docId);
+    if (!doc) return;
+
+    switch (getDocumentTypeFromName(doc.name)) {
+      case 'TOR':
+        handleTORUpload(fileData);
+        break;
+      case 'BIRTH_CERTIFICATE':
+        handleBirthCertificateUpload(fileData);
+        break;
+      case 'APPLICATION_FORM':
+        handleApplicationFormUpload(fileData);
+        break;
+      default:
+        const nextDocs = normalizedDocuments.map(d =>
+          d.id === docId ? { ...d, status: 'UPLOADED' as const, fileData } : d
+        );
+        onUpdateStudent({
+          ...student,
+          profilePhoto: student.profilePhoto, // Preserve profile photo
+          documents: normalizeStudentDocuments(nextDocs),
+        });
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && selectedDocId) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        handleDocumentUpload(selectedDocId, reader.result as string);
+      try {
+        const preparedData = await prepareUploadData(file);
+        if (selectedDocId === PROFILE_PHOTO_TARGET) {
+          handleProfilePhotoUpload(preparedData);
+        } else {
+          handleDocumentUpload(selectedDocId, preparedData);
+        }
+      } finally {
         setSelectedDocId(null);
-      };
-      reader.readAsDataURL(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -118,9 +240,25 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
-        handleDocumentUpload(selectedDocId, dataUrl);
-        stopCamera();
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.82);
+        optimizeImageDataUrl(dataUrl)
+          .then((optimizedDataUrl) => {
+            if (selectedDocId === PROFILE_PHOTO_TARGET) {
+              handleProfilePhotoUpload(optimizedDataUrl);
+            } else {
+              handleDocumentUpload(selectedDocId, optimizedDataUrl);
+            }
+          })
+          .catch(() => {
+            if (selectedDocId === PROFILE_PHOTO_TARGET) {
+              handleProfilePhotoUpload(dataUrl);
+            } else {
+              handleDocumentUpload(selectedDocId, dataUrl);
+            }
+          })
+          .finally(() => {
+            stopCamera();
+          });
       }
     }
   };
@@ -144,12 +282,12 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
          </div>
          <div className="relative z-10 flex flex-col md:flex-row items-center gap-5">
             <div className="w-32 h-32 rounded-md border-4 border-white/10 overflow-hidden shrink-0 shadow-md flex items-center justify-center relative group" style={{ backgroundColor: brandColor }}>
-               {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                 <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} className="w-full h-full object-cover" alt="Profile" />
+               {profilePhoto ? (
+                 <img src={profilePhoto} className="w-full h-full object-cover" alt="Profile" />
                ) : (
                  <User size={56} />
                )}
-               <button onClick={() => startCamera(student.documents.find(d => d.name === 'Passport Size Photo')?.id || 'photo')} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <button onClick={() => startCamera(PROFILE_PHOTO_TARGET)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Camera size={24} />
                </button>
             </div>
@@ -309,7 +447,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                      <div className="flex justify-between items-end">
                         <div>
                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Verified Items</p>
-                           <p className="text-xl font-semibold tracking-tighter">{verifiedCount}<span className="text-xl text-gray-600"> / {student.documents.length}</span></p>
+                           <p className="text-xl font-semibold tracking-tighter">{verifiedCount}<span className="text-xl text-gray-600"> / {complianceDocuments.length}</span></p>
                         </div>
                         <div className="text-right">
                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
@@ -344,11 +482,11 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
       {activeTab === 'DOCS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {student.documents.map(doc => (
-             <div key={doc.id} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md transition-all">
-                <div className="flex justify-between items-start">
-                   <div className="p-4 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.08), color: brandColor }}>
-                      <FileText size={28}/>
+           {complianceDocuments.map(doc => (
+              <div key={doc.id} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md transition-all">
+                 <div className="flex justify-between items-start">
+                    <div className="p-4 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.08), color: brandColor }}>
+                       <FileText size={28}/>
                    </div>
                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
                      doc.status === 'VERIFIED' ? 'bg-emerald-50 border-emerald-100' : 
@@ -357,9 +495,51 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                    }`} style={doc.status === 'VERIFIED' || doc.status === 'UPLOADED' ? { color: brandColor, backgroundColor: withAlpha(brandColor, doc.status === 'VERIFIED' ? 0.1 : 0.12) } : undefined}>
                      {doc.status}
                    </span>
-                </div>
-                <h3 className="text-base font-semibold text-gray-800 uppercase tracking-tight flex-1">{doc.name}</h3>
-                {doc.status !== 'VERIFIED' && (
+                 </div>
+                 <h3 className="text-base font-semibold text-gray-800 uppercase tracking-tight flex-1">{doc.name}</h3>
+                 {doc.fileData && (
+                  <div className="rounded-md border border-gray-200 bg-gray-50 overflow-hidden">
+                     {isImageDataUrl(doc.fileData) ? (
+                       <div className="space-y-3 p-3">
+                          <div className="aspect-[4/3] w-full overflow-hidden rounded bg-white border border-gray-200">
+                             <img src={doc.fileData} alt={doc.name} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                             <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Image attached</span>
+                             <a
+                               href={doc.fileData}
+                               target="_blank"
+                               rel="noreferrer"
+                               className="text-[11px] font-semibold uppercase tracking-wide"
+                               style={{ color: brandColor }}
+                             >
+                               Open file
+                             </a>
+                          </div>
+                       </div>
+                     ) : (
+                       <div className="p-4 flex items-center justify-between gap-3">
+                          <div>
+                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">
+                     {isPdfDataUrl(doc.fileData) ? 'PDF attached' : 'Document attached'}
+                             </p>
+                             <p className="text-[11px] text-gray-500 mt-1">
+                             </p>
+                          </div>
+                          <a
+                            href={doc.fileData}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded text-[11px] font-semibold uppercase tracking-wide text-white"
+                            style={{ backgroundColor: brandColor }}
+                          >
+                            <ArrowRight size={14} /> Open
+                          </a>
+                       </div>
+                     )}
+                  </div>
+                 )}
+                 {doc.status !== 'VERIFIED' && (
                   <div className="flex gap-3">
                      {doc.name.toLowerCase().includes('photo') && (
                        <button onClick={() => startCamera(doc.id)} className="flex-1 py-3.5 bg-gray-800 text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-black transition-all">
