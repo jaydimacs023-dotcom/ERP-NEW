@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, AlertCircle, Package, ShieldCheck, Database, Info, Filter, Tag, Zap, Target } from 'lucide-react';
-import { StockItem, InventoryValuationMethod } from '../types';
+import { StockItem, InventoryValuationMethod, Organization } from '../types';
 
 interface StockItemsViewProps {
   items: StockItem[];
@@ -10,6 +10,7 @@ interface StockItemsViewProps {
   onDelete: (id: string) => Promise<void>;
   currency: string;
   isLoading?: boolean;
+  organization?: Organization;
 }
 
 interface FormData {
@@ -49,7 +50,9 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
   onDelete,
   currency,
   isLoading = false,
+  organization,
 }) => {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -198,7 +201,10 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
           <button
             onClick={handleAddClick}
             disabled={isLoading || submitting}
-            className="flex items-center gap-2 px-8 py-3 bg-[#F47721] text-white rounded hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm shadow-gray-100 font-semibold text-xs active:scale-95 uppercase tracking-wide"
+            style={{ backgroundColor: brandColor }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            className="flex items-center gap-2 px-8 py-3 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm shadow-gray-100 font-semibold text-xs active:scale-95 uppercase tracking-wide"
           >
             <Plus className="w-5 h-5" />
             Define Stock Item
@@ -213,7 +219,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
             <ShieldCheck size={240} />
           </div>
           <div className="flex items-center gap-8 relative z-10">
-            <div className="p-6 bg-[#F47721]/10 rounded-md border border-orange-400/20 text-orange-400">
+            <div style={{ backgroundColor: `${brandColor}10`, borderColor: `${brandColor}40` }} className="p-6 rounded-md border text-orange-400">
                <Package size={40} />
             </div>
             <div>
@@ -268,7 +274,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
             />
           </div>
           <div className="flex items-center gap-4 bg-gray-50 p-2 rounded border border-gray-100">
-            <button className="p-2.5 text-gray-400 hover:text-[#F47721] transiton-colors"><Filter size={18} /></button>
+            <button className="p-2.5 text-gray-400 transition-colors" style={{ color: brandColor }} onMouseEnter={(e) => { e.currentTarget.style.color = brandColor; }} onMouseLeave={(e) => { e.currentTarget.style.color = '#9CA3AF'; }}><Filter size={18} /></button>
             <div className="w-[1px] h-6 bg-gray-200" />
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">{filteredItems.length} Indices Found</p>
           </div>
@@ -279,7 +285,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
         <div className="bg-white rounded-md border border-gray-200 shadow-md overflow-hidden animate-in zoom-in-95 duration-300 max-w-5xl mx-auto">
           <div className="p-5 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
             <div className="flex items-center gap-6">
-                <div className="w-14 h-14 bg-[#F47721] rounded flex items-center justify-center text-white shadow-sm shadow-gray-300/10">
+                <div style={{ backgroundColor: brandColor }} className="w-14 h-14 rounded flex items-center justify-center text-white shadow-sm shadow-gray-300/10">
                     <Database size={28} />
                 </div>
                 <div>
@@ -297,7 +303,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
               <div className="space-y-8">
                  <div className="bg-gray-50 p-8 rounded border border-gray-100 space-y-6">
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                       <Tag size={14} className="text-[#F47721]" /> Identity Attributes
+                       <Tag size={14} style={{ color: brandColor }} /> Identity Attributes
                     </h3>
                     <div className="space-y-4">
                        <div className="space-y-2">
@@ -367,7 +373,8 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                        <p className="text-xs font-bold text-gray-500 mt-1 uppercase">Activate for logistics pipelines</p>
                     </div>
                     <button type="button" onClick={() => setFormData({...formData, isActive: !formData.isActive})}
-                      className={`w-14 h-8 rounded-full transition-all flex items-center px-1 ${formData.isActive ? 'bg-[#F47721]' : 'bg-gray-300'}`}>
+                      style={{ backgroundColor: formData.isActive ? brandColor : '#D1D5DB' }}
+                      className="w-14 h-8 rounded-full transition-all flex items-center px-1">
                       <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${formData.isActive ? 'translate-x-6' : ''}`} />
                     </button>
                  </div>
@@ -378,7 +385,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                <button type="button" onClick={handleCancel} className="flex-1 py-4 bg-gray-100 text-gray-600 rounded font-semibold text-xs uppercase tracking-wide hover:bg-gray-200 transition-all">
                   Cancel Specification
                </button>
-               <button type="submit" disabled={submitting} className="flex-[2] py-4 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide hover:bg-[#E06610] shadow-sm shadow-gray-300/10 transition-all disabled:opacity-50">
+               <button type="submit" disabled={submitting} style={{ backgroundColor: brandColor }} onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }} className="flex-[2] py-4 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/10 transition-all disabled:opacity-50">
                   {submitting ? 'PROCESSING RECAPITULATION...' : 'REALIZE ITEM INDEX'}
                </button>
             </div>

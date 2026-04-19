@@ -79,14 +79,64 @@ function getActorRole(payload: JwtPayload | null): string | undefined {
   return payload?.appRole || payload?.app_role || payload?.role;
 }
 
-function canManageOrgUsers(payload: JwtPayload | null, orgId: string): boolean {
+function getActorOrgId(payload: JwtPayload | null): string | undefined {
+  return payload?.orgId || payload?.org_id;
+}
+
+const ROLE_CANONICAL_MAP: Record<string, string> = {
+  system_admin: "SYSTEM_ADMIN",
+  admin: "ADMIN",
+  president: "PRESIDENT",
+  finance_manager: "FINANCE_MANAGER",
+  accountant: "ACCOUNTANT",
+  ar_specialist: "AR_SPECIALIST",
+  ap_specialist: "AP_SPECIALIST",
+  ap_clerk: "AP_CLERK",
+  ap_supervisor: "AP_SUPERVISOR",
+  treasury: "TREASURY",
+  auditor: "AUDITOR",
+  registrar: "REGISTRAR",
+  trainer: "TRAINER",
+  student: "STUDENT",
+};
+
+const ALLOWED_USER_ROLES = new Set(Object.values(ROLE_CANONICAL_MAP));
+
+function normalizeUserRole(role: string | undefined): string | undefined {
+  if (!role || typeof role !== "string") return undefined;
+  return ROLE_CANONICAL_MAP[role.trim().toLowerCase()];
+}
+
+async function canManageOrgUsers(payload: JwtPayload | null, orgId: string, userRole: string): Promise<boolean> {
   if (!payload?.sub) return false;
 
-  const actorRole = getActorRole(payload);
-  if (actorRole === "SYSTEM_ADMIN") return true;
+  const actorRole = getActorRole(payload)?.toLowerCase();
+  const actorOrgId = getActorOrgId(payload);
 
-  const actorOrgId = payload.orgId || payload.org_id;
-  return actorRole === "ADMIN" && actorOrgId === orgId;
+  // SYSTEM_ADMIN can manage any org
+  if (actorRole === "system_admin") return true;
+
+  // ADMIN can manage their own org
+  if (actorRole === "admin") {
+    return Boolean(actorOrgId && actorOrgId === orgId);
+  }
+
+  // Allow creating the first user or ADMIN users if no users exist in the org
+  if (userRole === "ADMIN") {
+    try {
+      const { count } = await admin
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId);
+
+      return count === 0; // Allow if no users exist
+    } catch (error) {
+      console.error("[users-write] Error checking existing users:", error);
+      return false;
+    }
+  }
+
+  return false;
 }
 
 Deno.serve(async (req) => {
@@ -121,21 +171,27 @@ Deno.serve(async (req) => {
   if (body.action === "create_user") {
     const user = body.user || {};
     const userOrgId = user.org_id || user.orgId;
+    const userRole = normalizeUserRole(user.role);
 
     if (!userOrgId) {
       return json(400, { error: "Missing user.org_id" });
     }
 
-    if (!user.email || !user.name || !user.role) {
+    if (!user.email || !user.name || !userRole) {
       return json(400, { error: "Missing required user fields" });
     }
 
-    if (!canManageOrgUsers(actor, userOrgId)) {
+    if (!ALLOWED_USER_ROLES.has(userRole)) {
+      return json(400, { error: `Invalid user.role: ${String(user.role)}` });
+    }
+
+    if (!await canManageOrgUsers(actor, userOrgId, userRole)) {
       return json(403, { error: "ADMIN for this organization or SYSTEM_ADMIN role required" });
     }
 
     const insertPayload = {
       ...user,
+      role: userRole,
       org_id: userOrgId,
       created_at: user.created_at ?? new Date().toISOString(),
       updated_at: user.updated_at ?? new Date().toISOString(),

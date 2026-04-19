@@ -1,6 +1,6 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, Download, MapPin, Building2, AlertCircle } from 'lucide-react';
-import { WarehouseLocation } from '../types';
+import { WarehouseLocation, Organization } from '../types';
 import { DataExportService } from '../services/DataExportService';
 
 interface WarehouseLocationsViewProps {
@@ -10,6 +10,7 @@ interface WarehouseLocationsViewProps {
   onDelete: (id: string) => Promise<void>;
   currency: string;
   isLoading?: boolean;
+  organization?: Organization;
 }
 
 interface FormData {
@@ -33,7 +34,10 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   onDelete,
   currency,
   isLoading = false,
+  organization,
 }) => {
+  // Brand color from organization, fallback to default
+  const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -162,7 +166,13 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
             <button
               onClick={handleAddClick}
               disabled={isLoading || submitting}
-              className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+              style={{
+                backgroundColor: brandColor,
+                boxShadow: `0 10px 15px -3px ${brandColor}20`
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${brandColor}dd`)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = brandColor)}
+              className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               New Location
@@ -178,7 +188,16 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                 }));
                 DataExportService.exportToCSV(exportData, `Warehouse_Map_${new Date().toISOString().split('T')[0]}.csv`);
              }}
-             className="p-3 bg-white border border-gray-200 rounded text-gray-400 hover:text-[#F47721] hover:border-orange-100 transition-all active:scale-95 shadow-sm"
+             style={{ borderColor: `${brandColor}20` }}
+             onMouseEnter={(e) => { 
+               e.currentTarget.style.borderColor = `${brandColor}40`;
+               e.currentTarget.style.color = brandColor;
+             }}
+             onMouseLeave={(e) => { 
+               e.currentTarget.style.borderColor = `${brandColor}20`;
+               e.currentTarget.style.color = '#9CA3AF';
+             }}
+             className="p-3 bg-white rounded transition-all active:scale-95 shadow-sm border text-gray-400"
              title="Export CSV"
            >
              <Download size={20} />
@@ -222,9 +241,9 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
             <MapPin className="text-gray-200 group-hover:scale-110 transition-transform" size={40} />
           </div>
         </div>
-        <div className="bg-orange-50 p-6 rounded border border-orange-100 shadow-sm">
-           <p className="text-xs font-semibold text-orange-800 uppercase tracking-wide mb-1">Active Centers</p>
-           <p className="text-xl font-semibold text-[#F47721] tracking-tight">
+        <div className="p-6 rounded border shadow-sm" style={{ backgroundColor: `${brandColor}10`, borderColor: `${brandColor}20` }}>
+           <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: brandColor }}>Active Centers</p>
+           <p className="text-xl font-semibold tracking-tight" style={{ color: brandColor }}>
              {activeLocations.filter(l => l.isActive).length}
            </p>
         </div>
@@ -232,7 +251,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Logistics Integrity</p>
           <div className="flex items-center gap-4 mt-2">
              <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-[#F47721] rounded-full" style={{ width: '100%' }}></div>
+                <div className="h-full rounded-full" style={{ width: '100%', backgroundColor: brandColor }}></div>
              </div>
              <span className="text-xs font-semibold text-white uppercase tracking-wide">Verified</span>
           </div>
@@ -241,7 +260,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
 
       {/* Form Overlay */}
       {showForm && (
-        <div className="bg-white rounded-md border-2 border-orange-100 shadow-sm overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-md shadow-sm overflow-hidden animate-in zoom-in-95 duration-200" style={{ borderWidth: '2px', borderColor: `${brandColor}30` }}>
            <div className="p-8 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">{editingId ? 'Edit Storage Zone' : 'Define New Capacity'}</h3>
@@ -259,7 +278,18 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                       placeholder="e.g. WH-01"
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800 font-mono"
+                      style={{
+                        borderColor: 'transparent'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = `${brandColor}40`;
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent';
+                        e.currentTarget.style.backgroundColor = '#f9fafb';
+                      }}
+                      className="w-full px-5 py-3.5 bg-gray-50 border-2 rounded outline-none transition-all text-sm font-semibold text-gray-800 font-mono"
                     />
                  </div>
 
@@ -270,7 +300,18 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g. Bulk Storage Alpha"
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800"
+                      style={{
+                        borderColor: 'transparent'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = `${brandColor}40`;
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent';
+                        e.currentTarget.style.backgroundColor = '#f9fafb';
+                      }}
+                      className="w-full px-5 py-3.5 bg-gray-50 border-2 rounded outline-none transition-all text-sm font-semibold text-gray-800"
                     />
                  </div>
 
@@ -281,7 +322,18 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                       value={formData.location}
                       onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                       placeholder="Enter precise physical location details..."
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800"
+                      style={{
+                        borderColor: 'transparent'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = `${brandColor}40`;
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'transparent';
+                        e.currentTarget.style.backgroundColor = '#f9fafb';
+                      }}
+                      className="w-full px-5 py-3.5 bg-gray-50 border-2 rounded outline-none transition-all text-sm font-semibold text-gray-800"
                     />
                  </div>
 
@@ -294,7 +346,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                           onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                           className="sr-only peer"
                         />
-                        <div className="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-[#F47721] transition-colors"></div>
+                        <div className="w-10 h-6 bg-gray-200 rounded-full transition-colors" style={{ backgroundColor: formData.isActive ? brandColor : '#D1D5DB' }}></div>
                         <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
                       </div>
                       <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide group-hover:text-gray-800 transition-colors">Active Warehouse Center</span>
@@ -313,7 +365,19 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-3.5 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+                  style={{
+                    backgroundColor: brandColor,
+                    boxShadow: `0 2px 4px 0 ${brandColor}40`
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = `${brandColor}dd`;
+                    (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = brandColor;
+                    (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+                  }}
+                  className="px-5 py-3.5 text-white rounded font-semibold text-xs uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50"
                 >
                   {editingId ? 'COMMIT CHANGES' : 'CREATE STORAGE ZONE'}
                 </button>
@@ -332,7 +396,16 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
               placeholder="Search via zone code, name or address..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded text-sm font-medium focus:ring-2 focus:ring-orange-400/20 outline-none transition-all placeholder:text-gray-400"
+              style={{
+                focusRingColor: `${brandColor}30`
+              }}
+              onFocus={(e) => {
+                (e.currentTarget as HTMLInputElement).style.boxShadow = `0 0 0 2px ${brandColor}20`;
+              }}
+              onBlur={(e) => {
+                (e.currentTarget as HTMLInputElement).style.boxShadow = 'none';
+              }}
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded text-sm font-medium outline-none transition-all placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -355,7 +428,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
               {isLoading ? (
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
-                      <div className="w-10 h-10 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin mx-auto mb-4"></div>
+                      <div className="w-10 h-10 border-4 rounded-full animate-spin mx-auto mb-4" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }}></div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Mapping Logistics Architecture...</p>
                    </td>
                 </tr>
@@ -375,12 +448,12 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                     <td className="px-8 py-5">
                        <div className="text-center">
                           <div className="text-xs font-mono font-semibold text-gray-400 uppercase mb-0.5 tracking-tighter">{loc.code}</div>
-                          <div className="w-8 h-1 bg-[#F47721]/20 rounded-full mx-auto"></div>
+                          <div className="w-8 h-1 rounded-full mx-auto" style={{ backgroundColor: `${brandColor}30` }}></div>
                        </div>
                     </td>
                     <td className="px-6 py-5 font-semibold text-gray-800 tracking-tight">
                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-[#F47721] group-hover:scale-110 transition-transform">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform" style={{ backgroundColor: `${brandColor}15`, color: brandColor }}>
                              <Building2 size={16} />
                           </div>
                           {loc.name}
@@ -398,7 +471,16 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEditClick(loc)}
-                            className="p-2.5 text-gray-400 hover:text-[#F47721] hover:bg-white rounded transition-all shadow-sm border border-transparent hover:border-gray-100"
+                            className="p-2.5 text-gray-400 rounded transition-all shadow-sm border border-transparent hover:border-gray-100"
+                            style={{}}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = brandColor;
+                              e.currentTarget.style.backgroundColor = 'white';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#9CA3AF';
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
                             <Edit2 size={16} />
                           </button>
@@ -423,7 +505,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         {!isLoading && filteredItems.length > 0 && (
            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} className="text-[#F47721]" /></div>
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} style={{ color: brandColor }} /></div>
                   <div>
                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Logistics Integrity</p>
                      <p className="text-xs font-bold text-gray-600">Total physical storage footprint: {filteredItems.length} registered zones.</p>

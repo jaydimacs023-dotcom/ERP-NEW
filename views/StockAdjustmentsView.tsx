@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
-import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine } from '../types';
+import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine, Organization } from '../types';
 import { InventoryService } from '../services/InventoryService';
 import { InventoryGLService } from '../services/InventoryGLService';
 import { DataExportService } from '../services/DataExportService';
@@ -18,6 +18,7 @@ interface StockAdjustmentsViewProps {
   currency: string;
   isLoading?: boolean;
   currentUserId?: string;
+  organization?: Organization;
 }
 
 interface FormData {
@@ -55,7 +56,9 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
   currency,
   isLoading = false,
   currentUserId,
+  organization,
 }) => {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -251,7 +254,10 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
             <button
               onClick={handleAddClick}
               disabled={isLoading || submitting}
-              className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px ${brandColor}1f` }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+              className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               New Adjustment
@@ -275,7 +281,10 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                 });
                 DataExportService.exportToCSV(exportData, `Stock_Adjustments_${new Date().toISOString().split('T')[0]}.csv`);
              }}
-             className="p-3 bg-white border border-gray-200 rounded text-gray-400 hover:text-[#F47721] hover:border-orange-100 transition-all active:scale-95 shadow-sm"
+             className="p-3 bg-white border border-gray-200 rounded text-gray-400 transition-all active:scale-95 shadow-sm"
+             style={{ borderColor: '#E5E7EB' }}
+             onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${brandColor}30`; e.currentTarget.style.color = brandColor; }}
+             onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#9CA3AF'; }}
              title="Export CSV"
            >
              <Download size={20} />

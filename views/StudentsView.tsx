@@ -894,7 +894,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       {/* Manual Registration Modal */}
       {showModal && (
         <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
           <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col md:flex-row h-full max-h-[95vh]">
             <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
               <div className="flex justify-between items-center mb-8">
@@ -1093,333 +1093,333 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
             </div>
           </div>
         </div>
-</ModalPortal>
+        </ModalPortal>
       )}
 
       {/* Edit Student Modal */}
       {showEditModal && editingStudent && (
         <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[95vh]">
-            <div className="p-8 border-b bg-gradient-to-r from-brand/10 to-brand/20/50 flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20"><RefreshCw size={24} /></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Edit Student Record</h3>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Update {editingStudent.firstName} {editingStudent.lastName}'s Information</p>
-                </div>
-              </div>
-              <button onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="p-3 hover:bg-white rounded transition-colors">
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
+                  <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[95vh]">
+                    <div className="p-8 border-b bg-gradient-to-r from-brand/10 to-brand/20/50 flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20"><RefreshCw size={24} /></div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Edit Student Record</h3>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Update {editingStudent.firstName} {editingStudent.lastName}'s Information</p>
+                        </div>
+                      </div>
+                      <button onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="p-3 hover:bg-white rounded transition-colors">
+                        <X size={20} className="text-gray-400" />
+                      </button>
+                    </div>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              try {
-                // Update documents with new photo if changed
-                let updatedDocuments = editingStudent.documents || [];
-                if (editPhotoPreview) {
-                  const photoDocIndex = updatedDocuments.findIndex(d => d.name === 'Passport Size Photo');
-                  const newPhotoDoc = {
-                    id: photoDocIndex >= 0 ? updatedDocuments[photoDocIndex].id : `doc-photo-${Date.now()}`,
-                    name: 'Passport Size Photo',
-                    status: 'UPLOADED' as const,
-                    fileData: editPhotoPreview
-                  };
-                  if (photoDocIndex >= 0) {
-                    updatedDocuments = updatedDocuments.map((d, i) => i === photoDocIndex ? newPhotoDoc : d);
-                  } else {
-                    updatedDocuments = [...updatedDocuments, newPhotoDoc];
-                  }
-                }
-
-                const updatedStudent: Student = {
-                  ...editingStudent,
-                  ...formData,
-                  id: editingStudent.id,
-                  orgId: editingStudent.orgId,
-                  documents: updatedDocuments,
-                  createdAt: editingStudent.createdAt,
-                  createdBy: editingStudent.createdBy
-                } as Student;
-                onUpdateStudent(updatedStudent);
-                showToast(`Student ${formData.firstName} ${formData.lastName} updated successfully!`, 'success');
-                setShowEditModal(false);
-                setEditingStudent(null);
-                setEditPhotoPreview(null);
-              } catch (error) {
-                showToast(`Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-              }
-            }} className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
-
-              {/* Student Photo */}
-              <div className="flex flex-col items-center mb-4 gap-4">
-                <div className="relative">
-                  <div className="w-32 h-32 rounded-md border-4 border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center shadow-lg">
-                    {showEditCamera ? (
-                      <video ref={editVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                    ) : editPhotoPreview ? (
-                      <img src={editPhotoPreview} alt="New Photo" className="w-full h-full object-cover" />
-                    ) : editingStudent.documents?.find(d => d.name === 'Passport Size Photo')?.fileData ? (
-                      <img src={editingStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={48} className="text-gray-300" />
-                    )}
-                  </div>
-                  {editPhotoPreview && (
-                    <button type="button" onClick={() => setEditPhotoPreview(null)} className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-                <canvas ref={editCanvasRef} className="hidden" />
-                <input type="file" ref={editPhotoInputRef} accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => setEditPhotoPreview(reader.result as string);
-                    reader.readAsDataURL(file);
-                  }
-                }} />
-                <div className="flex gap-2">
-                  {showEditCamera ? (
-                    <>
-                      <button type="button" onClick={() => {
-                        if (editVideoRef.current && editCanvasRef.current) {
-                          const context = editCanvasRef.current.getContext('2d');
-                          if (context) {
-                            editCanvasRef.current.width = editVideoRef.current.videoWidth;
-                            editCanvasRef.current.height = editVideoRef.current.videoHeight;
-                            context.drawImage(editVideoRef.current, 0, 0);
-                            const dataUrl = editCanvasRef.current.toDataURL('image/jpeg', 0.8);
-                            setEditPhotoPreview(dataUrl);
-                            if (editVideoRef.current?.srcObject) {
-                              (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-                            }
-                            setShowEditCamera(false);
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      try {
+                        // Update documents with new photo if changed
+                        let updatedDocuments = editingStudent.documents || [];
+                        if (editPhotoPreview) {
+                          const photoDocIndex = updatedDocuments.findIndex(d => d.name === 'Passport Size Photo');
+                          const newPhotoDoc = {
+                            id: photoDocIndex >= 0 ? updatedDocuments[photoDocIndex].id : `doc-photo-${Date.now()}`,
+                            name: 'Passport Size Photo',
+                            status: 'UPLOADED' as const,
+                            fileData: editPhotoPreview
+                          };
+                          if (photoDocIndex >= 0) {
+                            updatedDocuments = updatedDocuments.map((d, i) => i === photoDocIndex ? newPhotoDoc : d);
+                          } else {
+                            updatedDocuments = [...updatedDocuments, newPhotoDoc];
                           }
                         }
-                      }} className="px-4 py-2 bg-green-600 text-white rounded text-xs font-bold uppercase tracking-wider hover:bg-green-700 transition-colors flex items-center gap-2">
-                        <Camera size={14} /> Capture
-                      </button>
-                      <button type="button" onClick={() => {
-                        if (editVideoRef.current?.srcObject) {
-                          (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-                        }
-                        setShowEditCamera(false);
-                      }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-xs font-bold uppercase tracking-wider hover:bg-gray-300 transition-colors">
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => {
-                        setShowEditCamera(true);
-                        setTimeout(async () => {
-                          try {
-                            const stream = await navigator.mediaDevices.getUserMedia({
-                              video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } }
-                            });
-                            if (editVideoRef.current) editVideoRef.current.srcObject = stream;
-                          } catch (err) {
-                            alert("Camera access denied.");
-                            setShowEditCamera(false);
+
+                        const updatedStudent: Student = {
+                          ...editingStudent,
+                          ...formData,
+                          id: editingStudent.id,
+                          orgId: editingStudent.orgId,
+                          documents: updatedDocuments,
+                          createdAt: editingStudent.createdAt,
+                          createdBy: editingStudent.createdBy
+                        } as Student;
+                        onUpdateStudent(updatedStudent);
+                        showToast(`Student ${formData.firstName} ${formData.lastName} updated successfully!`, 'success');
+                        setShowEditModal(false);
+                        setEditingStudent(null);
+                        setEditPhotoPreview(null);
+                      } catch (error) {
+                        showToast(`Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+                      }
+                    }} className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
+
+                      {/* Student Photo */}
+                      <div className="flex flex-col items-center mb-4 gap-4">
+                        <div className="relative">
+                          <div className="w-32 h-32 rounded-md border-4 border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center shadow-lg">
+                            {showEditCamera ? (
+                              <video ref={editVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                            ) : editPhotoPreview ? (
+                              <img src={editPhotoPreview} alt="New Photo" className="w-full h-full object-cover" />
+                            ) : editingStudent.documents?.find(d => d.name === 'Passport Size Photo')?.fileData ? (
+                              <img src={editingStudent.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="Student" className="w-full h-full object-cover" />
+                            ) : (
+                              <User size={48} className="text-gray-300" />
+                            )}
+                          </div>
+                          {editPhotoPreview && (
+                            <button type="button" onClick={() => setEditPhotoPreview(null)} className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <canvas ref={editCanvasRef} className="hidden" />
+                        <input type="file" ref={editPhotoInputRef} accept="image/*" className="hidden" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => setEditPhotoPreview(reader.result as string);
+                            reader.readAsDataURL(file);
                           }
-                        }, 100);
-                      }} className="px-4 py-2 bg-brand/10 text-brand rounded text-xs font-bold uppercase tracking-wider hover:bg-brand/20 transition-colors flex items-center gap-2">
-                        <Camera size={14} /> Camera
-                      </button>
-                      <button type="button" onClick={() => editPhotoInputRef.current?.click()} className="px-4 py-2 bg-brand/10 text-brand rounded text-xs font-bold uppercase tracking-wider hover:bg-brand/20 transition-colors flex items-center gap-2">
-                        <Upload size={14} /> Upload
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+                        }} />
+                        <div className="flex gap-2">
+                          {showEditCamera ? (
+                            <>
+                              <button type="button" onClick={() => {
+                                if (editVideoRef.current && editCanvasRef.current) {
+                                  const context = editCanvasRef.current.getContext('2d');
+                                  if (context) {
+                                    editCanvasRef.current.width = editVideoRef.current.videoWidth;
+                                    editCanvasRef.current.height = editVideoRef.current.videoHeight;
+                                    context.drawImage(editVideoRef.current, 0, 0);
+                                    const dataUrl = editCanvasRef.current.toDataURL('image/jpeg', 0.8);
+                                    setEditPhotoPreview(dataUrl);
+                                    if (editVideoRef.current?.srcObject) {
+                                      (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                                    }
+                                    setShowEditCamera(false);
+                                  }
+                                }
+                              }} className="px-4 py-2 bg-green-600 text-white rounded text-xs font-bold uppercase tracking-wider hover:bg-green-700 transition-colors flex items-center gap-2">
+                                <Camera size={14} /> Capture
+                              </button>
+                              <button type="button" onClick={() => {
+                                if (editVideoRef.current?.srcObject) {
+                                  (editVideoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+                                }
+                                setShowEditCamera(false);
+                              }} className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-xs font-bold uppercase tracking-wider hover:bg-gray-300 transition-colors">
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" onClick={() => {
+                                setShowEditCamera(true);
+                                setTimeout(async () => {
+                                  try {
+                                    const stream = await navigator.mediaDevices.getUserMedia({
+                                      video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } }
+                                    });
+                                    if (editVideoRef.current) editVideoRef.current.srcObject = stream;
+                                  } catch (err) {
+                                    alert("Camera access denied.");
+                                    setShowEditCamera(false);
+                                  }
+                                }, 100);
+                              }} className="px-4 py-2 bg-brand/10 text-brand rounded text-xs font-bold uppercase tracking-wider hover:bg-brand/20 transition-colors flex items-center gap-2">
+                                <Camera size={14} /> Camera
+                              </button>
+                              <button type="button" onClick={() => editPhotoInputRef.current?.click()} className="px-4 py-2 bg-brand/10 text-brand rounded text-xs font-bold uppercase tracking-wider hover:bg-brand/20 transition-colors flex items-center gap-2">
+                                <Upload size={14} /> Upload
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
 
-              {/* Personal Information */}
-              <section className="space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><User size={16} /></div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personal Information</h4>
-                </div>
+                      {/* Personal Information */}
+                      <section className="space-y-6">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><User size={16} /></div>
+                          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personal Information</h4>
+                        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">ULI</label>
-                    <input disabled className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded text-sm font-bold text-gray-500 opacity-75 cursor-not-allowed" value={formData.uli} />
-                  </div>
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
-                  </div>
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">ULI</label>
+                            <input disabled className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded text-sm font-bold text-gray-500 opacity-75 cursor-not-allowed" value={formData.uli} />
+                          </div>
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
+                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
+                          </div>
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
+                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Middle Name</label>
+                            <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({ ...formData, middleName: e.target.value })} />
+                          </div>
+                          <div className="md:col-span-1 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Extension</label>
+                            <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({ ...formData, extension: e.target.value })} />
+                          </div>
+                          <div className="md:col-span-1 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Sex</label>
+                            <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value })}>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Date of Birth</label>
+                            <input required type="date" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                          </div>
+                        </div>
+
+                        {/* Birth Address */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Region</label>
+                            <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthRegion || ''} onChange={e => setFormData({ ...formData, birthRegion: e.target.value })} placeholder="e.g. NCR, Region IV-A" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Province</label>
+                            <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthProvince || ''} onChange={e => setFormData({ ...formData, birthProvince: e.target.value })} placeholder="e.g. Metro Manila, Laguna" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth City/Municipality</label>
+                            <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthCity || ''} onChange={e => setFormData({ ...formData, birthCity: e.target.value })} placeholder="e.g. Manila, Calamba" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Civil Status</label>
+                            <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({ ...formData, civilStatus: e.target.value })}>
+                              <option value="Single">Single</option>
+                              <option value="Married">Married</option>
+                              <option value="Widowed">Widowed</option>
+                              <option value="Divorced">Divorced</option>
+                              <option value="Separated">Separated</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Email</label>
+                            <input type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
+                            <input type="tel" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Address Information */}
+                      <section className="space-y-6">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><MapPin size={16} /></div>
+                          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Address Information</h4>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Street Address</label>
+                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
+                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
+                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
+                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Education & Guardian */}
+                      <section className="space-y-6">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><BookOpen size={16} /></div>
+                          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">III. Background & Guardian</h4>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
+                            <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
+                              <option value="Elementary Graduate">Elementary Graduate</option>
+                              <option value="High School Graduate">High School Graduate</option>
+                              <option value="College Level">College Level</option>
+                              <option value="College Graduate">College Graduate</option>
+                              <option value="TVET Graduate">TVET Graduate</option>
+                              <option value="Masteral/PhD">Masteral/PhD</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
+                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                            <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.guardian || ''} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
+                          </div>
+                        </div>
+                      </section>
+
+                      <div className="flex gap-4 pt-4">
+                        <button type="button" onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="flex-1 py-4 bg-white border border-gray-200 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-50 transition-all">Cancel</button>
+                        <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-lg shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all">Save Changes</button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Middle Name</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.middleName} onChange={e => setFormData({ ...formData, middleName: e.target.value })} />
-                  </div>
-                  <div className="md:col-span-1 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Extension</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.extension} onChange={e => setFormData({ ...formData, extension: e.target.value })} />
-                  </div>
-                  <div className="md:col-span-1 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Sex</label>
-                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.sex} onChange={e => setFormData({ ...formData, sex: e.target.value })}>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Date of Birth</label>
-                    <input required type="date" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
-                  </div>
-                </div>
-
-                {/* Birth Address */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Region</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthRegion || ''} onChange={e => setFormData({ ...formData, birthRegion: e.target.value })} placeholder="e.g. NCR, Region IV-A" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Province</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthProvince || ''} onChange={e => setFormData({ ...formData, birthProvince: e.target.value })} placeholder="e.g. Metro Manila, Laguna" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth City/Municipality</label>
-                    <input className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.birthCity || ''} onChange={e => setFormData({ ...formData, birthCity: e.target.value })} placeholder="e.g. Manila, Calamba" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Civil Status</label>
-                    <select className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.civilStatus} onChange={e => setFormData({ ...formData, civilStatus: e.target.value })}>
-                      <option value="Single">Single</option>
-                      <option value="Married">Married</option>
-                      <option value="Widowed">Widowed</option>
-                      <option value="Divorced">Divorced</option>
-                      <option value="Separated">Separated</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Email</label>
-                    <input type="email" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
-                    <input type="tel" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
-                  </div>
-                </div>
-              </section>
-
-              {/* Address Information */}
-              <section className="space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><MapPin size={16} /></div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Address Information</h4>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Street Address</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
-                      <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Education & Guardian */}
-              <section className="space-y-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500"><BookOpen size={16} /></div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">III. Background & Guardian</h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
-                    <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
-                      <option value="Elementary Graduate">Elementary Graduate</option>
-                      <option value="High School Graduate">High School Graduate</option>
-                      <option value="College Level">College Level</option>
-                      <option value="College Graduate">College Graduate</option>
-                      <option value="TVET Graduate">TVET Graduate</option>
-                      <option value="Masteral/PhD">Masteral/PhD</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
-                    <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
-                    <input placeholder="Name of parent or guardian (optional)" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.guardian || ''} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
-                  </div>
-                </div>
-              </section>
-
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => { setShowEditModal(false); setEditingStudent(null); setEditPhotoPreview(null); setShowEditCamera(false); }} className="flex-1 py-4 bg-white border border-gray-200 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-50 transition-all">Cancel</button>
-                <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-lg shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all">Save Changes</button>
-              </div>
-            </form>
-          </div>
-        </div>
-</ModalPortal>
+        </ModalPortal>
       )}
 
       {/* Camera Overlay */}
       {showCamera && (
         <ModalPortal>
-<div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
-          <div className="w-full max-w-md space-y-12">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-white uppercase tracking-tight">Identity Capture</h3>
-              <p className="text-gray-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
-            </div>
-            <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white shadow-md ring-4 ring-brand/10">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                <div className="w-3/4 h-3/4 border-2 border-dashed border-white/40 rounded relative">
-                  <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-1/2 h-1/2 border-2 border-white/20 rounded-full"></div>
+        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-xl flex flex-col items-center justify-center z-[100] p-4">
+                  <div className="w-full max-w-md space-y-12">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-white uppercase tracking-tight">Identity Capture</h3>
+                      <p className="text-gray-500 text-sm font-medium mt-1">Position learner's face within the frame.</p>
+                    </div>
+                    <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white shadow-md ring-4 ring-brand/10">
+                      <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                      <canvas ref={canvasRef} className="hidden" />
+                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                        <div className="w-3/4 h-3/4 border-2 border-dashed border-white/40 rounded relative">
+                          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-1/2 h-1/2 border-2 border-white/20 rounded-full"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center gap-12">
+                      <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all">
+                        <X size={28} />
+                      </button>
+                      <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-gray-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-md ring-8 ring-white/10">
+                        <Camera size={40} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-12">
-              <button onClick={stopCamera} className="w-16 h-16 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 transition-all">
-                <X size={28} />
-              </button>
-              <button onClick={capturePhoto} className="w-24 h-24 flex items-center justify-center bg-white text-gray-900 rounded-full hover:scale-110 active:scale-90 transition-all shadow-md ring-8 ring-white/10">
-                <Camera size={40} />
-              </button>
-            </div>
-          </div>
-        </div>
-</ModalPortal>
-      )}
+        </ModalPortal>
+              )}
 
       {/* Toast Notifications moved to bottom to prevent margin-top issues on header */}
       <div className="fixed top-4 right-4 z-[200] space-y-2 max-w-md">

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
-  JournalLine
+  JournalLine, Organization
 } from '../types';
 import {
   InventoryReportingService
@@ -20,6 +20,7 @@ interface AdvancedInventoryReportsProps {
   transactions: InventoryTransaction[];
   lines: JournalLine[];
   currency: string;
+  organization?: Organization;
 }
 
 const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
@@ -27,10 +28,14 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   levels,
   transactions,
   lines,
-  currency
+  currency,
+  organization
 }) => {
   const [activeTab, setActiveTab] = useState<'aging' | 'valuation' | 'trends' | 'variance' | 'abc' | 'metrics'>('aging');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'quantity' | 'days'>('value');
+
+  // Brand color from organization, fallback to default
+  const brandColor = organization?.primaryColor || '#4F46E5';
 
   // Generate reports
   const agingReport = useMemo(() => InventoryReportingService.getStockAging(items, levels, transactions), [items, levels, transactions]);
@@ -40,7 +45,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   const abcReport = useMemo(() => InventoryReportingService.getABCAnalysis(items, transactions), [items, transactions]);
   const metricsReport = useMemo(() => InventoryReportingService.getInventoryMetrics(items, levels, transactions), [items, levels, transactions]);
 
-  const COLORS = ['#0D9488', '#0891B2', '#4F46E5', '#7C3AED', '#DB2777'];
+  // Use brand color as primary, with complementary colors
+  const COLORS = [brandColor, '#0891B2', '#6366F1', '#7C3AED', '#DB2777'];
   const SEVERITY_COLORS = { Critical: '#BE123C', High: '#E11D48', Medium: '#F59E0B', Low: '#10B981' };
 
   const handleExportCSV = () => {
@@ -86,7 +92,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         <div className="flex gap-3">
           <button 
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/20 hover:bg-black hover:-translate-y-0.5 transition-all"
+            style={{ backgroundColor: brandColor }}
+            className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/20 hover:opacity-90 hover:-translate-y-0.5 transition-all"
           >
             <Download size={14} />
             Export Dataset
@@ -99,9 +106,10 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
+            style={activeTab === tab.id ? { backgroundColor: 'white', color: brandColor, boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' } : {}}
             className={`flex items-center gap-2 px-6 py-3 rounded text-xs font-semibold uppercase tracking-wide transition-all ${
               activeTab === tab.id 
-                ? 'bg-white text-[#F47721] shadow-sm' 
+                ? 'shadow-sm' 
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
@@ -117,7 +125,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm relative overflow-hidden">
                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full -mr-10 -mt-6 opacity-50"></div>
                <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
-                  <Clock className="text-[#F47721]" /> Lifespan Distribution
+                  <Clock style={{ color: brandColor }} /> Lifespan Distribution
                </h3>
                <div className="h-[350px]">
                  <ResponsiveContainer width="99%" height={350}>
@@ -129,7 +137,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                         contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                         itemStyle={{ fontSize: '12px', fontWeight: '800' }}
                      />
-                     <Bar dataKey="daysInStock" fill="#0D9488" radius={[8, 8, 0, 0]} />
+                     <Bar dataKey="daysInStock" fill={brandColor} radius={[8, 8, 0, 0]} />
                    </BarChart>
                  </ResponsiveContainer>
                </div>
@@ -177,7 +185,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
 
           <div className="space-y-8">
             <div className="bg-gray-800 p-8 rounded-md shadow-sm shadow-gray-300/20 text-white">
-               <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wide mb-6">Inventory Velocity Summary</h4>
+               <h4 className="text-xs font-semibold uppercase tracking-wide mb-6" style={{ color: brandColor }}>Inventory Velocity Summary</h4>
                <div className="space-y-6">
                   <div className="flex items-center justify-between border-b border-white/10 pb-4">
                      <p className="text-xs font-bold text-gray-400">Average Retention</p>
@@ -192,12 +200,12 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
 
             <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm shadow-gray-200/10">
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-6 flex items-center gap-2">
-                 <ShieldCheck size={14} className="text-[#F47721]" /> Assurance Monitor
+                 <ShieldCheck size={14} style={{ color: brandColor }} /> Assurance Monitor
               </h4>
               <div className="space-y-4">
-                 <div className="p-4 bg-orange-50 rounded border border-orange-100">
-                    <p className="text-xs font-semibold text-orange-800 uppercase mb-1">Data Freshness</p>
-                    <p className="text-xs font-bold text-[#F47721]">Archive snapshots are up to date within the last 5 minutes.</p>
+                 <div className="p-4 rounded border" style={{ backgroundColor: `${brandColor}15`, borderColor: `${brandColor}30` }}>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: brandColor }}>Data Freshness</p>
+                    <p className="text-xs font-bold" style={{ color: brandColor }}>Archive snapshots are up to date within the last 5 minutes.</p>
                  </div>
                  <div className="p-4 bg-gray-50 rounded border border-gray-100">
                     <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Audit Trail</p>
@@ -215,21 +223,21 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
            <BarChart3 className="w-16 h-16 text-gray-200 mx-auto mb-4" />
            <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-wide">{activeTab.toUpperCase()} ANALYTICS NODE</h3>
            <p className="text-sm text-gray-400 mt-2">Visualization engine standardizing for {activeTab} reporting...</p>
-           <button onClick={() => setActiveTab('aging')} className="mt-6 text-xs font-semibold text-[#F47721] underline uppercase tracking-wide">Return to Aging Archive</button>
+           <button onClick={() => setActiveTab('aging')} className="mt-6 text-xs font-semibold underline uppercase tracking-wide" style={{ color: brandColor }}>Return to Aging Archive</button>
         </div>
       )}
 
       <footer className="p-8 bg-gray-800 rounded-md flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-             <div className="p-3 bg-[#F47721] rounded text-white shadow-lg shadow-gray-300/30"><FileText size={20} /></div>
+             <div className="p-3 rounded text-white shadow-lg shadow-gray-300/30" style={{ backgroundColor: brandColor }}><FileText size={20} /></div>
              <div>
                 <p className="text-xs font-semibold text-white uppercase tracking-wide">Logistics Integrity Snapshot</p>
-                <p className="text-xs text-orange-400 font-bold uppercase">Computed: {new Date().toLocaleString()}</p>
+                <p className="text-xs font-bold uppercase" style={{ color: brandColor }}>Computed: {new Date().toLocaleString()}</p>
              </div>
           </div>
           <div className="flex gap-4">
              <button className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded text-xs font-semibold uppercase tracking-wide transition-all">Report Discrepancy</button>
-             <button className="px-6 py-3 bg-[#F47721] hover:bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide transition-all shadow-lg shadow-gray-300/30">Schedule Audit</button>
+             <button className="px-6 py-3 text-white rounded text-xs font-semibold uppercase tracking-wide transition-all shadow-lg shadow-gray-300/30" style={{ backgroundColor: brandColor }}>Schedule Audit</button>
           </div>
       </footer>
     </div>

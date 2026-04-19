@@ -1,7 +1,7 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
-  JournalLine, AccountClass 
+  JournalLine, AccountClass, Organization 
 } from '../types';
 import {
   InventoryReportingService,
@@ -28,6 +28,7 @@ interface AdvancedInventoryReportsProps {
   transactions: InventoryTransaction[];
   lines: JournalLine[];
   currency: string;
+  organization?: Organization;
 }
 
 const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
@@ -35,9 +36,11 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
   levels,
   transactions,
   lines,
-  currency
+  currency,
+  organization
 }) => {
   const [activeTab, setActiveTab] = useState<'aging' | 'valuation' | 'trends' | 'variance' | 'abc' | 'metrics'>('aging');
+  const brandColor = organization?.primaryColor || '#4F46E5';
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'quantity' | 'days'>('value');
 
   // Generate reports
@@ -96,26 +99,26 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
     value: value as number,
   }));
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
+  const COLORS = [brandColor, '#10B981', '#F59E0B'];
   const SEVERITY_COLORS = { Critical: '#EF4444', High: '#F97316', Medium: '#FBBF24', Low: '#86EFAC' };
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#F47721] to-purple-600 rounded p-8 text-white">
+      <div className="rounded p-8 text-white" style={{ background: `linear-gradient(90deg, ${brandColor} 0%, #7C3AED 100%)` }}>
         <h1 className="text-xl font-bold mb-2">Advanced Inventory Analytics</h1>
-        <p className="text-orange-100">Real-time stock valuation, aging, trends, and variance analysis</p>
+        <p className="text-white/80">Real-time stock valuation, aging, trends, and variance analysis</p>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl shadow p-4 border-l-4 border-orange-400">
+<div className="bg-white rounded-xl shadow p-4 border-l-4" style={{ borderColor: brandColor }}>
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-semibold">Total Inventory Value</p>
-              <p className="text-xl font-bold text-gray-900">{currency} {metricsReport.totalInventoryValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
-            </div>
-            <DollarSign size={28} className="text-orange-500" />
+             <div>
+               <p className="text-xs text-gray-500 uppercase font-semibold">Total Inventory Value</p>
+               <p className="text-xl font-bold text-gray-900">{currency} {metricsReport.totalInventoryValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+             </div>
+             <DollarSign size={28} style={{ color: brandColor }} />
           </div>
         </div>
 
@@ -173,9 +176,10 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
+            style={activeTab === tab.id ? { backgroundColor: brandColor, color: 'white' } : undefined}
             className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition flex items-center gap-2 ${
               activeTab === tab.id
-                ? 'bg-[#F47721] text-white'
+                ? 'shadow-sm'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -203,7 +207,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportAgingReport(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -300,7 +305,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportValuationComparison(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -322,7 +328,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono font-bold text-gray-900">{item.itemCode}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-[#F47721] font-semibold">{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right font-semibold" style={{ color: brandColor }}>{currency} {item.fifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-green-600 font-semibold">{currency} {item.lifoValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-purple-600 font-semibold">{currency} {item.weightedAvgValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{currency} {item.currentCostPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}</td>
@@ -351,7 +357,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportMovementTrends(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -387,7 +394,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportVarianceAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -471,7 +479,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                   }));
                   DataExportService.exportABCAnalysis(exportData);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                style={{ backgroundColor: brandColor }}
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
               >
                 <Download size={14} /> Export CSV
               </button>
@@ -568,7 +577,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
             <div className="bg-white rounded-xl shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-orange-500" />
+                  <AlertTriangle size={20} style={{ color: brandColor }} />
                   Low Stock Items ({lowStockReport.length})
                 </h2>
                 <button
@@ -586,7 +595,8 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       ['Code', 'Item', 'Current Qty', 'Min Level', 'Deficit', 'Reorder Point']
                     );
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg text-xs font-semibold hover:bg-[#E06610] transition"
+                  style={{ backgroundColor: brandColor }}
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
                 >
                   <Download size={14} /> Export CSV
                 </button>

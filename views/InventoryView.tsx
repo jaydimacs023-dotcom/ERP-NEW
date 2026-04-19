@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { AlertTriangle, TrendingDown, TrendingUp, Eye, Package, ShieldCheck, Box, Filter, Search, Download, Check, ArrowRight, BarChart3, Warehouse } from 'lucide-react';
-import { InventoryLevel, StockItem } from '../types';
+import { InventoryLevel, StockItem, Organization } from '../types';
 import { InventoryService } from '../services/InventoryService';
 
 interface InventoryViewProps {
@@ -10,6 +10,7 @@ interface InventoryViewProps {
   onSelectItem?: (itemId: string) => void;
   currency: string;
   isLoading?: boolean;
+  organization?: Organization;
 }
 
 interface StockStatus {
@@ -29,7 +30,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onSelectItem,
   currency,
   isLoading = false,
+  organization,
 }) => {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'RED' | 'YELLOW' | 'GREEN' | 'BLUE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -116,7 +119,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
         <div className="flex gap-3">
           <div className="bg-white px-4 py-2 rounded border border-gray-200 shadow-sm flex items-center gap-3">
-             <Warehouse size={16} className="text-[#F47721]" />
+             <Warehouse size={16} style={{ color: brandColor }} />
              <div className="leading-none">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Active nodes</p>
                 <p className="text-sm font-semibold text-gray-800">Operational</p>
@@ -170,7 +173,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     placeholder="Identify item by code, name or description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:bg-white transition-all text-sm font-bold text-gray-800"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = `${brandColor}40`; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
                   />
                </div>
             </div>
@@ -181,7 +186,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = `${brandColor}40`; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
                   >
                     <option value="ALL">TOTAL SPECTRUM</option>
                     <option value="RED">CRITICAL STOCK-OUT</option>
@@ -210,7 +217,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {isLoading ? (
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
-                      <div className="w-10 h-10 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin mx-auto mb-4"></div>
+                      <div style={{ borderColor: `${brandColor}40`, borderTopColor: brandColor }} className="w-10 h-10 border-4 rounded-full animate-spin mx-auto mb-4"></div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Synchronizing Clusters...</p>
                    </td>
                 </tr>

@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Download, Eye, X, ChevronDown, Package, MapPin, Calendar, Hash, FileText, Filter, Search, ArrowUpRight, ArrowDownLeft, RefreshCcw, Check } from 'lucide-react';
-import { InventoryTransaction, StockItem, InventoryTransactionType } from '../types';
+import { InventoryTransaction, StockItem, InventoryTransactionType, Organization } from '../types';
 
 interface InventoryTransactionsViewProps {
   transactions: InventoryTransaction[];
@@ -8,6 +8,7 @@ interface InventoryTransactionsViewProps {
   locations: any[];
   currency: string;
   isLoading?: boolean;
+  organization?: Organization;
 }
 
 interface TransactionWithDetails extends InventoryTransaction {
@@ -41,7 +42,9 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
   locations,
   currency,
   isLoading = false,
+  organization,
 }) => {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<InventoryTransactionType | 'ALL'>('ALL');
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'item' | 'type'>('date');
@@ -157,7 +160,8 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
            <button
              onClick={handleExport}
              disabled={filteredTransactions.length === 0}
-             className="flex items-center gap-2 px-6 py-3 bg-gray-800 text-white rounded font-semibold text-xs uppercase tracking-[0.2em] shadow-lg shadow-gray-300/20 hover:bg-black hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+             style={{ backgroundColor: brandColor }}
+             className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-[0.2em] shadow-lg shadow-gray-300/20 hover:opacity-90 hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
            >
              <Download className="w-4 h-4" />
              Export Audit CSV
@@ -170,7 +174,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Log Entries</p>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-semibold text-gray-800 tracking-tight">{summaries.totalTransactions}</p>
-            <FileText className="text-gray-200 group-hover:text-orange-500/10 transition-colors" size={40} />
+            <FileText style={{ color: brandColor }} size={40} />
           </div>
         </div>
         <div className="bg-emerald-50 p-6 rounded border border-emerald-100 shadow-sm">
@@ -179,7 +183,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
         </div>
         <div className="bg-orange-50 p-6 rounded border border-orange-100 shadow-sm">
           <p className="text-[10px] font-semibold text-orange-800 uppercase tracking-wide mb-1">Dispatches</p>
-          <p className="text-3xl font-semibold text-[#F47721] tracking-tight">{summaries.sales}</p>
+          <p className="text-3xl font-semibold tracking-tight" style={{ color: brandColor }}>{summaries.sales}</p>
         </div>
         <div className="bg-rose-50 p-6 rounded border border-rose-100 shadow-sm group">
           <p className="text-[10px] font-semibold text-rose-800 uppercase tracking-wide mb-1">Risk Events</p>
@@ -255,7 +259,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
               {isLoading ? (
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
-                      <div className="w-10 h-10 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin mx-auto mb-4"></div>
+                      <div className="w-10 h-10 border-4 border-orange-200 rounded-full animate-spin mx-auto mb-4" style={{ borderTopColor: brandColor }}></div>
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.3em]">Querying Archive Nodes...</p>
                    </td>
                 </tr>
@@ -301,7 +305,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                          </div>
                       </td>
                       <td className="px-8 py-5 text-right">
-                         <button className={`p-2 rounded-xl transition-all ${expandedId === tx.id ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-[#F47721]'}`}>
+                         <button style={{ color: brandColor }} className={`p-2 rounded-xl transition-all ${expandedId === tx.id ? 'bg-gray-200 text-gray-800' : 'text-gray-400'}`}>
                             <ChevronDown size={14} />
                          </button>
                       </td>
@@ -314,7 +318,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                                  <div>
                                     <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Movement Path</p>
                                     <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                                       <MapPin size={14} className="text-orange-500" />
+                                       <MapPin size={14} style={{ color: brandColor }} />
                                        {tx.location?.name || 'Undefined Cluster'} ({tx.location?.code || 'N/A'})
                                     </div>
                                  </div>
@@ -341,7 +345,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                                           <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Fiscal Unit Cost</p>
                                           <p className="text-sm font-semibold text-gray-900 font-mono">{currency} {tx.unitCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                        </div>
-                                       <div className="p-3 bg-[#F47721] rounded text-white shadow-lg shadow-gray-300/20">
+                                       <div className="p-3 rounded text-white shadow-lg shadow-gray-300/20" style={{ backgroundColor: brandColor }}>
                                           <p className="text-[8px] font-semibold uppercase tracking-wide opacity-80 mb-0.5">Impact Value</p>
                                           <p className="text-sm font-semibold font-mono">{currency} {(tx.unitCost * Math.abs(tx.quantity)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                        </div>
@@ -365,7 +369,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
         {!isLoading && filteredTransactions.length > 0 && (
            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} className="text-[#F47721]" /></div>
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} style={{ color: brandColor }} /></div>
                   <div>
                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Archive Integrity</p>
                      <p className="text-xs font-bold text-gray-600">Total volume recorded: {summaries.totalQty.toLocaleString()} units mapped.</p>

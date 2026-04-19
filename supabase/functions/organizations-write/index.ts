@@ -94,12 +94,16 @@ function getActorRole(payload: JwtPayload | null): string | undefined {
   return payload?.appRole || payload?.app_role || payload?.role;
 }
 
+function getActorOrgId(payload: JwtPayload | null): string | undefined {
+  return payload?.orgId || payload?.org_id;
+}
+
 function requireSystemAdmin(payload: JwtPayload | null): Response | null {
   if (!payload?.sub) {
     return json(401, { error: "Authentication required" });
   }
 
-  if (getActorRole(payload) !== "SYSTEM_ADMIN") {
+  if (getActorRole(payload)?.toUpperCase() !== "SYSTEM_ADMIN") {
     return json(403, { error: "SYSTEM_ADMIN role required" });
   }
 
@@ -111,17 +115,23 @@ function requireOrgAdminOrSystemAdmin(payload: JwtPayload | null, orgId: string)
     return json(401, { error: "Authentication required" });
   }
 
-  const actorRole = getActorRole(payload);
+  const actorRole = getActorRole(payload)?.toUpperCase();
   if (actorRole === "SYSTEM_ADMIN") {
     return null;
   }
 
-  const actorOrgId = payload.orgId || payload.org_id;
-  if (actorRole === "ADMIN" && actorOrgId === orgId) {
+  if (actorRole === "ADMIN") {
+    const actorOrgId = getActorOrgId(payload);
+    if (!actorOrgId) {
+      return json(403, { error: "ADMIN role requires org context" });
+    }
+    if (actorOrgId !== orgId) {
+      return json(403, { error: "ADMIN may only modify their own organization" });
+    }
     return null;
   }
 
-  return json(403, { error: "ADMIN for this organization or SYSTEM_ADMIN role required" });
+  return json(403, { error: "ADMIN or SYSTEM_ADMIN role required" });
 }
 
 Deno.serve(async (req) => {

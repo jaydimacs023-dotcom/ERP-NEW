@@ -86,7 +86,8 @@ const JWT_CONFIG = {
 };
 
 function resolveAppUserRole(payload: Pick<JWTPayload, 'appRole' | 'app_role' | 'role'>): User['role'] {
-  return (payload.appRole || payload.app_role || payload.role) as User['role'];
+  const role = payload.appRole || payload.app_role || payload.role;
+  return role ? role.toUpperCase() as User['role'] : role;
 }
 
 // ============================================================================
@@ -303,7 +304,7 @@ class JWTServiceClass {
       email: user.email,
       name: user.name,
       role: 'authenticated',
-      appRole: user.role,
+      appRole: user.role?.toLowerCase(),
       orgId: user.orgId,
       studentId: user.studentId,
       trainerId: user.trainerId,
@@ -322,7 +323,7 @@ class JWTServiceClass {
       email: user.email,
       name: user.name,
       role: 'authenticated',
-      appRole: user.role,
+      appRole: user.role?.toLowerCase(),
       orgId: user.orgId,
       studentId: user.studentId,
       trainerId: user.trainerId,

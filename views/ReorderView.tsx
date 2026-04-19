@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, AlertTriangle, Zap, Truck, Target, Clock, ShieldCheck, FileText, Search, Package, ArrowRight, BarChart3 } from 'lucide-react';
-import { ReorderPoint, StockItem, InventoryLevel } from '../types';
+import { ReorderPoint, StockItem, InventoryLevel, Organization } from '../types';
 import ModalPortal from '../components/ModalPortal';
 
 interface ReorderViewProps {
@@ -12,6 +12,7 @@ interface ReorderViewProps {
   onDelete: (id: string) => Promise<void>;
   currency: string;
   isLoading?: boolean;
+  organization?: Organization;
 }
 
 interface FormData {
@@ -43,7 +44,9 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
   onDelete,
   currency,
   isLoading = false,
+  organization,
 }) => {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -135,7 +138,8 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
               setFormData(INITIAL_FORM);
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all"
+            style={{ backgroundColor: brandColor }}
+            className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 transition-all hover:opacity-90 active:scale-95"
           >
             <Plus className="w-4 h-4" />
             Define Threshold
@@ -146,7 +150,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded border border-gray-200 shadow-sm flex flex-col justify-between group">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-             <Target size={12} className="text-[#F47721]" /> Active Rules
+             <Target size={12} style={{ color: brandColor }} /> Active Rules
           </p>
           <div className="flex items-end justify-between">
             <p className="text-xl font-semibold text-gray-800 tracking-tight">{summaries.total}</p>
@@ -236,10 +240,10 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                     <td className="px-6 py-5">
                        <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase italic">
-                             <Truck size={12} className="text-[#F47721]" /> {entry.reorderPoint.leadTimeDays}d
+                             <Truck size={12} style={{ color: brandColor }} /> {entry.reorderPoint.leadTimeDays}d
                           </div>
                           {entry.needsReorder && (
-                             <span className="px-2 py-0.5 bg-rose-600 text-white rounded-full text-xs font-semibold animate-pulse">REORDER_NOW</span>
+                             <span className="px-2 py-0.5 text-white rounded-full text-xs font-semibold animate-pulse" style={{ backgroundColor: brandColor }}>REORDER_NOW</span>
                           )}
                        </div>
                     </td>
@@ -259,7 +263,8 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                                });
                                setShowForm(true);
                             }}
-                            className="p-2 text-gray-400 hover:text-[#F47721] hover:bg-orange-50 rounded transition-all"
+                            style={{ color: brandColor }}
+                            className="p-2 text-gray-400 hover:bg-orange-50 rounded transition-all"
                           >
                             <Edit2 size={14} />
                           </button>
@@ -280,7 +285,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
         
         <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
-               <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><ShieldCheck size={16} className="text-[#F47721]" /></div>
+               <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><ShieldCheck size={16} style={{ color: brandColor }} /></div>
                <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Procurement Integrity</p>
                   <p className="text-xs font-bold text-gray-600">Continuous monitoring of safety stock and replenishment cycles.</p>
@@ -299,7 +304,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
           <div className="bg-white rounded-md w-full max-w-xl shadow-md border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-200">
             <header className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                <div>
-                  <p className="text-xs font-semibold text-[#F47721] uppercase tracking-wide mb-1">Logic Definition</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: brandColor }}>Logic Definition</p>
                   <h3 className="text-xl font-semibold text-gray-800">{editingId ? 'Recalibrate Threshold' : 'New Equilibrium Point'}</h3>
                </div>
                <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={20} /></button>
@@ -383,7 +388,10 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                <button
                  type="submit"
                  disabled={submitting}
-                 className="w-full py-4 bg-gray-800 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/20 hover:bg-black hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50"
+                 style={{ backgroundColor: brandColor }}
+                 onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.93'; }}
+                 onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                 className="w-full py-4 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/20 transition-all active:scale-95 disabled:opacity-50"
                >
                  {submitting ? 'PROCESSING_LOGIC...' : editingId ? 'DEPLOY_RECALIBRATION' : 'INITIALIZE_THRESHOLD'}
                </button>
