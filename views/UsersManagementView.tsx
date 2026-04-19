@@ -59,6 +59,16 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     return trainers.filter(t => !t.isDeleted && !linkedTrainerIds.has(t.id));
   }, [trainers, users]);
 
+  const selectedStudent = useMemo(
+    () => students.find(s => s.id === formData.studentId),
+    [students, formData.studentId]
+  );
+
+  const selectedTrainer = useMemo(
+    () => trainers.find(t => t.id === formData.trainerId),
+    [trainers, formData.trainerId]
+  );
+
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -246,10 +256,10 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     {user.role}
                   </div>
                   {user.studentId && (
-                    <div className="text-xs text-gray-400 mt-1">Linked to Student</div>
+                    <div className="text-xs text-gray-400 mt-1">Linked student ID: {user.studentId}</div>
                   )}
                   {user.trainerId && (
-                    <div className="text-xs text-gray-400 mt-1">Linked to Trainer</div>
+                    <div className="text-xs text-gray-400 mt-1">Linked trainer ID: {user.trainerId}</div>
                   )}
                 </td>
                 <td className="px-8 py-6">
@@ -370,10 +380,16 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       <option value="">-- Select a student --</option>
                       {availableStudents.map(s => (
                         <option key={s.id} value={s.id}>
-                          {s.firstName} {s.lastName} ({s.email || 'No email'})
+                          {s.firstName} {s.lastName} ({s.email || 'No email'}) - {s.id}
                         </option>
                       ))}
                     </select>
+                    {selectedStudent && (
+                      <div className="rounded border border-brand/20 bg-brand/5 px-4 py-3 text-xs text-gray-600">
+                        Linked student record: <span className="font-semibold text-gray-800">{selectedStudent.firstName} {selectedStudent.lastName}</span>
+                        {' '}| ID: <span className="font-mono text-[11px] text-gray-700">{selectedStudent.id}</span>
+                      </div>
+                    )}
                     <p className="text-xs text-gray-400 px-1">
                       This will allow the student to log in and access their portal.
                     </p>
@@ -393,10 +409,16 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       <option value="">-- Select a trainer --</option>
                       {availableTrainers.map(t => (
                         <option key={t.id} value={t.id}>
-                          {t.firstName} {t.lastName} ({t.email || 'No email'})
+                          {t.firstName} {t.lastName} ({t.email || 'No email'}) - {t.id}
                         </option>
                       ))}
                     </select>
+                    {selectedTrainer && (
+                      <div className="rounded border border-brand/20 bg-brand/5 px-4 py-3 text-xs text-gray-600">
+                        Linked trainer record: <span className="font-semibold text-gray-800">{selectedTrainer.firstName} {selectedTrainer.lastName}</span>
+                        {' '}| ID: <span className="font-mono text-[11px] text-gray-700">{selectedTrainer.id}</span>
+                      </div>
+                    )}
                     <p className="text-xs text-gray-400 px-1">
                       This will allow the trainer to log in and access their portal.
                     </p>

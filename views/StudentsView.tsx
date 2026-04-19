@@ -24,6 +24,7 @@ interface StudentsViewProps {
   students: Student[];
   batches?: Batch[];
   qualifications?: Qualification[];
+  brandColor: string;
   onAddStudent: (student: Student) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
@@ -46,7 +47,16 @@ const CSV_HEADERS = [
 
 const PAGE_SIZE = 10;
 
-const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
+function withAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '');
+  if (!/^[\da-fA-F]{6}$/.test(normalized)) return hex;
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'all' | 'batch'>('all');
@@ -374,6 +384,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 ? 'bg-brand text-white border-brand shadow-md'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-brand hover:text-brand'
                 }`}
+              style={viewMode === 'all' ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: `0 10px 20px ${withAlpha(brandColor, 0.22)}` } : undefined}
             >
               <Users size={14} /> All Learners
             </button>
@@ -383,6 +394,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 ? 'bg-brand text-white border-brand shadow-md'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-brand hover:text-brand'
                 }`}
+              style={viewMode === 'batch' ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: `0 10px 20px ${withAlpha(brandColor, 0.22)}` } : undefined}
             >
               <Layers size={14} /> By Batch
             </button>
@@ -393,8 +405,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
               <Download size={14} /> Template
             </button>
             <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
-            <button onClick={() => csvInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2.5 bg-brand/10 text-brand rounded border border-brand-light text-xs font-semibold h-10 hover:bg-brand/20 transition-all">
-              <FileSpreadsheet size={14} className="text-brand" /> MIS Batch
+            <button
+              onClick={() => csvInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-2.5 rounded border text-xs font-semibold h-10 transition-all"
+              style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor, borderColor: withAlpha(brandColor, 0.22) }}
+            >
+              <FileSpreadsheet size={14} style={{ color: brandColor }} /> MIS Batch
             </button>
             <button onClick={() => {
               setFormData(defaultFormData);
@@ -407,7 +423,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
               setMandatoryDocFiles({});
               setPhotoPreview(null);
               setShowModal(true);
-            }} className="flex items-center gap-2 px-3 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-sm text-xs font-semibold h-10">
+            }} className="flex items-center gap-2 px-3 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-sm text-xs font-semibold h-10" style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px ${withAlpha(brandColor, 0.2)}` }}>
               <Plus size={14} /> Register Learner
             </button>
           </div>
@@ -418,7 +434,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       {viewMode === 'batch' && (
         <div className="bg-white rounded-md border border-gray-200 shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Layers size={16} className="text-brand" />
+            <Layers size={16} style={{ color: brandColor }} />
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Select a Training Batch</h3>
           </div>
           {batches.length === 0 ? (
@@ -436,9 +452,10 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                       ? 'bg-brand text-white border-brand shadow-md'
                       : 'bg-gray-50 border-gray-200 hover:border-brand hover:shadow-sm'
                       }`}
+                    style={isSelected ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: `0 10px 20px ${withAlpha(brandColor, 0.18)}` } : undefined}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? 'text-brand/80' : 'text-brand'}`}>
+                      <span className={`text-xs font-semibold uppercase tracking-wide ${isSelected ? 'text-white/80' : 'text-brand'}`} style={!isSelected ? { color: brandColor } : undefined}>
                         FY {batch.year}
                       </span>
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-500'}`}>
@@ -446,7 +463,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                       </span>
                     </div>
                     <p className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-gray-800'}`}>{batch.name}</p>
-                    <p className={`text-xs truncate mt-0.5 ${isSelected ? 'text-brand/80' : 'text-gray-400'}`}>
+                    <p className={`text-xs truncate mt-0.5 ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>
                       <Award size={10} className="inline mr-1" />{qual?.name || 'Unknown'}
                     </p>
                   </button>
@@ -459,9 +476,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
 
       {/* Selected Batch Info Header */}
       {viewMode === 'batch' && selectedBatch && (
-        <div className="bg-gradient-to-r from-brand/10 to-brand/20 rounded-md border border-brand-light p-4 flex items-center justify-between">
+        <div className="rounded-md border p-4 flex items-center justify-between" style={{ background: `linear-gradient(90deg, ${withAlpha(brandColor, 0.08)}, ${withAlpha(brandColor, 0.16)})`, borderColor: withAlpha(brandColor, 0.2) }}>
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-brand text-white rounded shadow-sm">
+            <div className="p-3 text-white rounded shadow-sm" style={{ backgroundColor: brandColor }}>
               <Layers size={20} />
             </div>
             <div>
@@ -527,18 +544,18 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 <tr key={student.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded overflow-hidden bg-brand/10 flex items-center justify-center border border-brand-light shadow-sm shrink-0">
+                      <div className="w-10 h-10 rounded overflow-hidden flex items-center justify-center border shadow-sm shrink-0" style={{ backgroundColor: withAlpha(brandColor, 0.1), borderColor: withAlpha(brandColor, 0.18) }}>
                         {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
                           <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} alt="S" className="w-full h-full object-cover" />
                         ) : (
-                          <UserCircle className="text-brand/70" size={24} />
+                          <UserCircle size={24} style={{ color: withAlpha(brandColor, 0.75) }} />
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-gray-800 leading-tight">
                           {student.lastName.toUpperCase()}, {student.firstName}
                         </div>
-                        <div className="text-xs font-mono font-bold text-brand mt-1 uppercase">ULI: {student.uli}</div>
+                        <div className="text-xs font-mono font-bold mt-1 uppercase" style={{ color: brandColor }}>ULI: {student.uli}</div>
                       </div>
                     </div>
                   </td>
@@ -565,10 +582,10 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingStudent(student); setShowEditModal(true); setFormData(student); }} className="p-2 bg-brand/10 text-brand rounded hover:bg-brand/20 hover:text-brand/90 transition-all" title="Edit Student">
+                      <button onClick={() => { setEditingStudent(student); setShowEditModal(true); setFormData(student); }} className="p-2 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor }} title="Edit Student">
                         <RefreshCw size={16} />
                       </button>
-                      <button onClick={() => setAuditStudent(student)} className="p-2 bg-brand/10 text-brand rounded hover:bg-brand hover:text-white transition-all" title="View Audit">
+                      <button onClick={() => setAuditStudent(student)} className="p-2 text-white rounded transition-all" style={{ backgroundColor: brandColor }} title="View Audit">
                         <Eye size={16} />
                       </button>
                     </div>
@@ -621,6 +638,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                       ? 'bg-brand text-white shadow-sm'
                       : 'text-gray-500 hover:bg-gray-100'
                       }`}
+                    style={currentPage === item ? { backgroundColor: brandColor } : undefined}
                   >
                     {item}
                   </button>

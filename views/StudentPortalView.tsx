@@ -21,11 +21,21 @@ interface StudentPortalViewProps {
   schedules: TrainerSchedule[];
   entries: JournalEntry[];
   lines: JournalLine[];
+  brandColor: string;
   onUpdateStudent: (student: Student) => void;
 }
 
+function withAlpha(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '');
+  if (!/^[\da-fA-F]{6}$/.test(normalized)) return hex;
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const StudentPortalView: React.FC<StudentPortalViewProps> = ({ 
-  student, batches, qualifications, trainers, locations, schedules, entries, lines, onUpdateStudent 
+  student, batches, qualifications, trainers, locations, schedules, entries, lines, brandColor, onUpdateStudent 
 }) => {
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DOCS' | 'BILLING' | 'PROFILE'>('OVERVIEW');
   const [showCamera, setShowCamera] = useState(false);
@@ -133,7 +143,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             <UserCircle size={220} />
          </div>
          <div className="relative z-10 flex flex-col md:flex-row items-center gap-5">
-            <div className="w-32 h-32 rounded-md bg-[#F47721] border-4 border-white/10 overflow-hidden shrink-0 shadow-md flex items-center justify-center relative group">
+            <div className="w-32 h-32 rounded-md border-4 border-white/10 overflow-hidden shrink-0 shadow-md flex items-center justify-center relative group" style={{ backgroundColor: brandColor }}>
                {student.documents.find(d => d.name === 'Passport Size Photo')?.fileData ? (
                  <img src={student.documents.find(d => d.name === 'Passport Size Photo')?.fileData} className="w-full h-full object-cover" alt="Profile" />
                ) : (
@@ -149,11 +159,11 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   <span className="px-3 py-1 bg-white/10 rounded-full text-xs font-semibold uppercase tracking-wide border border-white/5">Learner Tier 1</span>
                </div>
                <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-orange-400 bg-white/5 px-4 py-2 rounded border border-white/5">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold bg-white/5 px-4 py-2 rounded border border-white/5" style={{ color: brandColor }}>
                      <Fingerprint size={14} /> ULI: {student.uli}
                   </div>
                   <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 bg-white/5 px-4 py-2 rounded border border-white/5 uppercase tracking-wide">
-                     <Globe size={14} className="text-orange-500" /> {student.city}, {student.province}
+                     <Globe size={14} style={{ color: brandColor }} /> {student.city}, {student.province}
                   </div>
                </div>
             </div>
@@ -173,10 +183,10 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
       {/* Primary Portal Navigation */}
       <div className="flex bg-white rounded-md p-2 border border-gray-200 shadow-sm max-w-2xl mx-auto md:mx-0">
-         <TabButton active={activeTab === 'OVERVIEW'} onClick={() => setActiveTab('OVERVIEW')} label="Console" icon={<LayoutDashboard size={18}/>} />
-         <TabButton active={activeTab === 'DOCS'} onClick={() => setActiveTab('DOCS')} label="Documents" icon={<FileText size={18}/>} />
-         <TabButton active={activeTab === 'BILLING'} onClick={() => setActiveTab('BILLING')} label="My Ledger" icon={<Receipt size={18}/>} />
-         <TabButton active={activeTab === 'PROFILE'} onClick={() => setActiveTab('PROFILE')} label="Registry" icon={<Globe size={18}/>} />
+         <TabButton active={activeTab === 'OVERVIEW'} onClick={() => setActiveTab('OVERVIEW')} label="Console" icon={<LayoutDashboard size={18}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'DOCS'} onClick={() => setActiveTab('DOCS')} label="Documents" icon={<FileText size={18}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'BILLING'} onClick={() => setActiveTab('BILLING')} label="My Ledger" icon={<Receipt size={18}/>} brandColor={brandColor} />
+         <TabButton active={activeTab === 'PROFILE'} onClick={() => setActiveTab('PROFILE')} label="Registry" icon={<Globe size={18}/>} brandColor={brandColor} />
       </div>
 
       {activeTab === 'OVERVIEW' && (
@@ -186,17 +196,17 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                {enrollment ? (
                  <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden flex flex-col group">
                     <div className="p-5 border-b bg-gray-50 flex flex-col md:flex-row items-center gap-8">
-                       <div className="w-20 h-20 bg-[#F47721] text-white rounded flex items-center justify-center shadow-sm shadow-gray-100 shrink-0">
+                       <div className="w-20 h-20 text-white rounded flex items-center justify-center shadow-sm shadow-gray-100 shrink-0" style={{ backgroundColor: brandColor }}>
                           <GraduationCap size={40} />
                        </div>
                        <div className="text-center md:text-left">
-                          <p className="text-xs font-semibold text-[#F47721] uppercase tracking-wide mb-1">Current Enrollment Program</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: brandColor }}>Current Enrollment Program</p>
                           <h4 className="text-xl font-semibold text-gray-900 tracking-tight leading-tight">{enrollment.qual?.name}</h4>
                           <div className="flex items-center justify-center md:justify-start gap-4 mt-3">
                              <span className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                BATCH: {enrollment.batch.name}
                              </span>
-                             <span className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-semibold text-[#F47721] uppercase tracking-wide">
+                             <span className="px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-semibold uppercase tracking-wide" style={{ color: brandColor }}>
                                {enrollment.batch.status.replace('_', ' ')}
                              </span>
                           </div>
@@ -206,7 +216,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                     <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                        <div className="space-y-6">
                           <div className="flex items-center gap-4">
-                             <div className="p-3 bg-gray-100 rounded text-gray-400 group-hover:bg-[#F47721] group-hover:text-white transition-all">
+                             <div className="p-3 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor }}>
                                 <UserCheck size={20} />
                              </div>
                              <div>
@@ -217,7 +227,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                           </div>
 
                           <div className="flex items-center gap-4">
-                             <div className="p-3 bg-gray-100 rounded text-gray-400 group-hover:bg-[#F47721] group-hover:text-white transition-all">
+                             <div className="p-3 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor }}>
                                 <MapPin size={20} />
                              </div>
                              <div>
@@ -232,16 +242,16 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                           <div className="p-6 bg-gray-800 rounded text-white shadow-md relative overflow-hidden">
                              <div className="relative z-10">
                                 <div className="flex justify-between items-center mb-4">
-                                   <CalendarClock size={20} className="text-orange-400" />
+                                   <CalendarClock size={20} style={{ color: brandColor }} />
                                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Program Schedule</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                    <div>
-                                      <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Commences</p>
+                                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: brandColor }}>Commences</p>
                                       <p className="text-sm font-semibold">{enrollment.batch.startDate}</p>
                                    </div>
                                    <div className="text-right">
-                                      <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Concludes</p>
+                                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: brandColor }}>Concludes</p>
                                       <p className="text-sm font-semibold">{enrollment.batch.endDate}</p>
                                    </div>
                                 </div>
@@ -275,12 +285,15 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                   <div className="w-full md:w-64 space-y-4">
                      <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Balance Due</span>
-                        <span className={`text-lg font-mono font-semibold ${billing.balance > 0 ? 'text-rose-600' : 'text-[#F47721]'}`}>
+                        <span
+                          className={`text-lg font-mono font-semibold ${billing.balance > 0 ? 'text-rose-600' : ''}`}
+                          style={billing.balance > 0 ? undefined : { color: brandColor }}
+                        >
                            {"\u20B1"} {formatCurrency(billing.balance)}
                         </span>
                      </div>
                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#F47721]" style={{ width: billing.totalInvoiced > 0 ? `${(billing.totalPaid / billing.totalInvoiced) * 100}%` : '0%' }}></div>
+                        <div className="h-full" style={{ backgroundColor: brandColor, width: billing.totalInvoiced > 0 ? `${(billing.totalPaid / billing.totalInvoiced) * 100}%` : '0%' }}></div>
                      </div>
                      <p className="text-xs font-semibold text-gray-400 uppercase text-center tracking-wide">
                         {billing.totalInvoiced > 0 ? `${((billing.totalPaid / billing.totalInvoiced) * 100).toFixed(0)}% Settle Rate` : 'No Invoices Recognition'}
@@ -291,7 +304,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
             <div className="space-y-8">
                <div className="bg-gray-800 rounded-md p-5 text-white shadow-md relative overflow-hidden">
-                  <h4 className="text-xs font-semibold text-orange-500 uppercase tracking-wide mb-8">Registry Compliance</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide mb-8" style={{ color: brandColor }}>Registry Compliance</h4>
                   <div className="space-y-6">
                      <div className="flex justify-between items-end">
                         <div>
@@ -306,7 +319,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                         </div>
                      </div>
                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#F47721] transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+                        <div className="h-full transition-all duration-1000" style={{ backgroundColor: brandColor, width: `${progressPercent}%` }}></div>
                      </div>
                   </div>
                   <div className="absolute top-0 right-0 p-8 opacity-5">
@@ -316,7 +329,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
                <div className="bg-white rounded border border-gray-200 p-8 shadow-sm">
                   <div className="flex gap-4">
-                     <Info size={24} className="text-[#F47721] shrink-0" />
+                     <Info size={24} className="shrink-0" style={{ color: brandColor }} />
                      <div>
                         <h4 className="text-xs font-semibold text-gray-800 uppercase">Self-Service Note</h4>
                         <p className="text-xs text-gray-500 leading-relaxed font-bold mt-2">
@@ -332,16 +345,16 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
       {activeTab === 'DOCS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
            {student.documents.map(doc => (
-             <div key={doc.id} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md hover:border-orange-200 transition-all">
+             <div key={doc.id} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md transition-all">
                 <div className="flex justify-between items-start">
-                   <div className="p-4 bg-gray-50 rounded text-gray-400 group-hover:bg-[#F47721] group-hover:text-white transition-all">
+                   <div className="p-4 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.08), color: brandColor }}>
                       <FileText size={28}/>
                    </div>
                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
-                     doc.status === 'VERIFIED' ? 'bg-emerald-50 text-[#F47721] border-emerald-100' : 
-                     doc.status === 'UPLOADED' ? 'bg-orange-50 text-[#F47721] border-orange-100' :
+                     doc.status === 'VERIFIED' ? 'bg-emerald-50 border-emerald-100' : 
+                     doc.status === 'UPLOADED' ? 'border-orange-100' :
                      'bg-gray-50 text-gray-400 border-gray-200'
-                   }`}>
+                   }`} style={doc.status === 'VERIFIED' || doc.status === 'UPLOADED' ? { color: brandColor, backgroundColor: withAlpha(brandColor, doc.status === 'VERIFIED' ? 0.1 : 0.12) } : undefined}>
                      {doc.status}
                    </span>
                 </div>
@@ -353,13 +366,13 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                          <Camera size={14} /> Identity Capture
                        </button>
                      )}
-                     <button onClick={() => { setSelectedDocId(doc.id); fileInputRef.current?.click(); }} className="flex-1 py-3.5 bg-[#F47721] text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-[#E06610] shadow-lg shadow-gray-100 transition-all">
+                     <button onClick={() => { setSelectedDocId(doc.id); fileInputRef.current?.click(); }} className="flex-1 py-3.5 text-white rounded text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-gray-100 transition-all" style={{ backgroundColor: brandColor }}>
                         <Upload size={14} /> File Sync
                      </button>
                   </div>
                 )}
                 {doc.status === 'VERIFIED' && (
-                  <div className="flex items-center gap-2 text-[#F47721] text-xs font-semibold uppercase tracking-wide">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide" style={{ color: brandColor }}>
                      <ShieldCheck size={16} /> Auditor Approved
                   </div>
                 )}
@@ -378,11 +391,11 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                </div>
                <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Payments Made</p>
-                  <p className="text-lg font-mono font-semibold text-[#F47721]">{"\u20B1"} {formatCurrency(billing.totalPaid)}</p>
+                  <p className="text-lg font-mono font-semibold" style={{ color: brandColor }}>{"\u20B1"} {formatCurrency(billing.totalPaid)}</p>
                </div>
                <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm flex flex-col items-center text-center">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Statement Balance</p>
-                  <p className={`text-lg font-mono font-semibold ${billing.balance > 0 ? 'text-rose-600' : 'text-[#F47721]'}`}>{"\u20B1"} {formatCurrency(billing.balance)}</p>
+                  <p className={`text-lg font-mono font-semibold ${billing.balance > 0 ? 'text-rose-600' : ''}`} style={billing.balance > 0 ? undefined : { color: brandColor }}>{"\u20B1"} {formatCurrency(billing.balance)}</p>
                </div>
             </div>
 
@@ -413,12 +426,12 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                                 <td className="px-5 py-6 text-xs font-bold text-gray-500">{entry?.date}</td>
                                 <td className="px-5 py-6">
                                    <p className="text-sm font-semibold text-gray-800 uppercase tracking-tight">{entry?.description}</p>
-                                   <p className="text-xs font-mono font-bold text-[#F47721] mt-0.5">{entry?.reference}</p>
+                                   <p className="text-xs font-mono font-bold mt-0.5" style={{ color: brandColor }}>{entry?.reference}</p>
                                 </td>
                                 <td className="px-5 py-6 text-right font-mono text-sm font-bold text-gray-600">
                                    {line.debit > 0 ? formatCurrency(line.debit) : '—'}
                                 </td>
-                                <td className="px-5 py-6 text-right font-mono text-sm font-semibold text-[#F47721]">
+                                <td className="px-5 py-6 text-right font-mono text-sm font-semibold" style={{ color: brandColor }}>
                                    {line.credit > 0 ? `+ ${formatCurrency(line.credit)}` : '—'}
                                 </td>
                              </tr>
@@ -438,14 +451,14 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             <div className="bg-gray-800 rounded-md p-5 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-5">
                <div className="relative z-10 flex-1 space-y-4">
                   <div className="flex items-center gap-3">
-                     <CreditCard size={28} className="text-orange-400" />
-                     <h4 className="text-lg font-semibold tracking-tight uppercase">Digital Settlement</h4>
+                     <CreditCard size={28} style={{ color: brandColor }} />
+                     <h4 className="text-lg font-semibold tracking-tight uppercase">Digital Settlement</h4><span className="italic text-red-600">to be implemented soon *</span>
                   </div>
-                  <p className="text-sm text-orange-200 leading-relaxed font-medium">
+                  <p className="text-sm leading-relaxed font-medium" style={{ color: withAlpha(brandColor, 0.45) }}>
                     "Securely settle your outstanding dues via institutional bank transfer or digital wallet. All payments are verified by our treasury department within 24 hours."
                   </p>
                </div>
-               <button className="relative z-10 px-12 py-5 bg-white text-orange-900 rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm hover:scale-105 active:scale-95 transition-all">
+               <button className="relative z-10 px-12 py-5 bg-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm hover:scale-105 active:scale-95 transition-all" style={{ color: brandColor }}>
                   Open Payment Gateway
                </button>
                <div className="absolute top-0 right-0 p-12 opacity-10">
@@ -494,7 +507,7 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                 <h3 className="text-lg font-semibold uppercase tracking-tight">Biometric Verification</h3>
                 <p className="text-gray-500 text-sm font-medium mt-1">Align your face within the frame for institutional identification.</p>
              </div>
-             <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white/20 shadow-md ring-4 ring-orange-500/10">
+             <div className="relative aspect-square w-full bg-gray-800 rounded-md overflow-hidden border-4 border-white/20 shadow-md" style={{ boxShadow: `0 0 0 8px ${withAlpha(brandColor, 0.1)}` }}>
                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
@@ -513,8 +526,8 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   );
 };
 
-const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void, icon: React.ReactNode }> = ({ active, label, onClick, icon }) => (
-  <button onClick={onClick} className={`flex-1 flex items-center justify-center gap-3 py-4 rounded text-xs font-semibold uppercase tracking-wide transition-all ${active ? 'bg-[#F47721] text-white shadow-sm shadow-gray-300/30' : 'text-gray-400 hover:text-gray-600'}`}>{icon} {label}</button>
+const TabButton: React.FC<{ active: boolean, label: string, onClick: () => void, icon: React.ReactNode, brandColor: string }> = ({ active, label, onClick, icon, brandColor }) => (
+  <button onClick={onClick} className={`flex-1 flex items-center justify-center gap-3 py-4 rounded text-xs font-semibold uppercase tracking-wide transition-all ${active ? 'text-white shadow-sm shadow-gray-300/30' : 'text-gray-400 hover:text-gray-600'}`} style={active ? { backgroundColor: brandColor } : undefined}>{icon} {label}</button>
 );
 
 export default StudentPortalView;

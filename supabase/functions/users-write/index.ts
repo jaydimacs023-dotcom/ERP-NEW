@@ -107,6 +107,30 @@ function normalizeUserRole(role: string | undefined): string | undefined {
   return ROLE_CANONICAL_MAP[role.trim().toLowerCase()];
 }
 
+async function linkedRecordExists(
+  table: "trainers" | "students",
+  id: string,
+  orgId: string,
+): Promise<boolean> {
+  try {
+    const { count, error } = await admin
+      .from(table)
+      .select("*", { count: "exact", head: true })
+      .eq("id", id)
+      .eq("org_id", orgId);
+
+    if (error) {
+      console.error(`[users-write] Error checking ${table} record:`, error);
+      return false;
+    }
+
+    return (count ?? 0) > 0;
+  } catch (error) {
+    console.error(`[users-write] Unexpected error checking ${table} record:`, error);
+    return false;
+  }
+}
+
 async function canManageOrgUsers(payload: JwtPayload | null, orgId: string, userRole: string): Promise<boolean> {
   if (!payload?.sub) return false;
 
@@ -172,6 +196,8 @@ Deno.serve(async (req) => {
     const user = body.user || {};
     const userOrgId = user.org_id || user.orgId;
     const userRole = normalizeUserRole(user.role);
+    const trainerId = user.trainer_id || user.trainerId;
+    const studentId = user.student_id || user.studentId;
 
     if (!userOrgId) {
       return json(400, { error: "Missing user.org_id" });
@@ -183,6 +209,32 @@ Deno.serve(async (req) => {
 
     if (!ALLOWED_USER_ROLES.has(userRole)) {
       return json(400, { error: `Invalid user.role: ${String(user.role)}` });
+    }
+
+    if (userRole === "TRAINER") {
+      if (!trainerId) {
+        return json(400, { error: "TRAINER users require user.trainer_id" });
+      }
+
+      const trainerExists = await linkedRecordExists("trainers", trainerId, userOrgId);
+      if (!trainerExists) {
+        return json(400, {
+          error: `Selected trainer record was not found for this organization: ${trainerId}`,
+        });
+      }
+    }
+
+    if (userRole === "STUDENT") {
+      if (!studentId) {
+        return json(400, { error: "STUDENT users require user.student_id" });
+      }
+
+      const studentExists = await linkedRecordExists("students", studentId, userOrgId);
+      if (!studentExists) {
+        return json(400, {
+          error: `Selected student record was not found for this organization: ${studentId}`,
+        });
+      }
     }
 
     if (!await canManageOrgUsers(actor, userOrgId, userRole)) {

@@ -6,7 +6,7 @@ import {
   Calendar, Users, Info, Layers, BookOpen, Briefcase,
   Mail, Phone, ShieldCheck, Globe, Star
 } from 'lucide-react';
-import { Trainer, Batch, Qualification, Location, TrainerSchedule } from '../types';
+import { Trainer, Batch, Qualification, Location, TrainerSchedule, BatchStatus } from '../types';
 
 interface TrainerPortalViewProps {
   trainer: Trainer;
@@ -35,13 +35,25 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
     return qualifications.filter(q => trainer.qualificationIds.includes(q.id));
   }, [qualifications, trainer.qualificationIds]);
 
+  const trainerBatches = useMemo(() => {
+    return batches
+      .filter(b => b.orgId === trainer.orgId && b.trainerId === trainer.id)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }, [batches, trainer.id, trainer.orgId]);
+
   const activeBatches = useMemo(() => {
-    return batches.filter(b => b.status === 'ON_GOING' || b.status === 'OPEN_FOR_ENROLLMENT');
-  }, [batches]);
+    return trainerBatches.filter(
+      b => b.status === BatchStatus.PLANNED || b.status === BatchStatus.ONGOING
+    );
+  }, [trainerBatches]);
+
+  const commencedBatches = useMemo(() => {
+    return trainerBatches.filter(b => b.status === BatchStatus.ONGOING);
+  }, [trainerBatches]);
 
   const trainerSchedule = useMemo(() => {
-    return schedules.find(s => s.trainerId === trainer.id);
-  }, [schedules, trainer.id]);
+    return schedules.find(s => s.orgId === trainer.orgId && s.trainerId === trainer.id);
+  }, [schedules, trainer.id, trainer.orgId]);
 
   const handleProfileSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,7 +167,8 @@ const TrainerPortalView: React.FC<TrainerPortalViewProps> = ({
                  <h4 className="text-xs font-semibold uppercase tracking-wide mb-6" style={{ color: brandColor }}>Instructor Snapshot</h4>
                  <div className="space-y-4">
                     <StatusItemPortal label="Accreditations" value={accreditedQuals.length.toString()} icon={<Award size={14}/>} brandColor={brandColor} />
-                    <StatusItemPortal label="Total Batches" value={batches.length.toString()} icon={<Layers size={14}/>} brandColor={brandColor} />
+                    <StatusItemPortal label="Assigned Batches" value={trainerBatches.length.toString()} icon={<Layers size={14}/>} brandColor={brandColor} />
+                    <StatusItemPortal label="Commenced Batches" value={commencedBatches.length.toString()} icon={<BookOpen size={14}/>} brandColor={brandColor} />
                     <StatusItemPortal label="Weekly Hours" value={trainerSchedule?.slots.length ? "Defined" : "Pending"} icon={<Clock size={14}/>} brandColor={brandColor} />
                  </div>
               </div>
