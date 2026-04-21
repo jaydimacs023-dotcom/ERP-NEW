@@ -23,7 +23,6 @@ import {
   Printer,
   Save,
   Search,
-  Send,
   CornerUpLeft,
   User,
   Wallet,
@@ -2337,35 +2336,39 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   if (viewMode === 'list') {
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-200 px-5 py-4">
             <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage payment receipts and invoice application activity from one formal registry workspace.
+            </p>
           </div>
-        </div>
-
-        <div className="inline-flex w-full max-w-fit rounded-xl border bg-white p-1 shadow-sm">
-          <button
-            onClick={() => handleListTabChange('payments')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-              listTab === 'payments'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Wallet size={16} />
-            Payments
-          </button>
-          <button
-            onClick={() => handleListTabChange('applications')}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-              listTab === 'applications'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <CheckSquare size={16} />
-            Payment Applications
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-stretch">
+            <button
+              onClick={() => handleListTabChange('payments')}
+              className={`flex items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-semibold transition-colors ${
+                listTab === 'payments'
+                  ? 'bg-slate-50'
+                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+              style={listTab === 'payments' ? { borderColor: brandColor, color: brandColor } : undefined}
+            >
+              <Wallet size={16} />
+              Payments
+            </button>
+            <button
+              onClick={() => handleListTabChange('applications')}
+              className={`flex items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-semibold transition-colors ${
+                listTab === 'applications'
+                  ? 'bg-slate-50'
+                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              }`}
+              style={listTab === 'applications' ? { borderColor: brandColor, color: brandColor } : undefined}
+            >
+              <CheckSquare size={16} />
+              Payment Applications
+            </button>
+          </div>
         </div>
 
         {listTab === 'payments' && (
@@ -2380,49 +2383,21 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
           </button>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-xl border bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gray-100 p-2">
-                <Clock size={20} className="text-gray-600" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-400">On Hold</p>
-                <p className="text-xl font-semibold text-gray-800">{paymentStats.draftCount}</p>
-              </div>
-            </div>
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">On Hold</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{paymentStats.draftCount}</p>
           </div>
-          <div className="rounded-xl border bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-100 p-2">
-                <Send size={20} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-400">Open</p>
-                <p className="text-xl font-semibold text-blue-600">{paymentStats.openCount}</p>
-              </div>
-            </div>
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Open</p>
+            <p className="mt-2 text-2xl font-semibold text-blue-600">{paymentStats.openCount}</p>
           </div>
-          <div className="rounded-xl border bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-100 p-2">
-                <CheckCircle size={20} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-400">Closed</p>
-                <p className="text-xl font-semibold text-green-600">{paymentStats.closedCount}</p>
-              </div>
-            </div>
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Closed</p>
+            <p className="mt-2 text-2xl font-semibold text-emerald-600">{paymentStats.closedCount}</p>
           </div>
-          <div className="rounded-xl border bg-white p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-orange-100 p-2">
-                <span className="block text-lg font-bold leading-none text-orange-600">?</span>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-400">Unapplied Payments</p>
-                <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentStats.unappliedPayments)}</p>
-              </div>
-            </div>
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Unapplied Payments</p>
+            <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{formatCurrency(paymentStats.unappliedPayments)}</p>
           </div>
         </div>
 
@@ -2536,49 +2511,21 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-amber-100 p-2">
-                    <Clock size={20} className="text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied</p>
-                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.unappliedCount}</p>
-                  </div>
-                </div>
+              <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Not Yet Applied</p>
+                <p className="mt-2 text-2xl font-semibold text-gray-900">{paymentApplicationStats.unappliedCount}</p>
               </div>
-              <div className="rounded-xl border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-orange-100 p-2">
-                    <span className="block text-lg font-bold leading-none text-orange-600">?</span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400">Not Yet Applied Balance</p>
-                    <p className="text-lg font-semibold text-gray-800">{formatPesoKpiAmount(paymentApplicationStats.unappliedBalance)}</p>
-                  </div>
-                </div>
+              <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Not Yet Applied Balance</p>
+                <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{formatCurrency(paymentApplicationStats.unappliedBalance)}</p>
               </div>
-              <div className="rounded-xl border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-emerald-100 p-2">
-                    <CheckCircle size={20} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400">Already Applied</p>
-                    <p className="text-xl font-semibold text-gray-800">{paymentApplicationStats.appliedCount}</p>
-                  </div>
-                </div>
+              <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Already Applied</p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-600">{paymentApplicationStats.appliedCount}</p>
               </div>
-              <div className="rounded-xl border bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-sky-100 p-2">
-                    <span className="block text-lg font-bold leading-none text-sky-600">?</span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400">Amount Applied</p>
-                    <p className="text-lg font-semibold text-gray-800">{formatCurrency(paymentApplicationStats.appliedAmount)}</p>
-                  </div>
-                </div>
+              <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount Applied</p>
+                <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{formatCurrency(paymentApplicationStats.appliedAmount)}</p>
               </div>
             </div>
 

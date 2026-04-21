@@ -10,6 +10,7 @@ interface SponsorSOAViewProps {
   lines: JournalLine[];
   accounts: ChartOfAccount[];
   currency: string;
+  brandColor?: string;
   onClose: () => void;
 }
 
@@ -27,7 +28,7 @@ const toDateInput = (d: Date) => {
 };
 
 const SponsorSOAView: React.FC<SponsorSOAViewProps> = ({
-  sponsor, entries, lines, accounts, currency, onClose
+  sponsor, entries, lines, accounts, currency, brandColor = '#4f46e5', onClose
 }) => {
   const today = new Date();
   const [fromDate, setFromDate] = useState(
@@ -173,10 +174,14 @@ const SponsorSOAView: React.FC<SponsorSOAViewProps> = ({
         <button
           onClick={onClose}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+          style={{ borderColor: 'var(--acm-primary-light)' }}
         >
           Back
         </button>
-        <div className="rounded-lg border border-brand-light bg-brand/10 px-4 py-3 text-sm">
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{ borderColor: 'var(--acm-primary-light)', backgroundColor: 'var(--acm-primary-light)' }}
+        >
           <div className="text-gray-500">Statement Period</div>
           <div className="font-semibold text-gray-800">
             {format(new Date(fromDate), 'yyyy-MM-dd')} to {format(new Date(toDate), 'yyyy-MM-dd')}
@@ -235,9 +240,12 @@ const SponsorSOAView: React.FC<SponsorSOAViewProps> = ({
           <div className="text-xs text-gray-500">Payments</div>
           <div className="font-bold text-lg">{formatAmount(-payments)}</div>
         </div>
-        <div className="bg-brand/10 rounded p-4 text-center border border-brand-light">
-          <div className="text-xs text-brand font-bold">Ending Balance</div>
-          <div className="font-bold text-2xl text-brand">{formatAmount(endingBalance)}</div>
+        <div
+          className="rounded p-4 text-center border"
+          style={{ backgroundColor: 'var(--acm-primary-light)', borderColor: 'var(--acm-primary-light)' }}
+        >
+          <div className="text-xs font-bold" style={{ color: brandColor }}>Ending Balance</div>
+          <div className="font-bold text-2xl" style={{ color: brandColor }}>{formatAmount(endingBalance)}</div>
         </div>
       </div>
 
@@ -245,14 +253,14 @@ const SponsorSOAView: React.FC<SponsorSOAViewProps> = ({
         <div className="font-semibold text-md mb-2">Activity Ledger</div>
         <div className="border rounded overflow-x-auto bg-white shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead style={{ backgroundColor: brandColor }}>
               <tr>
-                <th className="px-4 py-2 text-left">Date</th>
-                <th className="px-4 py-2 text-left">Type</th>
-                <th className="px-4 py-2 text-left">Reference</th>
-                <th className="px-4 py-2 text-left">Description</th>
-                <th className="px-4 py-2 text-right">Amount</th>
-                <th className="px-4 py-2 text-right">Running Balance</th>
+                <th className="px-4 py-2 text-left text-white">Date</th>
+                <th className="px-4 py-2 text-left text-white">Type</th>
+                <th className="px-4 py-2 text-left text-white">Reference</th>
+                <th className="px-4 py-2 text-left text-white">Description</th>
+                <th className="px-4 py-2 text-right text-white">Amount</th>
+                <th className="px-4 py-2 text-right text-white">Running Balance</th>
               </tr>
             </thead>
             <tbody>

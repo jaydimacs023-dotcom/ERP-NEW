@@ -6,9 +6,9 @@ import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Building2, User, Calendar, DollarSign, Percent, CheckCircle,
-  Clock, XCircle, AlertTriangle, Receipt, Download, Printer,
+  XCircle, AlertTriangle, Receipt, Download, Printer,
   RotateCcw, MoreHorizontal, Scissors, CornerUpLeft,
-  ChevronDown, ChevronUp, MoreVertical, Send, Ban, Wand2, Users,
+  ChevronDown, ChevronUp, MoreVertical, Ban, Wand2, Users,
   GraduationCap, CheckSquare, Square, Calculator, FileSpreadsheet, ArrowUpDown
 } from 'lucide-react';
 
@@ -1760,52 +1760,22 @@ const brandColor = organization?.primaryColor || '#059669';
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="bg-white rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-100">
-                  <Clock size={20} className="text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400">On Hold</p>
-                  <p className="text-xl font-semibold text-gray-800">{stats.draft.length}</p>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">On Hold</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{stats.draft.length}</p>
             </div>
-            <div className="bg-white rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <Send size={20} className="text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400">Open</p>
-                  <p className="text-xl font-semibold text-blue-600">{stats.open.length}</p>
-                </div>
-              </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Open</p>
+              <p className="mt-2 text-2xl font-semibold text-blue-600">{stats.open.length}</p>
             </div>
-            <div className="bg-white rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-100">
-                  <CheckCircle size={20} className="text-green-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400">Closed</p>
-                  <p className="text-xl font-semibold text-green-600">{stats.closed.length}</p>
-                </div>
-              </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Closed</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-600">{stats.closed.length}</p>
             </div>
-            <div className="bg-white rounded-xl border p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-100">
-                  <span className="text-orange-500 text-xl font-bold leading-none">₱</span>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-gray-400">Outstanding</p>
-                  <p className="text-lg font-semibold text-black">
-                    <span className="mr-1">₱</span>{Number(stats.totalOutstanding).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Outstanding</p>
+              <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{formatCurrency(stats.totalOutstanding)}</p>
             </div>
           </div>
 

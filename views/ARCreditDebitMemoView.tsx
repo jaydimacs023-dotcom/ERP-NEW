@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, FileText, Plus, Search } from 'lucide-react';
+import { Building2, ChevronDown, ChevronLeft, FileText, Filter, GraduationCap, Plus, RotateCcw, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
 import {
   Sponsor,
@@ -25,6 +25,8 @@ interface ARCreditDebitMemoViewProps {
 
 type MemoType = 'CREDIT' | 'DEBIT';
 type ViewMode = 'LIST' | 'FORM';
+type DateFilterMode = 'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM';
+type CustomerFilter = 'ALL' | 'SPONSOR' | 'STUDENT';
 
 const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
   orgId,
@@ -53,6 +55,14 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
   const [offsetAccountId, setOffsetAccountId] = useState('');
   const [reason, setReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [memoTypeFilter, setMemoTypeFilter] = useState<'ALL' | MemoType>('ALL');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerFilter>('ALL');
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showMemoTypeDropdown, setShowMemoTypeDropdown] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   useEffect(() => {
     setReference(getNextReference(memoType));
@@ -108,18 +118,104 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
   }, [customerId, customerType, sponsors, students]);
 
   const memoEntries = useMemo(() => {
-    const term = searchTerm.toLowerCase();
     return entries
       .filter(e => e.status === 'POSTED' && (e.reference || '').match(/^(CM|DM)-/))
-      .filter(e =>
-        (e.reference || '').toLowerCase().includes(term) ||
-        (e.description || '').toLowerCase().includes(term)
-      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [entries, searchTerm]);
+  }, [entries]);
+
+  const memoRows = useMemo(() => {
+    return memoEntries.map(entry => {
+      const arLine = lines.find(line => line.journalEntryId === entry.id && (line.debit > 0 || line.credit > 0) && line.contactId);
+      const amountVal = arLine ? Math.abs(arLine.debit - arLine.credit) : 0;
+      const resolvedMemoType: MemoType = (entry.reference || '').startsWith('CM-') ? 'CREDIT' : 'DEBIT';
+
+      let customerLabel = 'Unknown';
+      let customerKind: CustomerFilter = 'ALL';
+      if (arLine?.contactType === 'SPONSOR') {
+        customerKind = 'SPONSOR';
+        customerLabel = sponsors.find(s => s.id === arLine.contactId)?.name || 'Unknown Sponsor';
+      } else if (arLine?.contactType === 'STUDENT') {
+        customerKind = 'STUDENT';
+        const student = students.find(s => s.id === arLine.contactId);
+        customerLabel = student ? `${student.lastName}, ${student.firstName}` : 'Unknown Student';
+      }
+
+      return {
+        entry,
+        amount: amountVal,
+        memoType: resolvedMemoType,
+        customerLabel,
+        customerKind
+      };
+    });
+  }, [lines, memoEntries, sponsors, students]);
+
+  const filteredMemoRows = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const todayDate = new Date();
+    const currentMonth = todayDate.getMonth();
+    const currentYear = todayDate.getFullYear();
+
+    return memoRows.filter(row => {
+      const matchesSearch =
+        !term ||
+        (row.entry.reference || '').toLowerCase().includes(term) ||
+        (row.entry.description || '').toLowerCase().includes(term) ||
+        row.customerLabel.toLowerCase().includes(term);
+
+      const matchesMemoType = memoTypeFilter === 'ALL' || row.memoType === memoTypeFilter;
+      const matchesCustomerType = customerTypeFilter === 'ALL' || row.customerKind === customerTypeFilter;
+
+      const rowDate = new Date(row.entry.date);
+      let matchesDate = true;
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = row.entry.date === today;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear;
+      } else if (dateFilterMode === 'CUSTOM') {
+        const afterFrom = !dateFrom || row.entry.date >= dateFrom;
+        const beforeTo = !dateTo || row.entry.date <= dateTo;
+        matchesDate = afterFrom && beforeTo;
+      }
+
+      return matchesSearch && matchesMemoType && matchesCustomerType && matchesDate;
+    });
+  }, [customerTypeFilter, dateFilterMode, dateFrom, dateTo, memoRows, memoTypeFilter, searchTerm, today]);
+
+  const summary = useMemo(() => {
+    const totalAmount = filteredMemoRows.reduce((sum, row) => sum + row.amount, 0);
+    const creditCount = filteredMemoRows.filter(row => row.memoType === 'CREDIT').length;
+    const debitCount = filteredMemoRows.filter(row => row.memoType === 'DEBIT').length;
+    return {
+      count: filteredMemoRows.length,
+      creditCount,
+      debitCount,
+      totalAmount
+    };
+  }, [filteredMemoRows]);
 
   const formatCurrency = (val: number) =>
     `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const hasActiveFilters =
+    searchTerm.trim().length > 0 ||
+    memoTypeFilter !== 'ALL' ||
+    customerTypeFilter !== 'ALL' ||
+    dateFilterMode !== 'ALL' ||
+    !!dateFrom ||
+    !!dateTo;
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setMemoTypeFilter('ALL');
+    setCustomerTypeFilter('ALL');
+    setDateFilterMode('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setShowMemoTypeDropdown(false);
+    setShowCustomerDropdown(false);
+    setShowDateDropdown(false);
+  };
 
   const resetFormState = (nextMemoType: MemoType = memoType) => {
     setMemoType(nextMemoType);
@@ -233,51 +329,235 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
             </button>
           </div>
 
-          <div className="bg-white rounded-md border border-gray-200 shadow-sm">
-            <div
-              className="p-4 border-b flex items-center justify-between"
-              style={{ backgroundColor: 'var(--acm-primary-light)' }}
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: brandColor }}>
-                <FileText size={16} /> Posted Memos
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Visible Memos</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{summary.count}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Credit Memos</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-600">{summary.creditCount}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Debit Memos</p>
+              <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{summary.debitCount}</p>
+            </div>
+            <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Amount</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(summary.totalAmount)}</p>
+            </div>
+          </div>
+
+          <div className="bg-white border-y px-4 py-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-72">
+                <Search size={14} className="text-gray-400 mr-2" />
                 <input
-                  className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded text-xs outline-none w-64"
-                  placeholder="Search by ref or memo..."
+                  type="text"
+                  placeholder="Search memos..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
+                  className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
                 />
               </div>
+
+              <div className="relative">
+                <div
+                  onClick={() => setShowMemoTypeDropdown(prev => !prev)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1">Type:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate">
+                    {memoTypeFilter === 'ALL' ? 'All' : memoTypeFilter === 'CREDIT' ? 'Credit' : 'Debit'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showMemoTypeDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMemoTypeDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        {(['ALL', 'CREDIT', 'DEBIT'] as Array<'ALL' | MemoType>).map(option => (
+                          <button
+                            key={option}
+                            onClick={() => { setMemoTypeFilter(option); setShowMemoTypeDropdown(false); }}
+                            className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${memoTypeFilter === option ? 'font-bold text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                            style={memoTypeFilter === option ? { backgroundColor: brandColor } : undefined}
+                          >
+                            {option === 'ALL' ? 'All Types' : option === 'CREDIT' ? 'Credit Memo' : 'Debit Memo'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="relative">
+                <div
+                  onClick={() => setShowCustomerDropdown(prev => !prev)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none max-w-[220px]"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1 truncate">Customer:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate">
+                    {customerTypeFilter === 'ALL' ? 'All' : customerTypeFilter === 'SPONSOR' ? 'Sponsors' : 'Students'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showCustomerDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowCustomerDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="p-1">
+                        {(['ALL', 'SPONSOR', 'STUDENT'] as CustomerFilter[]).map(option => (
+                          <button
+                            key={option}
+                            onClick={() => { setCustomerTypeFilter(option); setShowCustomerDropdown(false); }}
+                            className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${customerTypeFilter === option ? 'font-bold text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                            style={customerTypeFilter === option ? { backgroundColor: brandColor } : undefined}
+                          >
+                            {option === 'ALL' ? 'All Customers' : option === 'SPONSOR' ? 'Sponsors' : 'Students'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="relative">
+                <div
+                  onClick={() => setShowDateDropdown(prev => !prev)}
+                  className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                >
+                  <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+                  <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                    {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+                  </span>
+                  <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                </div>
+
+                {showDateDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                      <div className="border-b border-gray-100 p-1">
+                        <button
+                          onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100 rounded"
+                        >
+                          All Dates
+                        </button>
+                        <button
+                          onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] rounded ${dateFilterMode === 'TODAY' ? 'text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`}
+                          style={dateFilterMode === 'TODAY' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          Today
+                        </button>
+                        <button
+                          onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[13px] rounded ${dateFilterMode === 'THIS_MONTH' ? 'text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`}
+                          style={dateFilterMode === 'THIS_MONTH' ? { backgroundColor: brandColor } : undefined}
+                        >
+                          This Month
+                        </button>
+                      </div>
+
+                      <div className="p-3 space-y-2 bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                          <input
+                            type="date"
+                            value={dateTo}
+                            onChange={e => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                            className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none"
+                          />
+                        </div>
+                        <div className="flex justify-end items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowDateDropdown(false)}
+                            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowDateDropdown(false)}
+                            className="px-4 py-1 rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                            style={{ backgroundColor: brandColor }}
+                          >
+                            OK
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="p-2 text-gray-400 transition-colors"
+                style={hasActiveFilters ? { color: brandColor } : undefined}
+                title="Clear all filters"
+              >
+                <RotateCcw size={16} />
+              </button>
+
+              <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                <Filter size={14} />
+                <span>{filteredMemoRows.length} record{filteredMemoRows.length !== 1 ? 's' : ''}</span>
+              </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             <table className="min-w-full divide-y divide-gray-100">
               <thead style={{ backgroundColor: brandColor }}>
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Date</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Reference</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Customer</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Description</th>
                   <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wide">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {memoEntries.map(e => {
-                  const arLine = lines.find(l => l.journalEntryId === e.id && (l.debit > 0 || l.credit > 0) && l.contactId);
-                  const amountVal = arLine ? Math.abs(arLine.debit - arLine.credit) : 0;
+                {filteredMemoRows.map(row => {
                   return (
-                    <tr key={e.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-xs text-gray-600">{e.date}</td>
-                      <td className="px-6 py-4 text-xs font-mono font-bold text-gray-700">{e.reference}</td>
-                      <td className="px-6 py-4 text-xs text-gray-700">{e.description}</td>
+                    <tr key={row.entry.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 text-xs text-gray-600">{row.entry.date}</td>
+                      <td className="px-6 py-4 text-xs font-mono font-bold text-gray-700">{row.entry.reference}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
+                          {row.customerKind === 'SPONSOR' ? <Building2 size={12} style={{ color: brandColor }} /> : row.customerKind === 'STUDENT' ? <GraduationCap size={12} style={{ color: brandColor }} /> : <FileText size={12} style={{ color: brandColor }} />}
+                          {row.customerLabel}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-700">{row.entry.description}</td>
                       <td className="px-6 py-4 text-right text-xs font-mono font-semibold text-gray-900">
-                        {formatCurrency(amountVal)}
+                        {formatCurrency(row.amount)}
                       </td>
                     </tr>
                   );
                 })}
-                {memoEntries.length === 0 && (
+                {filteredMemoRows.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-20 text-center text-gray-400 italic">No memos posted yet.</td>
+                    <td colSpan={5} className="py-20 text-center text-gray-400 italic">No memos found for the current search and filter.</td>
                   </tr>
                 )}
               </tbody>

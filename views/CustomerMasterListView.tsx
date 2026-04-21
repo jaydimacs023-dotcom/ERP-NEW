@@ -7,8 +7,9 @@ import ModalPortal from '../components/ModalPortal';
 import {
     Search, Users, Handshake, Mail, Phone, MapPin, Building,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-    Eye, Filter, Plus, FileText, LayoutDashboard, X, User as UserIcon,
-    CheckCircle2, AlertCircle, Clock, ShieldCheck, Printer, Heart, Trash2, Edit2, Loader2, Receipt, Building2
+    Filter, Plus, FileText, LayoutDashboard, X, User as UserIcon,
+    CheckCircle2, AlertCircle, Clock, ShieldCheck, Printer, Heart, Loader2, Receipt, Building2,
+    ChevronDown, RotateCcw
 } from 'lucide-react';
 
 interface CustomerMasterListViewProps {
@@ -39,6 +40,8 @@ const MANDATORY_DOCS = [
     'Passport Size Photo'
 ];
 
+type BillingFilter = 'ALL' | 'BILLED' | 'UNBILLED' | 'PARTIAL' | 'NO_ENROLLMENT';
+
 const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     sponsors,
     students,
@@ -50,14 +53,14 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     brandColor = '#F47721',
     onAddSponsor,
     onUpdateSponsor,
-    onDeleteSponsor,
     onAddStudent,
     onUpdateStudent,
-    onDeleteStudent,
     onNotify
 }) => {
     const [activeSubTab, setActiveSubTab] = useState<'sponsors' | 'students'>('sponsors');
     const [searchTerm, setSearchTerm] = useState('');
+    const [billingFilter, setBillingFilter] = useState<BillingFilter>('ALL');
+    const [showBillingDropdown, setShowBillingDropdown] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -153,62 +156,6 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         }
     };
 
-    const handleDeleteSponsor = async (id: string) => {
-        if (!onDeleteSponsor || !confirm('Are you sure you want to delete this sponsor?')) return;
-        try {
-            const result = await onDeleteSponsor(id);
-            if (result === false) {
-                onNotify?.('error', 'Cannot delete sponsor: It is currently in use.');
-            } else {
-                onNotify?.('success', 'Sponsor deleted successfully!');
-            }
-        } catch (error) {
-            onNotify?.('error', 'Failed to delete sponsor.');
-        }
-    };
-
-    const handleDeleteStudent = (id: string) => {
-        if (!onDeleteStudent || !confirm('Are you sure you want to delete this learner?')) return;
-        onDeleteStudent(id);
-        onNotify?.('success', 'Learner deleted successfully!');
-    };
-
-    // --- Filtering Logic ---
-    const filteredData = useMemo(() => {
-        if (activeSubTab === 'sponsors') {
-            const lowerSearch = searchTerm.toLowerCase();
-            return sponsors.filter(s =>
-                !s.isDeleted && (
-                    s.name.toLowerCase().includes(lowerSearch) ||
-                    s.sponsorCode?.toLowerCase().includes(lowerSearch) ||
-                    s.contactPerson?.toLowerCase().includes(lowerSearch)
-                )
-            );
-        } else {
-            const lowerSearch = searchTerm.toLowerCase();
-            return students.filter(s =>
-                !s.isDeleted && (
-                    `${s.firstName} ${s.lastName}`.toLowerCase().includes(lowerSearch) ||
-                    s.uli.toLowerCase().includes(lowerSearch) ||
-                    s.email?.toLowerCase().includes(lowerSearch)
-                )
-            );
-        }
-    }, [activeSubTab, sponsors, students, searchTerm]);
-
-    // --- Pagination ---
-    const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
-    const paginatedData = useMemo(() => {
-        const start = (currentPage - 1) * PAGE_SIZE;
-        return filteredData.slice(start, start + PAGE_SIZE);
-    }, [filteredData, currentPage]);
-
-    const handleTabChange = (tab: 'sponsors' | 'students') => {
-        setActiveSubTab(tab);
-        setSearchTerm('');
-        setCurrentPage(1);
-    };
-
     // --- Status Logic ---
     const getStudentBillingStatus = (studentId: string) => {
         const studentEnrollments = enrollments.filter(e => e.studentId === studentId);
@@ -232,6 +179,78 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         return 'BILLED';
     };
 
+    // --- Filtering Logic ---
+    const filteredData = useMemo(() => {
+        if (activeSubTab === 'sponsors') {
+            const lowerSearch = searchTerm.toLowerCase();
+            return sponsors.filter(s =>
+                !s.isDeleted && (
+                    s.name.toLowerCase().includes(lowerSearch) ||
+                    s.sponsorCode?.toLowerCase().includes(lowerSearch) ||
+                    s.contactPerson?.toLowerCase().includes(lowerSearch)
+                ) &&
+                (billingFilter === 'ALL' || getSponsorBillingStatus(s.id) === billingFilter)
+            );
+        } else {
+            const lowerSearch = searchTerm.toLowerCase();
+            return students.filter(s =>
+                !s.isDeleted && (
+                    `${s.firstName} ${s.lastName}`.toLowerCase().includes(lowerSearch) ||
+                    s.uli.toLowerCase().includes(lowerSearch) ||
+                    s.email?.toLowerCase().includes(lowerSearch)
+                ) &&
+                (billingFilter === 'ALL' || getStudentBillingStatus(s.id) === billingFilter)
+            );
+        }
+    }, [activeSubTab, sponsors, students, searchTerm, billingFilter, invoices, enrollments]);
+
+    const activeTabData = useMemo(
+        () => activeSubTab === 'sponsors'
+            ? sponsors.filter(s => !s.isDeleted)
+            : students.filter(s => !s.isDeleted),
+        [activeSubTab, sponsors, students]
+    );
+
+    const summary = useMemo(() => {
+        if (activeSubTab === 'sponsors') {
+            const billedCount = activeTabData.filter(item => getSponsorBillingStatus((item as Sponsor).id) === 'BILLED').length;
+            const unbilledCount = activeTabData.filter(item => getSponsorBillingStatus((item as Sponsor).id) === 'UNBILLED').length;
+            return {
+                total: activeTabData.length,
+                billed: billedCount,
+                attention: unbilledCount,
+                visible: filteredData.length
+            };
+        }
+
+        const billedCount = activeTabData.filter(item => getStudentBillingStatus((item as Student).id) === 'BILLED').length;
+        const attentionCount = activeTabData.filter(item => {
+            const status = getStudentBillingStatus((item as Student).id);
+            return status === 'UNBILLED' || status === 'PARTIAL' || status === 'NO_ENROLLMENT';
+        }).length;
+        return {
+            total: activeTabData.length,
+            billed: billedCount,
+            attention: attentionCount,
+            visible: filteredData.length
+        };
+    }, [activeSubTab, activeTabData, filteredData.length, enrollments, invoices]);
+
+    // --- Pagination ---
+    const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+    const paginatedData = useMemo(() => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return filteredData.slice(start, start + PAGE_SIZE);
+    }, [filteredData, currentPage]);
+
+    const handleTabChange = (tab: 'sponsors' | 'students') => {
+        setActiveSubTab(tab);
+        setSearchTerm('');
+        setBillingFilter('ALL');
+        setShowBillingDropdown(false);
+        setCurrentPage(1);
+    };
+
     // --- Detail Renderers ---
     const DataPoint = ({ label, value, isSpan2 = false }: { label: string, value?: string, isSpan2?: boolean }) => (
         <div className={isSpan2 ? "col-span-2" : ""}>
@@ -240,9 +259,26 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         </div>
     );
 
+    const availableBillingFilters: Array<{ value: BillingFilter; label: string }> = activeSubTab === 'sponsors'
+        ? [
+            { value: 'ALL', label: 'All' },
+            { value: 'BILLED', label: 'Billed' },
+            { value: 'UNBILLED', label: 'Unbilled' },
+        ]
+        : [
+            { value: 'ALL', label: 'All' },
+            { value: 'BILLED', label: 'Billed' },
+            { value: 'UNBILLED', label: 'Unbilled' },
+            { value: 'PARTIAL', label: 'Partial' },
+            { value: 'NO_ENROLLMENT', label: 'No Enrollment' },
+        ];
+
+    const billingFilterLabel = availableBillingFilters.find(option => option.value === billingFilter)?.label || 'All';
+    const hasActiveFilters = searchTerm.trim().length > 0 || billingFilter !== 'ALL';
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-            <div className="flex justify-between items-end">
+            <div className="flex justify-between items-end gap-4 flex-wrap">
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 tracking-tighter">Customer Master List</h2>
                     <p className="text-sm italic text-slate-500 font-medium">Centralized registry for all billable entities and individuals.</p>
@@ -262,82 +298,162 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                             Learners
                         </button>
                     </div>
-                    {activeSubTab === 'sponsors' ? (
+                    {/* {activeSubTab === 'sponsors' ? (
                         <button
                             onClick={() => { resetSponsorForm(); setShowSponsorModal(true); }}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-hover transition-all shadow-xl shadow-brand/20 font-semibold text-[10px] uppercase tracking-widest"
+                            className="flex items-center gap-2 px-6 py-2.5 text-white rounded-xl transition-all font-semibold text-[10px] uppercase tracking-widest"
+                            style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
                         >
                             <Plus size={16} /> New Sponsor
                         </button>
                     ) : (
                         <button
                             onClick={() => { resetStudentForm(); setShowStudentModal(true); }}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-hover transition-all shadow-xl shadow-brand/20 font-semibold text-[10px] uppercase tracking-widest"
+                            className="flex items-center gap-2 px-6 py-2.5 text-white rounded-xl transition-all font-semibold text-[10px] uppercase tracking-widest"
+                            style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
                         >
                             <Plus size={16} /> Register Learner
                         </button>
-                    )}
+                    )} */}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                        {activeSubTab === 'sponsors' ? 'Total Sponsors' : 'Total Learners'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{summary.total}</p>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Billed</p>
+                    <p className="mt-2 text-2xl font-semibold text-emerald-600">{summary.billed}</p>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Needs Attention</p>
+                    <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{summary.attention}</p>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Visible Results</p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{summary.visible}</p>
                 </div>
             </div>
 
             {/* Search and Filters */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder={`Search ${activeSubTab}...`}
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex gap-2">
-                    <div className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        {filteredData.length} Total Records
+            <div className="bg-white border-y px-4 py-2">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-72">
+                        <Search size={14} className="text-gray-400 mr-2" />
+                        <input
+                            type="text"
+                            placeholder={`Search ${activeSubTab}...`}
+                            className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        />
+                    </div>
+
+                    <div className="relative">
+                        <div
+                            onClick={() => setShowBillingDropdown(prev => !prev)}
+                            className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none max-w-[220px]"
+                        >
+                            <span className="text-[13px] text-gray-500 mr-1 truncate">Billing:</span>
+                            <span className="text-[13px] font-bold text-gray-800 pr-5 truncate">{billingFilterLabel}</span>
+                            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                        </div>
+
+                        {showBillingDropdown && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowBillingDropdown(false)}></div>
+                                <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="p-1">
+                                        {availableBillingFilters.map(option => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => {
+                                                    setBillingFilter(option.value);
+                                                    setShowBillingDropdown(false);
+                                                    setCurrentPage(1);
+                                                }}
+                                                className={`w-full text-left px-3 py-2 text-[13px] rounded transition-colors ${
+                                                    billingFilter === option.value ? 'font-bold text-white' : 'text-gray-700 hover:bg-gray-100'
+                                                }`}
+                                                style={billingFilter === option.value ? { backgroundColor: brandColor } : undefined}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchTerm('');
+                            setBillingFilter('ALL');
+                            setShowBillingDropdown(false);
+                            setCurrentPage(1);
+                        }}
+                        className="p-2 text-gray-400 transition-colors"
+                        style={hasActiveFilters ? { color: brandColor } : undefined}
+                        title="Clear all filters"
+                    >
+                        <RotateCcw size={16} />
+                    </button>
+
+                    <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                        <Filter size={14} />
+                        <span>{filteredData.length} record{filteredData.length !== 1 ? 's' : ''}</span>
                     </div>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-100 text-left">
+                    <thead style={{ backgroundColor: brandColor }}>
+                        <tr>
+                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">
                                 {activeSubTab === 'sponsors' ? 'Sponsor Identification' : 'Learner Identification'}
                             </th>
                             {activeSubTab === 'sponsors' ? (
                                 <>
-                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Person</th>
-                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Details</th>
+                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Person</th>
+                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Details</th>
                                 </>
                             ) : (
                                 <>
-                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Contact Number</th>
-                                    <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Residence</th>
+                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Number</th>
+                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Residence</th>
                                 </>
                             )}
-                            <th className="px-6 py-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Billing Status</th>
-                            <th className="px-6 py-4 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400">Action</th>
+                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Billing Status</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {paginatedData.map((item, idx) => {
+                    <tbody className="divide-y divide-gray-100">
+                        {paginatedData.map((item) => {
                             if (activeSubTab === 'sponsors') {
                                 const sponsor = item as Sponsor;
                                 const status = getSponsorBillingStatus(sponsor.id);
                                 return (
-                                    <tr key={sponsor.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <tr key={sponsor.id} className="hover:bg-gray-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center text-brand border border-brand-light shrink-0">
+                                                <div
+                                                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                                                    style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
+                                                >
                                                     <Building size={20} />
                                                 </div>
                                                 <div>
                                                     <button
                                                         onClick={() => setSelectedSponsor(sponsor)}
-                                                        className="text-sm font-semibold text-slate-900 uppercase tracking-tight hover:text-brand transition-colors text-left"
+                                                        className="text-sm font-semibold text-slate-900 uppercase tracking-tight transition-colors text-left"
+                                                        style={{ color: undefined }}
                                                     >
                                                         {sponsor.name}
                                                     </button>
@@ -362,51 +478,29 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => { setSponsorFormData(sponsor); setEditingSponsor(sponsor); setShowSponsorModal(true); }}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteSponsor(sponsor.id)}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => setSelectedSponsor(sponsor)}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="View"
-                                                >
-                                                    <Eye size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
                                     </tr>
                                 );
                             } else {
                                 const student = item as Student;
                                 const status = getStudentBillingStatus(student.id);
                                 return (
-                                    <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <tr key={student.id} className="hover:bg-gray-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500 border border-indigo-100 shrink-0 overflow-hidden">
+                                                <div
+                                                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                                                    style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
+                                                >
                                                     <UserIcon size={20} />
                                                 </div>
                                                 <div>
                                                     <button
                                                         onClick={() => setSelectedStudent(student)}
-                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight hover:text-brand transition-colors text-left"
+                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight transition-colors text-left"
                                                     >
                                                         {student.lastName.toUpperCase()}, {student.firstName}
                                                     </button>
-                                                    <div className="text-[10px] font-mono font-bold text-brand uppercase">ULI: {student.uli}</div>
+                                                    <div className="text-[10px] font-mono font-bold uppercase" style={{ color: brandColor }}>ULI: {student.uli}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -438,31 +532,6 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                                     No Enrollment
                                                 </span>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => { setStudentFormData(student); setEditingStudent(student); setShowStudentModal(true); }}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteStudent(student.id)}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => setSelectedStudent(student)}
-                                                    className="p-2 text-slate-400 hover:text-brand transition-colors"
-                                                    title="View"
-                                                >
-                                                    <Eye size={18} />
-                                                </button>
-                                            </div>
                                         </td>
                                     </tr>
                                 );

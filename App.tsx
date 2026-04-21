@@ -6351,7 +6351,7 @@ export default function App() {
             onAddUser={handleAddUser}
             onDeleteUser={handleDeleteUser}
           />}
-          {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} />}
+          {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} brandColor={brandColor} />}
           {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />}
           {activeTab === 'backup-restore' && (
             <BackupRestoreView
@@ -6382,6 +6382,7 @@ export default function App() {
               lines={filteredLines}
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
             />
           )}
           {activeTab === 'aging-report' && (
@@ -6392,6 +6393,7 @@ export default function App() {
               lines={filteredLines}
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
             />
           )}
           {activeTab === 'write-off' && (
@@ -6432,6 +6434,7 @@ export default function App() {
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
             />
           )}
           {activeTab === 'customer-ledger' && (
@@ -6442,6 +6445,7 @@ export default function App() {
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
             />
           )}
 
