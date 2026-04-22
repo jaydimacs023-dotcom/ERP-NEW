@@ -1,19 +1,20 @@
 ﻿
-import React, { useState, useMemo } from 'react';
-import { User, Student, Trainer } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { User, Student, Trainer, Organization } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
   UserCog, Search, Plus, Trash2, X, Shield, Users, 
   Key, Mail, Eye, EyeOff, ShieldCheck, UserCircle,
-  ChevronRight, Lock, GraduationCap, Award, AlertCircle
+  ChevronRight, Lock, GraduationCap, Award, AlertCircle, Filter
 } from 'lucide-react';
 
 interface UsersManagementViewProps {
   users: User[];
   students?: Student[];
   trainers?: Trainer[];
+  organization?: Organization;
   onAddUser: (user: User) => void;
   onDeleteUser: (id: string) => void;
 }
@@ -33,10 +34,12 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   users, 
   students = [], 
   trainers = [],
+  organization,
   onAddUser, 
   onDeleteUser 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | string>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -47,6 +50,14 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     trainerId: '' as string,
   });
   const [formError, setFormError] = useState('');
+  const brandColor = organization?.primaryColor || '#059669';
+  const hasActiveFilters = searchTerm.trim().length > 0 || roleFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
 
   // Get students/trainers that don't already have user accounts
   const availableStudents = useMemo(() => {
@@ -69,10 +80,13 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     [trainers, formData.trainerId]
   );
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch =
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   const resetForm = () => {
     setFormData({
@@ -214,26 +228,57 @@ const UsersManagementView: React.FC<UsersManagementViewProps> = ({
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            placeholder="Search by name or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none transition-all"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              placeholder="Search by name or email..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={roleFilter}
+              onChange={e => setRoleFilter(e.target.value as 'ALL' | string)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All Roles</option>
+              {ROLES.map(role => (
+                <option key={role.id} value={role.id}>{role.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setRoleFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredUsers.length}</span> of <span className="font-semibold text-gray-900">{users.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded border border-gray-200 overflow-hidden shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">System User</th>
-              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned Role</th>
-              <th className="px-8 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Authentication</th>
-              <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-white uppercase tracking-wide">System User</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-white uppercase tracking-wide">Assigned Role</th>
+              <th className="px-8 py-5 text-left text-xs font-semibold text-white uppercase tracking-wide">Authentication</th>
+              <th className="px-8 py-5 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

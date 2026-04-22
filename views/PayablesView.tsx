@@ -4,14 +4,13 @@ import {
   PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder
 } from '../types';
 import { AccountingService } from '../accountingService';
-import EmptyState from '../components/EmptyState';
 import ModalPortal from '../components/ModalPortal';
 import {
   Search, Calculator, Building, Coins, AlertCircle, Calendar,
   X, Plus, FileText, Edit, Trash2, Eye, CheckCircle, Clock,
-  DollarSign, Filter, ChevronDown, RefreshCw, CreditCard,
+  DollarSign, ChevronDown, RefreshCw, CreditCard,
   BookOpen, Landmark, Receipt, TrendingUp, ArrowRight,
-  Percent, Banknote, BarChart3, PieChart, Download, Printer
+  Percent, Banknote, BarChart3, PieChart, Download, Printer, RotateCcw
 } from 'lucide-react';
 
 interface PayablesViewProps {
@@ -71,6 +70,19 @@ const STATUS_CONFIG: Record<PayableStatus, { label: string; color: string; bgCol
   paid: { label: 'Paid', color: 'text-brand', bgColor: 'bg-brand/10', borderColor: 'border-brand-light' },
   partially_paid: { label: 'Partially Paid', color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200' },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bgColor: 'bg-gray-100', borderColor: 'border-gray-200' },
+};
+
+const formatPayableDate = (value?: string) => {
+  if (!value) return '-';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(date);
 };
 
 const PayablesView: React.FC<PayablesViewProps> = ({
@@ -293,18 +305,37 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // FILTERING & SEARCHING
   // ============================================================================
   const filteredPayables = useMemo(() => {
-    return orgPayables.filter(p => {
-      const matchesSearch =
-        p.payableNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        orgVendors.find(v => v.id === p.vendorId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-      const matchesVendor = vendorFilter === 'all' || p.vendorId === vendorFilter;
+    return orgPayables
+      .filter(p => {
+        const vendorName = orgVendors.find(v => v.id === p.vendorId)?.name || '';
+        const statusLabel = STATUS_CONFIG[p.status]?.label || '';
+        const categoryLabel = PAYABLE_CATEGORIES.find(c => c.value === p.category)?.label || p.category;
+        const searchableText = [
+          p.payableNumber,
+          p.description,
+          vendorName,
+          p.referenceDocument || '',
+          p.billDate,
+          p.dueDate,
+          categoryLabel,
+          statusLabel,
+        ].join(' ').toLowerCase();
 
-      return matchesSearch && matchesStatus && matchesVendor;
-    });
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+        const matchesVendor = vendorFilter === 'all' || p.vendorId === vendorFilter;
+
+        return matchesSearch && matchesStatus && matchesVendor;
+      })
+      .sort((a, b) => (b.billDate || '').localeCompare(a.billDate || ''));
   }, [orgPayables, searchTerm, statusFilter, vendorFilter, orgVendors]);
+
+  const hasActiveListFilters =
+    searchTerm.trim() !== '' ||
+    statusFilter !== 'all' ||
+    vendorFilter !== 'all';
 
   // ============================================================================
   // SUMMARY METRICS
@@ -902,71 +933,85 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const renderListTab = () => (
     <>
       {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
-          <div className="relative flex-1 sm:flex-none sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
             <input
               type="text"
               placeholder="Search payables..."
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
             />
           </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as PayableStatus | 'all')}
-              className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm appearance-none cursor-pointer"
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
             >
-              <option value="all">All Statuses</option>
+              <option value="all">All</option>
               {Object.entries(STATUS_CONFIG).map(([value, config]) => (
                 <option key={value} value={value}>{config.label}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
           </div>
-          <div className="relative">
-            <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Vendor:</span>
             <select
               value={vendorFilter}
               onChange={(e) => setVendorFilter(e.target.value)}
-              className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm appearance-none cursor-pointer"
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[220px]"
             >
-              <option value="all">All Vendors</option>
+              <option value="all">All</option>
               {orgVendors.map(v => (
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
           </div>
-        </div>
-        <p className="text-xs text-gray-500">
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('all');
+              setVendorFilter('all');
+            }}
+            className={`p-2 transition-colors ${hasActiveListFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <p className="ml-auto text-xs text-gray-500">
           Showing <span className="font-semibold text-gray-700">{filteredPayables.length}</span> of {orgPayables.length}
-        </p>
+          </p>
+        </div>
       </div>
 
       {/* Payables Table */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Vendor</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Doc # / Type</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Date / Due</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Balance</th>
-              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date / Due</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Doc # / Type</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Vendor</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Description</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Amount</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Balance</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredPayables.length > 0 ? (
-              filteredPayables
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .map(payable => {
+              filteredPayables.map(payable => {
                   const statusConfig = STATUS_CONFIG[payable.status];
                   const isOverdue = payable.status !== 'paid' && payable.status !== 'cancelled' && new Date(payable.dueDate) < new Date();
                   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
@@ -975,18 +1020,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
                   return (
                     <tr key={payable.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand border border-brand-light flex items-center justify-center font-bold text-xs">
-                            {getVendorName(payable.vendorId).charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{getVendorName(payable.vendorId)}</p>
-                            <p className="text-xs text-gray-500 truncate max-w-[180px]">{payable.description}</p>
-                          </div>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium text-gray-800">{formatPayableDate(payable.billDate)}</span>
+                          <span className={`text-xs ${isOverdue ? 'text-rose-600 font-semibold' : 'text-gray-400'}`}>
+                            Due: {formatPayableDate(payable.dueDate)}
+                          </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-mono font-semibold text-brand">{payable.payableNumber}</span>
                           <span className={`text-xs font-semibold ${invoiceTypeConfig?.color || 'text-gray-500'}`}>
@@ -994,15 +1036,24 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs text-gray-600">{payable.billDate}</span>
-                          <span className={`text-xs ${isOverdue ? 'text-rose-600 font-semibold' : 'text-gray-400'}`}>
-                            Due: {payable.dueDate} {isOverdue && '??'}
-                          </span>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand border border-brand-light flex items-center justify-center font-bold text-xs">
+                            {getVendorName(payable.vendorId).charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{getVendorName(payable.vendorId)}</p>
+                            <p className="text-xs text-gray-500">{getCategoryLabel(payable.category)}</p>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium text-gray-800">{payable.description}</span>
+                          <span className="text-xs text-gray-500">{payable.referenceDocument || 'No reference document'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-1">
                           <span className="font-mono text-sm text-gray-700">{"\u20B1"}{formatCurrency(payable.amount)}</span>
                           {payable.withholdingAmount > 0 && (
@@ -1010,13 +1061,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono text-sm font-semibold">
-                        <span className={remainingBalance > 0 ? 'text-brand' : 'text-brand'}>
+                      <td className="px-4 py-3 text-right font-mono text-sm font-semibold">
+                        <span className="text-brand">
                           {"\u20B1"}{formatCurrency(remainingBalance)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex flex-col items-center gap-1">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-start gap-1">
                           <span className={`inline-flex items-center px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
                             {statusConfig.label}
                           </span>
@@ -1027,8 +1078,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openViewModal(payable)}
                             className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
@@ -1092,12 +1143,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 })
             ) : (
               <tr>
-                <td colSpan={7} className="py-16 text-center">
-                  <EmptyState
-                    icon={<Coins className="text-gray-300" size={48} />}
-                    title="No payables found"
-                    description={searchTerm || statusFilter !== 'all' || vendorFilter !== 'all' ? 'Try adjusting your search or filters' : 'Create your first payable to get started'}
-                  />
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  {hasActiveListFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'No payables found. Create your first payable to get started.'}
                 </td>
               </tr>
             )}

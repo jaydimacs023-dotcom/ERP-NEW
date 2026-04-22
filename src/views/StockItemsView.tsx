@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { StockItem, InventoryValuationMethod } from '../types';
 
 interface StockItemsViewProps {
@@ -54,6 +54,8 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'STOCK_ITEM' | 'NON_STOCK_ITEM'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -183,21 +185,35 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
     }
   };
 
-  const activeItems = items.filter((item) => !item.isDeleted);
-  const filteredItems = activeItems.filter(
-    (item) =>
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const activeItems = React.useMemo(() => items.filter((item) => !item.isDeleted), [items]);
+  const filteredItems = React.useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return activeItems
+      .filter((item) => {
+        const searchableText = [
+          item.code,
+          item.name,
+          item.description || '',
+          item.unitOfMeasure,
+          item.valuationMethod,
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesType = typeFilter === 'ALL' || item.type === typeFilter;
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'ACTIVE' && item.isActive)
+          || (statusFilter === 'INACTIVE' && !item.isActive);
+
+        return matchesSearch && matchesType && matchesStatus;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [activeItems, searchTerm, typeFilter, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || statusFilter !== 'ALL';
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl text-gray-900 mb-2">Stock Items</h1>
-        <p className="text-gray-600">Manage your inventory items and product catalog</p>
-      </div>
-
       {/* Messages */}
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -222,27 +238,79 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       )}
 
       {/* Controls */}
-      <div className="mb-6 flex gap-3 items-center">
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Stock Items</h2>
+          <p className="text-sm text-gray-500 font-normal italic">Manage item master records, valuation methods, and replenishment settings.</p>
+        </div>
         {!showForm && (
           <button
             onClick={handleAddClick}
             disabled={isLoading || submitting}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
           >
             <Plus className="w-4 h-4" />
             Add Item
           </button>
         )}
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by code or name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            disabled={showForm}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50"
-          />
+      </div>
+
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search stock items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Type:</span>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as 'ALL' | 'STOCK_ITEM' | 'NON_STOCK_ITEM')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="ALL">All</option>
+              <option value="STOCK_ITEM">Stock</option>
+              <option value="NON_STOCK_ITEM">Service</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+            >
+              <option value="ALL">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setTypeFilter('ALL');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredItems.length}</span> of {activeItems.length} items
+          </div>
         </div>
       </div>
 
@@ -432,79 +500,71 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       )}
 
       {/* List */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading items...</p>
           </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="p-8 text-center text-gray-600">
-            <p>
-              {searchTerm
-                ? 'No items match your search.'
-                : 'No items found. Create one to get started.'}
-            </p>
-          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Unit
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Valuation
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.code}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{item.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      <span className="text-xs px-2 py-1 bg-gray-100 rounded">
+              <tbody className="divide-y divide-gray-100">
+                {filteredItems.length > 0 ? filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      <span className="text-xs px-2 py-1 bg-gray-100 rounded border border-gray-200">
                         {item.type === 'STOCK_ITEM' ? 'Stock' : 'Service'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{item.unitOfMeasure}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.unitOfMeasure}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
                       {item.valuationMethod.replace('_', ' ')}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
                           item.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-brand/10 text-brand border-brand-light'
+                            : 'bg-gray-100 text-gray-800 border-gray-200'
                         }`}
                       >
                         {item.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditClick(item)}
                           disabled={submitting}
-                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -524,7 +584,15 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : 'No items found. Create one to get started.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

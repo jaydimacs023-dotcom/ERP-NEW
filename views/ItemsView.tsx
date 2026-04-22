@@ -1,6 +1,6 @@
-﻿import React, { useState } from 'react';
-import { NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory } from '../types';
-import { Search, Plus, Box, Trash2, X, Tag, CreditCard, ShieldCheck, Filter, Edit2, ChevronRight, Link as LinkIcon, AlertCircle, Percent, Info, Database, Layers } from 'lucide-react';
+﻿import React, { useMemo, useState } from 'react';
+import { NonStockItem, ChartOfAccount } from '../types';
+import { Search, Plus, Box, Trash2, X, Tag, ShieldCheck, Edit2, Link as LinkIcon, Percent, Info, Database, Layers, ChevronDown, RotateCcw } from 'lucide-react';
 import ModalPortal from '../components/ModalPortal';
 
 interface ItemsViewProps {
@@ -13,6 +13,7 @@ interface ItemsViewProps {
 
 const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpdateItem, onDeleteItem }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT'>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<NonStockItem | null>(null);
 
@@ -26,10 +27,30 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
     taxCategoryId: ''
   });
 
-  const filteredItems = items.filter(i => 
-    i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    i.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const activeItems = useMemo(() => items.filter(item => !item.isDeleted), [items]);
+
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return activeItems
+      .filter(item => {
+        const searchableText = [
+          item.code,
+          item.name,
+          item.description || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesTax = taxFilter === 'ALL'
+          || (taxFilter === 'TAXABLE' && !!item.taxCategoryId)
+          || (taxFilter === 'EXEMPT' && !item.taxCategoryId);
+
+        return matchesSearch && matchesTax;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeItems, searchTerm, taxFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || taxFilter !== 'ALL';
 
   const resetForm = () => {
     setFormData({ code: '', name: '', description: '', unitPrice: 0, incomeAccountId: '', expenseAccountId: '', taxCategoryId: '' });
@@ -129,39 +150,70 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
          </div>
       </div>
 
-      <div className="p-6 bg-white rounded border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-6 no-print">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Query catalog indices by nomenclature or SKU code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-gray-50 border-2 border-transparent rounded text-sm font-bold text-gray-800 focus:bg-white focus:border-brand-light outline-none transition-all"
-          />
-        </div>
-        <div className="px-6 py-2 bg-gray-100 rounded-full text-xs font-semibold text-gray-500 uppercase tracking-wide">
-           {filteredItems.length} active nodes
+      <div className="bg-white border-y px-4 py-2 no-print">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full sm:w-64">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search catalog items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Tax:</span>
+            <select
+              value={taxFilter}
+              onChange={(e) => setTaxFilter(e.target.value as 'ALL' | 'TAXABLE' | 'EXEMPT')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+            >
+              <option value="ALL">All</option>
+              <option value="TAXABLE">Taxable</option>
+              <option value="EXEMPT">Exempt</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setTaxFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredItems.length}</span> of {activeItems.length} items
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-5 py-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Reference & Identity</th>
-                <th className="px-6 py-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Pricing Structure</th>
-                <th className="px-6 py-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Account Topology</th>
-                <th className="px-6 py-6 text-xs font-semibold text-gray-400 uppercase tracking-wide">Tax Mapping</th>
-                <th className="px-5 py-6 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">System Control</th>
+          <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
+              <tr>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Reference & Identity</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Pricing Structure</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Account Topology</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Tax Mapping</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">System Control</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-16 text-center text-gray-400 italic">
-                    The non-stock catalog is currently void. Initialize a new definition to begin.
+                  <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                    <Tag size={40} className="mx-auto mb-2 text-gray-300" />
+                    {hasActiveFilters
+                      ? 'Try adjusting your search or filters.'
+                      : 'The non-stock catalog is currently void. Initialize a new definition to begin.'}
                   </td>
                 </tr>
               ) : (
@@ -171,9 +223,9 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
 
                   return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-5 py-6">
-                        <div className="flex items-center gap-5">
-                           <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-brand-light group-hover:text-brand transition-all border border-gray-200">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                               <Tag size={20} />
                            </div>
                            <div>
@@ -183,12 +235,12 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                            </div>
                         </div>
                       </td>
-                      <td className="px-6 py-6">
+                      <td className="px-4 py-3">
                         <div className="text-sm font-semibold text-gray-800 font-mono tracking-tight bg-gray-100 px-3 py-1.5 rounded-lg w-fit">
                           PHP {item.unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </div>
                       </td>
-                      <td className="px-6 py-6">
+                      <td className="px-4 py-3">
                          <div className="space-y-2 border-l-2 border-gray-100 pl-4">
                             {incomeAcc && (
                               <div className="flex items-center gap-2">
@@ -204,7 +256,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                             )}
                          </div>
                       </td>
-                      <td className="px-6 py-6">
+                      <td className="px-4 py-3">
                          {item.taxCategoryId ? (
                             <span className="inline-flex items-center gap-2 px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-semibold uppercase tracking-wide border border-brand-light">
                                <Percent size={10} /> VAT_ACTIVE
@@ -213,7 +265,7 @@ const ItemsView: React.FC<ItemsViewProps> = ({ items, accounts, onAddItem, onUpd
                             <span className="text-xs text-gray-400 italic font-semibold uppercase tracking-wide border border-gray-100 px-2 py-1 rounded-full">EXEMPT</span>
                          )}
                       </td>
-                      <td className="px-5 py-6 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => {

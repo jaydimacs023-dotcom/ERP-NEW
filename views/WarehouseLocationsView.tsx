@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search, Download, MapPin, Building2, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, Search, Download, MapPin, Building2, AlertCircle, ChevronDown, RotateCcw } from 'lucide-react';
 import { WarehouseLocation, Organization } from '../types';
 import { DataExportService } from '../services/DataExportService';
 
@@ -46,6 +46,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -146,12 +147,30 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     }
   };
 
-  const activeLocations = locations.filter((loc) => !loc.isDeleted);
-  const filteredItems = activeLocations.filter(loc => 
-    loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    loc.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    loc.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const activeLocations = useMemo(() => locations.filter((loc) => !loc.isDeleted), [locations]);
+
+  const filteredLocations = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return activeLocations
+      .filter((loc) => {
+        const searchableText = [
+          loc.code,
+          loc.name,
+          loc.location,
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'ACTIVE' && loc.isActive)
+          || (statusFilter === 'INACTIVE' && !loc.isActive);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [activeLocations, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -163,16 +182,10 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         </div>
         <div className="flex gap-3">
            {!showForm && (
-            <button
+           <button
               onClick={handleAddClick}
               disabled={isLoading || submitting}
-              style={{
-                backgroundColor: brandColor,
-                boxShadow: `0 10px 15px -3px ${brandColor}20`
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${brandColor}dd`)}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = brandColor)}
-              className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide hover:bg-brand-hover hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-brand/20"
             >
               <Plus className="w-4 h-4" />
               New Location
@@ -180,7 +193,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
            )}
            <button
              onClick={() => {
-                const exportData = filteredItems.map(loc => ({
+                const exportData = filteredLocations.map(loc => ({
                   Code: loc.code,
                   Name: loc.name,
                   Description: loc.location,
@@ -188,16 +201,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                 }));
                 DataExportService.exportToCSV(exportData, `Warehouse_Map_${new Date().toISOString().split('T')[0]}.csv`);
              }}
-             style={{ borderColor: `${brandColor}20` }}
-             onMouseEnter={(e) => { 
-               e.currentTarget.style.borderColor = `${brandColor}40`;
-               e.currentTarget.style.color = brandColor;
-             }}
-             onMouseLeave={(e) => { 
-               e.currentTarget.style.borderColor = `${brandColor}20`;
-               e.currentTarget.style.color = '#9CA3AF';
-             }}
-             className="p-3 bg-white rounded transition-all active:scale-95 shadow-sm border text-gray-400"
+             className="p-3 bg-white rounded transition-all active:scale-95 shadow-sm border border-gray-200 text-gray-400 hover:text-brand hover:border-brand-light"
              title="Export CSV"
            >
              <Download size={20} />
@@ -388,99 +392,119 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
 
       {/* Filter Bar */}
       {!showForm && (
-        <div className="p-6 bg-white rounded-md border border-gray-200 shadow-sm no-print">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search via zone code, name or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                focusRingColor: `${brandColor}30`
+        <div className="bg-white border-y px-4 py-2 no-print">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full sm:w-64">
+              <Search size={14} className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Search locations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+              />
+            </div>
+
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+              <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+              >
+                <option value="ALL">All</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('ALL');
               }}
-              onFocus={(e) => {
-                (e.currentTarget as HTMLInputElement).style.boxShadow = `0 0 0 2px ${brandColor}20`;
-              }}
-              onBlur={(e) => {
-                (e.currentTarget as HTMLInputElement).style.boxShadow = 'none';
-              }}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded text-sm font-medium outline-none transition-all placeholder:text-gray-400"
-            />
+              className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+              title="Clear all filters"
+            >
+              <RotateCcw size={16} />
+            </button>
+
+            <div className="ml-auto text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-700">{filteredLocations.length}</span> of {activeLocations.length} locations
+            </div>
           </div>
         </div>
       )}
 
       {/* Table List */}
-      <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-8 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center w-24">CID</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Location Detail</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Physical Address</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Status</th>
-                <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Management</th>
+          <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
+              <tr>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Code</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Location Detail</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Physical Address</th>
+                <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Status</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Management</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 text-sm">
+            <tbody className="divide-y divide-gray-100 text-sm">
               {isLoading ? (
                 <tr>
-                   <td colSpan={5} className="px-8 py-20 text-center">
-                      <div className="w-10 h-10 border-4 rounded-full animate-spin mx-auto mb-4" style={{ borderColor: `${brandColor}30`, borderTopColor: brandColor }}></div>
+                   <td colSpan={5} className="px-4 py-16 text-center">
+                      <div className="w-10 h-10 border-4 rounded-full animate-spin mx-auto mb-4 border-brand-light border-t-gray-300"></div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Mapping Logistics Architecture...</p>
                    </td>
                 </tr>
-              ) : filteredItems.length === 0 ? (
+              ) : filteredLocations.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 italic">
+                  <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Building2 className="text-gray-200" size={32} />
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{searchTerm ? 'Search produced no coordinates' : 'No logistics centers defined'}</p>
-                    <p className="text-xs text-gray-400 mt-2 italic font-medium">Add a physical location to begin inventory tracking.</p>
+                    <p className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      {hasActiveFilters ? 'No locations match your filters' : 'No logistics centers defined'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2 italic font-medium">
+                      {hasActiveFilters ? 'Try adjusting your search or status filter.' : 'Add a physical location to begin inventory tracking.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((loc) => (
+                filteredLocations.map((loc) => (
                   <tr key={loc.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-8 py-5">
-                       <div className="text-center">
-                          <div className="text-xs font-mono font-semibold text-gray-400 uppercase mb-0.5 tracking-tighter">{loc.code}</div>
-                          <div className="w-8 h-1 rounded-full mx-auto" style={{ backgroundColor: `${brandColor}30` }}></div>
+                    <td className="px-4 py-3">
+                       <div className="text-left">
+                          <div className="text-sm font-semibold text-gray-900 font-mono">{loc.code}</div>
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">Zone ID</div>
                        </div>
                     </td>
-                    <td className="px-6 py-5 font-semibold text-gray-800 tracking-tight">
+                    <td className="px-4 py-3 font-semibold text-gray-800 tracking-tight">
                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform" style={{ backgroundColor: `${brandColor}15`, color: brandColor }}>
+                          <div className="w-10 h-10 rounded bg-brand/10 text-brand border border-brand-light shadow-sm flex items-center justify-center shrink-0">
                              <Building2 size={16} />
                           </div>
-                          {loc.name}
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900">{loc.name}</div>
+                            <div className="text-xs text-gray-500 uppercase tracking-wide">{loc.isActive ? 'Operational' : 'Inactive'}</div>
+                          </div>
                        </div>
                     </td>
-                    <td className="px-6 py-5 text-gray-500 font-medium truncate max-w-xs">{loc.location}</td>
-                    <td className="px-6 py-5 text-center">
-                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
-                          loc.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                    <td className="px-4 py-3 text-gray-500 font-medium max-w-xs">{loc.location}</td>
+                    <td className="px-4 py-3 text-center">
+                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
+                          loc.isActive ? 'bg-brand/10 text-brand border-brand-light' : 'bg-gray-100 text-gray-500 border-gray-200'
                        }`}>
                           {loc.isActive ? 'ACTIVE_CENTER' : 'LOCKED'}
                        </span>
                     </td>
-                    <td className="px-8 py-5 text-right">
+                    <td className="px-4 py-3 text-right">
                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEditClick(loc)}
-                            className="p-2.5 text-gray-400 rounded transition-all shadow-sm border border-transparent hover:border-gray-100"
-                            style={{}}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = brandColor;
-                              e.currentTarget.style.backgroundColor = 'white';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#9CA3AF';
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
+                            className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
                           >
                             <Edit2 size={16} />
                           </button>
@@ -502,13 +526,13 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         </div>
 
         {/* Audit Footnote */}
-        {!isLoading && filteredItems.length > 0 && (
-           <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
+        {!isLoading && filteredLocations.length > 0 && (
+           <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} style={{ color: brandColor }} /></div>
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} className="text-brand" /></div>
                   <div>
                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Logistics Integrity</p>
-                     <p className="text-xs font-bold text-gray-600">Total physical storage footprint: {filteredItems.length} registered zones.</p>
+                     <p className="text-xs font-bold text-gray-600">Total physical storage footprint: {filteredLocations.length} registered zones.</p>
                   </div>
                </div>
                <div className="text-right">

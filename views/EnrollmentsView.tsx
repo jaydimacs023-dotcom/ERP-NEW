@@ -3,9 +3,10 @@ import { Enrollment, BillingStatus, EnrollmentStatus, Student, Batch, Sponsor, Q
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
-  Search, Plus, UserCheck, Trash2, X, GraduationCap, Users,
-  Filter, Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
-  Calendar, DollarSign, FileText, Clock, Layers, Building
+  Search, Plus, UserCheck, Trash2, X, GraduationCap,
+  Edit2, Loader2, CheckCircle, AlertCircle,
+  DollarSign, FileText, Layers, Building,
+  ChevronDown, RotateCcw
 } from 'lucide-react';
 
 interface Toast {
@@ -38,6 +39,19 @@ const ENROLLMENT_STATUS_OPTIONS: { value: EnrollmentStatus; label: string; color
   { value: 'COMPLETED', label: 'Completed', color: 'bg-blue-100 text-blue-700' },
   { value: 'DROPPED', label: 'Dropped', color: 'bg-rose-100 text-rose-700' },
 ];
+
+const formatEnrollmentDate = (value?: string) => {
+  if (!value) return '-';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(date);
+};
 
 const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({ 
   enrollments, students, batches, sponsors, qualifications, currency = 'PHP',
@@ -78,28 +92,43 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
   }, [students, enrollments, formData.batchId, editingEnrollment]);
 
   const filteredEnrollments = useMemo(() => {
-    return enrollments.filter(e => {
-      if (e.isDeleted) return false;
-      
-      const student = students.find(s => s.id === e.studentId);
-      const batch = batches.find(b => b.id === e.batchId);
-      const sponsor = sponsors.find(sp => sp.id === e.sponsorId);
-      
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        (e.enrollmentCode?.toLowerCase().includes(searchLower)) ||
-        (`${student?.firstName} ${student?.lastName}`.toLowerCase().includes(searchLower)) ||
-        (student?.uli?.toLowerCase().includes(searchLower)) ||
-        (batch?.name?.toLowerCase().includes(searchLower)) ||
-        (sponsor?.name?.toLowerCase().includes(searchLower));
-      
-      const matchesBatch = !filterBatch || e.batchId === filterBatch;
-      const matchesBillingStatus = !filterBillingStatus || e.billingStatus === filterBillingStatus;
-      const matchesEnrollmentStatus = !filterEnrollmentStatus || e.enrollmentStatus === filterEnrollmentStatus;
-      
-      return matchesSearch && matchesBatch && matchesBillingStatus && matchesEnrollmentStatus;
-    });
-  }, [enrollments, students, batches, sponsors, searchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus]);
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return enrollments
+      .filter(e => {
+        if (e.isDeleted) return false;
+
+        const student = students.find(s => s.id === e.studentId);
+        const batch = batches.find(b => b.id === e.batchId);
+        const sponsor = sponsors.find(sp => sp.id === e.sponsorId);
+        const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
+
+        const searchableText = [
+          e.enrollmentCode || '',
+          `${student?.firstName || ''} ${student?.lastName || ''}`,
+          student?.uli || '',
+          batch?.batchCode || '',
+          batch?.name || '',
+          qualification?.code || '',
+          qualification?.name || '',
+          sponsor?.name || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesBatch = !filterBatch || e.batchId === filterBatch;
+        const matchesBillingStatus = !filterBillingStatus || e.billingStatus === filterBillingStatus;
+        const matchesEnrollmentStatus = !filterEnrollmentStatus || e.enrollmentStatus === filterEnrollmentStatus;
+
+        return matchesSearch && matchesBatch && matchesBillingStatus && matchesEnrollmentStatus;
+      })
+      .sort((a, b) => (b.enrollmentDate || '').localeCompare(a.enrollmentDate || ''));
+  }, [enrollments, students, batches, sponsors, qualifications, searchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    !!filterBatch ||
+    !!filterBillingStatus ||
+    !!filterEnrollmentStatus;
 
   const resetForm = () => {
     setFormData({ 
@@ -331,63 +360,92 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search student, batch, sponsor..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={filterBatch}
-            onChange={(e) => setFilterBatch(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search enrollments..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Batch:</span>
+            <select
+              value={filterBatch}
+              onChange={(e) => setFilterBatch(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="">All</option>
+              {batches.filter(b => !b.isDeleted).map(b => (
+                <option key={b.id} value={b.id}>{b.batchCode || b.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Billing:</span>
+            <select
+              value={filterBillingStatus}
+              onChange={(e) => setFilterBillingStatus(e.target.value as BillingStatus | '')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
+            >
+              <option value="">All</option>
+              {BILLING_STATUS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={filterEnrollmentStatus}
+              onChange={(e) => setFilterEnrollmentStatus(e.target.value as EnrollmentStatus | '')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+            >
+              <option value="">All</option>
+              {ENROLLMENT_STATUS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setFilterBatch('');
+              setFilterBillingStatus('');
+              setFilterEnrollmentStatus('');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
           >
-            <option value="">All Batches</option>
-            {batches.filter(b => !b.isDeleted).map(b => (
-              <option key={b.id} value={b.id}>{b.batchCode || b.name}</option>
-            ))}
-          </select>
-          <select
-            value={filterBillingStatus}
-            onChange={(e) => setFilterBillingStatus(e.target.value as BillingStatus | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-          >
-            <option value="">All Billing Status</option>
-            {BILLING_STATUS_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <select
-            value={filterEnrollmentStatus}
-            onChange={(e) => setFilterEnrollmentStatus(e.target.value as EnrollmentStatus | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-          >
-            <option value="">All Status</option>
-            {ENROLLMENT_STATUS_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            <RotateCcw size={16} />
+          </button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Student</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Batch / Course</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Sponsor</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Fees</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Billing</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Student</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Batch / Course</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Sponsor</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Fees</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Billing</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -395,10 +453,13 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
               const qual = getQualificationForBatch(enrollment.batchId);
               const sponsorName = getSponsorName(enrollment.sponsorId);
               const unbilledAmt = (enrollment.totalFees || 0) - (enrollment.billedAmount || 0);
-              
+
               return (
                 <tr key={enrollment.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                    {formatEnrollmentDate(enrollment.enrollmentDate)}
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                         <UserCheck size={20} />
@@ -412,37 +473,34 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm text-gray-800 font-medium">
                         <Layers size={14} className="text-gray-400" />
                         {getBatchName(enrollment.batchId)}
                       </div>
+                      <div className="text-xs text-gray-400">{getBatchCode(enrollment.batchId)}</div>
                       {qual && (
                         <div className="text-xs text-gray-500 flex items-center gap-1.5">
                           <GraduationCap size={12} className="text-gray-400" />
                           {qual.code} - {qual.name}
                         </div>
                       )}
-                      <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                        <Calendar size={12} />
-                        Enrolled: {new Date(enrollment.enrollmentDate).toLocaleDateString()}
-                      </div>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     {sponsorName ? (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Building size={14} className="text-gray-400" />
-                        <span className="truncate max-w-[150px]">{sponsorName}</span>
+                        <span className="truncate max-w-[160px]">{sponsorName}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400 italic">Self-pay</span>
                     )}
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3 text-right">
                     <div className="space-y-1">
-                      <div className="text-sm font-semibold text-gray-800 font-mono">
+                      <div className="text-sm font-semibold text-brand font-mono">
                         {formatCurrency(enrollment.totalFees || 0)}
                       </div>
                       {unbilledAmt > 0 && (
@@ -452,22 +510,22 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     {getBillingBadge(enrollment.billingStatus)}
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     {getEnrollmentBadge(enrollment.enrollmentStatus)}
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button 
+                      <button
                         onClick={() => openEditModal(enrollment)}
                         disabled={deletingId === enrollment.id}
                         className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
                       >
                         <Edit2 size={16} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDelete(enrollment.id)}
                         disabled={deletingId === enrollment.id}
                         className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -479,7 +537,14 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                 </tr>
               );
             }) : (
-              <tr><td colSpan={7} className="py-20 text-center text-gray-400 italic">No enrollments found. Enroll a student in a batch to get started.</td></tr>
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  {hasActiveFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'No enrollments found. Enroll a student in a batch to get started.'}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

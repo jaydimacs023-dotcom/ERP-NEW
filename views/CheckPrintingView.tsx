@@ -3,13 +3,13 @@ import {
   CheckVoucher, CheckStatus, BankAccount, Vendor, Payable,
   JournalEntry, JournalLine, ChartOfAccount
 } from '../types';
-import { AccountingService } from '../accountingService';
+import { format } from 'date-fns';
 import EmptyState from '../components/EmptyState';
 import ModalPortal from '../components/ModalPortal';
 import {
-  FileText, Printer, Send, CheckCircle, Clock, XCircle,
-  X, Plus, Search, Filter, ChevronDown, Eye, AlertCircle,
-  Download, Calendar, Building, Banknote, Hash, RotateCcw
+  FileText, Printer, Send, CheckCircle, XCircle,
+  X, Plus, Search, ChevronDown, AlertCircle,
+  Hash, RotateCcw, CheckSquare
 } from 'lucide-react';
 
 interface CheckPrintingViewProps {
@@ -37,6 +37,25 @@ const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; bgColor
   STALE: { label: 'Stale', color: 'text-amber-600', bgColor: 'bg-amber-50' },
 };
 
+const getCheckDateValue = (check: Pick<CheckVoucher, 'checkDate' | 'createdAt'>) =>
+  (check.checkDate || check.createdAt || '').slice(0, 10);
+
+const formatCheckDate = (value?: string) => {
+  if (!value) return '-';
+
+  try {
+    return format(new Date(`${value.slice(0, 10)}T00:00:00`), 'MM-dd-yyyy');
+  } catch {
+    return value;
+  }
+};
+
+const getTodayDateValue = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   orgId,
   checks,
@@ -58,6 +77,10 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CheckStatus | 'all'>('all');
   const [bankFilter, setBankFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -93,23 +116,56 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
     [vendors, orgId]
   );
 
-  const orgPayables = useMemo(() =>
-    payables.filter(p => p.orgId === orgId && !p.isDeleted &&
-      (p.status === 'approved' || p.status === 'partially_paid')),
-    [payables, orgId]
+  const bankAccountById = useMemo(
+    () => new Map(orgBankAccounts.map(bank => [bank.id, bank])),
+    [orgBankAccounts]
   );
+
+  const getBankName = (id: string) => bankAccountById.get(id)?.bankName || 'Unknown';
 
   // Search & Filter
   const filteredChecks = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const todayValue = getTodayDateValue();
+    const currentMonthValue = todayValue.slice(0, 7);
+
     return orgChecks.filter(c => {
+      const checkDateValue = getCheckDateValue(c);
       const matchesSearch =
-        c.checkNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.payeeName.toLowerCase().includes(searchTerm.toLowerCase());
+        normalizedSearch === '' ||
+        c.checkNumber.toLowerCase().includes(normalizedSearch) ||
+        c.payeeName.toLowerCase().includes(normalizedSearch) ||
+        c.payeeType.toLowerCase().includes(normalizedSearch) ||
+        (bankAccountById.get(c.bankAccountId)?.bankName || '').toLowerCase().includes(normalizedSearch);
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesBank = bankFilter === 'all' || c.bankAccountId === bankFilter;
-      return matchesSearch && matchesStatus && matchesBank;
+      let matchesDate = true;
+
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = checkDateValue === todayValue;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = checkDateValue.slice(0, 7) === currentMonthValue;
+      } else if (dateFilterMode === 'CUSTOM') {
+        matchesDate =
+          (!dateFrom || checkDateValue >= dateFrom) &&
+          (!dateTo || checkDateValue <= dateTo);
+      }
+
+      return matchesSearch && matchesStatus && matchesBank && matchesDate;
+    }).sort((a, b) => {
+      const left = getCheckDateValue(a) || a.createdAt || '';
+      const right = getCheckDateValue(b) || b.createdAt || '';
+      return right.localeCompare(left);
     });
-  }, [orgChecks, searchTerm, statusFilter, bankFilter]);
+  }, [orgChecks, searchTerm, statusFilter, bankFilter, dateFilterMode, dateFrom, dateTo, bankAccountById]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    statusFilter !== 'all' ||
+    bankFilter !== 'all' ||
+    dateFilterMode !== 'ALL' ||
+    !!dateFrom ||
+    !!dateTo;
 
   // Summary metrics
   const summaryMetrics = useMemo(() => {
@@ -373,7 +429,6 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
   };
 
   const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2 });
-  const getBankName = (id: string) => orgBankAccounts.find(b => b.id === id)?.bankName || 'Unknown';
 
   // Settings modal for check number sequence
   const [settingsBank, setSettingsBank] = useState<string>('');
@@ -474,89 +529,196 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded border shadow-sm">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search checks..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-brand outline-none text-sm"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as CheckStatus | 'all')}
-            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded outline-none text-sm appearance-none"
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search checks..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as CheckStatus | 'all')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+            >
+              <option value="all">All</option>
+              {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                <option key={value} value={value}>{config.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Bank:</span>
+            <select
+              value={bankFilter}
+              onChange={e => setBankFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-5 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="all">All</option>
+              {orgBankAccounts.map(bank => (
+                <option key={bank.id} value={bank.id}>{bank.bankName}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <div
+              onClick={() => setShowDateDropdown(!showDateDropdown)}
+              className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+            >
+              <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+              <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+              </span>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            {showDateDropdown && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                    >
+                      Remove Quick Filter
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-1">
+                    <button
+                      onClick={() => setDateFilterMode('CUSTOM')}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'CUSTOM' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                    </button>
+                    <button
+                      onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'TODAY' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                    </button>
+                    <button
+                      onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'THIS_MONTH' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={e => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                        className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={e => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                        className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div className="flex justify-end items-center gap-2 pt-1">
+                      <button
+                        onClick={() => setShowDateDropdown(false)}
+                        className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => setShowDateDropdown(false)}
+                        className="px-4 py-1 bg-brand hover:bg-brand-hover rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('all');
+              setBankFilter('all');
+              setDateFilterMode('ALL');
+              setDateFrom('');
+              setDateTo('');
+              setShowDateDropdown(false);
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
           >
-            <option value="all">All Statuses</option>
-            {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-              <option key={value} value={value}>{config.label}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-        </div>
-        <div className="relative">
-          <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <select
-            value={bankFilter}
-            onChange={e => setBankFilter(e.target.value)}
-            className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded outline-none text-sm appearance-none"
-          >
-            <option value="all">All Banks</option>
-            {orgBankAccounts.map(b => (
-              <option key={b.id} value={b.id}>{b.bankName}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+            <RotateCcw size={16} />
+          </button>
         </div>
       </div>
 
       {/* Checks Table */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Check #</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Bank / Date</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Payee</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Amount</th>
-              <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Check No.</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Bank</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Payee</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Amount</th>
+              <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Status</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredChecks.length > 0 ? (
-              filteredChecks
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .map(check => {
+              filteredChecks.map(check => {
                   const statusConfig = STATUS_CONFIG[check.status];
 
                   return (
                     <tr key={check.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-800">{formatCheckDate(getCheckDateValue(check))}</span>
+                      </td>
+                      <td className="px-4 py-3">
                         <span className="font-mono font-bold text-brand">{check.checkNumber}</span>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-gray-700">{getBankName(check.bankAccountId)}</p>
-                        <p className="text-xs text-gray-400">{check.checkDate}</p>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{getBankName(check.bankAccountId)}</div>
+                        <div className="text-xs text-gray-400">{bankAccountById.get(check.bankAccountId)?.accountNumber || 'No account number'}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-gray-800">{check.payeeName}</p>
-                        <p className="text-xs text-gray-400">{check.payeeType}</p>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{check.payeeName}</div>
+                        <div className="text-xs text-gray-400">{check.payeeType}</div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 text-right">
                         <span className="font-mono font-semibold text-gray-700">{"\u20B1"}{formatCurrency(check.amount)}</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3 text-center">
                         <span className={`inline-flex px-2.5 py-1 text-xs font-bold uppercase rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
                           {statusConfig.label}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {check.status === 'DRAFT' && (
                             <>
@@ -621,11 +783,11 @@ const CheckPrintingView: React.FC<CheckPrintingViewProps> = ({
                 })
             ) : (
               <tr>
-                <td colSpan={6} className="py-16 text-center">
+                <td colSpan={7} className="py-16 text-center">
                   <EmptyState
                     icon={<FileText className="text-gray-300" size={48} />}
                     title="No checks found"
-                    description="Create your first check voucher to get started."
+                    description={hasActiveFilters ? 'Try adjusting your search or filters.' : 'Create your first check voucher to get started.'}
                   />
                 </td>
               </tr>

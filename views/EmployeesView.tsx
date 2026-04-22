@@ -1,26 +1,28 @@
 ﻿
-import React, { useState } from 'react';
-import { Employee } from '../types';
-import EmptyState from '../components/EmptyState';
+import React, { useMemo, useState } from 'react';
+import { Employee, Organization } from '../types';
 import ModalPortal from '../components/ModalPortal';
 import { 
-  Users, Plus, Search, Filter, Mail, Phone, Briefcase, 
+  Users, Plus, Search, Mail, Phone, Briefcase, 
   ChevronRight, Trash2, X, Save, ShieldCheck, Landmark,
-  Fingerprint, CreditCard
+  Fingerprint, CreditCard, ChevronDown, RotateCcw
 } from 'lucide-react';
 
 interface EmployeesViewProps {
   employees: Employee[];
+  organization?: Organization;
   onAddEmployee: (emp: Employee) => void;
   onUpdateEmployee: (emp: Employee) => void;
   onDeleteEmployee: (id: string) => void;
 }
 
 const EmployeesView: React.FC<EmployeesViewProps> = ({ 
-  employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee 
+  employees, organization, onAddEmployee, onUpdateEmployee, onDeleteEmployee 
 }) => {
+  const brandColor = organization?.primaryColor || 'var(--acm-primary)';
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
 
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -35,10 +37,29 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
     pagibig: ''
   });
 
-  const filteredEmployees = employees.filter(e => 
-    `${e.firstName} ${e.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.designation.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return employees
+      .filter(employee => {
+        const searchableText = [
+          `${employee.firstName} ${employee.lastName}`,
+          employee.designation,
+          employee.id,
+          employee.tin || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'ACTIVE' && employee.isActive)
+          || (statusFilter === 'ARCHIVED' && !employee.isActive);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
+  }, [employees, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,50 +102,73 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
         </div>
         <button 
           onClick={() => { resetForm(); setShowModal(true); }}
-          className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-bold text-sm"
+          style={{ backgroundColor: brandColor }}
+          className="flex items-center gap-2 px-6 py-2.5 text-white rounded hover:opacity-90 transition-all shadow-md shadow-brand/20 font-bold text-sm"
         >
           <Plus size={18} /> Register Staff
         </button>
       </header>
 
-      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            placeholder="Search staff by name or role..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input 
+              placeholder="Search employees..." 
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'ARCHIVED')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+            >
+              <option value="ALL">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredEmployees.length}</span> of {employees.length} employees
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
-        {filteredEmployees.length === 0 ? (
-          <EmptyState 
-            title="No employees found"
-            description="Register your first staff member to get started with HR management."
-            actionLabel="Register Staff"
-            onAction={() => { resetForm(); setShowModal(true); }}
-            icon={<Users size={48} className="text-gray-300" />}
-          />
-        ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Employee Information</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Designation</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Monthly Basic</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Employee Information</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Designation</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Monthly Basic</th>
+                <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Status</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredEmployees.map(emp => (
+              {filteredEmployees.length > 0 ? filteredEmployees.map(emp => (
                 <tr key={emp.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded bg-gray-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      <div className="w-10 h-10 rounded bg-brand/10 text-brand border border-brand-light shadow-sm flex items-center justify-center font-bold text-xs shrink-0">
                         {emp.lastName[0]}{emp.firstName[0]}
                       </div>
                       <div>
@@ -133,21 +177,21 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-600">
                       <Briefcase size={14} className="text-gray-400" />
                       {emp.designation}
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-right font-mono font-bold text-gray-900">
+                  <td className="px-4 py-3 text-right font-mono font-bold text-gray-900">
                     {emp.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="px-6 py-5 text-center">
+                  <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase border ${emp.isActive ? 'bg-brand/10 text-brand border-brand-light' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
                       {emp.isActive ? 'Active' : 'Archived'}
                     </span>
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => { setEditingEmp(emp); setFormData(emp); setShowModal(true); }}
@@ -164,10 +208,18 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                    <Users size={40} className="mx-auto mb-2 text-gray-300" />
+                    {hasActiveFilters
+                      ? 'Try adjusting your search or filters.'
+                      : 'Register your first staff member to get started with HR management.'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-        )}
       </div>
 
       {showModal && (

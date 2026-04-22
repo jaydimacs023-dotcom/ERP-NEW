@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
-import { Download, Eye, X, ChevronDown } from 'lucide-react';
+import { Download, Eye, X, ChevronDown, Search, RotateCcw } from 'lucide-react';
 import { InventoryTransaction, StockItem, InventoryTransactionType } from '../types';
 
 interface InventoryTransactionsViewProps {
@@ -42,6 +42,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
   currency,
   isLoading = false,
 }) => {
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<InventoryTransactionType | 'ALL'>('ALL');
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'item' | 'type'>('date');
@@ -60,6 +61,24 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
 
   const filteredTransactions = useMemo(() => {
     let filtered = transactionsWithDetails;
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    if (normalizedSearch !== '') {
+      filtered = filtered.filter((t) => {
+        const searchableText = [
+          t.item?.code || '',
+          t.item?.name || '',
+          t.location?.code || '',
+          t.location?.name || '',
+          t.referenceNumber || '',
+          t.notes || '',
+          t.createdBy || '',
+        ].join(' ').toLowerCase();
+
+        return searchableText.includes(normalizedSearch);
+      });
+    }
 
     // Filter by type
     if (selectedTypeFilter !== 'ALL') {
@@ -91,7 +110,14 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     });
 
     return sorted;
-  }, [transactionsWithDetails, selectedTypeFilter, selectedItemFilter, sortBy, sortOrder]);
+  }, [transactionsWithDetails, searchTerm, selectedTypeFilter, selectedItemFilter, sortBy, sortOrder]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== ''
+    || selectedTypeFilter !== 'ALL'
+    || selectedItemFilter !== 'ALL'
+    || sortBy !== 'date'
+    || sortOrder !== 'desc';
 
   // Calculate summaries
   const summaries = useMemo(() => {
@@ -173,236 +199,228 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
       </div>
 
       {/* Controls */}
-      <div className="mb-6 space-y-3 md:space-y-0 md:flex gap-3">
-        {/* Type Filter */}
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Transaction Type</label>
-          <select
-            value={selectedTypeFilter}
-            onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-          >
-            <option value="ALL">All Types</option>
-            {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="bg-white border-y px-4 py-2 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
 
-        {/* Item Filter */}
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Item</label>
-          <select
-            value={selectedItemFilter}
-            onChange={(e) => setSelectedItemFilter(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-          >
-            <option value="ALL">All Items</option>
-            {uniqueItems.map((itemId) => {
-              const item = items.find((i) => i.id === itemId);
-              return (
-                <option key={itemId} value={itemId}>
-                  {item?.code} - {item?.name}
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Type:</span>
+            <select
+              value={selectedTypeFilter}
+              onChange={(e) => setSelectedTypeFilter(e.target.value as InventoryTransactionType | 'ALL')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
+            >
+              <option value="ALL">All</option>
+              {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
                 </option>
-              );
-            })}
-          </select>
-        </div>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
 
-        {/* Sort By */}
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Sort By</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Item:</span>
+            <select
+              value={selectedItemFilter}
+              onChange={(e) => setSelectedItemFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[220px]"
+            >
+              <option value="ALL">All</option>
+              {uniqueItems.map((itemId) => {
+                const item = items.find((i) => i.id === itemId);
+                return (
+                  <option key={itemId} value={itemId}>
+                    {item?.code} - {item?.name}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'date' | 'item' | 'type')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[130px]"
+            >
+              <option value="date">Date</option>
+              <option value="item">Item</option>
+              <option value="type">Type</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Order:</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[140px]"
+            >
+              <option value="desc">Newest</option>
+              <option value="asc">Oldest</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedTypeFilter('ALL');
+              setSelectedItemFilter('ALL');
+              setSortBy('date');
+              setSortOrder('desc');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
           >
-            <option value="date">Date</option>
-            <option value="item">Item</option>
-            <option value="type">Type</option>
-          </select>
-        </div>
+            <RotateCcw size={16} />
+          </button>
 
-        {/* Sort Order */}
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Order</label>
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-          >
-            <option value="desc">Newest First</option>
-            <option value="asc">Oldest First</option>
-          </select>
-        </div>
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredTransactions.length}</span> of {transactionsWithDetails.length} transactions
+          </div>
 
-        {/* Export Button */}
-        <div className="flex items-end">
           <button
             onClick={handleExport}
             disabled={filteredTransactions.length === 0}
-            className="w-full md:w-auto px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            className="flex items-center gap-2 h-9 px-3 bg-white text-gray-700 rounded border border-gray-200 hover:bg-gray-50 transition-colors text-[13px] font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            Export
           </button>
         </div>
       </div>
 
-      {/* Transactions List */}
-      <div className="space-y-3">
+      {/* Transactions Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center bg-white rounded-lg border border-gray-200">
+          <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading transactions...</p>
           </div>
-        ) : filteredTransactions.length === 0 ? (
-          <div className="p-8 text-center bg-white rounded-lg border border-gray-200 text-gray-600">
-            <p>No transactions found.</p>
-          </div>
         ) : (
-          filteredTransactions.map((transaction) => (
-            <div
-              key={transaction.id}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-            >
-              {/* Main Row */}
-              <div className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    {/* Header */}
-                    <div className="flex items-center gap-3 mb-2">
-                      <button
-                        onClick={() =>
-                          setExpandedId(expandedId === transaction.id ? null : transaction.id)
-                        }
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        <ChevronDown
-                          className={`w-5 h-5 text-gray-600 transition-transform ${
-                            expandedId === transaction.id ? 'rotate-180' : ''
+          <div className="overflow-x-auto">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Item</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Type</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Quantity</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Location</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Reference</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredTransactions.length > 0 ? filteredTransactions.map((transaction) => (
+                  <React.Fragment key={transaction.id}>
+                    <tr className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-gray-900">{transaction.item?.code}</div>
+                        <div className="text-xs text-gray-600">{transaction.item?.name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block px-3 py-1 rounded text-xs font-semibold ${
+                            TRANSACTION_TYPE_COLORS[transaction.type]
                           }`}
-                        />
-                      </button>
-                      <div>
-                        <p className="font-semibold text-gray-900">{transaction.item?.code}</p>
-                        <p className="text-xs text-gray-600">{transaction.item?.name}</p>
-                      </div>
-                    </div>
-
-                    {/* Details Row */}
-                    <div className="ml-9 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-600">Type</p>
-                        <p className="font-medium text-gray-900">
+                        >
                           {TRANSACTION_TYPE_LABELS[transaction.type]}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Quantity</p>
-                        <p className="font-medium text-gray-900">
-                          {transaction.quantity} {transaction.item?.unitOfMeasure}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Date</p>
-                        <p className="font-medium text-gray-900">
-                          {new Date(transaction.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Location</p>
-                        <p className="font-medium text-gray-900">
-                          {transaction.location?.code || '-'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Type Badge */}
-                  <div className="ml-4">
-                    <span
-                      className={`inline-block px-3 py-1 rounded text-xs font-semibold ${
-                        TRANSACTION_TYPE_COLORS[transaction.type]
-                      }`}
-                    >
-                      {transaction.type}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                {expandedId === transaction.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 ml-9 space-y-3">
-                    {transaction.referenceNumber && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Reference
-                          </p>
-                          <p className="text-sm text-gray-900 font-mono">{transaction.referenceNumber}</p>
-                        </div>
-                      </div>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                        {transaction.quantity} {transaction.item?.unitOfMeasure}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {new Date(transaction.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {transaction.location?.code || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {transaction.referenceNumber || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setExpandedId(expandedId === transaction.id ? null : transaction.id)}
+                          className="inline-flex items-center gap-1 p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Toggle details"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${
+                              expandedId === transaction.id ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedId === transaction.id && (
+                      <tr className="bg-gray-50/60">
+                        <td colSpan={7} className="px-4 py-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</p>
+                              <p className="mt-1 text-gray-900 font-mono">{transaction.referenceNumber || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</p>
+                              <p className="mt-1 text-gray-700">{transaction.createdBy || 'System'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</p>
+                              <p className="mt-1 text-gray-700">{new Date(transaction.createdAt).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Location</p>
+                              <p className="mt-1 text-gray-700">{transaction.location?.name || transaction.location?.code || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Cost</p>
+                              <p className="mt-1 text-gray-900 font-mono">
+                                {transaction.unitCost ? `${currency} ${transaction.unitCost.toFixed(2)}` : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</p>
+                              <p className="mt-1 text-gray-900 font-mono font-bold">
+                                {transaction.unitCost ? `${currency} ${(transaction.unitCost * transaction.quantity).toFixed(2)}` : '—'}
+                              </p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</p>
+                              <p className="mt-1 text-gray-700">{transaction.notes || 'No additional notes.'}</p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-
-                    {transaction.notes && (
-                      <div>
-                        <p className="text-xs font-medium text-gray-700 uppercase tracking-wider mb-1">
-                          Notes
-                        </p>
-                        <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                          {transaction.notes}
-                        </p>
-                      </div>
-                    )}
-
-                    {transaction.unitCost && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Unit Cost
-                          </p>
-                          <p className="text-sm text-gray-900 font-mono">
-                            {currency} {transaction.unitCost.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                            Total Value
-                          </p>
-                          <p className="text-sm text-gray-900 font-mono font-bold">
-                            {currency}{' '}
-                            {(transaction.unitCost * transaction.quantity).toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Created By
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {transaction.createdBy || 'System'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Created At
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(transaction.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  </React.Fragment>
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters ? 'Try adjusting your search or filters.' : 'No transactions found.'}
+                    </td>
+                  </tr>
                 )}
-              </div>
-            </div>
-          ))
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

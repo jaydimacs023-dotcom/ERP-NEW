@@ -7,11 +7,11 @@ import { ContributionService } from '../services/ContributionService';
 import { PayrollCalculationService } from '../services/PayrollCalculationService';
 import ModalPortal from '../components/ModalPortal';
 import {
-   UserCheck, Plus, Search, Calendar, ChevronRight, X, Play,
-   ShieldCheck, Calculator, AlertCircle, TrendingUp, DollarSign,
-   Briefcase, Landmark, History, Printer, Save, Info,
-   CheckCircle2, ArrowRight, Eye, FileText, Download, Building2,
-   Receipt
+   Search, Calendar, X, Play,
+   ShieldCheck, Calculator, AlertCircle, TrendingUp,
+   Briefcase, Landmark, History, Printer, Info,
+   CheckCircle2, Eye, FileText, Download, Building2,
+   Receipt, ChevronDown, RotateCcw, CheckSquare
 } from 'lucide-react';
 
 interface PayrollViewProps {
@@ -26,6 +26,25 @@ interface PayrollViewProps {
    orgId: string;
 }
 
+const formatRegistryDate = (value?: string) => {
+   if (!value) return '-';
+
+   const date = new Date(value);
+   if (Number.isNaN(date.getTime())) return value;
+
+   return new Intl.DateTimeFormat('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+   }).format(date);
+};
+
+const getTodayDateValue = () => {
+   const now = new Date();
+   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+   return local.toISOString().slice(0, 10);
+};
+
 const PayrollView: React.FC<PayrollViewProps> = ({
    employees, payrollRuns, payrollLines, accounts, bankAccounts, entries, orgName = "AccounTech ERP", onPostPayroll,
    orgId
@@ -33,6 +52,12 @@ const PayrollView: React.FC<PayrollViewProps> = ({
    const [showModal, setShowModal] = useState(false);
    const [viewingRunId, setViewingRunId] = useState<string | null>(null);
    const [viewingPaystub, setViewingPaystub] = useState<{ run: PayrollRun, line: PayrollLine } | null>(null);
+   const [historySearchTerm, setHistorySearchTerm] = useState('');
+   const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | PayrollRun['status']>('ALL');
+   const [historyDateFrom, setHistoryDateFrom] = useState('');
+   const [historyDateTo, setHistoryDateTo] = useState('');
+   const [historyDateFilterMode, setHistoryDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+   const [showHistoryDateDropdown, setShowHistoryDateDropdown] = useState(false);
 
    const [periodStart, setPeriodStart] = useState('');
    const [periodEnd, setPeriodEnd] = useState('');
@@ -103,6 +128,58 @@ const PayrollView: React.FC<PayrollViewProps> = ({
       return { lines, gross, depr, net };
    }, [activeEmployees, adjustments]);
 
+   const filteredPayrollRuns = useMemo(() => {
+      const normalizedSearch = historySearchTerm.trim().toLowerCase();
+      const todayValue = getTodayDateValue();
+      const currentMonthValue = todayValue.slice(0, 7);
+
+      return payrollRuns
+         .filter(run => {
+            const employeeSearchText = payrollLines
+               .filter(line => line.payrollRunId === run.id)
+               .map(line => {
+                  const employee = employees.find(e => e.id === line.employeeId);
+                  return `${employee?.firstName || ''} ${employee?.lastName || ''} ${employee?.designation || ''}`;
+               })
+               .join(' ')
+               .toLowerCase();
+
+            const searchableText = [
+               run.id,
+               run.periodStart,
+               run.periodEnd,
+               run.status,
+               run.createdAt,
+               employeeSearchText,
+            ].join(' ').toLowerCase();
+
+            const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+            const matchesStatus = historyStatusFilter === 'ALL' || run.status === historyStatusFilter;
+
+            const runDateValue = (run.periodEnd || run.createdAt || '').slice(0, 10);
+            let matchesDate = true;
+            if (historyDateFilterMode === 'TODAY') {
+               matchesDate = runDateValue === todayValue;
+            } else if (historyDateFilterMode === 'THIS_MONTH') {
+               matchesDate = runDateValue.slice(0, 7) === currentMonthValue;
+            } else if (historyDateFilterMode === 'CUSTOM') {
+               matchesDate =
+                  (!historyDateFrom || runDateValue >= historyDateFrom) &&
+                  (!historyDateTo || runDateValue <= historyDateTo);
+            }
+
+            return matchesSearch && matchesStatus && matchesDate;
+         })
+         .sort((a, b) => (b.periodEnd || '').localeCompare(a.periodEnd || ''));
+   }, [payrollRuns, payrollLines, employees, historySearchTerm, historyStatusFilter, historyDateFilterMode, historyDateFrom, historyDateTo]);
+
+   const hasActiveHistoryFilters =
+      historySearchTerm.trim() !== '' ||
+      historyStatusFilter !== 'ALL' ||
+      historyDateFilterMode !== 'ALL' ||
+      !!historyDateFrom ||
+      !!historyDateTo;
+
    const handlePostRun = (e: React.FormEvent) => {
       e.preventDefault();
       if (!periodStart || !periodEnd || !bankId) return;
@@ -156,6 +233,22 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
    const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+   const getRunStatusBadge = (status: PayrollRun['status']) => {
+      if (status === 'POSTED') {
+         return (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-semibold text-brand border border-brand-light">
+               Posted
+            </span>
+         );
+      }
+
+      return (
+         <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 border border-gray-200">
+            Draft
+         </span>
+      );
+   };
+
    const viewingRun = useMemo(() => payrollRuns.find(r => r.id === viewingRunId), [payrollRuns, viewingRunId]);
    const viewingLines = useMemo(() => payrollLines.filter(l => l.payrollRunId === viewingRunId), [payrollLines, viewingRunId]);
 
@@ -181,48 +274,193 @@ const PayrollView: React.FC<PayrollViewProps> = ({
             <StatWidget label="Next Pay Cycle" value="30 Jun 2024" icon={<Calendar size={18} />} color="amber" />
          </div>
 
-         <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-brand/10 text-brand border border-brand-light rounded"><History size={18} /></div>
-                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Recent Payroll History</h3>
+         <div className="space-y-4">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-brand/10 text-brand border border-brand-light rounded"><History size={18} /></div>
+               <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Recent Payroll History</h3>
+            </div>
+
+            <div className="bg-white border-y px-4 py-2">
+               <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+                     <Search size={14} className="text-gray-400 mr-2" />
+                     <input
+                        type="text"
+                        placeholder="Search payroll runs..."
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+                     />
+                  </div>
+
+                  <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+                     <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+                     <select
+                        value={historyStatusFilter}
+                        onChange={(e) => setHistoryStatusFilter(e.target.value as 'ALL' | PayrollRun['status'])}
+                        className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+                     >
+                        <option value="ALL">All</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="POSTED">Posted</option>
+                     </select>
+                     <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                  </div>
+
+                  <div className="relative">
+                     <div
+                        onClick={() => setShowHistoryDateDropdown(!showHistoryDateDropdown)}
+                        className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                     >
+                        <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+                        <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                           {historyDateFilterMode === 'ALL' ? 'All' : historyDateFilterMode === 'TODAY' ? 'Today' : historyDateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+                        </span>
+                        <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+                     </div>
+
+                     {showHistoryDateDropdown && (
+                        <>
+                           <div className="fixed inset-0 z-40" onClick={() => setShowHistoryDateDropdown(false)}></div>
+                           <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                              <div className="p-1">
+                                 <button
+                                    onClick={() => { setHistoryDateFilterMode('ALL'); setHistoryDateFrom(''); setHistoryDateTo(''); setShowHistoryDateDropdown(false); }}
+                                    className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                                 >
+                                    Remove Quick Filter
+                                 </button>
+                              </div>
+
+                              <div className="border-t border-gray-100 p-1">
+                                 <button
+                                    onClick={() => setHistoryDateFilterMode('CUSTOM')}
+                                    className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${historyDateFilterMode === 'CUSTOM' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                                 >
+                                    {historyDateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                                 </button>
+                                 <button
+                                    onClick={() => { setHistoryDateFilterMode('TODAY'); setShowHistoryDateDropdown(false); }}
+                                    className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${historyDateFilterMode === 'TODAY' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                                 >
+                                    {historyDateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                                 </button>
+                                 <button
+                                    onClick={() => { setHistoryDateFilterMode('THIS_MONTH'); setShowHistoryDateDropdown(false); }}
+                                    className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${historyDateFilterMode === 'THIS_MONTH' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                                 >
+                                    {historyDateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                                 </button>
+                              </div>
+
+                              <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                                    <input
+                                       type="date"
+                                       value={historyDateFrom}
+                                       onChange={(e) => { setHistoryDateFrom(e.target.value); if (historyDateFilterMode !== 'CUSTOM') setHistoryDateFilterMode('CUSTOM'); }}
+                                       className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                                    />
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                                    <input
+                                       type="date"
+                                       value={historyDateTo}
+                                       onChange={(e) => { setHistoryDateTo(e.target.value); if (historyDateFilterMode !== 'CUSTOM') setHistoryDateFilterMode('CUSTOM'); }}
+                                       className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                                    />
+                                 </div>
+                                 <div className="flex justify-end items-center gap-2 pt-1">
+                                    <button
+                                       onClick={() => setShowHistoryDateDropdown(false)}
+                                       className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                                    >
+                                       Cancel
+                                    </button>
+                                    <button
+                                       onClick={() => setShowHistoryDateDropdown(false)}
+                                       className="px-4 py-1 bg-brand hover:bg-brand-hover rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                                    >
+                                       OK
+                                    </button>
+                                 </div>
+                              </div>
+                           </div>
+                        </>
+                     )}
+                  </div>
+
+                  <button
+                     onClick={() => {
+                        setHistorySearchTerm('');
+                        setHistoryStatusFilter('ALL');
+                        setHistoryDateFilterMode('ALL');
+                        setHistoryDateFrom('');
+                        setHistoryDateTo('');
+                        setShowHistoryDateDropdown(false);
+                     }}
+                     className={`p-2 transition-colors ${hasActiveHistoryFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+                     title="Clear all filters"
+                  >
+                     <RotateCcw size={16} />
+                  </button>
+
+                  <p className="ml-auto text-xs text-gray-500">
+                     Showing <span className="font-semibold text-gray-700">{filteredPayrollRuns.length}</span> of {payrollRuns.length}
+                  </p>
                </div>
             </div>
-            <div className="overflow-x-auto">
-               <table className="min-w-full divide-y divide-gray-100">
-                  <thead className="bg-gray-50">
-                     <tr>
-                        <th className="px-5 py-5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Pay Period</th>
-                        <th className="px-5 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Gross Disbursement</th>
-                        <th className="px-5 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Statutory Holds</th>
-                        <th className="px-5 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Net Payable</th>
-                        <th className="px-5 py-5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">Audit</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                     {payrollRuns.length > 0 ? [...payrollRuns].reverse().map(run => (
-                        <tr key={run.id} className="hover:bg-gray-50 transition-colors">
-                           <td className="px-5 py-6">
-                              <div className="text-sm font-bold text-gray-800">{run.periodStart} to {run.periodEnd}</div>
-                              <div className="text-xs font-mono text-gray-400 uppercase mt-1">BATCH_ID: {run.id.slice(-8)}</div>
-                           </td>
-                           <td className="px-5 py-6 text-right font-mono text-sm font-bold text-gray-600">{formatCurrency(run.totalGross)}</td>
-                           <td className="px-5 py-6 text-right font-mono text-sm font-bold text-rose-500">({formatCurrency(run.totalDeductions)})</td>
-                           <td className="px-5 py-6 text-right font-mono text-sm font-semibold text-gray-900">{formatCurrency(run.totalNet)}</td>
-                           <td className="px-5 py-6 text-center">
-                              <button
-                                 onClick={() => setViewingRunId(run.id)}
-                                 className="px-4 py-1.5 bg-brand/5 text-brand border border-brand-light rounded-lg text-xs font-semibold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-brand hover:text-white transition-all mx-auto"
-                              >
-                                 <Eye size={12} /> View Advice
-                              </button>
-                           </td>
+
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+               <div className="overflow-x-auto">
+                  <table className="w-full font-sans">
+                     <thead className="bg-brand border-b">
+                        <tr>
+                           <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+                           <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Pay Period</th>
+                           <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Gross Disbursement</th>
+                           <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Statutory Holds</th>
+                           <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Net Payable</th>
+                           <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+                           <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Audit</th>
                         </tr>
-                     )) : (
-                        <tr><td colSpan={5} className="py-24 text-center text-gray-300 italic font-medium">No payroll runs initiated in the current fiscal year.</td></tr>
-                     )}
-                  </tbody>
-               </table>
+                     </thead>
+                     <tbody className="divide-y divide-gray-100">
+                        {filteredPayrollRuns.length > 0 ? filteredPayrollRuns.map(run => (
+                           <tr key={run.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800">{formatRegistryDate(run.createdAt)}</td>
+                              <td className="px-4 py-3">
+                                 <div className="text-sm font-bold text-gray-800">{formatRegistryDate(run.periodStart)} to {formatRegistryDate(run.periodEnd)}</div>
+                                 <div className="text-xs font-mono text-gray-400 uppercase mt-1">BATCH_ID: {run.id.slice(-8)}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-brand">{formatCurrency(run.totalGross)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-sm font-bold text-rose-500">({formatCurrency(run.totalDeductions)})</td>
+                              <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-gray-900">{formatCurrency(run.totalNet)}</td>
+                              <td className="px-4 py-3">{getRunStatusBadge(run.status)}</td>
+                              <td className="px-4 py-3 text-right">
+                                 <button
+                                    onClick={() => setViewingRunId(run.id)}
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-light bg-brand/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand transition-all hover:bg-brand hover:text-white"
+                                 >
+                                    <Eye size={12} /> View Advice
+                                 </button>
+                              </td>
+                           </tr>
+                        )) : (
+                           <tr>
+                              <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                                 <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                                 {hasActiveHistoryFilters
+                                    ? 'Try adjusting your search or filters.'
+                                    : 'No payroll runs initiated in the current fiscal year.'}
+                              </td>
+                           </tr>
+                        )}
+                     </tbody>
+                  </table>
+               </div>
             </div>
          </div>
 

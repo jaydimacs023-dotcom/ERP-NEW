@@ -115,6 +115,13 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     return summary;
   }, [transactionsWithDetails]);
 
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    selectedTypeFilter !== 'ALL' ||
+    selectedItemFilter !== 'ALL' ||
+    sortBy !== 'date' ||
+    sortOrder !== 'desc';
+
   const handleExport = () => {
     const csv = [
       ['Date', 'Item Code', 'Item Name', 'Type', 'Quantity', 'Unit', 'Location', 'Reference', 'Notes'].join(','),
@@ -195,64 +202,107 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
       </div>
 
       <div className="p-8 bg-white rounded-md border border-gray-200 shadow-sm space-y-6">
-         <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1 space-y-1.5">
-               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Universal Search</label>
-               <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search codes, items, references..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
-                  />
-               </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex-1 space-y-1.5">
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Search</label>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                placeholder="Search inventory transactions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand focus:bg-white transition-all text-sm font-bold text-gray-800"
+              />
+            </div>
+          </div>
+
+          <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-3 flex-1">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Event Type</label>
+              <select
+                value={selectedTypeFilter}
+                onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none"
+              >
+                <option value="ALL">All Event Types</option>
+                {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="md:w-64 space-y-1.5">
-               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Event Type Filter</label>
-               <select
-                 value={selectedTypeFilter}
-                 onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
-                 className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none"
-               >
-                 <option value="ALL">ALL ARCHIVE TYPES</option>
-                 {Object.entries(TRANSACTION_TYPE_LABELS).map(([key, label]) => (
-                   <option key={key} value={key}>{label.toUpperCase()}</option>
-                 ))}
-               </select>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Item</label>
+              <select
+                value={selectedItemFilter}
+                onChange={(e) => setSelectedItemFilter(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none"
+              >
+                <option value="ALL">All Items</option>
+                {uniqueItems.map((itemId) => {
+                  const item = items.find((i) => i.id === itemId);
+                  return (
+                    <option key={itemId} value={itemId}>
+                      {item?.code} - {item?.name}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
-            <div className="md:w-64 space-y-1.5">
-               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Temporal Sort</label>
-               <select
-                 value={`${sortBy}-${sortOrder}`}
-                 onChange={(e) => {
-                    const [field, order] = e.target.value.split('-');
-                    setSortBy(field as any);
-                    setSortOrder(order as any);
-                 }}
-                 className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none font-mono"
-               >
-                 <option value="date-desc">NEWEST_LOG_FIRST</option>
-                 <option value="date-asc">OLDEST_LOG_FIRST</option>
-                 <option value="type-asc">TYPE_A_Z</option>
-               </select>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide ml-1">Sort</label>
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [field, order] = e.target.value.split('-');
+                  setSortBy(field as any);
+                  setSortOrder(order as any);
+                }}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand focus:bg-white transition-all text-sm font-bold text-gray-800 appearance-none font-mono"
+              >
+                <option value="date-desc">Newest first</option>
+                <option value="date-asc">Oldest first</option>
+                <option value="type-asc">Type A - Z</option>
+              </select>
             </div>
-         </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedTypeFilter('ALL');
+              setSelectedItemFilter('ALL');
+              setSortBy('date');
+              setSortOrder('desc');
+            }}
+            className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Reset filters"
+          >
+            Clear filters
+          </button>
+
+          <div className="text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredTransactions.length}</span> of {transactionsWithDetails.length} transactions
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-8 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Temporal Marker</th>
-                <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Inventory Object</th>
-                <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Movement Logic</th>
-                <th className="px-6 py-5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Delta</th>
-                <th className="px-8 py-5 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Details</th>
+            <thead className="bg-brand border-b">
+              <tr>
+                <th className="px-8 py-5 text-[10px] font-semibold text-white uppercase tracking-wide">Temporal Marker</th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-white uppercase tracking-wide">Inventory Object</th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-white uppercase tracking-wide">Movement Logic</th>
+                <th className="px-6 py-5 text-right text-[10px] font-semibold text-white uppercase tracking-wide">Delta</th>
+                <th className="px-8 py-5 text-right text-[10px] font-semibold text-white uppercase tracking-wide">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

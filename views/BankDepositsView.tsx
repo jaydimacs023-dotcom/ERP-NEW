@@ -1,12 +1,13 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { BankDeposit, BankDepositLine, BankDepositStatus, BankAccount, Payment } from '../types';
 import { generateUUID } from '../utils/uuid';
+import { format } from 'date-fns';
 import ModalPortal from '../components/ModalPortal';
 import {
-  Landmark, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
-  Calendar, CheckCircle, Clock, XCircle, AlertTriangle, Receipt,
-  ChevronDown, ChevronUp, DollarSign, CreditCard, Wallet, Ban,
-  FileText, ArrowDownToLine, PlusCircle, MinusCircle
+  Landmark, Plus, Search, X, Save, Trash2, Edit3, Eye,
+  CheckCircle, Clock, XCircle, AlertTriangle, Receipt,
+  ChevronDown, ChevronUp, Wallet, Ban,
+  PlusCircle, MinusCircle, RotateCcw, CheckSquare
 } from 'lucide-react';
 
 interface BankDepositsViewProps {
@@ -21,6 +22,22 @@ interface BankDepositsViewProps {
   onVoidDeposit?: (id: string, reason: string) => void;
 }
 
+const formatDepositDate = (value?: string) => {
+  if (!value) return '-';
+
+  try {
+    return format(new Date(`${value.slice(0, 10)}T00:00:00`), 'MM-dd-yyyy');
+  } catch {
+    return value;
+  }
+};
+
+const getTodayDateValue = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 const BankDepositsView: React.FC<BankDepositsViewProps> = ({
   deposits, bankAccounts, payments, currency,
   onAddDeposit, onUpdateDeposit, onDeleteDeposit, onPostDeposit, onVoidDeposit
@@ -34,6 +51,11 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
   const [voidReason, setVoidReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<BankDepositStatus | 'ALL'>('ALL');
+  const [bankFilter, setBankFilter] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Form state
@@ -54,8 +76,6 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
     notes: '',
     lines: []
   });
-
-  const brandColor = '#F47721';
 
   // Generate next deposit number
   const generateDepositNo = () => {
@@ -178,6 +198,11 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
 
   const totalAmount = formData.cashAmount + checkAmount;
 
+  const bankAccountById = useMemo(
+    () => new Map(bankAccounts.map(account => [account.id, account])),
+    [bankAccounts]
+  );
+
   // Save deposit
   const handleSave = () => {
     if (!formData.bankAccountId) {
@@ -256,15 +281,46 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
 
   // Filter deposits
   const filteredDeposits = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const todayValue = getTodayDateValue();
+    const currentMonthValue = todayValue.slice(0, 7);
+
     return deposits.filter(dep => {
+      const bank = bankAccountById.get(dep.bankAccountId);
+      const bankLabel = `${bank?.bankName || ''} ${bank?.accountNumber || ''}`.toLowerCase();
+      const depositDateValue = dep.depositDate?.slice(0, 10) || '';
+
       const matchesSearch =
-        dep.depositNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dep.referenceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bankAccounts.find(b => b.id === dep.bankAccountId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        normalizedSearch === '' ||
+        (dep.depositNo || '').toLowerCase().includes(normalizedSearch) ||
+        (dep.referenceNo || '').toLowerCase().includes(normalizedSearch) ||
+        bankLabel.includes(normalizedSearch);
+
       const matchesStatus = statusFilter === 'ALL' || dep.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [deposits, searchTerm, statusFilter, bankAccounts]);
+      const matchesBank = bankFilter === 'ALL' || dep.bankAccountId === bankFilter;
+
+      let matchesDate = true;
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = depositDateValue === todayValue;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = depositDateValue.slice(0, 7) === currentMonthValue;
+      } else if (dateFilterMode === 'CUSTOM') {
+        matchesDate =
+          (!dateFrom || depositDateValue >= dateFrom) &&
+          (!dateTo || depositDateValue <= dateTo);
+      }
+
+      return matchesSearch && matchesStatus && matchesBank && matchesDate;
+    }).sort((a, b) => (b.depositDate || '').localeCompare(a.depositDate || ''));
+  }, [deposits, searchTerm, statusFilter, bankFilter, dateFilterMode, dateFrom, dateTo, bankAccountById]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    statusFilter !== 'ALL' ||
+    bankFilter !== 'ALL' ||
+    dateFilterMode !== 'ALL' ||
+    !!dateFrom ||
+    !!dateTo;
 
   // Summary stats
   const stats = useMemo(() => {
@@ -290,8 +346,8 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
     }
   };
 
-  const getBankName = (id?: string) => bankAccounts.find(b => b.id === id)?.name || '-';
-  const getPaymentNo = (id?: string) => payments.find(p => p.id === id)?.paymentNo || '-';
+  const getBankName = (id?: string) => bankAccountById.get(id || '')?.bankName || '-';
+  const getBankAccountNumber = (id?: string) => bankAccountById.get(id || '')?.accountNumber || '-';
 
   return (
     <div className="space-y-6">
@@ -381,142 +437,268 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border p-4">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search deposits..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20 focus:border-brand"
-              />
-            </div>
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search deposits..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-gray-400" />
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as BankDepositStatus | 'ALL')}
-              className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand/20"
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">All</option>
               <option value="DRAFT">Draft</option>
               <option value="POSTED">Posted</option>
               <option value="VOIDED">Voided</option>
             </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
           </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Bank:</span>
+            <select
+              value={bankFilter}
+              onChange={e => setBankFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[210px]"
+            >
+              <option value="ALL">All</option>
+              {bankAccounts.map(account => (
+                <option key={account.id} value={account.id}>
+                  {account.bankName}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <div
+              onClick={() => setShowDateDropdown(!showDateDropdown)}
+              className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+            >
+              <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+              <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+              </span>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            {showDateDropdown && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                    >
+                      Remove Quick Filter
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-1">
+                    <button
+                      onClick={() => setDateFilterMode('CUSTOM')}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'CUSTOM' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                    </button>
+                    <button
+                      onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'TODAY' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                    </button>
+                    <button
+                      onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'THIS_MONTH' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={e => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                        className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={e => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                        className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div className="flex justify-end items-center gap-2 pt-1">
+                      <button
+                        onClick={() => setShowDateDropdown(false)}
+                        className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => setShowDateDropdown(false)}
+                        className="px-4 py-1 bg-brand hover:bg-brand-hover rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+              setBankFilter('ALL');
+              setDateFilterMode('ALL');
+              setDateFrom('');
+              setDateTo('');
+              setShowDateDropdown(false);
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
         </div>
       </div>
 
       {/* Deposit List */}
       <div className="bg-white rounded-xl border overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deposit #</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Account</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cash</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Checks</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Deposit No.</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Bank Account</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Reference</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Cash</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Checks</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Total</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-100">
             {filteredDeposits.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
                   <Landmark size={40} className="mx-auto mb-2 text-gray-300" />
-                  No deposits found
+                  {hasActiveFilters ? 'Try adjusting your search or filters.' : 'No deposits found. Create one to get started!'}
                 </td>
               </tr>
             ) : (
-              filteredDeposits.map(dep => (
-                <React.Fragment key={dep.id}>
-                  <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleRow(dep.id)}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {expandedRows.has(dep.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        <span className="font-medium text-gray-800">{dep.depositNo}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{dep.depositDate}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Landmark size={14} className="text-gray-400" />
-                        <span className="text-sm">{getBankName(dep.bankAccountId)}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{dep.referenceNo || '-'}</td>
-                    <td className="px-4 py-3">{getStatusBadge(dep.status)}</td>
-                    <td className="px-4 py-3 text-right text-brand">{formatCurrency(dep.cashAmount)}</td>
-                    <td className="px-4 py-3 text-right text-brand">{formatCurrency(dep.checkAmount)}</td>
-                    <td className="px-4 py-3 text-right font-bold" style={{ color: brandColor }}>{formatCurrency(dep.totalAmount)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => handleView(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="View">
-                          <Eye size={16} />
-                        </button>
-                        {dep.status === 'DRAFT' && (
-                          <>
-                            <button onClick={() => handleEdit(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Edit">
-                              <Edit3 size={16} />
-                            </button>
-                            <button onClick={() => handlePost(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Post">
-                              <CheckCircle size={16} />
-                            </button>
-                            <button onClick={() => onDeleteDeposit(dep.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Delete">
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                        {dep.status === 'POSTED' && (
-                          <button
-                            onClick={() => { setVoidingDeposit(dep); setShowVoidModal(true); }}
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
-                            title="Void"
-                          >
-                            <Ban size={16} />
+              filteredDeposits.map(dep => {
+                const isExpanded = expandedRows.has(dep.id);
+
+                return (
+                  <React.Fragment key={dep.id}>
+                    <tr className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => toggleRow(dep.id)}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{formatDepositDate(dep.depositDate)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                          <span className="font-medium text-gray-800">{dep.depositNo}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-start gap-2">
+                          <Landmark size={14} className="mt-0.5 text-gray-400 shrink-0" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">{getBankName(dep.bankAccountId)}</div>
+                            <div className="text-xs text-gray-400">{getBankAccountNumber(dep.bankAccountId)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800">{dep.referenceNo || '-'}</td>
+                      <td className="px-4 py-3">{getStatusBadge(dep.status)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-medium text-brand">{formatCurrency(dep.cashAmount)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-medium text-brand">{formatCurrency(dep.checkAmount)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-brand">{formatCurrency(dep.totalAmount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => handleView(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="View">
+                            <Eye size={16} />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  {/* Expanded row with lines */}
-                  {expandedRows.has(dep.id) && dep.lines && dep.lines.length > 0 && (
-                    <tr>
-                      <td colSpan={9} className="bg-gray-50 px-8 py-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Deposit Items</h4>
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-gray-500">
-                              <th className="text-left py-1">Description</th>
-                              <th className="text-left py-1">Check #</th>
-                              <th className="text-left py-1">Payer</th>
-                              <th className="text-right py-1">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {dep.lines.map((line, idx) => (
-                              <tr key={line.id || idx}>
-                                <td className="py-1">{line.description}</td>
-                                <td className="py-1">{line.checkNumber || '-'}</td>
-                                <td className="py-1">{line.payerName || '-'}</td>
-                                <td className="py-1 text-right font-medium">{formatCurrency(line.amount)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                          {dep.status === 'DRAFT' && (
+                            <>
+                              <button onClick={() => handleEdit(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Edit">
+                                <Edit3 size={16} />
+                              </button>
+                              <button onClick={() => handlePost(dep)} className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="Post">
+                                <CheckCircle size={16} />
+                              </button>
+                              <button onClick={() => onDeleteDeposit(dep.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded" title="Delete">
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                          {dep.status === 'POSTED' && (
+                            <button
+                              onClick={() => { setVoidingDeposit(dep); setShowVoidModal(true); }}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                              title="Void"
+                            >
+                              <Ban size={16} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))
+                    {isExpanded && dep.lines && dep.lines.length > 0 && (
+                      <tr>
+                        <td colSpan={9} className="bg-gray-50 px-8 py-4">
+                          <h4 className="mb-3 text-sm font-medium text-gray-700">Deposit Items</h4>
+                          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-50">
+                                <tr className="text-gray-500">
+                                  <th className="px-4 py-2 text-left font-medium">Description</th>
+                                  <th className="px-4 py-2 text-left font-medium">Check #</th>
+                                  <th className="px-4 py-2 text-left font-medium">Payer</th>
+                                  <th className="px-4 py-2 text-right font-medium">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {dep.lines.map((line, idx) => (
+                                  <tr key={line.id || idx}>
+                                    <td className="px-4 py-2 text-gray-700">{line.description || '-'}</td>
+                                    <td className="px-4 py-2 text-gray-700">{line.checkNumber || '-'}</td>
+                                    <td className="px-4 py-2 text-gray-700">{line.payerName || '-'}</td>
+                                    <td className="px-4 py-2 text-right font-medium text-brand">{formatCurrency(line.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -567,7 +749,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                   >
                     <option value="">-- Select Bank --</option>
                     {bankAccounts.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
+                      <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber}</option>
                     ))}
                   </select>
                 </div>
@@ -712,7 +894,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
               {/* Total */}
               <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
                 <span className="text-lg font-bold text-gray-700">Total Deposit:</span>
-                <span className="text-2xl font-bold" style={{ color: brandColor }}>{formatCurrency(totalAmount)}</span>
+                <span className="text-2xl font-bold text-brand">{formatCurrency(totalAmount)}</span>
               </div>
 
               {/* Notes */}
@@ -756,7 +938,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
             <div className="flex items-center justify-between p-4 border-b">
               <div>
                 <h3 className="text-lg font-bold text-gray-800">Deposit {viewingDeposit.depositNo}</h3>
-                <p className="text-sm text-gray-500">{viewingDeposit.depositDate}</p>
+                <p className="text-sm text-gray-500">{formatDepositDate(viewingDeposit.depositDate)}</p>
               </div>
               <div className="flex items-center gap-2">
                 {getStatusBadge(viewingDeposit.status)}
@@ -791,7 +973,7 @@ const BankDepositsView: React.FC<BankDepositsViewProps> = ({
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="font-bold">Total Deposit:</span>
-                  <span className="font-bold text-lg" style={{ color: brandColor }}>{formatCurrency(viewingDeposit.totalAmount)}</span>
+                  <span className="font-bold text-lg text-brand">{formatCurrency(viewingDeposit.totalAmount)}</span>
                 </div>
               </div>
 

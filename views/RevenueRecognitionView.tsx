@@ -10,11 +10,13 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import ModalPortal from '../components/ModalPortal';
 import {
-  Calendar, Plus, Search, Filter, Edit2, Trash2, X, Check,
-  DollarSign, Clock, TrendingUp, AlertCircle, ChevronDown, ChevronUp,
-  Play, Pause, History, PieChart, RefreshCw, FileText
+  Calendar, Plus, Search, Edit2, Trash2, X, Check,
+  DollarSign, Clock, TrendingUp, ChevronDown, ChevronUp,
+  Play, Pause, History, PieChart, RefreshCw, FileText,
+  RotateCcw, CheckSquare
 } from 'lucide-react';
 import {
   RevenueSchedule,
@@ -24,7 +26,7 @@ import {
   RecognitionPeriod,
   RevenueScheduleStatus
 } from '../types';
-import { RevenueRecognitionService, RecognitionPeriodInfo } from '../services/RevenueRecognitionService';
+import { RevenueRecognitionService } from '../services/RevenueRecognitionService';
 
 interface Customer {
   id: string;
@@ -67,6 +69,25 @@ const STATUS_OPTIONS: { value: RevenueScheduleStatus; label: string }[] = [
   { value: 'CANCELLED', label: 'Cancelled' }
 ];
 
+const getScheduleDateValue = (schedule: Pick<RevenueSchedule, 'startDate' | 'createdAt'>) =>
+  (schedule.startDate || schedule.createdAt || '').slice(0, 10);
+
+const formatScheduleDate = (value?: string) => {
+  if (!value) return '-';
+
+  try {
+    return format(new Date(`${value.slice(0, 10)}T00:00:00`), 'MM-dd-yyyy');
+  } catch {
+    return value;
+  }
+};
+
+const getTodayDateValue = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 export default function RevenueRecognitionView({
   orgId,
   currency,
@@ -86,6 +107,10 @@ export default function RevenueRecognitionView({
   const [activeTab, setActiveTab] = useState<'schedules' | 'entries' | 'summary'>('schedules');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Form state
@@ -119,21 +144,54 @@ export default function RevenueRecognitionView({
 
   // Filtered schedules
   const filteredSchedules = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const todayValue = getTodayDateValue();
+    const currentMonthValue = todayValue.slice(0, 7);
+
     return schedules.filter(s => {
       if (s.isDeleted) return false;
+
       if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const customer = customers.find(c => c.id === s.customerId);
-        return (
-          s.description.toLowerCase().includes(search) ||
-          s.sourceReference?.toLowerCase().includes(search) ||
-          customer?.name.toLowerCase().includes(search)
-        );
+
+      const customerName = s.customerName || customers.find(c => c.id === s.customerId)?.name || '';
+      const methodLabel = RevenueRecognitionService.getMethodLabel(s.recognitionMethod);
+      const periodLabel = s.recognitionPeriod ? RevenueRecognitionService.getPeriodLabel(s.recognitionPeriod) : '';
+      const scheduleDateValue = getScheduleDateValue(s);
+
+      const matchesSearch =
+        normalizedSearch === '' ||
+        s.description.toLowerCase().includes(normalizedSearch) ||
+        (s.sourceReference || '').toLowerCase().includes(normalizedSearch) ||
+        customerName.toLowerCase().includes(normalizedSearch) ||
+        s.sourceType.toLowerCase().includes(normalizedSearch) ||
+        methodLabel.toLowerCase().includes(normalizedSearch) ||
+        periodLabel.toLowerCase().includes(normalizedSearch);
+
+      let matchesDate = true;
+      if (dateFilterMode === 'TODAY') {
+        matchesDate = scheduleDateValue === todayValue;
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        matchesDate = scheduleDateValue.slice(0, 7) === currentMonthValue;
+      } else if (dateFilterMode === 'CUSTOM') {
+        matchesDate =
+          (!dateFrom || scheduleDateValue >= dateFrom) &&
+          (!dateTo || scheduleDateValue <= dateTo);
       }
-      return true;
+
+      return matchesSearch && matchesDate;
+    }).sort((a, b) => {
+      const left = getScheduleDateValue(a) || a.createdAt || '';
+      const right = getScheduleDateValue(b) || b.createdAt || '';
+      return right.localeCompare(left);
     });
-  }, [schedules, statusFilter, searchTerm, customers]);
+  }, [schedules, statusFilter, searchTerm, customers, dateFilterMode, dateFrom, dateTo]);
+
+  const hasActiveScheduleFilters =
+    searchTerm.trim() !== '' ||
+    statusFilter !== 'ALL' ||
+    dateFilterMode !== 'ALL' ||
+    !!dateFrom ||
+    !!dateTo;
 
   // Summary calculations
   const summary = useMemo(() => {
@@ -485,54 +543,162 @@ export default function RevenueRecognitionView({
 
       {/* Filters */}
       {activeTab === 'schedules' && (
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search schedules..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
+        <div className="bg-white border-y px-4 py-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+              <Search size={14} className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Search schedules..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+              />
+            </div>
+
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+              <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+              >
+                <option value="ALL">All</option>
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            <div className="relative">
+              <div
+                onClick={() => setShowDateDropdown(!showDateDropdown)}
+                className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+              >
+                <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+                <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
+                  {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
+                </span>
+                <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+              </div>
+
+              {showDateDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowDateDropdown(false)}></div>
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-1">
+                      <button
+                        onClick={() => { setDateFilterMode('ALL'); setDateFrom(''); setDateTo(''); setShowDateDropdown(false); }}
+                        className="w-full text-left px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-100"
+                      >
+                        Remove Quick Filter
+                      </button>
+                    </div>
+
+                    <div className="border-t border-gray-100 p-1">
+                      <button
+                        onClick={() => setDateFilterMode('CUSTOM')}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'CUSTOM' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        {dateFilterMode === 'CUSTOM' && <CheckSquare size={14} />} Is Between
+                      </button>
+                      <button
+                        onClick={() => { setDateFilterMode('TODAY'); setShowDateDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'TODAY' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        {dateFilterMode === 'TODAY' && <CheckSquare size={14} />} Today
+                      </button>
+                      <button
+                        onClick={() => { setDateFilterMode('THIS_MONTH'); setShowDateDropdown(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 ${dateFilterMode === 'THIS_MONTH' ? 'font-bold text-brand bg-brand/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        {dateFilterMode === 'THIS_MONTH' && <CheckSquare size={14} />} This Month
+                      </button>
+                    </div>
+
+                    <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">From:</span>
+                        <input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => { setDateFrom(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                          className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-400 font-semibold uppercase w-8">To:</span>
+                        <input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => { setDateTo(e.target.value); if (dateFilterMode !== 'CUSTOM') setDateFilterMode('CUSTOM'); }}
+                          className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-[12px] font-bold text-gray-800 outline-none focus:border-brand"
+                        />
+                      </div>
+                      <div className="flex justify-end items-center gap-2 pt-1">
+                        <button
+                          onClick={() => setShowDateDropdown(false)}
+                          className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-[11px] font-bold text-gray-600 uppercase transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => setShowDateDropdown(false)}
+                          className="px-4 py-1 bg-brand hover:bg-brand-hover rounded text-[11px] font-bold text-white uppercase transition-colors shadow-sm"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('ALL');
+                setDateFilterMode('ALL');
+                setDateFrom('');
+                setDateTo('');
+                setShowDateDropdown(false);
+              }}
+              className={`p-2 transition-colors ${hasActiveScheduleFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+              title="Clear all filters"
             >
-              <option value="ALL">All Status</option>
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              <RotateCcw size={16} />
+            </button>
           </div>
         </div>
       )}
 
       {/* Schedules Tab */}
       {activeTab === 'schedules' && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recognized</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deferred</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Description</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Customer</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Total Amount</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Recognized</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Deferred Balance</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Method / Period</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {filteredSchedules.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                    No revenue schedules found. Create one to get started!
+                  <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                    <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                    {hasActiveScheduleFilters
+                      ? 'Try adjusting your search or filters.'
+                      : 'No revenue schedules found. Create one to get started!'}
                   </td>
                 </tr>
               ) : (
@@ -550,7 +716,10 @@ export default function RevenueRecognitionView({
 
                   return (
                     <React.Fragment key={schedule.id}>
-                      <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-brand/10' : ''}`}>
+                      <tr className={`group transition-colors hover:bg-gray-50 ${isExpanded ? 'bg-brand/10' : ''}`}>
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-800">{formatScheduleDate(schedule.startDate)}</span>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -570,21 +739,23 @@ export default function RevenueRecognitionView({
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {schedule.customerName || getCustomerName(schedule.customerId)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
                           {formatCurrency(schedule.totalAmount)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-brand">
-                          {formatCurrency(schedule.recognizedAmount)}
+                        <td className="px-4 py-3 text-right text-sm text-brand">
+                          <div className="font-medium">{formatCurrency(schedule.recognizedAmount)}</div>
                           <div className="text-xs text-gray-400">{progressPercent}%</div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-brand">
+                        <td className="px-4 py-3 text-right text-sm font-medium text-brand">
                           {formatCurrency(schedule.deferredBalance)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">
-                          {schedule.startDate} to {schedule.endDate}
-                          <div className="text-xs text-gray-400">
+                          <div className="font-medium text-gray-800">
                             {RevenueRecognitionService.getMethodLabel(schedule.recognitionMethod)}
-                            {schedule.recognitionPeriod && ` - ${RevenueRecognitionService.getPeriodLabel(schedule.recognitionPeriod)}`}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {formatScheduleDate(schedule.startDate)} to {formatScheduleDate(schedule.endDate)}
+                            {schedule.recognitionPeriod && ` • ${RevenueRecognitionService.getPeriodLabel(schedule.recognitionPeriod)}`}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -597,8 +768,8 @@ export default function RevenueRecognitionView({
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
                             {schedule.status === 'ACTIVE' && periodsDue.length > 0 && (
                               <button
                                 onClick={() => handleRunRecognition(schedule)}
@@ -635,7 +806,7 @@ export default function RevenueRecognitionView({
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={8} className="px-4 py-4 bg-gray-50">
+                          <td colSpan={9} className="px-4 py-4 bg-gray-50">
                             <div className="grid grid-cols-2 gap-6">
                               <div>
                                 <h4 className="font-medium text-gray-900 mb-3">Schedule Details</h4>
@@ -650,11 +821,11 @@ export default function RevenueRecognitionView({
                                   </div>
                                   <div className="flex">
                                     <dt className="w-40 text-gray-500">Last Recognition:</dt>
-                                    <dd className="text-gray-900">{schedule.lastRecognitionDate || 'None'}</dd>
+                                    <dd className="text-gray-900">{schedule.lastRecognitionDate ? formatScheduleDate(schedule.lastRecognitionDate) : 'None'}</dd>
                                   </div>
                                   <div className="flex">
                                     <dt className="w-40 text-gray-500">Next Recognition:</dt>
-                                    <dd className="text-gray-900">{schedule.nextRecognitionDate || 'N/A'}</dd>
+                                    <dd className="text-gray-900">{schedule.nextRecognitionDate ? formatScheduleDate(schedule.nextRecognitionDate) : 'N/A'}</dd>
                                   </div>
                                   {schedule.notes && (
                                     <div className="flex">
@@ -688,7 +859,7 @@ export default function RevenueRecognitionView({
                                     {scheduleEntries.slice(0, 10).map(entry => (
                                       <li key={entry.id} className="flex items-center gap-3 text-gray-700">
                                         <Clock className="w-3 h-3 text-gray-400" />
-                                        <span>{entry.recognitionDate}</span>
+                                        <span>{formatScheduleDate(entry.recognitionDate)}</span>
                                         <span className="text-gray-400">•</span>
                                         <span className="font-medium">{formatCurrency(entry.amount)}</span>
                                         <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -718,19 +889,19 @@ export default function RevenueRecognitionView({
 
       {/* Entries Tab */}
       {activeTab === 'entries' && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Journal Ref</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Period</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Schedule</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Amount</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Journal Ref</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {entries.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -744,14 +915,14 @@ export default function RevenueRecognitionView({
                     const schedule = schedules.find(s => s.id === entry.scheduleId);
                     return (
                       <tr key={entry.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">{entry.recognitionDate}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{formatScheduleDate(entry.recognitionDate)}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">
-                          {entry.periodStart} to {entry.periodEnd}
+                          {formatScheduleDate(entry.periodStart)} to {formatScheduleDate(entry.periodEnd)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {schedule?.description || 'Unknown'}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-brand">
+                        <td className="px-4 py-3 text-right text-sm font-medium text-brand">
                           {formatCurrency(entry.amount)}
                         </td>
                         <td className="px-4 py-3">
@@ -777,19 +948,19 @@ export default function RevenueRecognitionView({
 
       {/* Summary Tab */}
       {activeTab === 'summary' && (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <table className="w-full font-sans">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedules</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Deferred</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recognized</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remaining</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Customer</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Schedules</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Total Deferred</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Recognized</th>
+                <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Remaining</th>
+                <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Progress</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {customerSummaries.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -809,13 +980,13 @@ export default function RevenueRecognitionView({
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {summary.scheduleCount}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-4 py-3 text-right text-sm text-gray-900">
                         {formatCurrency(summary.totalDeferred)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-brand">
+                      <td className="px-4 py-3 text-right text-sm text-brand">
                         {formatCurrency(summary.totalRecognized)}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-[#F47721]">
+                      <td className="px-4 py-3 text-right text-sm font-medium text-brand">
                         {formatCurrency(summary.totalRemaining)}
                       </td>
                       <td className="px-4 py-3">

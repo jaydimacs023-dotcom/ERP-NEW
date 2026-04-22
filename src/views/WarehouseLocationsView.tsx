@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { WarehouseLocation } from '../types';
 
 interface WarehouseLocationsViewProps {
@@ -36,6 +36,8 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -153,16 +155,33 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     }
   };
 
-  const activeLocations = locations.filter((loc) => !loc.isDeleted);
+  const activeLocations = React.useMemo(() => locations.filter((loc) => !loc.isDeleted), [locations]);
+
+  const filteredLocations = React.useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return activeLocations
+      .filter(location => {
+        const searchableText = [
+          location.code,
+          location.name,
+          location.location,
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'ACTIVE' && location.isActive)
+          || (statusFilter === 'INACTIVE' && !location.isActive);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [activeLocations, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl text-gray-900 mb-2">Warehouse Locations</h1>
-        <p className="text-gray-600">Manage physical storage locations for inventory</p>
-      </div>
-
       {/* Messages */}
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -192,16 +211,21 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         </div>
       )}
 
-      {/* Add Button */}
       {!showForm && (
-        <button
-          onClick={handleAddClick}
-          disabled={isLoading || submitting}
-          className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Warehouse Location
-        </button>
+        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Warehouse Locations</h2>
+            <p className="text-sm text-gray-500 font-normal italic">Manage physical storage points and facility mapping for inventory operations.</p>
+          </div>
+          <button
+            onClick={handleAddClick}
+            disabled={isLoading || submitting}
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Add Warehouse Location
+          </button>
+        </div>
       )}
 
       {/* Form */}
@@ -296,68 +320,108 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         </div>
       )}
 
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search locations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[160px]"
+            >
+              <option value="ALL">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredLocations.length}</span> of {activeLocations.length} locations
+          </div>
+        </div>
+      </div>
+
       {/* List */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading warehouse locations...</p>
           </div>
-        ) : activeLocations.length === 0 ? (
-          <div className="p-8 text-center text-gray-600">
-            <p>No warehouse locations found. Create one to get started.</p>
-          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Location
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {activeLocations.map((location) => (
-                  <tr key={location.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+              <tbody className="divide-y divide-gray-100">
+                {filteredLocations.length > 0 ? filteredLocations.map((location) => (
+                  <tr key={location.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       {location.code}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600">
                       {location.name}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600">
                       {location.location}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
                           location.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-brand/10 text-brand border-brand-light'
+                            : 'bg-gray-100 text-gray-800 border-gray-200'
                         }`}
                       >
                         {location.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditClick(location)}
                           disabled={submitting}
-                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -377,7 +441,15 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : 'No warehouse locations found. Create one to get started.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -385,9 +457,9 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       </div>
 
       {/* Summary */}
-      {activeLocations.length > 0 && (
+      {filteredLocations.length > 0 && (
         <div className="mt-4 text-sm text-gray-600">
-          Total: {activeLocations.length} warehouse location{activeLocations.length !== 1 ? 's' : ''}
+          Total: {filteredLocations.length} warehouse location{filteredLocations.length !== 1 ? 's' : ''}
         </div>
       )}
     </div>

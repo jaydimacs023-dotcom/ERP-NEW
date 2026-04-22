@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download, ChevronDown, RotateCcw } from 'lucide-react';
 import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine, Organization } from '../types';
 import { InventoryService } from '../services/InventoryService';
 import { InventoryGLService } from '../services/InventoryGLService';
@@ -63,6 +63,8 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | typeof ADJUSTMENT_TYPES[number]>('ALL');
+  const [approvalFilter, setApprovalFilter] = useState<'ALL' | 'APPROVED' | 'PENDING'>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -222,11 +224,36 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
     }
   };
 
-  const activeAdjustments = adjustments.filter((adj) => !adj.isDeleted);
-  const filteredAdjustments = activeAdjustments.filter((adj) => {
-    const item = stockItems.find((i) => i.id === adj.stockItemId);
-    return !searchTerm || item?.code.toLowerCase().includes(searchTerm.toLowerCase()) || item?.name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const activeAdjustments = useMemo(() => adjustments.filter((adj) => !adj.isDeleted), [adjustments]);
+
+  const filteredAdjustments = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return activeAdjustments
+      .filter((adj) => {
+        const item = stockItems.find((i) => i.id === adj.stockItemId);
+        const location = activeLocations.find((l) => l.id === adj.warehouseLocationId);
+        const searchableText = [
+          item?.code || '',
+          item?.name || '',
+          location?.code || '',
+          location?.name || '',
+          adj.reason || '',
+          adj.notes || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesType = typeFilter === 'ALL' || adj.adjustmentType === typeFilter;
+        const matchesApproval = approvalFilter === 'ALL'
+          || (approvalFilter === 'APPROVED' && adj.isApproved)
+          || (approvalFilter === 'PENDING' && !adj.isApproved);
+
+        return matchesSearch && matchesType && matchesApproval;
+      })
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }, [activeAdjustments, stockItems, activeLocations, searchTerm, typeFilter, approvalFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || approvalFilter !== 'ALL';
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -254,41 +281,12 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
             <button
               onClick={handleAddClick}
               disabled={isLoading || submitting}
-              style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px ${brandColor}1f` }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
-              className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
               New Adjustment
             </button>
            )}
-           <button
-             onClick={() => {
-                const exportData = filteredAdjustments.map(adj => {
-                  const item = stockItems.find(i => i.id === adj.stockItemId);
-                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
-                  return {
-                    Date: new Date(adj.createdAt).toLocaleDateString(),
-                    Code: item?.code || 'N/A',
-                    Item: item?.name || 'N/A',
-                    Location: location?.name || 'N/A',
-                    Type: adj.adjustmentType,
-                    Qty: adj.quantity,
-                    Reason: adj.reason,
-                    Posted: adj.journalEntryId ? 'Yes' : 'No'
-                  };
-                });
-                DataExportService.exportToCSV(exportData, `Stock_Adjustments_${new Date().toISOString().split('T')[0]}.csv`);
-             }}
-             className="p-3 bg-white border border-gray-200 rounded text-gray-400 transition-all active:scale-95 shadow-sm"
-             style={{ borderColor: '#E5E7EB' }}
-             onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${brandColor}30`; e.currentTarget.style.color = brandColor; }}
-             onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#9CA3AF'; }}
-             title="Export CSV"
-           >
-             <Download size={20} />
-           </button>
         </div>
       </header>
 
@@ -481,144 +479,225 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
 
       {/* Filter & List Bar */}
       {!showForm && (
-        <div className="p-6 bg-white rounded-md border border-gray-200 shadow-sm no-print">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search historical adjustments by SKU or name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded text-sm font-medium focus:ring-2 focus:ring-orange-400/20 outline-none transition-all placeholder:text-gray-400"
-            />
+        <div className="bg-white border-y px-4 py-2 no-print">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+              <Search size={14} className="text-gray-400 mr-2" />
+              <input
+                type="text"
+                placeholder="Search adjustments..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+              />
+            </div>
+
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+              <span className="text-[13px] text-gray-500 mr-1">Type:</span>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as 'ALL' | typeof ADJUSTMENT_TYPES[number])}
+                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
+              >
+                <option value="ALL">All</option>
+                {ADJUSTMENT_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+              <span className="text-[13px] text-gray-500 mr-1">Approval:</span>
+              <select
+                value={approvalFilter}
+                onChange={(e) => setApprovalFilter(e.target.value as 'ALL' | 'APPROVED' | 'PENDING')}
+                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
+              >
+                <option value="ALL">All</option>
+                <option value="APPROVED">Approved</option>
+                <option value="PENDING">Pending</option>
+              </select>
+              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+            </div>
+
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setTypeFilter('ALL');
+                setApprovalFilter('ALL');
+              }}
+              className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+              title="Clear all filters"
+            >
+              <RotateCcw size={16} />
+            </button>
+
+            <div className="ml-auto text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-700">{filteredAdjustments.length}</span> of {activeAdjustments.length} adjustments
+            </div>
+
+            <button
+              onClick={() => {
+                const exportData = filteredAdjustments.map(adj => {
+                  const item = stockItems.find(i => i.id === adj.stockItemId);
+                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
+                  return {
+                    Date: new Date(adj.createdAt).toLocaleDateString(),
+                    Code: item?.code || 'N/A',
+                    Item: item?.name || 'N/A',
+                    Location: location?.name || 'N/A',
+                    Type: adj.adjustmentType,
+                    Qty: adj.quantity,
+                    Reason: adj.reason,
+                    Posted: adj.journalEntryId ? 'Yes' : 'No'
+                  };
+                });
+                DataExportService.exportToCSV(exportData, `Stock_Adjustments_${new Date().toISOString().split('T')[0]}.csv`);
+              }}
+              className="flex items-center gap-2 h-9 px-3 bg-white text-gray-700 rounded border border-gray-200 hover:bg-gray-50 transition-colors text-[13px] font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={filteredAdjustments.length === 0}
+            >
+              <Download size={14} />
+              Export
+            </button>
           </div>
         </div>
       )}
 
       {/* List Table */}
-      <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-8 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center w-24">Date</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Adjustment Detail</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Type</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Variance Qty</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">GL Status</th>
-                <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 text-sm">
-              {isLoading ? (
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
+            <p className="mt-2 text-gray-600">Loading adjustments...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
                 <tr>
-                   <td colSpan={6} className="px-8 py-20 text-center">
-                      <div className="w-10 h-10 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Synching Records...</p>
-                   </td>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Item</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Location</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Type</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Quantity</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Reason</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Approval</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">GL Status</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
                 </tr>
-              ) : filteredAdjustments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 italic">
-                      <BookOpen className="text-gray-200" size={32} />
-                    </div>
-                    <p className="text-sm font-semibold text-gray-900 uppercase tracking-wide">No variance logs detected</p>
-                    <p className="text-xs text-gray-400 mt-2 italic font-medium">Historical adjustments will appear here after creation.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredAdjustments.map((adj) => {
-                  const item = stockItems.find(i => i.id === adj.stockItemId);
-                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
-                  
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredAdjustments.length > 0 ? filteredAdjustments.map((adj) => {
+                  const item = stockItems.find((i) => i.id === adj.stockItemId);
+                  const location = activeLocations.find((l) => l.id === adj.warehouseLocationId);
+
                   return (
                     <tr key={adj.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-8 py-5">
-                         <div className="text-center">
-                            <div className="text-xs font-semibold text-gray-400 uppercase mb-0.5">{new Date(adj.createdAt).toLocaleDateString('en-US', { month: 'short' })}</div>
-                            <div className="text-lg font-semibold text-gray-800 leading-none">{new Date(adj.createdAt).getDate()}</div>
-                         </div>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="font-medium text-gray-900">{item?.code}</div>
+                        <div className="text-xs text-gray-600">{item?.name}</div>
                       </td>
-                      <td className="px-6 py-5">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-orange-50 group-hover:text-[#F47721] transition-colors">
-                               <BookOpen size={18} />
-                            </div>
-                            <div>
-                               <div className="text-xs font-mono font-semibold text-gray-400 uppercase tracking-tighter mb-0.5">LOCATION: {location?.name || 'GEN-WH'}</div>
-                               <div className="text-sm font-semibold text-gray-800 tracking-tight">{item?.name || 'N/A'}</div>
-                               <div className="text-xs text-gray-500 italic mt-0.5 flex items-center gap-1.5"><AlertCircle size={10} /> {adj.reason}</div>
-                            </div>
-                         </div>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {location?.code} - {location?.name}
                       </td>
-                      <td className="px-6 py-5 text-center">
-                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
-                            adj.adjustmentType === 'WRITEOFF' ? 'bg-rose-100 text-rose-700' :
-                            adj.adjustmentType === 'CORRECTION' ? 'bg-amber-100 text-amber-700' :
-                            'bg-gray-100 text-gray-600'
-                         }`}>
-                            {adj.adjustmentType}
-                         </span>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getTypeColor(adj.adjustmentType)}`}>
+                          {adj.adjustmentType}
+                        </span>
                       </td>
-                      <td className="px-6 py-5 text-right font-mono font-semibold text-gray-800">
-                         {adj.quantity > 0 ? '+' : ''}{adj.quantity.toFixed(0)} <span className="text-xs text-gray-400">{item?.unitOfMeasure}</span>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">
+                        {adj.quantity} {item?.unitOfMeasure}
                       </td>
-                      <td className="px-6 py-5 text-center">
-                         {adj.journalEntryId ? (
-                            <div className="flex justify-center" title="GL Posted">
-                               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 rounded-full border border-orange-100">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[#F47721] shadow-[0_0_10px_rgba(20,184,166,0.3)]"></div>
-                                  <span className="text-xs font-semibold uppercase tracking-wide">Posted</span>
-                               </div>
-                            </div>
-                         ) : adj.isApproved ? (
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {adj.reason}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                            adj.isApproved
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {adj.isApproved ? 'Approved' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {adj.journalEntryId ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <Check className="w-3 h-3" />
+                            Posted
+                          </span>
+                        ) : adj.isApproved ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
+                            <AlertCircle className="w-3 h-3" />
+                            Ready
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {adj.isApproved && !adj.journalEntryId && onPostGL && (
                             <button
-                               onClick={() => handlePostToGL(adj)}
-                               disabled={postingGL === adj.id || submitting}
-                               className="text-xs font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg hover:bg-amber-600 hover:text-white transition-all border border-amber-100 uppercase tracking-wide mx-auto block"
+                              onClick={() => handlePostToGL(adj)}
+                              disabled={submitting || postingGL === adj.id}
+                              className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Post to GL"
                             >
-                               {postingGL === adj.id ? 'PENDING...' : 'Post to GL'}
+                              {postingGL === adj.id ? <div className="w-4 h-4 border-2 border-brand-light border-t-gray-500 rounded-full animate-spin" /> : <BookOpen className="w-4 h-4" />}
                             </button>
-                         ) : (
-                            <span className="text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100 uppercase tracking-wide mx-auto block w-fit">
-                               Pending
-                            </span>
-                         )}
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {!adj.journalEntryId && (
-                               <>
-                                  <button
-                                    onClick={() => handleEditClick(adj)}
-                                    className="p-2.5 text-gray-400 hover:text-[#F47721] hover:bg-white rounded transition-all shadow-sm border border-transparent hover:border-gray-100"
-                                  >
-                                    <Edit2 size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClick(adj.id)}
-                                    className={`p-2.5 rounded transition-all shadow-sm border border-transparent ${
-                                       deleting === adj.id ? 'bg-rose-600 text-white' : 'text-gray-400 hover:text-rose-600 hover:bg-white hover:border-gray-100'
-                                    }`}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                               </>
-                            )}
-                         </div>
+                          )}
+                          {adj.journalEntryId && (
+                            <div className="flex items-center gap-1 text-xs text-green-600 px-2 py-1 bg-green-50 rounded">
+                              <Check className="w-3 h-3" />
+                              GL Posted
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleEditClick(adj)}
+                            disabled={submitting}
+                            className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(adj.id)}
+                            disabled={submitting}
+                            className={`p-2 rounded transition-colors ${
+                              deleting === adj.id
+                                ? 'bg-red-100 text-red-700'
+                                : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            title={deleting === adj.id ? 'Click again to confirm' : 'Delete'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                }) : (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                      <BookOpen size={40} className="mx-auto mb-2 text-gray-300" />
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : 'No adjustments recorded yet.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Summary Audit Footer */}
         {!isLoading && filteredAdjustments.length > 0 && (
-           <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
+           <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
                <div className="flex items-center gap-3">
                   <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><AlertCircle size={16} className="text-amber-500" /></div>
                   <div>
@@ -627,7 +706,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                   </div>
                </div>
                <div className="text-right">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5"><Check size={12} className="text-[#F47721]" /> LOGISTICS_AUDIT_ENABLED</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5"><Check size={12} className="text-brand" /> LOGISTICS_AUDIT_ENABLED</p>
                   <p className="text-xs font-bold text-gray-300 italic mt-1 uppercase">Snapshot: {new Date().toLocaleString()}</p>
                </div>
            </div>

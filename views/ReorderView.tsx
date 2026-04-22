@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, AlertTriangle, Zap, Truck, Target, Clock, ShieldCheck, FileText, Search, Package, ArrowRight, BarChart3 } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, AlertTriangle, Truck, Target, Clock, ShieldCheck, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { ReorderPoint, StockItem, InventoryLevel, Organization } from '../types';
 import ModalPortal from '../components/ModalPortal';
 
@@ -55,6 +55,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'NEEDS_REORDER' | 'HEALTHY'>('ALL');
 
   const stockItems = useMemo(
     () => items.filter((i) => !i.isDeleted && i.type === 'STOCK_ITEM'),
@@ -77,12 +78,32 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
           needsReorder,
         };
       })
-      .filter(entry => {
-        if (!searchTerm) return true;
-        const term = searchTerm.toLowerCase();
-        return entry.item?.name.toLowerCase().includes(term) || entry.item?.code.toLowerCase().includes(term);
-      });
-  }, [reorderPoints, stockItems, levels, searchTerm]);
+      .filter(entry => !!entry.item);
+  }, [reorderPoints, stockItems, levels]);
+
+  const reorderingCount = itemsNeedingReorder.filter((item) => item.needsReorder).length;
+
+  const filteredReorderItems = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return itemsNeedingReorder
+      .filter((entry) => {
+        const searchableText = [
+          entry.item?.code || '',
+          entry.item?.name || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'NEEDS_REORDER' && entry.needsReorder)
+          || (statusFilter === 'HEALTHY' && !entry.needsReorder);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => (a.item?.code || '').localeCompare(b.item?.code || ''));
+  }, [itemsNeedingReorder, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   const summaries = useMemo(() => ({
      total: itemsNeedingReorder.length,
@@ -138,8 +159,7 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
               setFormData(INITIAL_FORM);
               setShowForm(true);
             }}
-            style={{ backgroundColor: brandColor }}
-            className="flex items-center gap-2 px-6 py-3 text-white rounded font-semibold text-xs uppercase tracking-wide shadow-lg shadow-gray-300/30 transition-all hover:opacity-90 active:scale-95"
+            className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide shadow-md shadow-brand/20 transition-all hover:bg-brand-hover active:scale-95"
           >
             <Plus className="w-4 h-4" />
             Define Threshold
@@ -173,130 +193,170 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
         </div>
       </div>
 
-      <div className="p-8 bg-white rounded-md border border-gray-200 shadow-sm space-y-6">
-         <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1 space-y-1.5">
-               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Threshold Surveillance</label>
-               <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Identify active reorder points..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-bold text-gray-800"
-                  />
-               </div>
-            </div>
-         </div>
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search reorder points..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'NEEDS_REORDER' | 'HEALTHY')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="ALL">All</option>
+              <option value="NEEDS_REORDER">Needs Reorder</option>
+              <option value="HEALTHY">Healthy</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredReorderItems.length}</span> of {itemsNeedingReorder.length} reorder points
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-8 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Inventory Object</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Current Stock</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Min / Max Level</th>
-                <th className="px-6 py-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Lead Dynamics</th>
-                <th className="px-8 py-5 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {itemsNeedingReorder.length === 0 ? (
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div
+              className="inline-block w-8 h-8 border-4 border-orange-200 rounded-full animate-spin"
+              style={{ borderTopColor: brandColor }}
+            ></div>
+            <p className="mt-2 text-gray-600">Loading reorder points...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
                 <tr>
-                   <td colSpan={5} className="px-8 py-20 text-center text-gray-400 italic font-medium">
-                      No reorder definitions found.
-                   </td>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Item</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Current Qty</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Min Level</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Max Level</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Reorder Qty</th>
+                  <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Status</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
                 </tr>
-              ) : (
-                itemsNeedingReorder.map((entry) => (
-                  <tr key={entry.reorderPoint.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-8 py-5">
-                       <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded flex items-center justify-center border shadow-sm ${entry.needsReorder ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
-                             <Zap size={18} />
-                          </div>
-                          <div>
-                             <p className="text-xs font-semibold text-gray-900 tracking-tight uppercase">{entry.item?.code}</p>
-                             <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">{entry.item?.name}</p>
-                          </div>
-                       </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredReorderItems.length > 0 ? filteredReorderItems.map((entry) => (
+                  <tr
+                    key={entry.reorderPoint.id}
+                    className={`group transition-colors ${
+                      entry.needsReorder ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-medium text-gray-900">{entry.item?.code}</div>
+                      <div className="text-xs text-gray-600">{entry.item?.name}</div>
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-400 uppercase tracking-wide">
+                        <Truck className="w-3 h-3 text-brand" />
+                        {entry.reorderPoint.leadTimeDays}d lead time
+                      </div>
                     </td>
-                    <td className="px-6 py-5 text-right">
-                       <div className="space-y-0.5">
-                          <p className="text-sm font-semibold font-mono">
-                             {entry.currentQuantity.toLocaleString()}
-                          </p>
-                          <p className="text-xs font-bold text-gray-400 uppercase">ON_HAND_UNITS</p>
-                       </div>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">
+                      {entry.currentQuantity.toFixed(0)}
                     </td>
-                    <td className="px-6 py-5 text-right">
-                       <p className="text-xs font-semibold text-gray-700 font-mono">
-                          {entry.reorderPoint.minimumLevel} / {entry.reorderPoint.maximumLevel}
-                       </p>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
+                      {entry.reorderPoint.minimumLevel.toFixed(0)}
                     </td>
-                    <td className="px-6 py-5">
-                       <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase italic">
-                             <Truck size={12} style={{ color: brandColor }} /> {entry.reorderPoint.leadTimeDays}d
-                          </div>
-                          {entry.needsReorder && (
-                             <span className="px-2 py-0.5 text-white rounded-full text-xs font-semibold animate-pulse" style={{ backgroundColor: brandColor }}>REORDER_NOW</span>
-                          )}
-                       </div>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
+                      {entry.reorderPoint.maximumLevel.toFixed(0)}
                     </td>
-                    <td className="px-8 py-5 text-right">
-                       <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => {
-                               setEditingId(entry.reorderPoint.id);
-                               setFormData({
-                                  stockItemId: entry.reorderPoint.stockItemId,
-                                  minimumLevel: entry.reorderPoint.minimumLevel,
-                                  maximumLevel: entry.reorderPoint.maximumLevel,
-                                  reorderQuantity: entry.reorderPoint.reorderQuantity,
-                                  leadTimeDays: entry.reorderPoint.leadTimeDays,
-                                  economicOrderQuantity: entry.reorderPoint.economicOrderQuantity,
-                                  isActive: entry.reorderPoint.isActive,
-                               });
-                               setShowForm(true);
-                            }}
-                            style={{ color: brandColor }}
-                            className="p-2 text-gray-400 hover:bg-orange-50 rounded transition-all"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(entry.reorderPoint.id)}
-                            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                       </div>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
+                      {entry.reorderPoint.reorderQuantity.toFixed(0)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-center">
+                      <span
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                          entry.needsReorder
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {entry.needsReorder ? 'Reorder Now' : 'OK'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingId(entry.reorderPoint.id);
+                            setFormData({
+                              stockItemId: entry.reorderPoint.stockItemId,
+                              minimumLevel: entry.reorderPoint.minimumLevel,
+                              maximumLevel: entry.reorderPoint.maximumLevel,
+                              reorderQuantity: entry.reorderPoint.reorderQuantity,
+                              leadTimeDays: entry.reorderPoint.leadTimeDays,
+                              economicOrderQuantity: entry.reorderPoint.economicOrderQuantity,
+                              isActive: entry.reorderPoint.isActive,
+                            });
+                            setShowForm(true);
+                          }}
+                          disabled={submitting}
+                          className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entry.reorderPoint.id)}
+                          disabled={submitting}
+                          className={`p-2 rounded transition-colors ${
+                            deleting === entry.reorderPoint.id
+                              ? 'bg-red-100 text-red-700'
+                              : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          title={deleting === entry.reorderPoint.id ? 'Click again to confirm' : 'Delete'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-               <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><ShieldCheck size={16} style={{ color: brandColor }} /></div>
-               <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Procurement Integrity</p>
-                  <p className="text-xs font-bold text-gray-600">Continuous monitoring of safety stock and replenishment cycles.</p>
-               </div>
-            </div>
-            <div className="text-right">
-               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5 font-mono">SYSTEM_VERIFIED</p>
-               <p className="text-xs font-bold text-gray-300 italic mt-1 uppercase">Next sync: {new Date(Date.now() + 600000).toLocaleTimeString()}</p>
-            </div>
-        </div>
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : 'No reorder points configured yet. Create one to get started.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {filteredReorderItems.length > 0 && (
+        <div className="mt-4 text-sm text-gray-600">
+          Showing {filteredReorderItems.length} reorder point{filteredReorderItems.length !== 1 ? 's' : ''} |{' '}
+          {reorderingCount} need{reorderingCount === 1 ? 's' : ''} immediate action
+        </div>
+      )}
 
       {showForm && (
         <ModalPortal>

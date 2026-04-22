@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Check, AlertTriangle, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { ReorderPoint, StockItem, InventoryLevel } from '../types';
 
 interface ReorderViewProps {
@@ -46,6 +46,8 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'NEEDS_REORDER' | 'HEALTHY'>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -208,15 +210,30 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
 
   const activePoints = reorderPoints.filter((rp) => !rp.isDeleted);
   const reorderingCount = itemsNeedingReorder.filter((i) => i.needsReorder).length;
+  const filteredReorderItems = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return itemsNeedingReorder
+      .filter((item) => {
+        const searchableText = [
+          item.item?.code || '',
+          item.item?.name || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesStatus = statusFilter === 'ALL'
+          || (statusFilter === 'NEEDS_REORDER' && item.needsReorder)
+          || (statusFilter === 'HEALTHY' && !item.needsReorder);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => (a.item?.code || '').localeCompare(b.item?.code || ''));
+  }, [itemsNeedingReorder, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-xl text-gray-900 mb-2">Reorder Management</h1>
-        <p className="text-gray-600">Configure minimum and maximum stock levels for automatic reordering</p>
-      </div>
-
       {/* Messages */}
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -253,17 +270,66 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
         </div>
       )}
 
-      {/* Add Button */}
       {!showForm && (
-        <button
-          onClick={handleAddClick}
-          disabled={isLoading || submitting}
-          className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#F47721] text-white rounded-lg hover:bg-[#E06610] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Reorder Point
-        </button>
+        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Reorder Management</h2>
+            <p className="text-sm text-gray-500 font-normal italic">Configure minimum and maximum inventory thresholds for replenishment planning.</p>
+          </div>
+          <button
+            onClick={handleAddClick}
+            disabled={isLoading || submitting}
+            className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            Add Reorder Point
+          </button>
+        </div>
       )}
+
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search reorder points..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'NEEDS_REORDER' | 'HEALTHY')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="ALL">All</option>
+              <option value="NEEDS_REORDER">Needs Reorder</option>
+              <option value="HEALTHY">Healthy</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredReorderItems.length}</span> of {itemsNeedingReorder.length} reorder points
+          </div>
+        </div>
+      </div>
 
       {/* Form */}
       {showForm && (
@@ -420,69 +486,65 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
       )}
 
       {/* List */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading reorder points...</p>
           </div>
-        ) : itemsNeedingReorder.length === 0 ? (
-          <div className="p-8 text-center text-gray-600">
-            <p>No reorder points configured yet. Create one to get started.</p>
-          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">
                     Item
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Current Qty
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Min Level
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Max Level
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Reorder Qty
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-[13px] font-bold text-white">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {itemsNeedingReorder.map((item) => (
+              <tbody className="divide-y divide-gray-100">
+                {filteredReorderItems.length > 0 ? filteredReorderItems.map((item) => (
                   <tr
                     key={item.reorderPoint.id}
-                    className={`transition-colors ${
+                    className={`group transition-colors ${
                       item.needsReorder ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       <div className="font-medium text-gray-900">{item.item?.code}</div>
                       <div className="text-xs text-gray-600">{item.item?.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-900 font-medium">
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">
                       {item.currentQuantity.toFixed(0)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-600">
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
                       {item.reorderPoint.minimumLevel.toFixed(0)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-600">
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
                       {item.reorderPoint.maximumLevel.toFixed(0)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-right text-gray-600">
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">
                       {item.reorderPoint.reorderQuantity.toFixed(0)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-center">
+                    <td className="px-4 py-3 text-sm text-center">
                       <span
                         className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                           item.needsReorder
@@ -493,12 +555,12 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                         {item.needsReorder ? 'Reorder Now' : 'OK'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditClick(item.reorderPoint)}
                           disabled={submitting}
-                          className="p-2 hover:bg-orange-50 text-[#F47721] rounded hover:text-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -518,7 +580,15 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : 'No reorder points configured yet. Create one to get started.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -526,9 +596,9 @@ export const ReorderView: React.FC<ReorderViewProps> = ({
       </div>
 
       {/* Summary */}
-      {itemsNeedingReorder.length > 0 && (
+      {filteredReorderItems.length > 0 && (
         <div className="mt-4 text-sm text-gray-600">
-          Showing {itemsNeedingReorder.length} reorder point{itemsNeedingReorder.length !== 1 ? 's' : ''} |{' '}
+          Showing {filteredReorderItems.length} reorder point{filteredReorderItems.length !== 1 ? 's' : ''} |{' '}
           {reorderingCount} need{reorderingCount === 1 ? 's' : ''} immediate action
         </div>
       )}

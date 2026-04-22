@@ -1,11 +1,12 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount, TaxType } from '../types';
+import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
-  Search, Plus, DollarSign, Trash2, X, BookOpen, GraduationCap,
-  Filter, Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
-  Percent, Hash, Tag, ToggleLeft, ToggleRight, FileText, Layers, Copy
+  Search, Plus, DollarSign, Trash2, X, GraduationCap,
+  Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
+  Percent, Hash, ToggleLeft, ToggleRight, FileText, Copy,
+  ChevronDown, RotateCcw
 } from 'lucide-react';
 
 interface Toast {
@@ -39,6 +40,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterQualification, setFilterQualification] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<CourseFeeCategory | ''>('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingFee, setEditingFee] = useState<CourseFee | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,20 +85,43 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   });
 
   const filteredFees = useMemo(() => {
-    return courseFees.filter(f => {
-      if (f.isDeleted) return false;
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-      const matchesSearch =
-        f.feeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.feeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (f.description?.toLowerCase().includes(searchTerm.toLowerCase()));
+    return courseFees
+      .filter(f => {
+        if (f.isDeleted) return false;
 
-      const matchesQualification = !filterQualification || f.qualificationId === filterQualification;
-      const matchesCategory = !filterCategory || f.category === filterCategory;
+        const qualification = qualifications.find(q => q.id === f.qualificationId);
+        const account = accounts.find(a => a.id === f.glAccountId);
+        const categoryLabel = CATEGORY_OPTIONS.find(cat => cat.value === f.category)?.label || '';
+        const searchableText = [
+          f.feeName,
+          f.feeCode,
+          f.description || '',
+          qualification?.code || '',
+          qualification?.name || '',
+          account?.code || '',
+          account?.name || '',
+          categoryLabel,
+        ].join(' ').toLowerCase();
 
-      return matchesSearch && matchesQualification && matchesCategory;
-    });
-  }, [courseFees, searchTerm, filterQualification, filterCategory]);
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesQualification = !filterQualification || f.qualificationId === filterQualification;
+        const matchesCategory = !filterCategory || f.category === filterCategory;
+        const matchesStatus =
+          statusFilter === 'ALL' ||
+          (statusFilter === 'ACTIVE' ? f.isActive : !f.isActive);
+
+        return matchesSearch && matchesQualification && matchesCategory && matchesStatus;
+      })
+      .sort((a, b) => a.feeName.localeCompare(b.feeName));
+  }, [courseFees, searchTerm, filterQualification, filterCategory, statusFilter, qualifications, accounts]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    !!filterQualification ||
+    !!filterCategory ||
+    statusFilter !== 'ALL';
 
   const revenueAccounts = useMemo(() =>
     accounts.filter(a => a.class === 'REVENUE' && !a.isHeader && a.isActive !== false),
@@ -398,59 +423,96 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search by name, code, description..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={filterQualification}
-            onChange={(e) => setFilterQualification(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search course fees..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+            >
+              <option value="ALL">All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Course:</span>
+            <select
+              value={filterQualification}
+              onChange={(e) => setFilterQualification(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[220px]"
+            >
+              <option value="">All</option>
+              {qualifications.filter(q => !q.isDeleted).map(q => (
+                <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Category:</span>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value as CourseFeeCategory | '')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="">All</option>
+              {CATEGORY_OPTIONS.map(cat => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+              setFilterQualification('');
+              setFilterCategory('');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
           >
-            <option value="">All Courses</option>
-            {qualifications.filter(q => !q.isDeleted).map(q => (
-              <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
-            ))}
-          </select>
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value as CourseFeeCategory | '')}
-            className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-          >
-            <option value="">All Categories</option>
-            {CATEGORY_OPTIONS.map(cat => (
-              <option key={cat.value} value={cat.value}>{cat.label}</option>
-            ))}
-          </select>
+            <RotateCcw size={16} />
+          </button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Fee Details</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Course</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">GL Account</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Tax/EWT</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Fee Details</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Course</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Amount</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">GL Account</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Tax/EWT</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredFees.length > 0 ? filteredFees.map(fee => (
               <tr key={fee.id} className="hover:bg-gray-50 transition-colors group">
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                       <DollarSign size={20} />
@@ -462,23 +524,23 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <GraduationCap size={14} className="text-gray-400" />
                     <span className="truncate max-w-[200px]">{getQualificationName(fee.qualificationId)}</span>
                   </div>
                 </td>
-                <td className="px-6 py-5">
-                  <div className="text-sm font-semibold text-gray-800 font-mono">
+                <td className="px-4 py-3 text-right">
+                  <div className="text-sm font-semibold text-brand font-mono">
                     {formatCurrency(fee.amount)}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="text-xs text-gray-600 truncate max-w-[180px]">
                     {getAccountName(fee.glAccountId)}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="space-y-1">
                     {fee.isSubjectToEwt ? (
                       <div className="flex items-center gap-1.5">
@@ -492,7 +554,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   {fee.isActive ? (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded border border-brand-light">
                       <CheckCircle size={12} /> Active
@@ -503,7 +565,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-5 text-right">
+                <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => openEditModal(fee)}
@@ -523,7 +585,14 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={7} className="py-20 text-center text-gray-400 italic">No course fees defined. Create a fee structure to get started.</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  {hasActiveFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'No course fees defined. Create a fee structure to get started.'}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

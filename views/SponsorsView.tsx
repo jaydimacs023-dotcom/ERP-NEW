@@ -5,8 +5,8 @@ import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
-  Building, Filter, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
-  BookOpen, FileText, Receipt, Percent, Hash
+  Building, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
+  BookOpen, FileText, Receipt, Percent, Hash, ChevronDown, RotateCcw
 } from 'lucide-react';
 
 interface Toast {
@@ -31,6 +31,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
 }) => {
   const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [taxTypeFilter, setTaxTypeFilter] = useState<TaxType | 'ALL'>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,13 +51,32 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
     arAccountId: ''
   });
 
-  const filteredSponsors = useMemo(() => sponsors.filter(s => 
-    !s.isDeleted && (
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  ), [sponsors, searchTerm]);
+  const filteredSponsors = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return sponsors
+      .filter(s => {
+        if (s.isDeleted) return false;
+
+        const searchableText = [
+          s.name,
+          s.sponsorCode || '',
+          s.contactPerson || '',
+          s.email || '',
+          s.phone || '',
+          s.tin || '',
+          s.address || '',
+        ].join(' ').toLowerCase();
+
+        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
+        const matchesTaxType = taxTypeFilter === 'ALL' || s.taxType === taxTypeFilter;
+
+        return matchesSearch && matchesTaxType;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sponsors, searchTerm, taxTypeFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || taxTypeFilter !== 'ALL';
 
   const resetForm = () => {
     setFormData({ sponsorCode: '', name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
@@ -207,38 +227,67 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         </button>
       </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search sponsors by name, contact or email..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="text-sm text-gray-500 font-medium">
-          {filteredSponsors.length} sponsor{filteredSponsors.length !== 1 ? 's' : ''}
+      <div className="bg-white border-y px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input 
+              type="text" 
+              placeholder="Search sponsors..." 
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Tax:</span>
+            <select
+              value={taxTypeFilter}
+              onChange={(e) => setTaxTypeFilter(e.target.value as TaxType | 'ALL')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="ALL">All</option>
+              <option value="VAT">VAT Registered</option>
+              <option value="NON_VAT">Non-VAT</option>
+              <option value="ZERO_RATED">Zero-Rated</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setTaxTypeFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
+          >
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredSponsors.length}</span> of {sponsors.filter(s => !s.isDeleted).length} sponsors
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Sponsor</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Person</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Info</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Tax Info</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Sponsor</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Contact Person</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Contact Info</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Tax Info</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Address</th>
+              <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredSponsors.length > 0 ? filteredSponsors.map(sponsor => (
               <tr key={sponsor.id} className="hover:bg-gray-50 transition-colors group">
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand border border-brand-light shadow-sm shrink-0">
                       <Building size={20} />
@@ -254,13 +303,13 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <User size={14} className="text-gray-400" />
                     {sponsor.contactPerson || <span className="italic text-gray-400">Not specified</span>}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="space-y-1">
                     {sponsor.email && (
                       <div className="text-xs text-gray-600 flex items-center gap-1.5">
@@ -277,7 +326,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="space-y-1">
                     {sponsor.tin && (
                       <div className="text-xs text-gray-600 flex items-center gap-1.5">
@@ -299,7 +348,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-4 py-3">
                   <div className="text-xs text-gray-600 flex items-start gap-1.5 max-w-xs">
                     {sponsor.address ? (
                       <>
@@ -311,7 +360,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-5 text-right">
+                <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button 
                       onClick={() => openEditModal(sponsor)}
@@ -338,7 +387,14 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan={6} className="py-20 text-center text-gray-400 italic">No sponsors registered in the system.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <Building size={40} className="mx-auto mb-2 text-gray-300" />
+                  {hasActiveFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'No sponsors registered in the system.'}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

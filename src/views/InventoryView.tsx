@@ -1,5 +1,5 @@
 ﻿import React, { useMemo } from 'react';
-import { AlertTriangle, TrendingDown, TrendingUp, Eye } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Eye, Search, ChevronDown, RotateCcw } from 'lucide-react';
 import { InventoryLevel, StockItem } from '../types';
 import { InventoryService } from '../services/InventoryService';
 
@@ -31,7 +31,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   isLoading = false,
 }) => {
   const [statusFilter, setStatusFilter] = React.useState<'ALL' | 'RED' | 'YELLOW' | 'GREEN' | 'BLUE'>('ALL');
-  const [typeFilter, setTypeFilter] = React.useState<'ALL' | 'STOCK_ITEM' | 'NON_STOCK_ITEM'>('ALL');
+  const [searchTerm, setSearchTerm] = React.useState('');
 
   const stockStatuses = useMemo(() => {
     const statuses: StockStatus[] = items
@@ -80,12 +80,22 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   }, [items, levels]);
 
   const filteredStatuses = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
     return stockStatuses.filter((s) => {
+      const searchableText = [
+        s.item.code,
+        s.item.name,
+        s.item.unitOfMeasure,
+      ].join(' ').toLowerCase();
+
+      if (normalizedSearch !== '' && !searchableText.includes(normalizedSearch)) return false;
       if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
-      if (typeFilter !== 'ALL' && s.item.type !== typeFilter) return false;
       return true;
     });
-  }, [stockStatuses, statusFilter, typeFilter]);
+  }, [stockStatuses, searchTerm, statusFilter]);
+
+  const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
   // Calculate summaries
   const summaries = useMemo(() => {
@@ -189,115 +199,128 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col md:flex-row gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status Filter</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+      <div className="bg-white border-y px-4 py-2 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
+            <Search size={14} className="text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search inventory..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
+            />
+          </div>
+
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'RED' | 'YELLOW' | 'GREEN' | 'BLUE')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="ALL">All</option>
+              <option value="RED">Critical</option>
+              <option value="YELLOW">Low Stock</option>
+              <option value="GREEN">Optimal</option>
+              <option value="BLUE">Overstock</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            title="Clear all filters"
           >
-            <option value="ALL">All Status</option>
-            <option value="RED">Critical (RED)</option>
-            <option value="YELLOW">Low Stock (YELLOW)</option>
-            <option value="GREEN">Optimal (GREEN)</option>
-            <option value="BLUE">Overstock (BLUE)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type Filter</label>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-          >
-            <option value="ALL">All Types</option>
-            <option value="STOCK_ITEM">Stock Items</option>
-            <option value="NON_STOCK_ITEM">Non-Stock Items</option>
-          </select>
+            <RotateCcw size={16} />
+          </button>
+
+          <div className="ml-auto text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredStatuses.length}</span> of {summaries.totalItems} items
+          </div>
         </div>
       </div>
 
-      {/* Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Items Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="col-span-full p-8 text-center">
+          <div className="p-8 text-center">
             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
             <p className="mt-2 text-gray-600">Loading inventory...</p>
           </div>
-        ) : filteredStatuses.length === 0 ? (
-          <div className="col-span-full p-8 text-center text-gray-600">
-            <p>No items match your filter.</p>
-          </div>
         ) : (
-          filteredStatuses.map((status) => (
-            <div
-              key={status.item.id}
-              className={`p-4 rounded-lg border-2 ${getStatusColor(status.status)}`}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{status.item.code}</p>
-                  <p className="text-sm text-gray-600">{status.item.name}</p>
-                </div>
-                <button
-                  onClick={() => onSelectItem?.(status.item.id)}
-                  className="p-1 hover:bg-white rounded transition-colors"
-                  title="View details"
-                >
-                  <Eye className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Status Badge */}
-              <div className="mb-3">
-                <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusTextColor(status.status)}`}>
-                  {status.statusLabel}
-                </span>
-              </div>
-
-              {/* Metrics */}
-              <div className="space-y-2 text-sm mb-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Available:</span>
-                  <span className="font-medium text-gray-900">
-                    {status.availableQuantity.toFixed(0)} {status.item.unitOfMeasure}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Reorder Level:</span>
-                  <span className="text-gray-700">{status.item.reorderLevel}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Safety Stock:</span>
-                  <span className="text-gray-700">{status.item.safetyStock}</span>
-                </div>
-              </div>
-
-              {/* Alerts */}
-              {status.isLowStock && (
-                <div className="p-2 bg-yellow-100 rounded text-xs text-yellow-800 flex items-start gap-2 mb-2">
-                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Stock below reorder level</span>
-                </div>
-              )}
-
-              {status.isOverstocked && (
-                <div className="p-2 bg-orange-100 rounded text-xs text-orange-800 flex items-start gap-2">
-                  <TrendingUp className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Overstock detected</span>
-                </div>
-              )}
-
-              {!status.isLowStock && !status.isOverstocked && status.status === 'GREEN' && (
-                <div className="p-2 bg-green-100 rounded text-xs text-green-800 flex items-start gap-2">
-                  <TrendingUp className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>Stock level is optimal</span>
-                </div>
-              )}
-            </div>
-          ))
+          <div className="overflow-x-auto">
+            <table className="w-full font-sans">
+              <thead className="bg-brand border-b">
+                <tr>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Item</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Available</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Reorder Level</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Safety Stock</th>
+                  <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Status</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Alerts</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredStatuses.length > 0 ? filteredStatuses.map((status) => (
+                  <tr key={status.item.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">{status.item.code}</div>
+                      <div className="text-xs text-gray-600">{status.item.name}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                      {status.availableQuantity.toFixed(0)} {status.item.unitOfMeasure}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-600">{status.item.reorderLevel}</td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-600">{status.item.safetyStock}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusTextColor(status.status)}`}>
+                        {status.statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {status.isLowStock ? (
+                        <span className="inline-flex items-center gap-1 text-yellow-800">
+                          <AlertTriangle className="w-3 h-3" />
+                          Stock below reorder level
+                        </span>
+                      ) : status.isOverstocked ? (
+                        <span className="inline-flex items-center gap-1 text-orange-800">
+                          <TrendingUp className="w-3 h-3" />
+                          Overstock detected
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-green-700">
+                          <TrendingUp className="w-3 h-3" />
+                          Stock level is optimal
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => onSelectItem?.(status.item.id)}
+                        className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="View details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                      {hasActiveFilters ? 'Try adjusting your search or filters.' : 'No items match your filter.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
