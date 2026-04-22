@@ -66,6 +66,7 @@ function normalizeStudentRecord(student: Student): Student {
 
 const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [complianceFilter, setComplianceFilter] = useState<'ALL' | 'COMPLIANT' | 'PENDING' | 'REJECTED'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'all' | 'batch'>('all');
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -121,13 +122,26 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       }
     }
 
+    if (complianceFilter !== 'ALL') {
+      base = base.filter(student => {
+        const docs = getComplianceDocuments(student);
+        const verifiedCount = docs.filter(d => d.status === 'VERIFIED').length;
+        const pendingCount = docs.filter(d => d.status === 'PENDING' || d.status === 'UPLOADED').length;
+        const isCompliant = docs.length > 0 ? verifiedCount === docs.length || student.isEnrollmentOverridden : false;
+        if (complianceFilter === 'COMPLIANT') return isCompliant;
+        if (complianceFilter === 'PENDING') return pendingCount > 0 && !isCompliant;
+        if (complianceFilter === 'REJECTED') return docs.some(d => d.status === 'REJECTED');
+        return true;
+      });
+    }
+
     if (!searchTerm) return base;
     const lower = searchTerm.toLowerCase();
     return base.filter(s =>
       `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
       s.uli.toLowerCase().includes(lower)
     );
-  }, [students, searchTerm, viewMode, selectedBatchId, batches]);
+  }, [students, searchTerm, viewMode, selectedBatchId, complianceFilter, batches]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
@@ -141,6 +155,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
     setSearchTerm(term);
     setCurrentPage(1);
   };
+
+  const hasActiveFilters = searchTerm.trim().length > 0 || complianceFilter !== 'ALL' || viewMode === 'batch';
 
   const handleSelectBatch = (batchId: string) => {
     setSelectedBatchId(batchId);
@@ -267,6 +283,33 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
     }
   };
 
+  const openDocumentPreview = (doc: StudentDocument) => {
+    if (!doc.fileData) return;
+
+    if (/^https?:\/\//.test(doc.fileData)) {
+      window.open(doc.fileData, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (doc.fileData.startsWith('data:')) {
+      const [metadata, base64Data] = doc.fileData.split(',');
+      const mimeType = metadata.split(':')[1]?.split(';')[0] || 'application/octet-stream';
+      const binary = atob(base64Data || '');
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    }
+
+    const fallbackUrl = `data:application/octet-stream;base64,${doc.fileData}`;
+    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleToggleOverride = () => {
     if (!auditStudent) return;
     try {
@@ -323,15 +366,30 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
 
   const handleDocumentUpload = (docName: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setMandatoryDocStatuses(prev => ({ ...prev, [docName]: 'UPLOADED' }));
-        setMandatoryDocFiles(prev => ({ ...prev, [docName]: dataUrl }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    const allowedExtensions = ['docx', 'pdf', 'png', 'jpeg', 'jpg'];
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg'
+    ];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+
+    if (!allowedExtensions.includes(fileExtension) || !allowedMimeTypes.includes(file.type)) {
+      showToast('Unsupported file type. Allowed: DOCX, PDF, PNG, JPEG, JPG.', 'error');
+      if (e.target) e.target.value = '';
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      setMandatoryDocStatuses(prev => ({ ...prev, [docName]: 'UPLOADED' }));
+      setMandatoryDocFiles(prev => ({ ...prev, [docName]: dataUrl }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -501,31 +559,59 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
         </div>
       )}
 
-      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            placeholder="Search by name or ULI..."
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded text-sm focus:ring-2 focus:ring-brand/20 outline-none font-bold"
-            value={searchTerm}
-            onChange={e => handleSearchChange(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 items-center">
-          <div className="px-5 py-3 bg-gray-100 rounded text-xs font-semibold uppercase tracking-wide text-gray-500 border border-gray-200">
-            Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredStudents.length)}–{Math.min(currentPage * PAGE_SIZE, filteredStudents.length)} of {filteredStudents.length}
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              placeholder="Search by name or ULI..."
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={e => handleSearchChange(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={complianceFilter}
+              onChange={e => { setComplianceFilter(e.target.value as any); setCurrentPage(1); }}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All compliance statuses</option>
+              <option value="COMPLIANT">Compliant</option>
+              <option value="PENDING">Pending docs</option>
+              <option value="REJECTED">Rejected docs</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setComplianceFilter('ALL');
+                setViewMode('all');
+                setSelectedBatchId(null);
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredStudents.length}</span> of <span className="font-semibold text-gray-900">{students.length}</span>
+            </p>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Learner Identification</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Compliance Status</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Residence</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Action</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Learner Identification</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Compliance Status</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Residence</th>
+              <th className="px-6 py-4 text-right text-xs font-bold text-white uppercase tracking-wide">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -868,7 +954,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                             </div>
                           </div>
                           {doc.fileData && (
-                            <button className="p-2 hover:bg-gray-100 rounded-lg text-brand"><ExternalLink size={16} /></button>
+                            <button
+                              onClick={() => openDocumentPreview(doc)}
+                              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide border border-brand/20 bg-white text-brand rounded-lg hover:bg-brand/5 transition-colors"
+                            >
+                              <ExternalLink size={14} /> View
+                            </button>
                           )}
                         </div>
 
@@ -1112,7 +1203,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                           <Upload size={14} /> {hasFile ? 'Replace' : 'Attach'}
                         </button>
                       </div>
-                      <input type="file" className="hidden" ref={el => { if (el) fileInputRefs.current[doc] = el; }} onChange={(e) => handleDocumentUpload(doc, e)} accept=".pdf,.jpg,.jpeg,.png" />
+                      <input type="file" className="hidden" ref={el => { if (el) fileInputRefs.current[doc] = el; }} onChange={(e) => handleDocumentUpload(doc, e)} accept=".docx,.pdf,.png,.jpeg,.jpg" />
                     </div>
                   );
                 })}

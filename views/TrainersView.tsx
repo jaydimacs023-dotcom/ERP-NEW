@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import { Batch, Trainer, Qualification, TrainerSchedule } from '../types';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { Batch, Trainer, Qualification, TrainerSchedule, Organization } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -20,6 +20,7 @@ interface TrainersViewProps {
   qualifications: Qualification[];
   batches: Batch[];
   schedules: TrainerSchedule[];
+  organization?: Organization;
   onAddTrainer: (trainer: Trainer) => void | Promise<void>;
   onUpdateTrainer: (trainer: Trainer) => void | Promise<void>;
   onDeleteTrainer: (id: string) => void | Promise<boolean>;
@@ -30,17 +31,28 @@ const TrainersView: React.FC<TrainersViewProps> = ({
   qualifications, 
   batches,
   schedules,
+  organization,
   onAddTrainer, 
   onUpdateTrainer, 
   onDeleteTrainer 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [specializationFilter, setSpecializationFilter] = useState<'ALL' | string>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState<Trainer | null>(null);
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const brandColor = organization?.primaryColor || '#059669';
+  const specializations = useMemo(() => Array.from(new Set(trainers.map(t => t.specialization).filter(Boolean))).sort(), [trainers]);
+  const hasActiveFilters = searchTerm.trim().length > 0 || specializationFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
   
   const [formData, setFormData] = useState<Partial<Trainer>>({
     firstName: '',
@@ -52,10 +64,13 @@ const TrainersView: React.FC<TrainersViewProps> = ({
     qualificationIds: []
   });
 
-  const filteredTrainers = trainers.filter(t => 
-    `${t.firstName} ${t.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.specialization.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTrainers = trainers.filter(t => {
+    const matchesSearch =
+      `${t.firstName} ${t.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.specialization.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = specializationFilter === 'ALL' || t.specialization === specializationFilter;
+    return matchesSearch && matchesFilter;
+  });
 
   const resetForm = () => {
     setFormData({
@@ -197,27 +212,58 @@ const TrainersView: React.FC<TrainersViewProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name or specialization..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search by name or specialization..." 
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={specializationFilter}
+              onChange={e => setSpecializationFilter(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All specializations</option>
+              {specializations.map(spec => (
+                <option key={spec} value={spec}>{spec}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSpecializationFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredTrainers.length}</span> of <span className="font-semibold text-gray-900">{trainers.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-brand border-b">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Trainer Info</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Specialization</th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Qualifications</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Actions</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer Info</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Specialization</th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Qualifications</th>
+              <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

@@ -1,13 +1,13 @@
 ﻿
-import React, { useState } from 'react';
-import { Batch, Location, TrainerSchedule } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Batch, Location, TrainerSchedule, Organization } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
   Search, Plus, MapPin, Trash2, X, Edit2, ShieldCheck, 
   Map, Building, Globe, ChevronRight, MoreVertical, Loader2,
-  CheckCircle, AlertCircle, Users
+  CheckCircle, AlertCircle, Users, Filter
 } from 'lucide-react';
 
 interface Toast {
@@ -20,16 +20,27 @@ interface LocationsViewProps {
   locations: Location[];
   batches: Batch[];
   schedules: TrainerSchedule[];
+  organization?: Organization;
   onAddLocation: (location: Location) => void | Promise<void>;
   onUpdateLocation: (location: Location) => void | Promise<void>;
   onDeleteLocation: (id: string) => void | Promise<boolean>;
 }
 
 const LocationsView: React.FC<LocationsViewProps> = ({ 
-  locations, batches, schedules, onAddLocation, onUpdateLocation, onDeleteLocation 
+  locations, batches, schedules, organization, onAddLocation, onUpdateLocation, onDeleteLocation 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [capacityFilter, setCapacityFilter] = useState<'ALL' | 'SMALL' | 'MEDIUM' | 'LARGE'>('ALL');
   const [showModal, setShowModal] = useState(false);
+  const brandColor = organization?.primaryColor || '#059669';
+  const capacityOptions = useMemo(() => ['ALL', 'SMALL', 'MEDIUM', 'LARGE'] as const, []);
+  const hasActiveFilters = searchTerm.trim().length > 0 || capacityFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -41,13 +52,19 @@ const LocationsView: React.FC<LocationsViewProps> = ({
     capacity: 0
   });
 
-  const filteredLocations = locations.filter(l => 
-    !l.isDeleted && (
-    l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (l.code?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    l.address.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const filteredLocations = locations.filter(l => {
+    if (l.isDeleted) return false;
+    const matchesSearch =
+      l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (l.code?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      l.address.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCapacity =
+      capacityFilter === 'ALL' ||
+      (capacityFilter === 'SMALL' && (l.capacity || 0) <= 20) ||
+      (capacityFilter === 'MEDIUM' && (l.capacity || 0) > 20 && (l.capacity || 0) <= 50) ||
+      (capacityFilter === 'LARGE' && (l.capacity || 0) > 50);
+    return matchesSearch && matchesCapacity;
+  });
 
   const resetForm = () => {
     setFormData({ name: '', address: '', capacity: 0 });
@@ -160,29 +177,60 @@ const LocationsView: React.FC<LocationsViewProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded border shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by facility name or code..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search by facility name, code, or address..." 
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={capacityFilter}
+              onChange={(e) => setCapacityFilter(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All capacities</option>
+              <option value="SMALL">Small (≤ 20)</option>
+              <option value="MEDIUM">Medium (21-50)</option>
+              <option value="LARGE">Large (51+)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setCapacityFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredLocations.length}</span> of <span className="font-semibold text-gray-900">{locations.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Facility</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Address</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Capacity</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Facility</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Address</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Capacity</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

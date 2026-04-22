@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location } from '../types';
+import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
@@ -17,6 +17,7 @@ interface BatchesViewProps {
   sponsors: Sponsor[];
   schedules: TrainerSchedule[];
   locations: Location[];
+  organization?: Organization;
   onAddBatch: (batch: Batch) => Promise<void> | void;
   onUpdateBatch: (batch: Batch) => Promise<void> | void;
   onDeleteBatch: (id: string) => Promise<boolean | void> | void;
@@ -81,11 +82,21 @@ const calculateProjectedEndDate = (
 };
 
 const BatchesView: React.FC<BatchesViewProps> = ({
-  batches, qualifications, trainers, students, sponsors, schedules, locations,
+  batches, qualifications, trainers, students, sponsors, schedules, locations, organization,
   onAddBatch, onUpdateBatch, onDeleteBatch, onNotify
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<BatchStatus | 'ALL'>('ALL');
   const [showModal, setShowModal] = useState(false);
+  const brandColor = organization?.primaryColor || '#059669';
+  const statuses = useMemo(() => ['ALL', ...Array.from(new Set(batches.map(b => b.status)))] as (BatchStatus | 'ALL')[], [batches]);
+  const hasActiveFilters = searchTerm.trim().length > 0 || statusFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -138,10 +149,13 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     }
   }, [formData.startDate, formData.qualificationId, formData.trainerId, qualifications, schedules]);
 
-  const filteredBatches = batches.filter(b =>
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredBatches = batches.filter(b => {
+    const matchesSearch =
+      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const resetForm = () => {
     setFormData({
@@ -399,33 +413,64 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-md border shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search by batch identifier..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search by batch name or ID..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as BatchStatus | 'ALL')}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All statuses</option>
+              {statuses.filter(s => s !== 'ALL').map(status => (
+                <option key={status} value={status}>{status.replace('_', ' ')}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredBatches.length}</span> of <span className="font-semibold text-gray-900">{batches.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Batch</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Qualification</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Trainer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Type</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Location</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Students</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">End Date</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Batch</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Qualification</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Type</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Location</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Students</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">End Date</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Status</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

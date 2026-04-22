@@ -1,13 +1,13 @@
 ﻿
-import React, { useState, useMemo } from 'react';
-import { Batch, Trainer, TrainerSchedule, DaySlot, Location } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Batch, Trainer, TrainerSchedule, DaySlot, Location, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
   CalendarClock, Search, Plus, Trash2, X, ChevronRight, 
   Clock, Timer, AlertCircle, CalendarDays, Check, MapPin,
   Briefcase, GraduationCap, ArrowRight, Save, ShieldCheck,
-  Info, Sparkles, Activity, Loader2, CheckCircle, Edit2 as Edit2Icon
+  Info, Sparkles, Activity, Loader2, CheckCircle, Edit2 as Edit2Icon, Filter
 } from 'lucide-react';
 
 interface Toast {
@@ -21,6 +21,7 @@ interface SchedulesViewProps {
   schedules: TrainerSchedule[];
   trainers: Trainer[];
   locations: Location[];
+  organization?: Organization;
   onAddSchedule: (sch: TrainerSchedule) => void | Promise<void>;
   onUpdateSchedule: (sch: TrainerSchedule) => void | Promise<void>;
   onDeleteSchedule: (id: string) => void | Promise<boolean>;
@@ -38,10 +39,20 @@ const getSlotHours = (start: string, end: string) => {
 };
 
 const SchedulesView: React.FC<SchedulesViewProps> = ({ 
-  batches, schedules, trainers, locations, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
+  batches, schedules, trainers, locations, organization, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState<'ALL' | string>('ALL');
   const [showModal, setShowModal] = useState(false);
+  const brandColor = organization?.primaryColor || '#059669';
+  const locationOptions = useMemo(() => locations.filter(l => !l.isDeleted), [locations]);
+  const hasActiveFilters = searchTerm.trim().length > 0 || locationFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
   const [editingSchedule, setEditingSchedule] = useState<TrainerSchedule | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -67,9 +78,12 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
     if (s.isDeleted) return false;
     const trainer = trainers.find(t => t.id === s.trainerId);
     if (!trainer) return false;
+    const location = locations.find(l => l.id === s.locationId);
     const name = `${trainer.firstName} ${trainer.lastName}`.toLowerCase();
-    return name.includes(searchTerm.toLowerCase());
-  }), [schedules, trainers, searchTerm]);
+    const matchesSearch = name.includes(searchTerm.toLowerCase());
+    const matchesLocation = locationFilter === 'ALL' || s.locationId === locationFilter;
+    return matchesSearch && matchesLocation;
+  }), [schedules, trainers, locations, searchTerm, locationFilter]);
 
   const resetForm = () => {
     setFormData({ trainerId: '', locationId: '', slots: [] });
@@ -190,33 +204,59 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            placeholder="Find profile by instructor name..." 
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded text-sm focus:border-brand outline-none font-bold"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 w-full md:w-auto">
-           <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 rounded text-xs font-semibold uppercase tracking-wide text-gray-500 border border-gray-200">
-              <Activity size={14} /> Total Profiles: {filteredSchedules.length}
-           </div>
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              placeholder="Search by instructor name or batch..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={locationFilter}
+              onChange={e => setLocationFilter(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All locations</option>
+              {locationOptions.map(loc => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setLocationFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredSchedules.length}</span> of <span className="font-semibold text-gray-900">{schedules.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Trainer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Location</th>
-                <th className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wide">Weekly Hours</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wide">Schedule</th>
-                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wide">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Location</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Weekly Hours</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Schedule</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

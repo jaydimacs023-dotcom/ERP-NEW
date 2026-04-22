@@ -1,5 +1,5 @@
-﻿import React, { useState, useMemo } from 'react';
-import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification, Enrollment } from '../types';
+﻿import React, { useState, useMemo, useEffect } from 'react';
+import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification, Enrollment, Organization } from '../types';
 import ModalPortal from '../components/ModalPortal';
 import {
     Briefcase, Search, Plus, Filter, Download, ExternalLink,
@@ -14,6 +14,7 @@ interface AlumniEmploymentViewProps {
     alumniReports: AlumniEmploymentReport[];
     batches: Batch[];
     qualifications: Qualification[];
+    organization?: Organization;
     onAddReport: (report: AlumniEmploymentReport) => void;
     onUpdateReport: (report: AlumniEmploymentReport) => void;
     onDeleteReport: (id: string) => void;
@@ -27,6 +28,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
     alumniReports,
     batches,
     qualifications,
+    organization,
     onAddReport,
     onUpdateReport,
     onDeleteReport
@@ -144,6 +146,14 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
         });
     };
 
+    const brandColor = organization?.primaryColor || '#059669';
+
+    useEffect(() => {
+        if (brandColor) {
+            document.documentElement.style.setProperty('--brand', brandColor);
+        }
+    }, [brandColor]);
+
     return (
         <div className="space-y-6 pb-20 font-sans">
             {/* Header */}
@@ -194,37 +204,60 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
             </div>
 
             {/* Search & Filter Bar */}
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col lg:flex-row items-center gap-4">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search by student or employer..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:border-brand outline-none text-sm transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as any)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand transition-all font-medium text-gray-600"
-                    >
-                        <option value="ALL">All Status</option>
-                        {Object.values(AlumniEmploymentStatus).map(s => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={relevanceFilter}
-                        onChange={(e) => setRelevanceFilter(e.target.value as any)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand transition-all font-medium text-gray-600"
-                    >
-                        <option value="ALL">Course Relevance</option>
-                        <option value="YES">Related</option>
-                        <option value="NO">Not Related</option>
-                    </select>
+            <div className="bg-white border-y px-4 py-4 shadow-sm">
+                <div className="flex flex-col lg:flex-row items-center gap-3">
+                    <div className="relative border rounded flex items-center bg-white h-11 px-3 hover:bg-gray-50 transition-colors group w-full lg:max-w-[360px]">
+                        <Search size={16} className="text-gray-400 mr-2" />
+                        <input
+                            type="text"
+                            placeholder="Search by alumni, employer, or position..."
+                            className="bg-transparent border-none outline-none text-sm font-semibold text-gray-800 flex-1 placeholder:text-gray-400"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="relative border rounded flex items-center bg-white h-11 px-3 hover:bg-gray-50 transition-colors min-w-[180px]">
+                        <Filter size={16} className="text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-500 mr-2">Status:</span>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                            className="bg-transparent border-none outline-none text-sm font-semibold text-gray-800 pr-6 appearance-none cursor-pointer"
+                        >
+                            <option value="ALL">All</option>
+                            {Object.values(AlumniEmploymentStatus).map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="relative border rounded flex items-center bg-white h-11 px-3 hover:bg-gray-50 transition-colors min-w-[180px]">
+                        <span className="text-sm text-gray-500 mr-2">Related:</span>
+                        <select
+                            value={relevanceFilter}
+                            onChange={(e) => setRelevanceFilter(e.target.value as any)}
+                            className="bg-transparent border-none outline-none text-sm font-semibold text-gray-800 pr-6 appearance-none cursor-pointer"
+                        >
+                            <option value="ALL">All</option>
+                            <option value="YES">Related</option>
+                            <option value="NO">Not Related</option>
+                        </select>
+                    </div>
+
+                    <div className="ml-auto flex flex-col sm:flex-row items-start sm:items-center gap-2 text-sm text-gray-500">
+                        <button
+                            onClick={() => {
+                                setSearchTerm('');
+                                setStatusFilter('ALL');
+                                setRelevanceFilter('ALL');
+                            }}
+                            className="font-semibold text-brand hover:text-brand-hover transition-colors"
+                        >
+                            Clear filters
+                        </button>
+                        <span className="text-xs text-gray-400">Showing <span className="font-semibold text-gray-900">{filteredReports.length}</span> of <span className="font-semibold text-gray-900">{alumniReports.length}</span></span>
+                    </div>
                 </div>
             </div>
 
@@ -232,12 +265,12 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
             <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-100">
-                        <thead className="bg-gray-50/50">
+                        <thead className="bg-brand border-b">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Alumni Details</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Employment Information</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Status & Date</th>
-                                <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Action</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Alumni Details</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Employment Information</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Status & Date</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">

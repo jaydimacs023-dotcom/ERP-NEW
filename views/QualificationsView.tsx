@@ -1,6 +1,6 @@
 ﻿
-import React, { useState } from 'react';
-import { Batch, Qualification, Trainer } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Batch, Qualification, Trainer, Organization } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -21,6 +21,7 @@ interface QualificationsViewProps {
   qualifications: Qualification[];
   batches: Batch[];
   trainers: Trainer[];
+  organization?: Organization;
   onAddQualification: (qual: Qualification) => void | Promise<void>;
   onUpdateQualification: (qual: Qualification) => void | Promise<void>;
   onDeleteQualification: (id: string) => void | Promise<boolean>;
@@ -39,8 +40,9 @@ const SECTORS = [
   'Others'
 ];
 
-const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, batches, trainers, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
+const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, batches, trainers, organization, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [sectorFilter, setSectorFilter] = useState<'ALL' | string>('ALL');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showModal, setShowModal] = useState(false);
   const [editingQual, setEditingQual] = useState<Qualification | null>(null);
@@ -54,13 +56,25 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     sector: 'ICT'
   });
 
-  const filteredQuals = qualifications.filter(q =>
-    !q.isDeleted && (
+  const brandColor = organization?.primaryColor || '#059669';
+  const sectors = useMemo(() => Array.from(new Set(qualifications.map(q => q.sector).filter(Boolean))).sort(), [qualifications]);
+  const hasActiveFilters = searchTerm.trim().length > 0 || sectorFilter !== 'ALL';
+
+  useEffect(() => {
+    if (brandColor) {
+      document.documentElement.style.setProperty('--brand', brandColor);
+    }
+  }, [brandColor]);
+
+  const filteredQuals = qualifications.filter(q => {
+    if (q.isDeleted) return false;
+    const matchesSearch =
       q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.sector?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+      q.sector?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSector = sectorFilter === 'ALL' || q.sector === sectorFilter;
+    return matchesSearch && matchesSector;
+  });
 
   const resetForm = () => {
     setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
@@ -192,47 +206,59 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search by code, name, or sector..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded transition-all ${viewMode === 'list' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded transition-all ${viewMode === 'grid' ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <LayoutGrid size={18} />
-            </button>
+      <div className="bg-white p-4 rounded border border-gray-200 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr_1fr] items-end">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search by code, name, or sector..."
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:bg-gray-50 border border-gray-200 rounded transition-colors text-xs font-medium uppercase tracking-wide">
-            <Filter size={14} /> Filter Sector
-          </button>
+
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <select
+              value={sectorFilter}
+              onChange={e => setSectorFilter(e.target.value as any)}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-700 focus:border-brand outline-none transition-all"
+            >
+              <option value="ALL">All sectors</option>
+              {sectors.map(sector => (
+                <option key={sector} value={sector}>{sector}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSectorFilter('ALL');
+              }}
+              className={`text-sm font-semibold transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
+            >
+              Clear filters
+            </button>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-900">{filteredQuals.length}</span> of <span className="font-semibold text-gray-900">{qualifications.length}</span>
+            </p>
+          </div>
         </div>
       </div>
 
       {viewMode === 'list' ? (
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-brand border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Code & Sector</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Qualification Name</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">Duration</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Code & Sector</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Qualification Name</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Duration</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
