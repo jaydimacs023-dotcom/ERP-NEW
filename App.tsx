@@ -5929,7 +5929,6 @@ export default function App() {
               {userCanAccess('po') && <NavItem icon={<ShoppingCart size={18} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => navigateTo('po')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('goods-receipt') && <NavItem icon={<Package size={18} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => navigateTo('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
               <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => navigateTo('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Calculator size={18} />} label="Budgets" active={activeTab === 'budgets'} onClick={() => navigateTo('budgets')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -6337,7 +6336,6 @@ export default function App() {
           />}
           {activeTab === 'locations' && <LocationsView organization={currentOrg} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
           {activeTab === 'schedules' && <SchedulesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
-          {activeTab === 'budgets' && <BudgetView accounts={filteredAccounts} summaries={summaries} budgets={[]} budgetLines={[]} onSaveBudget={() => { }} />}
 
           {activeTab === 'employees' && <EmployeesView
             employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
