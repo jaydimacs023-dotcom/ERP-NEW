@@ -27,38 +27,42 @@ Make the AR module audit-ready by enforcing accounting integrity, improving reve
 ### 2. Enforce Double-Entry Integrity
 
 - [ ] Add database validation that posted journal entries must balance.
-- [ ] Prevent journal entries from being marked `POSTED` unless total debits equal total credits.
+- [x] Prevent app-level journal posting unless total debits equal total credits.
+- [ ] Prevent database/API journal entries from being marked `POSTED` unless total debits equal total credits.
+- [x] Add an app-side helper to calculate journal totals before posting.
 - [ ] Add a server-side helper to calculate journal totals before posting.
 - [ ] Add tests for balanced and unbalanced journal posting.
 - [ ] Review all calls to `handlePostJournal` in `App.tsx`.
 
 ### 3. Lock Posted Invoices
 
-- [ ] Add database-level protection so posted/open/closed/voided invoices cannot have accounting fields or lines edited.
+- [x] Add database-level protection so posted/open/closed/voided invoices cannot have accounting fields or lines edited.
 - [ ] Allow only approved fields after posting, such as notes that do not affect accounting, if required.
-- [ ] Prevent `SupabaseDataService.updateInvoice()` from replacing lines on posted invoices.
-- [ ] Prevent `deleteInvoice()` for posted invoices; require void/reversal instead.
+- [x] Prevent `SupabaseDataService.updateInvoice()` from replacing lines on posted invoices.
+- [x] Prevent direct invoice line create/update/delete for posted invoices.
+- [x] Prevent `deleteInvoice()` for posted invoices; require void/reversal instead.
 - [ ] Add tests for attempted edits after posting.
 
 ### 4. Fix Invoice Line Persistence
 
-- [ ] Update Supabase schema/service allowlist for `invoice_lines`.
+- [x] Update Supabase schema/service allowlist for `invoice_lines`.
 - [ ] Persist:
-  - `org_id`
-  - `net_amount`
-  - `gross_amount`
-  - `classification_code`
-  - `tax_category_id`
-  - `gl_account_id`
-- [ ] Backfill missing net/gross values from existing invoice data where possible.
-- [ ] Make invoice GL posting use persisted `net_amount`, not fallback gross `amount`.
+  - [x] `org_id`
+  - [x] `net_amount`
+  - [x] `gross_amount`
+  - [x] `classification_code`
+  - [x] `tax_category_id`
+  - [x] `gl_account_id`
+- [x] Add migration to backfill missing net/gross values from existing invoice line amount where possible.
+- [x] Make invoice GL posting use persisted `net_amount`, with safer gross-minus-VAT fallback for legacy lines.
 - [ ] Add regression test for VAT-exclusive and VAT-inclusive invoice posting.
 
 ### 5. Replace Client-Side Invoice Number Generation
 
-- [ ] Create a database function such as `get_next_invoice_no(p_org_id uuid)`.
-- [ ] Add a unique constraint on `(org_id, invoice_no)`.
-- [ ] Replace `generateInvoiceNo()` in `views/InvoicesView.tsx`.
+- [x] Create a database function such as `get_next_invoice_no(p_org_id uuid)`.
+- [x] Add a unique constraint on `(org_id, invoice_no)`.
+- [x] Route invoice creation through server-side invoice number generation in `SupabaseDataService.createInvoice()`.
+- [ ] Replace temporary UI `generateInvoiceNo()` in `views/InvoicesView.tsx` with async preview/reservation if required.
 - [ ] Ensure failed drafts do not consume a posted invoice number unless the business requires gapless control.
 - [ ] Document numbering policy: no duplicates, explain whether gaps are allowed for drafts/voids.
 

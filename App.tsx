@@ -1638,6 +1638,36 @@ export default function App() {
     } as JournalLine & { qualificationId?: string; classificationCode?: string };
   };
 
+  const roundCurrencyAmount = (value: number): number => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+
+  const validateJournalLinesBalanced = (linesToValidate: JournalLine[]): { valid: boolean; message?: string } => {
+    if (!linesToValidate.length) {
+      return { valid: false, message: 'Cannot post journal entry: at least one journal line is required.' };
+    }
+
+    const hasNegativeAmount = linesToValidate.some(line => Number(line.debit || 0) < 0 || Number(line.credit || 0) < 0);
+    if (hasNegativeAmount) {
+      return { valid: false, message: 'Cannot post journal entry: debit and credit amounts cannot be negative.' };
+    }
+
+    const debitTotal = roundCurrencyAmount(linesToValidate.reduce((sum, line) => sum + Number(line.debit || 0), 0));
+    const creditTotal = roundCurrencyAmount(linesToValidate.reduce((sum, line) => sum + Number(line.credit || 0), 0));
+    const difference = roundCurrencyAmount(Math.abs(debitTotal - creditTotal));
+
+    if (debitTotal <= 0 || creditTotal <= 0) {
+      return { valid: false, message: 'Cannot post journal entry: total debits and credits must both be greater than zero.' };
+    }
+
+    if (difference > 0.01) {
+      return {
+        valid: false,
+        message: `Cannot post journal entry: debits (${debitTotal.toFixed(2)}) do not equal credits (${creditTotal.toFixed(2)}).`
+      };
+    }
+
+    return { valid: true };
+  };
+
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const sourceType = String(entry.sourceType || '').toUpperCase();
     let resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
@@ -1667,6 +1697,11 @@ export default function App() {
       console.info('[App] Posting journal entry:', fullEntry.id, fullEntry.sourceType);
       console.info('[App] Lines to save:', lines.length, 'Sample line:', lines[0]);
       const normalizedLines = lines.map(normalizeJournalLineForSave);
+      const balanceValidation = validateJournalLinesBalanced(normalizedLines);
+      if (!balanceValidation.valid) {
+        handleNotify('error', balanceValidation.message || 'Cannot post journal entry: journal lines are not balanced.');
+        return null;
+      }
 
       const savedEntry = await dataService.createJournalEntry(fullEntry);
       const normalizedSavedEntry = {
@@ -4194,7 +4229,17 @@ export default function App() {
         filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
         filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
 
-      const netRevenue = line.netAmount !== undefined ? line.netAmount : line.amount;
+      const numericNetAmount = Number(line.netAmount);
+      const numericGrossAmount = Number(line.grossAmount);
+      const numericVatAmount = Number(line.vatAmount || 0);
+      const numericLineAmount = Number(line.amount || 0);
+      const netRevenue = Number.isFinite(numericNetAmount) && numericNetAmount > 0
+        ? numericNetAmount
+        : Number.isFinite(numericGrossAmount) && numericGrossAmount > 0
+          ? Math.max(numericGrossAmount - numericVatAmount, 0)
+          : invoice.vatPricing === 'INCLUSIVE'
+            ? Math.max(numericLineAmount - numericVatAmount, 0)
+            : numericLineAmount;
 
       // Group VAT by Account
       if (line.vatAmount > 0) {

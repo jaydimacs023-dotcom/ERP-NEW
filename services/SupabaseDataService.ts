@@ -739,8 +739,9 @@ export class SupabaseDataService implements IDataService {
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
-        'id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
-        'quantity', 'unit_price', 'vat_amount', 'amount', 'tax_category_id', 'gl_account_id',
+        'id', 'org_id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
+        'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount',
+        'tax_category_id', 'gl_account_id', 'classification_code',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
       ],
       journal_entries: [
@@ -750,6 +751,7 @@ export class SupabaseDataService implements IDataService {
       ],
       journal_lines: [
         'id', 'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
+        'classification_code', 'tax_category_id',
         'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared'
       ],
       tax_categories: [
@@ -1878,6 +1880,56 @@ export class SupabaseDataService implements IDataService {
     } catch (error) {
       console.error('[SupabaseDataService] Error creating payment via edge function:', error);
       throw error;
+    }
+  }
+
+  private async getNextInvoiceNo(orgId: string): Promise<string> {
+    const headers = await this.getHeaders();
+    const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/get_next_invoice_no`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ p_org_id: orgId })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Failed to generate invoice number: ${response.status} - ${errorBody}`);
+    }
+
+    const responseText = await response.text();
+    const invoiceNo = responseText.startsWith('"') ? JSON.parse(responseText) : responseText;
+    if (!invoiceNo) {
+      throw new Error('Failed to generate invoice number: empty response');
+    }
+
+    return invoiceNo;
+  }
+
+  private isInvoiceAccountingLocked(invoice?: any): boolean {
+    if (!invoice) return false;
+    const status = String(invoice.status || '').toUpperCase();
+    return (
+      status === 'OPEN' ||
+      status === 'CLOSED' ||
+      status === 'VOIDED' ||
+      !!invoice.journal_entry_id ||
+      !!invoice.journalEntryId ||
+      !!invoice.posted_at ||
+      !!invoice.postedAt ||
+      !!String(invoice.gl_entry_number || invoice.glEntryNumber || '').trim()
+    );
+  }
+
+  private async getInvoiceRawForGuard(id: string): Promise<any | null> {
+    const invoices = await this.fetchFromSupabase<any>('invoices');
+    return Array.isArray(invoices) ? invoices.find((i: any) => i.id === id) || null : null;
+  }
+
+  private async assertInvoiceLinesMutable(invoiceId: string): Promise<void> {
+    if (!invoiceId) return;
+    const invoice = await this.getInvoiceRawForGuard(invoiceId);
+    if (this.isInvoiceAccountingLocked(invoice)) {
+      throw new Error('Posted invoices are locked. Reverse or void the invoice instead of changing invoice lines.');
     }
   }
 
@@ -4697,6 +4749,17 @@ export class SupabaseDataService implements IDataService {
     const invoiceLines = invoice.lines || [];
     const invoiceData = { ...invoice };
     delete invoiceData.lines;
+    const orgId = invoiceData.orgId || invoiceData.org_id;
+    const currentInvoiceNo = String(invoiceData.invoiceNo || invoiceData.invoice_no || '').trim();
+    const usesStandardInvoiceSequence = !currentInvoiceNo || /^INV-\d{4}-\d+$/i.test(currentInvoiceNo);
+
+    if (orgId && usesStandardInvoiceSequence) {
+      const generatedInvoiceNo = await this.getNextInvoiceNo(orgId);
+      invoiceData.invoiceNo = generatedInvoiceNo;
+      invoiceData.invoice_no = generatedInvoiceNo;
+    } else if (!orgId && usesStandardInvoiceSequence) {
+      throw new Error('Missing orgId - cannot generate invoice number');
+    }
 
     const snakeCaseInvoice = this.camelToSnake(invoiceData);
     if ((snakeCaseInvoice as any).status === 'on_hold' || (snakeCaseInvoice as any).status === 'ON_HOLD') {
@@ -4758,6 +4821,39 @@ export class SupabaseDataService implements IDataService {
       }
     });
 
+    const existingInvoice = await this.getInvoiceRawForGuard(id);
+    if (this.isInvoiceAccountingLocked(existingInvoice)) {
+      if (lines && Array.isArray(lines)) {
+        throw new Error('Posted invoices are locked. Reverse or void the invoice instead of replacing invoice lines.');
+      }
+
+      const allowedPostedInvoiceFields = new Set([
+        'amount_paid',
+        'balance_due',
+        'status',
+        'journal_entry_id',
+        'gl_entry_number',
+        'posted_by',
+        'posted_at',
+        'voided_by',
+        'voided_at',
+        'void_reason',
+        'updated_at',
+        'updated_by'
+      ]);
+      const disallowedFields = Object.keys(filteredUpdates).filter(field => !allowedPostedInvoiceFields.has(field));
+      if (disallowedFields.length > 0) {
+        throw new Error(`Posted invoices are locked. Disallowed invoice update fields: ${disallowedFields.join(', ')}`);
+      }
+
+      if (filteredUpdates.status) {
+        const nextStatus = String(filteredUpdates.status || '').toUpperCase();
+        if (!['OPEN', 'CLOSED', 'VOIDED'].includes(nextStatus)) {
+          throw new Error('Posted invoices cannot be moved back to draft/on-hold status.');
+        }
+      }
+    }
+
     console.debug('[Supabase] Filtered update payload for invoices:', filteredUpdates);
 
     // Call generic update with the filtered snake_case payload
@@ -4781,6 +4877,10 @@ export class SupabaseDataService implements IDataService {
 
   async deleteInvoice(id: string): Promise<void> {
     console.debug('[Supabase] deleteInvoice called with id:', id);
+    const existingInvoice = await this.getInvoiceRawForGuard(id);
+    if (this.isInvoiceAccountingLocked(existingInvoice)) {
+      throw new Error('Posted invoices cannot be deleted. Void the invoice instead.');
+    }
     return this.deleteFromSupabase('invoices', id);
   }
 
@@ -4828,18 +4928,25 @@ export class SupabaseDataService implements IDataService {
   // ============================================================================
 
   async createInvoiceLine(line: any): Promise<any> {
+    await this.assertInvoiceLinesMutable(line.invoiceId || line.invoice_id);
     const snakeCaseLine = this.camelToSnake(line);
     const filteredLine = this.filterToTableSchema('invoice_lines', snakeCaseLine, true);
     return this.insertToSupabaseRaw('invoice_lines', filteredLine);
   }
 
   async updateInvoiceLine(id: string, updates: Partial<any>): Promise<any> {
+    const existingLines = await this.fetchFromSupabase<any>('invoice_lines');
+    const existingLine = Array.isArray(existingLines) ? existingLines.find((line: any) => line.id === id) : null;
+    await this.assertInvoiceLinesMutable(existingLine?.invoice_id || existingLine?.invoiceId || (updates as any).invoiceId || (updates as any).invoice_id);
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('invoice_lines', snakeCaseUpdates);
     return this.updateInSupabaseRaw('invoice_lines', id, filteredUpdates);
   }
 
   async deleteInvoiceLine(id: string): Promise<void> {
+    const existingLines = await this.fetchFromSupabase<any>('invoice_lines');
+    const existingLine = Array.isArray(existingLines) ? existingLines.find((line: any) => line.id === id) : null;
+    await this.assertInvoiceLinesMutable(existingLine?.invoice_id || existingLine?.invoiceId);
     return this.deleteFromSupabase('invoice_lines', id);
   }
 
