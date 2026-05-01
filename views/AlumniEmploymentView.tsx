@@ -1,6 +1,7 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
-import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, Qualification, Enrollment, Organization } from '../types';
+﻿import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { AlumniEmploymentReport, AlumniEmploymentStatus, AlumniEmploymentType, Student, Batch, BatchStatus, Qualification, Enrollment, Organization } from '../types';
 import ModalPortal from '../components/ModalPortal';
+import { generateUUID } from '../utils/uuid';
 import {
     Briefcase, Search, Plus, Filter, Download, ExternalLink,
     MapPin, Calendar, DollarSign, CheckCircle2, X, MoreVertical,
@@ -20,7 +21,7 @@ interface AlumniEmploymentViewProps {
     onDeleteReport: (id: string) => void;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 7;
 
 const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
     students,
@@ -36,9 +37,11 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<AlumniEmploymentStatus | 'ALL'>('ALL');
     const [relevanceFilter, setRelevanceFilter] = useState<'ALL' | 'YES' | 'NO'>('ALL');
+    const [courseFilter, setCourseFilter] = useState<string>('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const [showModal, setShowModal] = useState(false);
     const [editingReport, setEditingReport] = useState<AlumniEmploymentReport | null>(null);
+    const autoEnlistedStudentIdsRef = useRef<Set<string>>(new Set());
 
     const [formData, setFormData] = useState<Partial<AlumniEmploymentReport>>({
         employmentStatus: AlumniEmploymentStatus.EMPLOYED,
@@ -46,16 +49,103 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
         employmentType: AlumniEmploymentType.REGULAR
     });
 
-    // Graduated Students Filtering
+    // Completed training students include completed enrollments and every student
+    // attached to a completed batch, so alumni tracking can be seeded reliably.
     const graduates = useMemo(() => {
-        // A student is considered a graduate if they have at least one enrollment with status 'COMPLETED'
-        const graduatedStudentIds = new Set(
-            enrollments
-                .filter(e => e.enrollmentStatus === 'COMPLETED')
-                .map(e => e.studentId)
+        const completedBatchIds = new Set(
+            batches
+                .filter(batch => batch.status === BatchStatus.COMPLETED)
+                .map(batch => batch.id)
         );
-        return students.filter(s => graduatedStudentIds.has(s.id));
-    }, [students, enrollments]);
+
+        const graduatedStudentIds = new Set<string>();
+
+        enrollments.forEach(enrollment => {
+            if (enrollment.enrollmentStatus === 'COMPLETED' || completedBatchIds.has(enrollment.batchId)) {
+                graduatedStudentIds.add(enrollment.studentId);
+            }
+        });
+
+        batches.forEach(batch => {
+            if (batch.status === BatchStatus.COMPLETED) {
+                (batch.studentIds || []).forEach(studentId => graduatedStudentIds.add(studentId));
+            }
+        });
+
+        return students.filter(student => graduatedStudentIds.has(student.id));
+    }, [students, enrollments, batches]);
+
+    const courseByStudentId = useMemo(() => {
+        const completedBatches = batches.filter(batch => batch.status === BatchStatus.COMPLETED);
+        const completedBatchIds = new Set(completedBatches.map(batch => batch.id));
+        const courseMap = new Map<string, { qualificationId: string; name: string; code?: string; batchCode?: string }>();
+
+        const setCourse = (studentId: string, batch?: Batch) => {
+            if (!batch || courseMap.has(studentId)) return;
+            const qualification = qualifications.find(q => q.id === batch.qualificationId);
+            courseMap.set(studentId, {
+                qualificationId: batch.qualificationId,
+                name: qualification?.name || 'Unassigned Course',
+                code: qualification?.code,
+                batchCode: batch.batchCode || batch.name
+            });
+        };
+
+        enrollments.forEach(enrollment => {
+            if (enrollment.enrollmentStatus !== 'COMPLETED' && !completedBatchIds.has(enrollment.batchId)) return;
+            setCourse(enrollment.studentId, batches.find(batch => batch.id === enrollment.batchId));
+        });
+
+        completedBatches.forEach(batch => {
+            (batch.studentIds || []).forEach(studentId => setCourse(studentId, batch));
+        });
+
+        return courseMap;
+    }, [batches, enrollments, qualifications]);
+
+    const courseFilterOptions = useMemo(() => {
+        const optionMap = new Map<string, { id: string; name: string; code?: string }>();
+
+        alumniReports.forEach(report => {
+            const course = courseByStudentId.get(report.studentId);
+            if (!course || optionMap.has(course.qualificationId)) return;
+            optionMap.set(course.qualificationId, {
+                id: course.qualificationId,
+                name: course.name,
+                code: course.code
+            });
+        });
+
+        return Array.from(optionMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [alumniReports, courseByStudentId]);
+
+    useEffect(() => {
+        const reportedStudentIds = new Set(alumniReports.map(report => report.studentId));
+        const missingGraduates = graduates.filter(student =>
+            !reportedStudentIds.has(student.id) &&
+            !autoEnlistedStudentIdsRef.current.has(student.id)
+        );
+
+        if (missingGraduates.length === 0) return;
+
+        missingGraduates.forEach(student => {
+            autoEnlistedStudentIdsRef.current.add(student.id);
+
+            const report: AlumniEmploymentReport = {
+                id: generateUUID(),
+                orgId: student.orgId || organization?.id || 'temp',
+                studentId: student.id,
+                employmentStatus: AlumniEmploymentStatus.UNEMPLOYED,
+                isRelatedToCourse: false,
+                createdAt: new Date().toISOString()
+            };
+
+            const result = onAddReport(report) as unknown as Promise<void> | void;
+            Promise.resolve(result).catch(() => {
+                autoEnlistedStudentIdsRef.current.delete(student.id);
+            });
+        });
+    }, [graduates, alumniReports, onAddReport, organization?.id]);
 
     // Derived Stats
     const stats = useMemo(() => {
@@ -81,16 +171,27 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
         return alumniReports.filter(report => {
             const student = students.find(s => s.id === report.studentId);
             const studentName = student ? `${student.firstName} ${student.lastName}`.toLowerCase() : '';
+            const course = courseByStudentId.get(report.studentId);
+            const courseText = `${course?.name || ''} ${course?.code || ''} ${course?.batchCode || ''}`.toLowerCase();
             const matchesSearch = studentName.includes(searchTerm.toLowerCase()) ||
-                (report.employerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+                (report.employerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                courseText.includes(searchTerm.toLowerCase());
 
             const matchesStatus = statusFilter === 'ALL' || report.employmentStatus === statusFilter;
             const matchesRelevance = relevanceFilter === 'ALL' ||
                 (relevanceFilter === 'YES' ? report.isRelatedToCourse : !report.isRelatedToCourse);
+            const matchesCourse = courseFilter === 'ALL' || course?.qualificationId === courseFilter;
 
-            return matchesSearch && matchesStatus && matchesRelevance;
+            return matchesSearch && matchesStatus && matchesRelevance && matchesCourse;
+        }).sort((a, b) => {
+            const studentA = students.find(student => student.id === a.studentId);
+            const studentB = students.find(student => student.id === b.studentId);
+            const nameA = studentA ? `${studentA.lastName} ${studentA.firstName} ${studentA.middleName || ''}` : '';
+            const nameB = studentB ? `${studentB.lastName} ${studentB.firstName} ${studentB.middleName || ''}` : '';
+
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
         });
-    }, [alumniReports, students, searchTerm, statusFilter, relevanceFilter]);
+    }, [alumniReports, students, searchTerm, statusFilter, relevanceFilter, courseFilter, courseByStudentId]);
 
     // Pagination
     const totalPages = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
@@ -232,6 +333,23 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                         </select>
                     </div>
 
+                    <div className="relative border rounded flex items-center bg-white h-11 px-3 hover:bg-gray-50 transition-colors min-w-[220px]">
+                        <BookOpen size={16} className="text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-500 mr-2">Course:</span>
+                        <select
+                            value={courseFilter}
+                            onChange={(e) => setCourseFilter(e.target.value)}
+                            className="bg-transparent border-none outline-none text-sm font-semibold text-gray-800 pr-6 appearance-none cursor-pointer max-w-[180px]"
+                        >
+                            <option value="ALL">All</option>
+                            {courseFilterOptions.map(course => (
+                                <option key={course.id} value={course.id}>
+                                    {course.code ? `${course.code} - ${course.name}` : course.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="relative border rounded flex items-center bg-white h-11 px-3 hover:bg-gray-50 transition-colors min-w-[180px]">
                         <span className="text-sm text-gray-500 mr-2">Related:</span>
                         <select
@@ -251,6 +369,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                 setSearchTerm('');
                                 setStatusFilter('ALL');
                                 setRelevanceFilter('ALL');
+                                setCourseFilter('ALL');
                             }}
                             className="font-semibold text-brand hover:text-brand-hover transition-colors"
                         >
@@ -268,6 +387,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                         <thead className="bg-brand border-b">
                             <tr>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Alumni Details</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Course</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Employment Information</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Status & Date</th>
                                 <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Action</th>
@@ -276,7 +396,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                         <tbody className="divide-y divide-gray-50">
                             {paginatedReports.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                    <td colSpan={5} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center gap-2 text-gray-300">
                                             <Briefcase size={40} />
                                             <p className="text-sm font-medium">No employment reports found.</p>
@@ -285,6 +405,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                 </tr>
                             ) : paginatedReports.map(report => {
                                 const student = students.find(s => s.id === report.studentId);
+                                const course = courseByStudentId.get(report.studentId);
                                 const isEmployed = report.employmentStatus === AlumniEmploymentStatus.EMPLOYED ||
                                     report.employmentStatus === AlumniEmploymentStatus.SELF_EMPLOYED;
 
@@ -302,6 +423,20 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     <p className="text-xs text-gray-500 truncate max-w-[150px]">{student?.email}</p>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {course ? (
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                                                        <BookOpen size={14} className="text-gray-400" /> {course.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {[course.code, course.batchCode].filter(Boolean).join(' - ')}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs font-medium text-gray-400 italic">No course linked</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             {isEmployed ? (
@@ -344,12 +479,6 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     className="p-1.5 hover:bg-brand-light text-gray-400 hover:text-brand rounded transition-all"
                                                 >
                                                     <ExternalLink size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => { if (confirm('Delete record?')) onDeleteReport(report.id); }}
-                                                    className="p-1.5 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded transition-all"
-                                                >
-                                                    <X size={16} />
                                                 </button>
                                             </div>
                                         </td>
@@ -404,7 +533,7 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
             {showModal && (
                 <ModalPortal>
 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-100 flex flex-col h-full max-h-[90vh]">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-100 flex flex-col h-full max-h-[90vh]">
                         <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center sticky top-0 z-10 shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-brand text-white rounded-lg shadow-brand/20"><Plus size={20} /></div>

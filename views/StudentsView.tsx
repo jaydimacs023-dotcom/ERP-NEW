@@ -46,7 +46,7 @@ const CSV_HEADERS = [
   'Highest Educational Attainment', 'Nationality', 'ULI'
 ];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 7;
 
 function withAlpha(hex: string, alpha: number): string {
   const normalized = hex.replace('#', '');
@@ -135,11 +135,20 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       });
     }
 
-    if (!searchTerm) return base;
-    const lower = searchTerm.toLowerCase();
-    return base.filter(s =>
-      `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
-      s.uli.toLowerCase().includes(lower)
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      base = base.filter(s =>
+        `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
+        s.uli.toLowerCase().includes(lower)
+      );
+    }
+
+    return [...base].sort((a, b) =>
+      `${a.lastName} ${a.firstName} ${a.middleName || ''}`.localeCompare(
+        `${b.lastName} ${b.firstName} ${b.middleName || ''}`,
+        undefined,
+        { sensitivity: 'base' }
+      )
     );
   }, [students, searchTerm, viewMode, selectedBatchId, complianceFilter, batches]);
 
