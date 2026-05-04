@@ -556,21 +556,25 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
-                          className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
-                          title="Edit Batch"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(batch.id)}
-                          disabled={batch.status === BatchStatus.ONGOING || isDeleting === batch.id}
-                          className={`p-2 rounded transition-colors ${batch.status === BatchStatus.ONGOING ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} disabled:opacity-50`}
-                          title={batch.status === BatchStatus.ONGOING ? 'Cannot delete ongoing batch' : 'Delete Batch'}
-                        >
-                          {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                        </button>
+                        {batch.status !== BatchStatus.COMPLETED && (
+                          <>
+                            <button
+                              onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
+                              className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
+                              title="Edit Batch"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(batch.id)}
+                              disabled={batch.status === BatchStatus.ONGOING || isDeleting === batch.id}
+                              className={`p-2 rounded transition-colors ${batch.status === BatchStatus.ONGOING ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} disabled:opacity-50`}
+                              title={batch.status === BatchStatus.ONGOING ? 'Cannot delete ongoing batch' : 'Delete Batch'}
+                            >
+                              {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => setViewingBatch(batch)}
                           className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
@@ -1061,20 +1065,22 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </div>
 
               <div className="mt-8 flex gap-3">
-                <button
-                  onClick={() => {
-                    setViewingBatch(null);
-                    setEditingBatch(viewingBatch);
-                    setFormData(viewingBatch);
-                    setShowModal(true);
-                  }}
-                  className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand/20"
-                >
-                  <Edit2 size={18} /> Edit Batch
-                </button>
+                {viewingBatch.status !== BatchStatus.COMPLETED && (
+                  <button
+                    onClick={() => {
+                      setViewingBatch(null);
+                      setEditingBatch(viewingBatch);
+                      setFormData(viewingBatch);
+                      setShowModal(true);
+                    }}
+                    className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand/20"
+                  >
+                    <Edit2 size={18} /> Edit Batch
+                  </button>
+                )}
                 <button
                   onClick={() => setViewingBatch(null)}
-                  className="px-8 py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all"
+                  className={`${viewingBatch.status === BatchStatus.COMPLETED ? 'flex-1' : 'px-8'} py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all`}
                 >
                   Close
                 </button>
