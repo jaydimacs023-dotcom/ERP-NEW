@@ -13,6 +13,7 @@ import {
   Search,
 } from 'lucide-react';
 import { Sponsor, Student, JournalEntry, JournalLine, ChartOfAccount, AccountClass } from '../types';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface ARAgingReportViewProps {
   entries: JournalEntry[];
@@ -223,6 +224,15 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
       overNinetyBalance,
     };
   }, [filteredAgingReport]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedAgingReport,
+    setCurrentPage
+  } = usePaginatedRows(filteredAgingReport, [searchTerm, debtorTypeFilter, agingAsOf]);
 
   const hasActiveFilters = searchTerm.trim().length > 0 || debtorTypeFilter !== 'ALL';
 
@@ -655,7 +665,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredAgingReport.map(row => (
+              {paginatedAgingReport.map(row => (
                 <tr
                   key={row.id}
                   onClick={() => setSelectedDebtorId(row.id)}
@@ -729,6 +739,15 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredAgingReport.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="aging rows"
+        />
       </div>
     </div>
   );

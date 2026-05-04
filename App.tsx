@@ -5928,16 +5928,21 @@ export default function App() {
               </NavSection>
 
               <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
-                <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Zap size={18} />} label="Write Offs" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<CreditCard size={18} />} label="Credit/Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={false} onClick={() => {}} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
+              </NavSection>
+
+              <NavSection label="AR Reports" isOpen={openSections.inventory} onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))} compact={!sidebarOpen}>
+                <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
                 <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
             </div>
@@ -6447,11 +6452,16 @@ export default function App() {
               orgId={currentOrgId}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+              users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
               entries={activeJournalEntries}
               lines={filteredLines}
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
               onPostJournal={handlePostJournal}
+              onSaveJournal={handleSaveJournalDraft}
+              onApproveJournal={handleApproveJournal}
+              onViewJournal={handleViewJournal}
               onNotify={handleNotify}
               initialContext={navigationContext}
               onClearContext={() => setNavigationContext(null)}
@@ -6559,7 +6569,7 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
     <div className="mb-8">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between mb-4 px-4 group"
+        className="w-full flex items-center justify-between mb-4 px-4 pb-3 border-b border-slate-200 group"
       >
         {!compact && (
           <p className="text-left text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-brand transition-colors">

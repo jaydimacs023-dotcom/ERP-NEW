@@ -31,7 +31,7 @@ interface CustomerMasterListViewProps {
     onNotify?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 7;
 
 const MANDATORY_DOCS = [
     'TOR (Transcript of Records)',

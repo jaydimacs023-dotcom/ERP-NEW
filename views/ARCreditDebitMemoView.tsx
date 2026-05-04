@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, ChevronDown, ChevronLeft, FileText, Filter, GraduationCap, Plus, RotateCcw, Search } from 'lucide-react';
 import { AccountingService } from '../accountingService';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   Sponsor,
   Student,
@@ -193,6 +194,15 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
       totalAmount
     };
   }, [filteredMemoRows]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedMemoRows,
+    setCurrentPage
+  } = usePaginatedRows(filteredMemoRows, [searchTerm, memoTypeFilter, customerTypeFilter, dateFilterMode, dateFrom, dateTo]);
 
   const formatCurrency = (val: number) =>
     `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -537,7 +547,7 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredMemoRows.map(row => {
+                {paginatedMemoRows.map(row => {
                   return (
                     <tr key={row.entry.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-xs text-gray-600">{row.entry.date}</td>
@@ -562,6 +572,15 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
                 )}
               </tbody>
             </table>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredMemoRows.length}
+              pageStartIndex={pageStartIndex}
+              pageEndIndex={pageEndIndex}
+              onPageChange={setCurrentPage}
+              itemLabel="memos"
+            />
           </div>
         </>
       ) : (

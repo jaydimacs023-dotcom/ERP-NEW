@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { AccountClass, Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, JournalEntry, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   AlertTriangle,
   ArrowRight,
@@ -429,18 +430,79 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return applications.map(getPaymentApplicationNo).join(', ');
   };
 
+  const getPaymentApplicationJournalEntry = (application: PaymentApplication) => {
+    const savedReference = String(application.glReference || '').trim();
+    const applicationNo = getPaymentApplicationNo(application);
+    return journalEntries.find(je =>
+      (application.journalEntryId && je.id === application.journalEntryId) ||
+      (
+        String(je.sourceType || '').toUpperCase() === 'APPLICATION' &&
+        (je.sourceRef === application.id || je.reference === applicationNo)
+      ) ||
+      (!!savedReference && (je.glEntryNumber === savedReference || je.reference === savedReference)) ||
+      (!!applicationNo && je.reference === applicationNo)
+    );
+  };
+
+  const getPaymentApplicationGlReference = (application: PaymentApplication) => {
+    const savedReference = String(application.glReference || '').trim();
+    if (savedReference) return savedReference;
+
+    const journalEntry = getPaymentApplicationJournalEntry(application);
+    return String(journalEntry?.glEntryNumber || journalEntry?.reference || '').trim() || 'Pending';
+  };
+
   const getPaymentApplicationGlReferenceLabel = (payment: Payment) => {
     const applications = getPaymentApplicationRecords(payment);
     if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending';
-    return applications.map(application => {
-      if (application.glReference) return application.glReference;
-      // Fallback: look up GL reference from journal entry
-      if (application.journalEntryId) {
-        const journalEntry = journalEntries.find(je => je.id === application.journalEntryId);
-        if (journalEntry?.glEntryNumber) return journalEntry.glEntryNumber;
-      }
-      return 'Pending';
-    }).join(', ');
+    return applications.map(getPaymentApplicationGlReference).join(', ');
+  };
+
+  const renderPaymentApplicationGlReference = (
+    application: PaymentApplication,
+    className = 'font-medium text-gray-800'
+  ) => {
+    const label = getPaymentApplicationGlReference(application);
+    const journalEntry = getPaymentApplicationJournalEntry(application);
+
+    if (!onViewJournal || !journalEntry?.id || label === 'Pending') {
+      return <span className={className}>{label}</span>;
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onViewJournal(journalEntry.id);
+        }}
+        className={`${className} text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200`}
+        title={`View journal entry ${label}`}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  const renderPaymentApplicationGlReferences = (
+    payment: Payment,
+    className = 'font-medium text-gray-800'
+  ) => {
+    const applications = getPaymentApplicationRecords(payment);
+    if (applications.length === 0) {
+      return <span className={className}>{payment.status === 'DRAFT' ? '-' : 'Pending'}</span>;
+    }
+
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
+        {applications.map((application, index) => (
+          <React.Fragment key={application.id || index}>
+            {index > 0 && <span className="text-gray-400">,</span>}
+            {renderPaymentApplicationGlReference(application, className)}
+          </React.Fragment>
+        ))}
+      </span>
+    );
   };
 
   const isInvoiceSettled = (invoice?: Pick<Invoice, 'status' | 'balanceDue'> | null) =>
@@ -1731,6 +1793,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return sortRegistryPayments(applyRegistryFilters(payments, 'payments'), 'payments');
   }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
+  const {
+    currentPage: paymentCurrentPage,
+    totalPages: paymentTotalPages,
+    pageStartIndex: paymentPageStartIndex,
+    pageEndIndex: paymentPageEndIndex,
+    paginatedRows: paginatedPayments,
+    setCurrentPage: setPaymentCurrentPage
+  } = usePaginatedRows(filteredPayments, [listTab, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig]);
+
   const exportToExcel = () => {
     const rows = getExportRows();
     if (rows.length === 0) { alert(getExportEmptyMessage()); return; }
@@ -1861,6 +1932,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments, 'applications'), 'applications');
   }, [currentApplicationPayments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
+  const {
+    currentPage: applicationCurrentPage,
+    totalPages: applicationTotalPages,
+    pageStartIndex: applicationPageStartIndex,
+    pageEndIndex: applicationPageEndIndex,
+    paginatedRows: paginatedApplicationPayments,
+    setCurrentPage: setApplicationCurrentPage
+  } = usePaginatedRows(filteredApplicationPayments, [listTab, applicationListTab, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig]);
+
   const filteredApplicationRemainingBalance = useMemo(() => {
     return filteredApplicationPayments.reduce((sum, payment) => sum + getAvailablePaymentBalance(payment), 0);
   }, [filteredApplicationPayments]);
@@ -1983,9 +2063,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'glReference',
       value: (payment) => getPaymentApplicationGlReferenceLabel(payment),
       render: (payment) => (
-        <span className="font-medium text-gray-800">
-          {getPaymentApplicationGlReferenceLabel(payment)}
-        </span>
+        renderPaymentApplicationGlReferences(payment)
       )
     },
     {
@@ -2714,7 +2792,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredPayments.map(payment => (
+                  paginatedPayments.map(payment => (
                     <tr
                       key={payment.id}
                       className="cursor-pointer transition-colors hover:bg-gray-50"
@@ -2735,6 +2813,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 )}
               </tbody>
             </table>
+            <PaginationControls
+              currentPage={paymentCurrentPage}
+              totalPages={paymentTotalPages}
+              totalItems={filteredPayments.length}
+              pageStartIndex={paymentPageStartIndex}
+              pageEndIndex={paymentPageEndIndex}
+              onPageChange={setPaymentCurrentPage}
+              itemLabel="payments"
+            />
           </div>
           </>
         )}
@@ -2876,7 +2963,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      filteredApplicationPayments.map(payment => {
+                      paginatedApplicationPayments.map(payment => {
                         return (
                           <tr
                             key={payment.id}
@@ -2899,6 +2986,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   </tbody>
                 </table>
               </div>
+              <PaginationControls
+                currentPage={applicationCurrentPage}
+                totalPages={applicationTotalPages}
+                totalItems={filteredApplicationPayments.length}
+                pageStartIndex={applicationPageStartIndex}
+                pageEndIndex={applicationPageEndIndex}
+                onPageChange={setApplicationCurrentPage}
+                itemLabel="payment applications"
+              />
 
               <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
                 {applicationListTab === 'unapplied'
@@ -3736,9 +3832,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (listTab === 'applications') {
       const activeApplications = getPaymentApplicationRecords(editingPayment);
       const primaryApplication = activeApplications[0];
+      const primaryApplicationJournalEntry = primaryApplication ? getPaymentApplicationJournalEntry(primaryApplication) : undefined;
       const applicationDetailDate = (primaryApplication?.createdAt || editingPayment.updatedAt || editingPayment.paymentDate || new Date().toISOString()).split('T')[0];
       const applicationDetailNo = getPaymentApplicationNumberLabel(editingPayment);
-      const applicationDetailGlReference = getPaymentApplicationGlReferenceLabel(editingPayment);
       const applicationAppliedTotal = activeApplications.reduce((sum, app) => sum + Number(app.amountApplied || 0), 0);
       const applicationRemainingBalance = getAvailablePaymentBalance(editingPayment);
       const { customerDepositsAccount } = resolvePaymentGlAccounts();
@@ -3788,11 +3884,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
 
             {renderPaymentDocumentActions()}
-            {primaryApplication?.journalEntryId && onViewJournal && (
+            {primaryApplicationJournalEntry?.id && onViewJournal && (
               <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2">
                 <button
                   title="View Journal Entry"
-                  onClick={() => onViewJournal(primaryApplication.journalEntryId!)}
+                  onClick={() => onViewJournal(primaryApplicationJournalEntry.id)}
                   className={`${iconActionClass} hover:text-emerald-500 hover:bg-emerald-50`}
                 >
                   <FileText size={20} />
@@ -3854,7 +3950,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       </div>
                       <div className="md:col-span-2">
                         <label className={invoiceLabelClass}>GL Reference No.</label>
-                        <input value={applicationDetailGlReference} readOnly className={invoiceReadOnlyClass} />
+                        <div className={`${invoiceReadOnlyClass} flex min-h-[38px] items-center`}>
+                          {renderPaymentApplicationGlReferences(editingPayment, 'text-[13px] font-medium')}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3907,7 +4005,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                               <tr key={app.id} className="text-gray-700 hover:bg-gray-50">
                                 <td className="px-4 py-3 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
                                 <td className="px-4 py-3 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
-                                <td className="px-4 py-3 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                                <td className="px-4 py-3 text-xs font-medium">
+                                  {renderPaymentApplicationGlReference(app, 'text-xs font-medium')}
+                                </td>
                                 <td className="px-4 py-3 text-xs">{app.description || '-'}</td>
                                 <td className="px-4 py-3 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
@@ -4220,7 +4320,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                           <tr key={index} className="border-t text-gray-700 hover:bg-gray-50">
                             <td className="px-4 py-2 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
                             <td className="px-4 py-2 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
-                            <td className="px-4 py-2 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                            <td className="px-4 py-2 text-xs font-medium">
+                              {renderPaymentApplicationGlReference(app, 'text-xs font-medium')}
+                            </td>
                             <td className="px-4 py-2 text-xs">{app.description || '-'}</td>
                             <td className="px-4 py-2 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
                             <td className="px-4 py-2 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>

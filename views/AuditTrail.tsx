@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AuditLog } from '../types';
 import { ChevronDown, Clock, Filter, History, RotateCcw, Search, ShieldCheck, User } from 'lucide-react';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface AuditTrailProps {
   orgId: string;
@@ -85,6 +86,15 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
       todayEvents
     };
   }, [filteredLogs]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedLogs,
+    setCurrentPage
+  } = usePaginatedRows(filteredLogs, [searchTerm, actionFilter, entityFilter, dateFilterMode, dateFrom, dateTo]);
 
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
@@ -343,7 +353,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
                 </td>
               </tr>
             ) : (
-              filteredLogs.map(log => (
+              paginatedLogs.map(log => (
                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2 text-gray-900 font-medium">
@@ -391,6 +401,15 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredLogs.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="audit records"
+        />
       </div>
     </div>
   );

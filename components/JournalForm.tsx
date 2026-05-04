@@ -26,6 +26,22 @@ interface JournalFormProps {
   onClose: () => void;
 }
 
+const getWriteOffReferenceNo = (entry: Partial<JournalEntry>): string => {
+  const reference = String(entry.reference || '').trim();
+  const sourceType = String(entry.sourceType || '').toUpperCase();
+  const description = String(entry.description || '').toUpperCase();
+  const isWriteOff =
+    /^WO-\d{4}-\d+/i.test(reference) ||
+    ((sourceType === 'MANUAL' || sourceType === 'JOURNAL') &&
+      (
+        description.includes('[WRITE OFF]') ||
+        description.includes('WRITE-OFF') ||
+        description.includes('WRITE OFF')
+      ));
+
+  return isWriteOff ? reference : '';
+};
+
 const JournalForm: React.FC<JournalFormProps> = ({
   accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onReverse, onClose
 }) => {
@@ -62,6 +78,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
   const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
   const hasExistingReversal = Boolean(entry.id && entries.some(existingEntry => existingEntry.originalEntryId === entry.id));
   const canReverseViewedEntry = isViewMode && Boolean(entry.id) && normalizedStatus === 'POSTED' && !isReversalEntry && !hasExistingReversal;
+  const writeOffReferenceNo = useMemo(() => getWriteOffReferenceNo(entry), [entry.reference, entry.sourceType, entry.description]);
 
   const getQualificationCodeById = (qualificationId?: string) => {
     const id = String(qualificationId || '').trim();
@@ -144,6 +161,12 @@ const JournalForm: React.FC<JournalFormProps> = ({
       if (sourceType === 'APPLICATION') {
         const applicationReferenceNo = String(entry.reference || '').trim();
         setDisplaySourceRef(applicationReferenceNo || String(entry.sourceRef || '').trim());
+        return;
+      }
+
+      const writeOffReferenceNo = getWriteOffReferenceNo(entry);
+      if (writeOffReferenceNo) {
+        setDisplaySourceRef(writeOffReferenceNo);
         return;
       }
 
@@ -373,7 +396,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                   ? `Journal Entry Details: ${(entry.glEntryNumber || entry.reference || '').trim()}`
                   : 'New Journal Entry'}
             </h3>
-            <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mt-1">{displaySourceRef || entry.sourceRef || ''}</p>
+            <p className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mt-1">{writeOffReferenceNo || displaySourceRef || entry.sourceRef || ''}</p>
           </div>
         </div>
 
@@ -491,8 +514,10 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
               <input
                   readOnly
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
-                  value={displaySourceRef || entry.sourceRef || ''}
-                  title={String(entry.sourceType || '').toUpperCase() === 'PAYMENT'
+                  value={writeOffReferenceNo || displaySourceRef || entry.sourceRef || ''}
+                  title={writeOffReferenceNo
+                    ? 'Write-Off Number from journal entry reference.'
+                    : String(entry.sourceType || '').toUpperCase() === 'PAYMENT'
                     ? 'payment_no from payments.id = sourceRef (UUID). Shows Payment No.'
                     : String(entry.sourceType || '').toUpperCase() === 'APPLICATION'
                       ? 'Payment Application Number from journal entry reference.'

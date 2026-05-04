@@ -10,6 +10,7 @@ import {
   Search,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   Sponsor,
   Student,
@@ -203,6 +204,15 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
   );
 
   const endingBalance = runningLines.length > 0 ? runningLines[runningLines.length - 1].balance : beginningBalance;
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedRunningLines,
+    setCurrentPage
+  } = usePaginatedRows(runningLines, [searchTerm, customerType, customerId, dateFilterMode, dateFrom, dateTo]);
+
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
     customerType !== 'SPONSOR' ||
@@ -438,7 +448,7 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {runningLines.map(line => (
+              {paginatedRunningLines.map(line => (
                 <tr key={line.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-xs text-gray-600">{format(new Date(line.date), 'yyyy-MM-dd')}</td>
                   <td className="px-6 py-4 text-xs font-mono font-bold text-gray-700">{line.reference}</td>
@@ -490,6 +500,15 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={runningLines.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="ledger entries"
+        />
       </div>
     </div>
   );

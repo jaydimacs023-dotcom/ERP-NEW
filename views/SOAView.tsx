@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Sponsor, JournalEntry, JournalLine, ChartOfAccount } from '../types';
 import { ChevronDown, FileText, Filter, Mail, RotateCcw, Search, Users } from 'lucide-react';
 import SponsorSOAView from './SponsorSOAView';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface SOAViewProps {
   sponsors: Sponsor[];
@@ -60,6 +61,15 @@ const SOAView: React.FC<SOAViewProps> = ({
       withContact: activeSponsors.filter(sponsor => !!String(sponsor.contactPerson || '').trim()).length,
     };
   }, [filteredSponsors.length, sponsors]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedSponsors,
+    setCurrentPage
+  } = usePaginatedRows(filteredSponsors, [searchTerm, sponsorFilter]);
 
   const hasActiveFilters = searchTerm.trim().length > 0 || sponsorFilter !== 'ALL';
   const sponsorFilterLabel =
@@ -204,7 +214,7 @@ const SOAView: React.FC<SOAViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredSponsors.length > 0 ? filteredSponsors.map(sponsor => (
+              {filteredSponsors.length > 0 ? paginatedSponsors.map(sponsor => (
                 <tr key={sponsor.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-5">
                     <div className="text-sm font-bold text-gray-800">{sponsor.name}</div>
@@ -265,6 +275,15 @@ const SOAView: React.FC<SOAViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredSponsors.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="statements"
+        />
       </div>
 
     </div>

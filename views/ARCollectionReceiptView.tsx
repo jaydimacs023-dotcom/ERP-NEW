@@ -14,6 +14,7 @@ import {
 import { BankAccount, JournalEntry, JournalLine, Sponsor, Student } from '../types';
 import { format } from 'date-fns';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface ARCollectionReceiptViewProps {
   entries: JournalEntry[];
@@ -142,6 +143,15 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
       studentCount,
     };
   }, [filteredCollections]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedCollections,
+    setCurrentPage
+  } = usePaginatedRows(filteredCollections, [searchTerm, payerTypeFilter, dateFilterMode, dateFrom, dateTo]);
 
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
@@ -362,7 +372,7 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredCollections.length > 0 ? filteredCollections.map(row => (
+              {filteredCollections.length > 0 ? paginatedCollections.map(row => (
                 <tr key={row.entry.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-5 text-xs font-mono font-bold text-gray-700">{row.entry.reference}</td>
                   <td className="px-6 py-5">
@@ -422,6 +432,15 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredCollections.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="receipts"
+        />
       </div>
 
       {selected && (

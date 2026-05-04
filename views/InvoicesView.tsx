@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import { calculateInvoiceDueDate, todayISO } from '../utils/invoiceTerms';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
   Building2, User, Calendar, DollarSign, Percent, CheckCircle,
@@ -1125,6 +1126,15 @@ const brandColor = organization?.primaryColor || '#059669';
     });
   }, [invoices, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, users, sortConfig, payerFilterMode, payerSearchTerm]);
 
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedInvoices,
+    setCurrentPage
+  } = usePaginatedRows(filteredInvoices, [searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, payerFilterMode, payerSearchTerm, sortConfig]);
+
   // Summary stats
   const stats = useMemo(() => {
     const draft = invoices.filter(i => i.status === 'DRAFT' || i.status === 'ON_HOLD');
@@ -1926,7 +1936,7 @@ const brandColor = organization?.primaryColor || '#059669';
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-800">Invoices</h2>
-
+              <p className="text-sm italic text-gray-500">Manage your invoices and billing</p>
             </div>
             <div className="flex items-center gap-3">
               {sponsorsWithUnbilledEnrollments.length > 0 && (
@@ -2454,7 +2464,7 @@ const brandColor = organization?.primaryColor || '#059669';
                         </td>
                       </tr>
                     ) : (
-                      filteredInvoices.map(inv => (
+                      paginatedInvoices.map(inv => (
                         <tr
                           key={inv.id}
                           className={`cursor-pointer transition-colors`}
@@ -2475,6 +2485,15 @@ const brandColor = organization?.primaryColor || '#059669';
                     )}
                   </tbody>
                 </table>
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredInvoices.length}
+                  pageStartIndex={pageStartIndex}
+                  pageEndIndex={pageEndIndex}
+                  onPageChange={setCurrentPage}
+                  itemLabel="invoices"
+                />
               </div>
             );
           })()}

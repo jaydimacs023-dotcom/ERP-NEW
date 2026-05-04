@@ -1,13 +1,15 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
   ChartOfAccount, JournalEntry, JournalLine, Student, Invoice, InvoiceLine, AccountClass,
   Payment,
   Trainer, Sponsor, Batch, NonStockItem, User, Qualification
 } from '../types';
-import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp } from 'lucide-react';
+import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import JournalForm from '../components/JournalForm';
+
+const JOURNAL_ENTRIES_PER_PAGE = 7;
 
 interface LedgerProps {
   accounts: ChartOfAccount[];
@@ -59,6 +61,7 @@ const Ledger: React.FC<LedgerProps> = ({
   const [editingLines, setEditingLines] = useState<JournalLine[]>([]);
   const [entryFormMode, setEntryFormMode] = useState<'new' | 'edit' | 'view'>('new');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | 'none' }>({ key: 'date', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Column ordering and resize state
   const [columnOrder, setColumnOrder] = useState<string[]>([
@@ -177,7 +180,25 @@ const Ledger: React.FC<LedgerProps> = ({
     });
   }, [filteredEntries, sortConfig, entryTotals]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedEntries.length / JOURNAL_ENTRIES_PER_PAGE));
+  const pageStartIndex = (currentPage - 1) * JOURNAL_ENTRIES_PER_PAGE;
+  const pageEndIndex = Math.min(pageStartIndex + JOURNAL_ENTRIES_PER_PAGE, sortedEntries.length);
+
+  const paginatedEntries = useMemo(
+    () => sortedEntries.slice(pageStartIndex, pageStartIndex + JOURNAL_ENTRIES_PER_PAGE),
+    [sortedEntries, pageStartIndex]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo]);
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(Math.max(page, 1), totalPages));
+  }, [totalPages]);
+
   const handleSort = (key: string) => {
+    setCurrentPage(1);
     setSortConfig(current => ({
       key,
       direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
@@ -419,6 +440,7 @@ const Ledger: React.FC<LedgerProps> = ({
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Journal Entries</h2>
+          <p className="text-sm italic text-gray-500">Review and manage your financial transactions</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
@@ -716,7 +738,7 @@ const Ledger: React.FC<LedgerProps> = ({
                 </td>
               </tr>
             ) : (
-              sortedEntries.map(entry => {
+              paginatedEntries.map(entry => {
                 const controlTotal = entryTotals.get(entry.id) || 0;
                 const statusLabel = entry.status || 'ON_HOLD';
 
@@ -779,6 +801,36 @@ const Ledger: React.FC<LedgerProps> = ({
             )}
           </tbody>
         </table>
+        {sortedEntries.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t bg-gray-50 px-4 py-3 text-[13px] text-gray-600">
+            <div className="font-medium">
+              Showing {pageStartIndex + 1}-{pageEndIndex} of {sortedEntries.length} journal entries
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                  disabled={currentPage === 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Previous page"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="min-w-20 text-center font-semibold text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Next page"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
         </>
       )}
