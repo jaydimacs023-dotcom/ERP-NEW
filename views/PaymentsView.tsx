@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, Organization, User as AppUser } from '../types';
+import { AccountClass, Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, JournalEntry, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
@@ -912,15 +912,22 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       alert('Open a saved payment before reversing applications.');
       return;
     }
-    const hasActiveApplication = (editingPayment.applications || []).some(app => !app.isReversed);
-    if (!hasActiveApplication) {
+    const activeApplications = (editingPayment.applications || []).filter(app => !app.isReversed);
+    if (activeApplications.length === 0) {
       alert('There are no active applications to reverse yet.');
       return;
     }
+
+    if (activeApplications.length === 1) {
+      openReverseApplicationModal(editingPayment, activeApplications[0]);
+      return;
+    }
+
+    setListTab('applications');
     setViewMode('payment-details');
   };
 
-  // Fetch open invoices for payor
+  // Fetch invoices for payor
   useEffect(() => {
     let isMounted = true;
     setInvoiceApplyMap({});
@@ -937,19 +944,21 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     Promise.resolve().then(() => {
       if (!isMounted) return;
-      const fetchedOpenInvoices = invoices.filter(inv => {
-        if (inv.status !== 'OPEN' || inv.balanceDue <= 0) return false;
+      const fetchedPayorInvoices = invoices
+        .filter(inv => {
+        if (inv.orgId !== currentOrgId || inv.status === 'VOIDED') return false;
         if (payorType === 'SPONSOR') return inv.sponsorId === formData.sponsorId;
         return inv.studentId === formData.studentId;
-      });
-      setOpenInvoicesForPayor(fetchedOpenInvoices);
+      })
+        .sort((a, b) => new Date(b.invoiceDate || 0).getTime() - new Date(a.invoiceDate || 0).getTime());
+      setOpenInvoicesForPayor(fetchedPayorInvoices);
       setIsFetchingOpenInvoices(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [selectedPayorId, payorType, formData.sponsorId, formData.studentId, invoices]);
+  }, [selectedPayorId, payorType, formData.sponsorId, formData.studentId, invoices, currentOrgId]);
 
   useEffect(() => {
     if (!editingPayment && defaultCashAccountId && !formData.bankAccountId) {
@@ -1037,16 +1046,70 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const existingApplied = editingPayment?.totalApplied || 0;
   const availableToApply = Math.max((editingPayment?.customerDepositBalance ?? baseTotalCredit), 0);
 
+  const getGlAccountLabel = (account?: ChartOfAccount, fallback = 'Unknown Account') => {
+    if (!account) return fallback;
+    return account.code ? `${account.code} - ${account.name}` : account.name;
+  };
+
+  const getReceivableAccountForInvoice = (invoice?: Invoice) => {
+    const coa = accounts.filter(a => a.orgId === currentOrgId && !a.isHeader);
+    const sponsor = invoice?.sponsorId ? sponsors.find(s => s.id === invoice.sponsorId) : undefined;
+    const preferredAccountId = (sponsor as (Sponsor & { arAccountId?: string }) | undefined)?.arAccountId;
+    const byName = (patterns: string[]) => coa.find(a => {
+      const name = (a.name || '').toLowerCase();
+      return patterns.every(pattern => name.includes(pattern));
+    });
+
+    return (
+      (preferredAccountId ? coa.find(a => a.id === preferredAccountId || a.code === preferredAccountId) : undefined) ||
+      byName(['accounts', 'receivable']) ||
+      byName(['receivable']) ||
+      coa.find(a => a.class === AccountClass.ASSET)
+    );
+  };
+
   const glImpactRows = useMemo(() => {
     const glLines = calculatePaymentGlLines();
     return glLines.map(line => ({
-      account: line.account?.code 
-        ? `${line.account.code} - ${line.account.name}`
-        : line.account?.name || 'Unknown Account',
+      account: getGlAccountLabel(line.account),
       debit: line.debit,
       credit: line.credit
     }));
   }, [formData.bankAccountId, formData.amountReceived, formData.ewtAmountCertified, accounts]);
+
+  const selectedApplicationInvoices = useMemo(() => {
+    return openInvoicesForPayor.filter(invoice =>
+      invoiceSelectionMap[invoice.id] && Number(invoiceApplyMap[invoice.id] || 0) > 0
+    );
+  }, [openInvoicesForPayor, invoiceSelectionMap, invoiceApplyMap]);
+
+  const applicationGlImpactRows = useMemo(() => {
+    const { customerDepositsAccount } = resolvePaymentGlAccounts();
+    const rows: Array<{ account: string; debit: number; credit: number; missing?: boolean }> = [];
+
+    if (plannedAppliedTotal <= 0) return rows;
+
+    rows.push({
+      account: getGlAccountLabel(customerDepositsAccount, 'Customer Deposits account not configured'),
+      debit: plannedAppliedTotal,
+      credit: 0,
+      missing: !customerDepositsAccount
+    });
+
+    selectedApplicationInvoices.forEach(invoice => {
+      const arAccount = getReceivableAccountForInvoice(invoice);
+      rows.push({
+        account: getGlAccountLabel(arAccount, `Accounts Receivable for ${invoice.invoiceNo} not configured`),
+        debit: 0,
+        credit: Number(invoiceApplyMap[invoice.id] || 0),
+        missing: !arAccount
+      });
+    });
+
+    return rows;
+  }, [accounts, currentOrgId, formData.bankAccountId, invoiceApplyMap, plannedAppliedTotal, selectedApplicationInvoices, sponsors]);
+
+  const applicationGlHasMissingAccounts = applicationGlImpactRows.some(row => row.missing);
 
   const validateHeader = () => {
     if (!formData.paymentNo) return 'Payment number is required.';
@@ -1065,6 +1128,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   };
 
   const headerValidationError = validateHeader();
+  const currentActiveApplications = editingPayment
+    ? (editingPayment.applications || []).filter(app => !app.isReversed)
+    : [];
+  const canUsePaymentApplicationAction = !!editingPayment && canApplyPayment(editingPayment);
+  const canUseReverseAction = currentActiveApplications.length > 0;
+
+  const handleClosePaymentWorkspace = () => {
+    setViewMode('list');
+    setEditingPayment(null);
+  };
 
   const buildPayment = (status: PaymentStatus) => {
     const paymentId = editingPayment?.id || generateUUID();
@@ -1158,11 +1231,24 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       return;
     }
 
+    const trimmedCrNo = String(formData.crNo || '').trim();
+    const paymentWithHeaderChanges: Payment = {
+      ...editingPayment,
+      crNo: trimmedCrNo || undefined,
+      updatedAt: new Date().toISOString()
+    };
+    const hasHeaderChanges = (editingPayment.crNo || '') !== (paymentWithHeaderChanges.crNo || '');
+
+    if (hasHeaderChanges) {
+      onUpdatePayment(paymentWithHeaderChanges);
+      setEditingPayment(paymentWithHeaderChanges);
+    }
+
     if (onApplyToInvoice) {
       for (const [invoiceId, amount] of selected) {
         const applyAmount = Number(amount || 0);
         const description = transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`;
-        await onApplyToInvoice(editingPayment.id, invoiceId, applyAmount);
+        await onApplyToInvoice(paymentWithHeaderChanges.id, invoiceId, applyAmount);
       }
     }
 
@@ -1185,10 +1271,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       }));
 
       const updatedPayment: Payment = {
-        ...editingPayment,
-        applications: [...(editingPayment.applications || []), ...newApps],
-        totalApplied: (editingPayment.totalApplied || 0) + totalToApply,
-        customerDepositBalance: (editingPayment.customerDepositBalance || 0) - totalToApply,
+        ...paymentWithHeaderChanges,
+        applications: [...(paymentWithHeaderChanges.applications || []), ...newApps],
+        totalApplied: (paymentWithHeaderChanges.totalApplied || 0) + totalToApply,
+        customerDepositBalance: (paymentWithHeaderChanges.customerDepositBalance || 0) - totalToApply,
         updatedAt: new Date().toISOString()
       };
       onUpdatePayment(updatedPayment);
@@ -1218,7 +1304,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         return sum + Number(amount || 0);
       }, 0);
       const remaining = Math.max(availableToApply - otherSelectedTotal, 0);
-      const suggested = Math.min(invoice.balanceDue, remaining);
+      const suggested = Math.min(Math.max(Number(invoice.balanceDue || 0), 0), remaining);
       return { ...prev, [invoice.id]: suggested };
     });
   };
@@ -1252,6 +1338,70 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const previewSectionTitleClass = 'mb-4 text-xs font-medium uppercase tracking-wide text-gray-500';
   const previewLabelClass = 'text-xs font-medium uppercase tracking-wide text-gray-500';
   const previewValueClass = 'mt-1 text-[13px] font-medium text-gray-700';
+  const iconActionClass = 'p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+
+  const renderPaymentDocumentActions = () => (
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-white">
+      <button
+        title="Discard Changes and Close"
+        onClick={discardPaymentChanges}
+        className={`${iconActionClass} hover:text-red-500 hover:bg-red-50`}
+      >
+        <RotateCcw size={20} />
+      </button>
+      {!isReadOnly && (
+        <>
+          <button
+            title={headerValidationError || 'Save'}
+            onClick={handleSaveDraft}
+            disabled={!!headerValidationError}
+            className={`${iconActionClass} hover:text-blue-500 hover:bg-blue-50`}
+          >
+            <Save size={20} />
+          </button>
+          <button
+            title={headerValidationError || 'Approve'}
+            onClick={handleSavePayment}
+            disabled={!!headerValidationError}
+            className={`${iconActionClass} hover:text-emerald-500 hover:bg-emerald-50`}
+          >
+            <CheckCircle size={20} />
+          </button>
+        </>
+      )}
+      <button
+        title="New Payment Application"
+        onClick={handleOpenApplyPayment}
+        disabled={!canUsePaymentApplicationAction}
+        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold uppercase tracking-wide text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus size={16} />
+        New Payment Application
+      </button>
+      <button
+        title="Reverse"
+        onClick={handleOpenReversePayment}
+        disabled={!canUseReverseAction}
+        className={`${iconActionClass} hover:text-amber-500 hover:bg-amber-50`}
+      >
+        <CornerUpLeft size={20} />
+      </button>
+      <button
+        title="Print"
+        onClick={handlePrintPayment}
+        className={`${iconActionClass} hover:text-indigo-500 hover:bg-indigo-50`}
+      >
+        <Printer size={20} />
+      </button>
+      <button
+        title="Close"
+        onClick={handleClosePaymentWorkspace}
+        className={`${iconActionClass} hover:text-gray-900 hover:bg-gray-100`}
+      >
+        <X size={20} />
+      </button>
+    </div>
+  );
 
   const getCreatedByName = (createdBy?: string) => {
     if (!createdBy) return '-';
@@ -2597,7 +2747,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
               >
                 <Plus size={20} />
-                New Pay Application
+                New Payment Application
               </button>
             </div>
 
@@ -2905,65 +3055,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             </div>
           </div>
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-white">
-            <button
-              title="Discard Changes and Close"
-              onClick={discardPaymentChanges}
-              className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <RotateCcw size={20} />
-            </button>
-            {!isReadOnly && (
-              <>
-                <button
-                  title={headerValidationError || 'Save as Draft'}
-                  onClick={handleSaveDraft}
-                  disabled={!!headerValidationError}
-                  className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Save size={20} />
-                </button>
-                <button
-                  title={headerValidationError || 'Approve'}
-                  onClick={handleSavePayment}
-                  disabled={!!headerValidationError}
-                  className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <CheckCircle size={20} />
-                </button>
-              </>
-            )}
-            <button
-              title="Add New Payment"
-              onClick={startNewPayment}
-              className="p-2 text-gray-500 hover:text-brand hover:bg-brand-light rounded-lg transition-colors"
-            >
-              <Plus size={20} />
-            </button>
-            <button
-              title="Apply"
-              onClick={handleOpenApplyPayment}
-              disabled={!editingPayment || (editingPayment.status !== 'OPEN' && editingPayment.status !== 'POSTED') || (editingPayment.customerDepositBalance ?? 0) <= 0.01}
-              className="px-3 py-2 text-sm font-bold uppercase tracking-wide text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              APPLY
-            </button>
-            <button
-              title="Print"
-              onClick={handlePrintPayment}
-              className="p-2 text-gray-500 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
-            >
-              <Printer size={20} />
-            </button>
-            <button
-              title="Reverse"
-              onClick={handleOpenReversePayment}
-              disabled={!editingPayment || !(editingPayment.applications || []).some(app => !app.isReversed)}
-              className="p-2 text-gray-500 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <CornerUpLeft size={20} />
-            </button>
-          </div>
+          {renderPaymentDocumentActions()}
           {!isReadOnly && headerValidationError && (
             <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {headerValidationError}
@@ -3356,152 +3448,283 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   // ===== VIEW: APPLY INVOICES =====
   if (viewMode === 'apply-payment' && editingPayment) {
+    const applicationDate = new Date().toISOString().split('T')[0];
+    const applicationNoPreview = generatePaymentApplicationNo();
+    const applicationGlReference = getPaymentApplicationGlReferenceLabel(editingPayment);
+    const canSubmitApplication = plannedAppliedTotal > 0 && !applicationGlHasMissingAccounts;
+    const applicationDateLabel = format(new Date(applicationDate), 'MM/dd/yyyy');
+    const selectedPreviewInvoice = selectedApplicationInvoices[0];
+    const { customerDepositsAccount } = resolvePaymentGlAccounts();
+    const previewReceivableAccount = getReceivableAccountForInvoice(selectedPreviewInvoice);
+    const displayApplicationGlRows = applicationGlImpactRows.length > 0
+      ? applicationGlImpactRows
+      : [
+        {
+          account: getGlAccountLabel(customerDepositsAccount, 'Customer Deposit'),
+          debit: 0,
+          credit: 0,
+          missing: !customerDepositsAccount
+        },
+        {
+          account: getGlAccountLabel(previewReceivableAccount, 'Accounts Receivable'),
+          debit: 0,
+          credit: 0,
+          missing: false
+        }
+      ];
+    const detailLabelClass = 'text-[13px] font-normal text-slate-700';
+    const detailValueClass = 'text-[13px] font-normal text-slate-800';
+    const readonlyPillClass = 'w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-normal text-slate-800 shadow-inner';
+    const toolbarButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-800 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-35';
+
     return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
+      <div className="space-y-4 bg-slate-50/40">
+        <div className="flex items-center gap-2 pt-1">
           <button
             onClick={() => setViewMode('list')}
-            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
+            className="inline-flex items-center gap-2 text-sm font-normal text-slate-700 hover:text-slate-900"
           >
             <ArrowLeft size={16} />
             Back to Payments and Applications
           </button>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between border-b bg-brand/10 p-4">
-            <div className="flex items-center justify-between flex-1">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Apply Payment to Invoices</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Payment: <span className="font-semibold text-gray-900">{editingPayment.paymentNo}</span> | 
-                  Payor: <span className="font-semibold text-gray-900">{getPayorName(editingPayment)}</span>
-                </p>
-              </div>
-              <div className="text-right mx-4">
-                <div className="text-xs text-gray-600">Available to Apply</div>
-                <div className="text-lg font-bold text-black">
-                  {formatCurrency(availableToApply)}
-                </div>
-              </div>
-            </div>
-            {/* Action Buttons - Top Right */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('list')}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={applySelectedInvoices}
-                disabled={plannedAppliedTotal <= 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 hover:bg-emerald-700"
-              >
-                <CheckCircle size={16} />
-                Apply Selected
-              </button>
-            </div>
+        <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-emerald-50 bg-emerald-50/70 px-5 py-5">
+            <h3 className="text-xl font-normal text-slate-900">New Pay Application : {applicationNoPreview}</h3>
           </div>
 
-          <div className="flex-1 overflow-auto p-6">
-            <div className="overflow-x-scroll rounded-xl border bg-white pb-2">
-              <table className="min-w-max w-full font-sans">
-                <thead className="border-b bg-emerald-600">
-                  <tr>
-                    {orderedApplyPaymentColumns.map((col, idx) => (
-                      <th
-                        key={col.key}
-                        draggable
-                        onDragStart={(e) => handleApplyPaymentDragStart(e, idx)}
-                        onDragEnd={handleApplyPaymentDragEnd}
-                        onDragOver={handleApplyPaymentDragOver}
-                        onDrop={(e) => handleApplyPaymentDrop(e, idx)}
-                        className={`group relative cursor-move select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors hover:border-emerald-200 hover:bg-emerald-700 ${draggedApplyPaymentColumnIdx === idx ? 'border-2 border-dashed border-emerald-300 bg-emerald-700 opacity-50' : ''} ${col.align}`}
-                        style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
-                        title="Drag to reorder column"
-                      >
-                        <div
-                          className={`flex items-center text-[13px] font-bold text-white ${
-                            col.align === 'text-right' ? 'justify-end' : col.align === 'text-center' ? 'justify-center' : ''
-                          }`}
-                        >
-                          {col.label}
-                        </div>
-                        <div
-                          onMouseDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            const th = e.currentTarget.parentElement;
-                            if (!th) return;
-                            const startWidth = th.getBoundingClientRect().width;
-                            applyPaymentResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
-                            const onMouseMove = (ev: MouseEvent) => {
-                              if (!applyPaymentResizeRef.current) return;
-                              const diff = ev.clientX - applyPaymentResizeRef.current.startX;
-                              const newWidth = Math.max(60, applyPaymentResizeRef.current.startWidth + diff);
-                              setApplyPaymentColumnWidths(prev => ({ ...prev, [applyPaymentResizeRef.current!.colKey]: newWidth }));
-                            };
-                            const onMouseUp = () => {
-                              applyPaymentResizeRef.current = null;
-                              document.removeEventListener('mousemove', onMouseMove);
-                              document.removeEventListener('mouseup', onMouseUp);
-                              document.body.style.cursor = '';
-                              document.body.style.userSelect = '';
-                            };
-                            document.addEventListener('mousemove', onMouseMove);
-                            document.addEventListener('mouseup', onMouseUp);
-                            document.body.style.cursor = 'col-resize';
-                            document.body.style.userSelect = 'none';
-                          }}
-                          className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize transition-colors hover:bg-emerald-400 z-10"
-                          title="Drag to resize column"
-                          draggable={false}
-                        />
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {isFetchingOpenInvoices && (
-                    <tr>
-                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
-                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
-                        Fetching open invoices...
-                      </td>
-                    </tr>
-                  )}
-                  {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
-                    <tr>
-                      <td colSpan={orderedApplyPaymentColumns.length} className="px-4 py-12 text-center text-gray-500">
-                        <FileText size={40} className="mx-auto mb-2 text-gray-300" />
-                        No open invoices for this payor.
-                      </td>
-                    </tr>
-                  )}
-                  {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
-                    <tr key={inv.id} className="cursor-pointer transition-colors hover:bg-gray-50">
-                      {orderedApplyPaymentColumns.map(col => (
-                        <td
-                          key={col.key}
-                          className={`px-4 py-3 ${col.align}`}
-                          style={applyPaymentColumnWidths[col.key] ? { width: applyPaymentColumnWidths[col.key], minWidth: applyPaymentColumnWidths[col.key] } : undefined}
-                        >
-                          {col.render(inv, invoiceSelectionMap, invoiceApplyMap, transactionDescriptions, setTransactionDescriptions, handleInvoiceTick, availableToApply)}
-                        </td>
+          <div className="flex flex-wrap items-center gap-5 border-b border-slate-200 bg-white px-5 py-3">
+            <button
+              title="Discard Changes and Close"
+              onClick={() => setViewMode('list')}
+              className={toolbarButtonClass}
+            >
+              <RotateCcw size={21} />
+            </button>
+            <button
+              title="Save Payment Application"
+              onClick={applySelectedInvoices}
+              disabled={!canSubmitApplication}
+              className={toolbarButtonClass}
+            >
+              <Save size={20} />
+            </button>
+            <button
+              title="Approve Payment Application"
+              onClick={applySelectedInvoices}
+              disabled={!canSubmitApplication}
+              className={toolbarButtonClass}
+            >
+              <CheckCircle size={20} />
+            </button>
+            <button
+              title="New Payment Application"
+              onClick={startNewPaymentApplication}
+              className={toolbarButtonClass}
+            >
+              <Plus size={22} />
+            </button>
+            <button
+              title="Print"
+              onClick={handlePrintPayment}
+              className={toolbarButtonClass}
+            >
+              <Printer size={21} />
+            </button>
+            <button
+              title="Reverse"
+              onClick={handleOpenReversePayment}
+              disabled={!canUseReverseAction}
+              className={toolbarButtonClass}
+            >
+              <CornerUpLeft size={20} />
+            </button>
+          </div>
+
+          {applicationGlHasMissingAccounts && plannedAppliedTotal > 0 && (
+            <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Configure Customer Deposits and Accounts Receivable GL accounts before applying this payment.
+            </div>
+          )}
+
+          <div className="flex-1 overflow-auto p-4">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(420px,1fr)]">
+              <section className="min-h-[354px] rounded-lg border border-slate-200 bg-white p-5">
+                <h3 className="mb-5 text-sm font-normal uppercase tracking-normal text-slate-800">Application Details</h3>
+                <div className="grid grid-cols-1 gap-x-12 gap-y-5 md:grid-cols-2">
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Payment No.</span>
+                    <span className={detailValueClass}>{editingPayment.paymentNo}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Payor Type</span>
+                    <span className={detailValueClass}>{editingPayment.sponsorId ? 'Sponsor' : 'Student'}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Post Period</span>
+                    <span className={detailValueClass}>{formatPostPeriod(applicationDate)}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Payor Name</span>
+                    <span className={detailValueClass}>{getPayorName(editingPayment)}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Payment Date</span>
+                    <span className={detailValueClass}>{applicationDateLabel}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <label htmlFor="payment-application-cr-no" className={detailLabelClass}>C.R. No.</label>
+                    <input
+                      id="payment-application-cr-no"
+                      value={formData.crNo}
+                      onChange={e => setFormData(prev => ({ ...prev, crNo: e.target.value }))}
+                      placeholder="Collection Receipt No."
+                      className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] font-normal text-slate-800 shadow-inner outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Payment Method</span>
+                    <span className={detailValueClass}>{editingPayment.paymentMethod}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Status</span>
+                    <div className={readonlyPillClass}>ON HOLD</div>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>Reference No.</span>
+                    <span className={detailValueClass}>{editingPayment.refNo || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-4">
+                    <span className={detailLabelClass}>GL Reference No.</span>
+                    <div className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] font-normal text-slate-500 shadow-inner">
+                      {applicationGlReference === '-' ? 'Generated when application is approved' : applicationGlReference}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="min-h-[354px] rounded-lg border border-slate-200 bg-white p-4">
+                <h3 className="mb-4 text-sm font-normal uppercase tracking-normal text-slate-800">GL Journal Entry Preview</h3>
+                <div className="overflow-hidden rounded-md border border-slate-100 shadow-sm">
+                  <table className="w-full text-[13px]">
+                    <thead className="bg-slate-50">
+                      <tr className="text-left text-[12px] font-normal uppercase text-slate-800">
+                        <th className="px-3 py-3">GL Account</th>
+                        <th className="px-3 py-3 text-right">Debit</th>
+                        <th className="px-3 py-3 text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayApplicationGlRows.map((row, index) => (
+                        <tr key={index} className={`border-t border-slate-100 ${row.missing ? 'text-rose-700' : 'text-slate-800'}`}>
+                          <td className="px-3 py-3 font-normal">{row.account}</td>
+                          <td className="px-3 py-3 text-right font-normal">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                          <td className="px-3 py-3 text-right font-normal">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      <tr className="border-t border-slate-200 bg-white font-normal text-slate-800">
+                        <td className="px-3 py-3">Total</td>
+                        <td className="px-3 py-3 text-right">{formatCurrency(plannedAppliedTotal)}</td>
+                        <td className="px-3 py-3 text-right">{formatCurrency(plannedAppliedTotal)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/80 p-4 text-[13px] text-emerald-800">
+                  <div className="mb-2 font-normal">GL Entry Details</div>
+                  <ul className="list-disc space-y-2 pl-5 font-normal">
+                    <li>Journal Entry Date: {applicationDateLabel}</li>
+                    <li>Reference: {applicationNoPreview}</li>
+                    <li>Total Debit = Total Credit (balanced entry)</li>
+                  </ul>
+                </div>
+              </section>
             </div>
 
-            <div className="mt-4 rounded-lg border bg-gray-50 p-4">
-              <div className="flex justify-between text-sm">
-                <span className="font-semibold text-gray-700">Total to Apply:</span>
-                <span className="font-bold text-black">{formatCurrency(plannedAppliedTotal)}</span>
+            <section className="mt-3 rounded-lg border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-normal uppercase tracking-normal text-slate-800">Invoice Applications</h3>
+              <div className="overflow-x-auto rounded-md border border-slate-200">
+                <table className="min-w-[980px] w-full font-sans text-sm">
+                  <thead className="bg-emerald-700">
+                    <tr className="text-left text-sm font-normal text-white">
+                      <th className="w-24 border-r border-emerald-500 px-4 py-3.5 text-center">Apply</th>
+                      <th className="min-w-40 border-r border-emerald-500 px-4 py-3.5">Invoice No</th>
+                      <th className="min-w-32 border-r border-emerald-500 px-4 py-3.5">Date</th>
+                      <th className="min-w-32 border-r border-emerald-500 px-4 py-3.5">Post Period</th>
+                      <th className="min-w-[280px] border-r border-emerald-500 px-4 py-3.5">Transaction Description</th>
+                      <th className="min-w-36 border-r border-emerald-500 px-4 py-3.5 text-right">Amount Due</th>
+                      <th className="min-w-40 px-4 py-3.5 text-right">Apply Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isFetchingOpenInvoices && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                          <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                          Fetching open invoices...
+                        </td>
+                      </tr>
+                    )}
+                    {!isFetchingOpenInvoices && openInvoicesForPayor.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                          <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                          No invoices for this payor.
+                        </td>
+                      </tr>
+                    )}
+                    {!isFetchingOpenInvoices && openInvoicesForPayor.map(inv => (
+                      <tr key={inv.id} className="border-t border-slate-100 text-slate-800 hover:bg-slate-50">
+                        <td className="px-4 py-3.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={!!invoiceSelectionMap[inv.id]}
+                            onChange={e => handleInvoiceTick(inv, e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3.5 font-normal">{inv.invoiceNo}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-'}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{formatPostPeriod(inv.invoiceDate) || '-'}</td>
+                        <td className="px-4 py-3.5">
+                          <input
+                            type="text"
+                            value={transactionDescriptions[inv.id] || `Payment application for invoice ${inv.invoiceNo}`}
+                            onChange={e => setTransactionDescriptions(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                            disabled={!invoiceSelectionMap[inv.id]}
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner outline-none transition-colors focus:border-emerald-500 disabled:bg-slate-50 disabled:text-slate-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-normal">{formatCurrency(inv.balanceDue)}</td>
+                        <td className="px-4 py-3.5 text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            disabled={!invoiceSelectionMap[inv.id]}
+                            max={Math.min(Math.max(Number(inv.balanceDue || 0), 0), availableToApply)}
+                            value={invoiceApplyMap[inv.id] || ''}
+                            onChange={e => {
+                              const value = parseFloat(e.target.value) || 0;
+                              setInvoiceApplyMap(prev => ({ ...prev, [inv.id]: Math.min(value, Math.max(Number(inv.balanceDue || 0), 0)) }));
+                            }}
+                            className="w-32 rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-sm font-normal text-slate-800 shadow-inner outline-none transition-colors focus:border-emerald-500 disabled:bg-slate-50"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+
+              <div className="mt-12 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 shadow-inner">
+                <div className="flex justify-between text-sm">
+                  <span className="font-normal text-slate-700">Total to Apply:</span>
+                  <span className="font-normal text-slate-800">{formatCurrency(plannedAppliedTotal)}</span>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -3510,6 +3733,288 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   // ===== VIEW: PAYMENT DETAILS =====
   if (viewMode === 'payment-details' && editingPayment) {
+    if (listTab === 'applications') {
+      const activeApplications = getPaymentApplicationRecords(editingPayment);
+      const primaryApplication = activeApplications[0];
+      const applicationDetailDate = (primaryApplication?.createdAt || editingPayment.updatedAt || editingPayment.paymentDate || new Date().toISOString()).split('T')[0];
+      const applicationDetailNo = getPaymentApplicationNumberLabel(editingPayment);
+      const applicationDetailGlReference = getPaymentApplicationGlReferenceLabel(editingPayment);
+      const applicationAppliedTotal = activeApplications.reduce((sum, app) => sum + Number(app.amountApplied || 0), 0);
+      const applicationRemainingBalance = getAvailablePaymentBalance(editingPayment);
+      const { customerDepositsAccount } = resolvePaymentGlAccounts();
+      const applicationDetailGlRows = applicationAppliedTotal > 0
+        ? [
+          {
+            account: getGlAccountLabel(customerDepositsAccount, 'Customer Deposits account not configured'),
+            debit: applicationAppliedTotal,
+            credit: 0,
+            missing: !customerDepositsAccount
+          },
+          ...activeApplications.map(app => {
+            const invoice = invoices.find(inv => inv.id === app.invoiceId);
+            const arAccount = getReceivableAccountForInvoice(invoice);
+            return {
+              account: getGlAccountLabel(arAccount, `Accounts Receivable for ${invoice?.invoiceNo || app.invoiceId} not configured`),
+              debit: 0,
+              credit: Number(app.amountApplied || 0),
+              missing: !arAccount
+            };
+          })
+        ]
+        : [];
+
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('list')}
+              className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft size={16} />
+              Back to Payments and Applications
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between border-b bg-brand/10 p-4">
+              <div>
+                <h3 className="text-xl text-gray-800">
+                  Payment Application : {applicationDetailNo}
+                </h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Payment <span className="font-semibold text-gray-900">{editingPayment.paymentNo}</span> for <span className="font-semibold text-gray-900">{getPayorName(editingPayment)}</span>
+                </p>
+              </div>
+            </div>
+
+            {renderPaymentDocumentActions()}
+            {primaryApplication?.journalEntryId && onViewJournal && (
+              <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2">
+                <button
+                  title="View Journal Entry"
+                  onClick={() => onViewJournal(primaryApplication.journalEntryId!)}
+                  className={`${iconActionClass} hover:text-emerald-500 hover:bg-emerald-50`}
+                >
+                  <FileText size={20} />
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-auto p-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                <div className="space-y-4 xl:col-span-8">
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Application Information</h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                      <div>
+                        <label className={invoiceLabelClass}>Payment Application No.</label>
+                        <input value={applicationDetailNo} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Post Period</label>
+                        <input value={formatPostPeriod(applicationDetailDate)} readOnly className={invoicePostPeriodClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Application Date</label>
+                        <div className="relative mt-1">
+                          <Calendar size={14} className="pointer-events-none absolute right-3 top-2.5 text-gray-400" />
+                          <input type="date" value={applicationDetailDate} readOnly className={invoiceReadOnlyClass} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Status</label>
+                        <div className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50">
+                          <span className="text-[13px] font-medium text-gray-700">
+                            {getDisplayStatusLabel(getApplicationRegistryStatus(editingPayment))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                      <div>
+                        <label className={invoiceLabelClass}>Payment No.</label>
+                        <input value={editingPayment.paymentNo} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>C.R. No.</label>
+                        <input value={editingPayment.crNo || '-'} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Payor Type</label>
+                        <input value={editingPayment.sponsorId ? 'Sponsor' : 'Student'} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Payment Method</label>
+                        <input value={editingPayment.paymentMethod} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={invoiceLabelClass}>Payor Name</label>
+                        <input value={getPayorName(editingPayment)} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={invoiceLabelClass}>GL Reference No.</label>
+                        <input value={applicationDetailGlReference} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Payment Details</h3>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                      <div>
+                        <label className={invoiceLabelClass}>Amount Received</label>
+                        <input value={formatInputCurrency(editingPayment.amountReceived)} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>EWT Amount Certified</label>
+                        <input value={formatInputCurrency(editingPayment.ewtAmountCertified)} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Amount Applied</label>
+                        <input value={formatInputCurrency(applicationAppliedTotal)} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                      <div>
+                        <label className={invoiceLabelClass}>Unapplied Balance</label>
+                        <input value={formatInputCurrency(applicationRemainingBalance)} readOnly className={invoicePostPeriodClass} />
+                      </div>
+                      <div className="md:col-span-4">
+                        <label className={invoiceLabelClass}>Transaction Description</label>
+                        <input value={editingPayment.notes || '-'} readOnly className={invoiceReadOnlyClass} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-600">Invoice Applications</h3>
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-emerald-600">
+                          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-white">
+                            <th className="px-4 py-3">Invoice Number</th>
+                            <th className="px-4 py-3">Application No.</th>
+                            <th className="px-4 py-3">GL Reference No.</th>
+                            <th className="px-4 py-3">Description</th>
+                            <th className="px-4 py-3 text-center">Status</th>
+                            <th className="px-4 py-3 text-right">Applied Amount</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {activeApplications.map(app => {
+                            const invoice = invoices.find(i => i.id === app.invoiceId);
+                            return (
+                              <tr key={app.id} className="text-gray-700 hover:bg-gray-50">
+                                <td className="px-4 py-3 text-xs font-medium">{invoice?.invoiceNo || app.invoiceId}</td>
+                                <td className="px-4 py-3 text-xs font-medium">{getPaymentApplicationNo(app)}</td>
+                                <td className="px-4 py-3 text-xs font-medium">{app.glReference || 'Pending'}</td>
+                                <td className="px-4 py-3 text-xs">{app.description || '-'}</td>
+                                <td className="px-4 py-3 text-center text-xs font-semibold">{getApplicationStatusLabel(editingPayment, app)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-emerald-700">{formatCurrency(app.amountApplied)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  {app.isReversed ? (
+                                    <span className="text-xs font-semibold text-gray-400">Reversed</span>
+                                  ) : onReverseApplication ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openReverseApplicationModal(editingPayment, app)}
+                                      className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                    >
+                                      <RotateCcw size={12} />
+                                      Reverse
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 xl:col-span-4">
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className={previewSectionTitleClass}>
+                      GL Journal Entry Preview
+                    </h3>
+
+                    {applicationDetailGlRows.length === 0 ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                        No active invoice applications are available to preview.
+                      </div>
+                    ) : (
+                      <>
+                        <table className="w-full text-[11px]">
+                          <thead>
+                            <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                              <th className="pb-2">GL Account</th>
+                              <th className="pb-2 text-right">Debit</th>
+                              <th className="pb-2 text-right">Credit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {applicationDetailGlRows.map((row, index) => (
+                              <tr key={index} className={`border-t ${row.missing ? 'text-rose-700' : 'text-gray-700'}`}>
+                                <td className="py-2 text-[11px] font-medium">{row.account}</td>
+                                <td className="py-2 text-right text-[11px] font-medium">{row.debit ? formatCurrency(row.debit) : '-'}</td>
+                                <td className="py-2 text-right text-[11px] font-medium">{row.credit ? formatCurrency(row.credit) : '-'}</td>
+                              </tr>
+                            ))}
+                            <tr className="border-t-2 border-gray-300 font-bold text-gray-700">
+                              <td className="py-3 text-[11px]">Total</td>
+                              <td className="py-3 text-right text-[11px]">{formatCurrency(applicationAppliedTotal)}</td>
+                              <td className="py-3 text-right text-[11px]">{formatCurrency(applicationAppliedTotal)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-700">
+                          <div className="mb-2 font-semibold">GL Entry Details</div>
+                          <ul className="list-disc space-y-1 pl-4 text-[11px] font-medium">
+                            <li>Journal Entry Date: {new Date(applicationDetailDate).toLocaleDateString()}</li>
+                            <li>Reference: {applicationDetailNo}</li>
+                            <li>Debit Customer Deposits and credit Accounts Receivable</li>
+                            <li>Total Debit = Total Credit (balanced entry)</li>
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <h3 className={previewSectionTitleClass}>
+                      Application Preview
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-gray-200 p-3">
+                        <div className={previewLabelClass}>Applications</div>
+                        <div className={previewValueClass}>{activeApplications.length}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 p-3">
+                        <div className={previewLabelClass}>Invoices</div>
+                        <div className={previewValueClass}>{getPaymentApplicationInvoiceLabel(editingPayment)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 p-3">
+                        <div className={previewLabelClass}>Applied</div>
+                        <div className={previewValueClass}>{formatCurrency(applicationAppliedTotal)}</div>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className={previewLabelClass}>Balance</div>
+                        <div className="mt-1 text-[13px] font-semibold text-gray-700">{formatCurrency(applicationRemainingBalance)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const glLines = calculatePaymentGlLines();
 
     return (
@@ -3546,15 +4051,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                   </span>
                 </div>
               </div>
-              {/* Close Button - Top Right */}
-              <button
-                onClick={() => setViewMode('list')}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium"
-              >
-                Close
-              </button>
             </div>
           </div>
+          {renderPaymentDocumentActions()}
 
           {/* Content */}
           <div className="p-6">
