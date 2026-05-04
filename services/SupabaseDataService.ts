@@ -510,8 +510,9 @@ export class SupabaseDataService implements IDataService {
       });
 
       if (!response.ok && response.status !== 204) {
-        console.error(`[Supabase] Error deleting from ${table} with filter ${filter}: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to delete from ${table}`);
+        const errorText = await response.text();
+        console.error(`[Supabase] Error deleting from ${table} with filter ${filter}: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`Failed to delete from ${table}: ${errorText || response.statusText}`);
       }
 
       console.info(`[Supabase] ✅ Deleted from ${table} with filter: ${filter}`);
@@ -4854,22 +4855,33 @@ export class SupabaseDataService implements IDataService {
       }
     }
 
-    console.debug('[Supabase] Filtered update payload for invoices:', filteredUpdates);
-
-    // Call generic update with the filtered snake_case payload
-    const updatedInvoice = await this.updateInSupabase<any>('invoices', id, filteredUpdates);
-
-    // Sync lines if provided
+    let savedLines: any[] | undefined;
     if (lines && Array.isArray(lines)) {
       console.debug('[Supabase] Syncing lines for invoice:', id, 'Count:', lines.length);
-      // Delete existing lines
+      // Replace lines before updating the header. Approving/posting changes the
+      // invoice to an accounting-locked state, and DB triggers then reject line
+      // deletes/inserts for that invoice.
       await this.deleteByFilter('invoice_lines', `invoice_id=eq.${id}`);
 
-      // Insert new lines
       if (lines.length > 0) {
-        await this.createInvoiceLines(lines.map(l => ({ ...l, invoiceId: id, orgId: updates.orgId || updatedInvoice.orgId })));
+        savedLines = await this.createInvoiceLines(lines.map(l => ({
+          ...l,
+          invoiceId: id,
+          orgId: updates.orgId || existingInvoice?.org_id || existingInvoice?.orgId
+        })));
+      } else {
+        savedLines = [];
       }
-      (updatedInvoice as any).lines = lines;
+    }
+
+    console.debug('[Supabase] Filtered update payload for invoices:', filteredUpdates);
+
+    // Call generic update with the filtered snake_case payload after child lines
+    // are synced so the posted-invoice lock trigger does not block them.
+    const updatedInvoice = await this.updateInSupabase<any>('invoices', id, filteredUpdates);
+
+    if (savedLines) {
+      (updatedInvoice as any).lines = savedLines;
     }
 
     return updatedInvoice;
