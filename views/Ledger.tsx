@@ -29,6 +29,18 @@ interface LedgerProps {
   initialSearchTerm?: string;
 }
 
+const getJournalEntryReferenceNo = (entry: JournalEntry): string => {
+  const sourceType = String(entry.sourceType || '').toUpperCase();
+  const sourceReference = String(entry.reference || '').trim();
+  const glReference = String(entry.glEntryNumber || '').trim();
+
+  if (sourceType === 'APPLICATION' && sourceReference) {
+    return sourceReference;
+  }
+
+  return glReference || sourceReference;
+};
+
 const Ledger: React.FC<LedgerProps> = ({
   accounts, entries, lines, invoices = [], payments = [], students, sponsors, trainers, batches, items, qualifications = [], users = [],
   currentUser, onPostEntry, onApproveJournal, onReverseJournal,
@@ -872,7 +884,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
             <div className="p-2 bg-[#F47721] text-white rounded-xl shadow-md font-bold text-xs">VOUCHER</div>
             <div>
                <h3 className="text-lg font-bold text-slate-800 tracking-tight">Journal Entry Details</h3>
-               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-0.5">{(entry.glEntryNumber || entry.reference || '').trim()}</p>
+               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-0.5">{getJournalEntryReferenceNo(entry)}</p>
             </div>
           </div>
         </div>

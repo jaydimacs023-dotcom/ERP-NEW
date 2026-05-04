@@ -141,6 +141,12 @@ const JournalForm: React.FC<JournalFormProps> = ({
         return;
       }
 
+      if (sourceType === 'APPLICATION') {
+        const applicationReferenceNo = String(entry.reference || '').trim();
+        setDisplaySourceRef(applicationReferenceNo || String(entry.sourceRef || '').trim());
+        return;
+      }
+
       if (!entry.sourceRef || sourceType !== 'INVOICE') {
         setDisplaySourceRef('');
         return;
@@ -488,7 +494,9 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                   value={displaySourceRef || entry.sourceRef || ''}
                   title={String(entry.sourceType || '').toUpperCase() === 'PAYMENT'
                     ? 'payment_no from payments.id = sourceRef (UUID). Shows Payment No.'
-                    : 'invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX'}
+                    : String(entry.sourceType || '').toUpperCase() === 'APPLICATION'
+                      ? 'Payment Application Number from journal entry reference.'
+                      : 'invoice_no from invoices.id = sourceRef (UUID). Shows formatted #INV-XXXXX'}
                 />           
             </div>
             <div className="space-y-1.5">

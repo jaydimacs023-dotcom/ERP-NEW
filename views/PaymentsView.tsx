@@ -61,6 +61,7 @@ type PayorType = 'SPONSOR' | 'STUDENT';
 type ViewMode = 'list' | 'create-payment' | 'apply-payment' | 'payment-details';
 type ListTab = 'payments' | 'applications';
 type ApplicationListTab = 'unapplied' | 'applied';
+type AmountFieldName = 'amountReceived' | 'ewtAmountCertified';
 type PaymentRegistryColumn = {
   key: string;
   label: string;
@@ -193,6 +194,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     ewtAmountCertified: 0,
     notes: ''
   });
+  const [focusedAmountField, setFocusedAmountField] = useState<AmountFieldName | null>(null);
+  const [amountInputDrafts, setAmountInputDrafts] = useState<Record<AmountFieldName, string>>({
+    amountReceived: '',
+    ewtAmountCertified: ''
+  });
 
   const selectedPayorId = payorType === 'SPONSOR' ? formData.sponsorId : formData.studentId;
   // Read-only for posted/voided payments when viewing, or for payments with certain statuses
@@ -221,6 +227,59 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const cleaned = value.replace(/,/g, '').replace(/\s/g, '');
     const parsed = parseFloat(cleaned);
     return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const formatEditableAmount = (value: number) => {
+    if (!value) return '';
+    return String(value);
+  };
+
+  const normalizeAmountInput = (value: string) => {
+    let normalized = value.replace(/,/g, '').replace(/\s/g, '').replace(/[^\d.]/g, '');
+    const firstDecimalIndex = normalized.indexOf('.');
+    if (firstDecimalIndex !== -1) {
+      normalized =
+        normalized.slice(0, firstDecimalIndex + 1) +
+        normalized.slice(firstDecimalIndex + 1).replace(/\./g, '');
+    }
+    if (normalized.startsWith('.')) normalized = `0${normalized}`;
+    return normalized;
+  };
+
+  const getAmountInputValue = (field: AmountFieldName) => {
+    if (focusedAmountField === field) return amountInputDrafts[field];
+    return formatInputCurrency(formData[field]);
+  };
+
+  const handleAmountFocus = (field: AmountFieldName, event: React.FocusEvent<HTMLInputElement>) => {
+    setFocusedAmountField(field);
+    setAmountInputDrafts(prev => ({
+      ...prev,
+      [field]: formatEditableAmount(formData[field])
+    }));
+    event.currentTarget.select();
+  };
+
+  const handleAmountChange = (field: AmountFieldName, rawValue: string) => {
+    const normalized = normalizeAmountInput(rawValue);
+    const parsedAmount = parseInputCurrency(normalized);
+    setAmountInputDrafts(prev => ({ ...prev, [field]: normalized }));
+    setFormData(prev => {
+      if (field !== 'ewtAmountCertified') {
+        return { ...prev, [field]: parsedAmount };
+      }
+
+      const ewtDelta = parsedAmount - Number(prev.ewtAmountCertified ?? 0);
+      return {
+        ...prev,
+        amountReceived: Math.max(Number(prev.amountReceived ?? 0) - ewtDelta, 0),
+        ewtAmountCertified: parsedAmount
+      };
+    });
+  };
+
+  const handleAmountBlur = () => {
+    setFocusedAmountField(null);
   };
 
   const generatePaymentNo = () => {
@@ -702,7 +761,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const totalReceived = Number(printablePayment.amountReceived ?? 0) + Number(printablePayment.ewtAmountCertified ?? 0);
     const dateLabel = printablePayment.paymentDate ? format(new Date(printablePayment.paymentDate), 'MM-dd-yyyy') : '-';
     const statusLabel = getDisplayStatusLabel(printablePayment.status);
-    const bankLabel = getCashGlLabel(printablePayment.bankAccountId as string | undefined);
     const esc = (value: any) =>
       String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -710,66 +768,88 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    const orgName = organization?.name || 'Payment Registry';
+    const logoUrl = organization?.logoUrl || '';
+    const voucherAccent = '#006b2d';
+    const transactionDescription = printablePayment.notes || (payorName && payorName !== '-' ? `Collection from ${payorName}` : 'Payment application');
 
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Payment Voucher</title><style>
-      @page { size: landscape; margin: 12mm; }
-      * { box-sizing: border-box; }
-      body { margin:0; padding:20px; font-family: Arial, Helvetica, sans-serif; color:#111827; }
-      .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #f3f4f6; }
-      .org { font-size:18px; font-weight:700; }
-      .title { font-size:22px; font-weight:800; color:#f47721; margin-top:4px; }
-      .sub { color:#6b7280; font-size:12px; margin-top:4px; }
-      .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
-      .card { border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
-      .card h3 { margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#4b5563; }
-      .row { display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:13px; }
-      .row span:first-child { color:#6b7280; }
-      .row span:last-child { font-weight:600; color:#111827; text-align:right; }
-      table { width:100%; border-collapse:collapse; font-size:12px; }
-      th { text-align:left; background:#f9fafb; color:#4b5563; text-transform:uppercase; font-size:10px; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid #e5e7eb; }
-      td { padding:8px 10px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+      @page { size: A4; margin: 0; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+      .page { position: relative; width: 210mm; height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; overflow: hidden; background:#fff; display:flex; flex-direction:column; }
+      .muted, .sub { color:#6b7280; font-size:12px; }
+      table { width:100%; border-collapse: collapse; font-size:12px; }
+      .band { background:${voucherAccent} !important; color:#fff !important; font-weight:700; }
+      .print-box { border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; flex:1 1 auto; display:flex; flex-direction:column; }
+      .summary { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+      .section { border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; }
+      .section-title { background:${voucherAccent} !important; color:#fff !important; font-size:12px; font-weight:700; text-transform:uppercase; padding:6px 8px; }
+      .section-body { padding:8px; }
+      .row { display:flex; justify-content:space-between; gap:14px; padding:4px 0; font-size:12px; }
+      .row span:last-child { font-weight:700; text-align:right; }
+      th { padding:6px 8px; text-align:left; font-size:12px; }
+      td { padding:6px 8px; border-bottom:1px solid #d1d5db; vertical-align:top; }
       td.num { text-align:right; white-space:nowrap; }
-      .footer { margin-top:18px; color:#9ca3af; font-size:10px; text-align:right; }
+      .nothing-follows { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; color:#6b7280; font-size:11px; font-style:italic; letter-spacing:.08em; padding:12px 8px; }
+      .signatures { margin-top:auto; display:grid; grid-template-columns:repeat(3,1fr); border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; flex:0 0 auto; }
+      .sign-box { min-height:116px; display:flex; flex-direction:column; border-right:1px solid ${voucherAccent}; }
+      .sign-box:last-child { border-right:0; }
+      .sign-label { padding:10px 12px; font-size:11px; font-weight:800; text-transform:uppercase; }
+      .sign-space { flex:1; margin:44px 28px 22px; border-bottom:1px solid #111827; }
+      .sign-footer { background:${voucherAccent} !important; color:#fff !important; text-align:center; font-weight:800; padding:7px; font-size:11px; }
+      .footer { margin-top:18px; color:#6b7280; font-size:12px; text-align:right; }
+      @media print {
+        body { background:#fff !important; }
+        .band, .section-title, .sign-footer { background:${voucherAccent} !important; color:#fff !important; }
+      }
     </style></head><body>
-      <div class="header">
+      <div class="page">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
-          <div class="org">${esc(organization?.name || 'Payment Registry')}</div>
-          <div class="title">Payment Voucher</div>
-          <div class="sub">Payment No. ${esc(printablePayment.paymentNo || '-')} | ${esc(dateLabel)} | ${esc(statusLabel)}</div>
+          ${logoUrl ? `<img src="${esc(logoUrl)}" alt="Tenant logo" style="max-width:300px;max-height:90px;object-fit:contain;" />` : `<div style="font-size:28px;font-weight:800;">${esc(orgName)}</div>`}
+          <div style="margin-top:8px;font-size:13px;">${esc(orgName)}</div>
         </div>
-        <div class="sub" style="text-align:right">
-          Printed ${esc(new Date().toLocaleString('en-PH'))}
+        <div style="text-align:left;min-width:310px;">
+          <div style="font-size:44px;font-weight:700;line-height:1;margin-bottom:8px;color:${voucherAccent};">Payment Voucher</div>
+          <table style="font-size:14px;">
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Reference No.:</td><td style="padding:2px 0;text-align:right;border:0;">${esc(printablePayment.paymentNo || '-')}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Date:</td><td style="padding:2px 0;text-align:right;border:0;">${esc(dateLabel)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Status:</td><td style="padding:2px 0;text-align:right;border:0;">${esc(statusLabel)}</td></tr>
+          </table>
+          <div class="muted" style="text-align:right;margin-top:6px;">Printed ${esc(new Date().toLocaleString('en-US'))}</div>
         </div>
       </div>
-      <div class="grid">
-        <div class="card">
-          <h3>Payment Information</h3>
+      <div class="summary">
+        <div class="section">
+          <div class="section-title">Payment Information</div>
+          <div class="section-body">
           <div class="row"><span>C.R. No.</span><span>${esc(printablePayment.crNo || '-')}</span></div>
           <div class="row"><span>Payor</span><span>${esc(payorName || '-')}</span></div>
           <div class="row"><span>Payment Method</span><span>${esc(printablePayment.paymentMethod || '-')}</span></div>
           <div class="row"><span>Reference No.</span><span>${esc(printablePayment.refNo || '-')}</span></div>
-          <div class="row"><span>Cash Account</span><span>${esc(bankLabel || '-')}</span></div>
-          <div class="row"><span>Check Number</span><span>${esc(printablePayment.checkNumber || '-')}</span></div>
-          <div class="row"><span>Check Date</span><span>${esc(printablePayment.checkDate || '-')}</span></div>
+          </div>
         </div>
-        <div class="card">
-          <h3>Amount Summary</h3>
+        <div class="section">
+          <div class="section-title">Amount Summary</div>
+          <div class="section-body">
           <div class="row"><span>Amount Received</span><span>${formatCurrency(Number(printablePayment.amountReceived ?? 0))}</span></div>
           <div class="row"><span>EWT Amount Certified</span><span>${formatCurrency(Number(printablePayment.ewtAmountCertified ?? 0))}</span></div>
           <div class="row"><span>Total Received</span><span>${formatCurrency(totalReceived)}</span></div>
           <div class="row"><span>Amount Applied</span><span>${formatCurrency(Number(printablePayment.totalApplied ?? 0))}</span></div>
           <div class="row"><span>Unapplied Balance</span><span>${formatCurrency(Number(printablePayment.customerDepositBalance ?? 0))}</span></div>
           <div class="row"><span>Status</span><span>${statusLabel}</span></div>
+          </div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
-        <h3>Invoice Applications</h3>
+      <div class="print-box" style="margin-top:18px;">
         ${activeApplications.length === 0 ? '<div class="sub">No applications yet.</div>' : `
           <table>
             <thead>
-              <tr>
+              <tr class="band">
                 <th>Invoice</th>
                 <th>Application Status</th>
+                <th>Transaction Description</th>
                 <th class="num">Applied Amount</th>
               </tr>
             </thead>
@@ -779,15 +859,26 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 return `<tr>
                   <td>${esc(invoice?.invoiceNo || app.invoiceId)}</td>
                   <td>${esc(getApplicationStatusLabel(printablePayment, app))}</td>
+                  <td>${esc(transactionDescription)}</td>
                   <td class="num">${formatCurrency(Number(app.amountApplied ?? 0))}</td>
                 </tr>`;
               }).join('')}
             </tbody>
           </table>
+          <div class="nothing-follows">*** NOTHING FOLLOWS ***</div>
         `}
       </div>
-      ${printablePayment.notes ? `<div class="card" style="margin-top:16px"><h3>Transaction Description</h3><div class="sub" style="white-space:pre-wrap;color:#111827">${esc(printablePayment.notes).replace(/\n/g, '<br/>')}</div></div>` : ''}
-      <div class="footer">Generated by ${esc(organization?.name || 'AT-ERP')}</div>
+      <div class="signatures">
+        ${['Received By:', 'Reviewed By:', 'Acknowledged By:'].map(label => `
+          <div class="sign-box">
+            <div class="sign-label">${label}</div>
+            <div class="sign-space"></div>
+            <div class="sign-footer">NAME &amp; SIGNATURE</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="footer">Generated by ${esc(orgName)}</div>
+      </div>
     </body></html>`;
 
     const w = window.open('', '_blank');
@@ -3093,8 +3184,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={formatInputCurrency(formData.amountReceived)}
-                        onChange={e => setFormData(prev => ({ ...prev, amountReceived: parseInputCurrency(e.target.value) }))}
+                        value={getAmountInputValue('amountReceived')}
+                        onFocus={e => handleAmountFocus('amountReceived', e)}
+                        onChange={e => handleAmountChange('amountReceived', e.target.value)}
+                        onBlur={handleAmountBlur}
                         disabled={isReadOnly}
                         className={invoiceInputClass}
                       />
@@ -3104,8 +3197,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={formatInputCurrency(formData.ewtAmountCertified)}
-                        onChange={e => setFormData(prev => ({ ...prev, ewtAmountCertified: parseInputCurrency(e.target.value) }))}
+                        value={getAmountInputValue('ewtAmountCertified')}
+                        onFocus={e => handleAmountFocus('ewtAmountCertified', e)}
+                        onChange={e => handleAmountChange('ewtAmountCertified', e.target.value)}
+                        onBlur={handleAmountBlur}
                         disabled={isReadOnly}
                         className={invoiceInputClass}
                       />
