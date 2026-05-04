@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser, Payment } from '../types';
 import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
+import { calculateInvoiceDueDate, todayISO } from '../utils/invoiceTerms';
 import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Plus, Search, Filter, X, Save, Trash2, Edit3, Eye,
@@ -126,8 +127,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // Generate from Enrollments state
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>('');
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<Set<string>>(new Set());
-  const [generateInvoiceDate, setGenerateInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [generateDueDate, setGenerateDueDate] = useState<string>(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [generateInvoiceDate, setGenerateInvoiceDate] = useState<string>(todayISO());
+  const [generateDueDate, setGenerateDueDate] = useState<string>(calculateInvoiceDueDate(todayISO(), 'Net 30'));
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -152,8 +153,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     studentId: '',
     enrollmentId: '',
     batchId: '',
-    invoiceDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    invoiceDate: todayISO(),
+    dueDate: calculateInvoiceDueDate(todayISO(), 'Net 30'),
     status: 'ON_HOLD',
     reference: '',
     terms: 'Net 30',
@@ -196,6 +197,8 @@ const brandColor = organization?.primaryColor || '#059669';
     const normalized = String(value || '').trim();
     return !normalized || normalized.toLowerCase() === 'none';
   };
+  const invoicePrintAccent = '#006b2d';
+  const signatoryLabels = ['PREPARED BY:', 'REVIEWED BY:', 'APPROVED BY:'];
 
   const validateInvoiceRequiredFields = (invoiceDraft: Pick<Invoice, 'notes' | 'lines'> | null | undefined) => {
     const missingFields: string[] = [];
@@ -250,6 +253,10 @@ const brandColor = organization?.primaryColor || '#059669';
     : hasInvoiceApplication
       ? 'This invoice already has a payment application'
       : 'Pay';
+  const canUseInvoiceActions = editingInvoice?.status === 'OPEN';
+  const invoiceActionUnavailableTitle = editingInvoice
+    ? 'Only open invoices can use this action.'
+    : 'Save and approve the invoice before using this action.';
 
   // Generate next invoice number
   const generateInvoiceNo = () => {
@@ -280,17 +287,20 @@ const brandColor = organization?.primaryColor || '#059669';
 
   // Reset form
   const resetForm = () => {
+    const invoiceDate = todayISO();
+    const terms = 'Net 30';
     setFormData({
       invoiceNo: generateInvoiceNo(),
       sponsorId: '',
       studentId: '',
       enrollmentId: '',
       batchId: '',
-      invoiceDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      invoiceDate,
+      dueDate: calculateInvoiceDueDate(invoiceDate, terms),
       status: 'ON_HOLD',
       reference: '',
-      terms: 'Net 30',
+      terms,
+      notes: '',
       vatPricing: 'INCLUSIVE',
       vatRate: 0.12,
       glEntryNumber: '',
@@ -304,6 +314,22 @@ const brandColor = organization?.primaryColor || '#059669';
   const handleNew = () => {
     resetForm();
     setViewMode('FORM');
+  };
+
+  const handleInvoiceDateChange = (invoiceDate: string) => {
+    setFormData(prev => ({
+      ...prev,
+      invoiceDate,
+      dueDate: calculateInvoiceDueDate(invoiceDate, prev.terms),
+    }));
+  };
+
+  const handleTermsChange = (terms: string) => {
+    setFormData(prev => ({
+      ...prev,
+      terms,
+      dueDate: calculateInvoiceDueDate(prev.invoiceDate, terms),
+    }));
   };
 
   // Open modal for editing
@@ -427,9 +453,9 @@ const brandColor = organization?.primaryColor || '#059669';
     onNavigate?.('write-off', { invoice: editingInvoice });
   };
 
-  const handleReversalNavigation = () => {
+  const handleCreateAdjustmentNavigation = () => {
     if (!editingInvoice) return;
-    onNavigate?.('payments', { viewMode: 'payment-details', invoice: editingInvoice });
+    onNavigate?.('credit-debit-memo', { invoice: editingInvoice });
   };
 
   const handleVoidInvoiceClick = () => {
@@ -445,6 +471,58 @@ const brandColor = organization?.primaryColor || '#059669';
       ...prev,
       sponsorId
     }));
+  };
+
+  const getBatchStudentIds = (batchId: string) => {
+    const enrolledStudentIds = enrollments
+      .filter(e => e.batchId === batchId && !e.isDeleted)
+      .map(e => e.studentId)
+      .filter(Boolean);
+
+    if (enrolledStudentIds.length > 0) {
+      return Array.from(new Set(enrolledStudentIds));
+    }
+
+    const batch = batches.find(b => b.id === batchId);
+    return Array.from(new Set(batch?.studentIds || []));
+  };
+
+  const getBilledStudentIdsForPrivateBatch = (batchId: string) => {
+    return new Set(
+      invoices
+        .filter(inv =>
+          inv.batchId === batchId &&
+          inv.status !== 'VOIDED' &&
+          inv.id !== editingInvoice?.id &&
+          !inv.sponsorId &&
+          !!inv.studentId
+        )
+        .map(inv => inv.studentId as string)
+    );
+  };
+
+  const getBillableStudentsForBatch = (batchId: string, includeStudentId?: string) => {
+    const batch = batches.find(b => b.id === batchId);
+    const batchStudents = getBatchStudentIds(batchId)
+      .map(id => students.find(s => s.id === id))
+      .filter((s): s is Student => !!s && !s.isDeleted);
+
+    if (batch?.sponsorId) return batchStudents;
+
+    const billedStudentIds = getBilledStudentIdsForPrivateBatch(batchId);
+    return batchStudents.filter(student =>
+      !billedStudentIds.has(student.id) || student.id === includeStudentId
+    );
+  };
+
+  const isPrivateBatchFullyBilled = (batch: Batch) => {
+    if (batch.sponsorId) return false;
+
+    const studentIds = getBatchStudentIds(batch.id);
+    if (studentIds.length === 0) return false;
+
+    const billedStudentIds = getBilledStudentIdsForPrivateBatch(batch.id);
+    return studentIds.every(studentId => billedStudentIds.has(studentId));
   };
 
   // Recalculate VAT for all lines when VAT settings change or during initial edit load
@@ -488,10 +566,9 @@ const brandColor = organization?.primaryColor || '#059669';
     }
 
     const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
-    const studentsInBatch = batchEnrollments
-      .map(e => students.find(s => s.id === e.studentId))
-      .filter((s): s is Student => !!s && !s.isDeleted);
     const sponsorId = batch.sponsorId || '';
+    const studentsInBatch = getBillableStudentsForBatch(batchId, formData.studentId);
+    const nextPrivateStudentId = studentsInBatch[0]?.id || '';
 
     // if there are already lines, do not override description/course fee/unit price/amount
     if (formData.lines.length > 0) {
@@ -499,7 +576,7 @@ const brandColor = organization?.primaryColor || '#059669';
         ...prev,
         batchId,
         sponsorId,
-        studentId: sponsorId ? '' : (studentsInBatch[0]?.id || prev.studentId || '')
+        studentId: sponsorId ? '' : (nextPrivateStudentId || prev.studentId || '')
       }));
       return;
     }
@@ -547,7 +624,7 @@ const brandColor = organization?.primaryColor || '#059669';
       ...prev,
       batchId,
       sponsorId,
-      studentId: sponsorId ? '' : (studentsInBatch[0]?.id || ''),
+      studentId: sponsorId ? '' : nextPrivateStudentId,
       lines: newLines
     }));
   };
@@ -1316,6 +1393,14 @@ const brandColor = organization?.primaryColor || '#059669';
     const glRef = getInvoiceGlRef(invoice);
     const orgName = organization?.name || 'Tenant Organization';
     const logoUrl = organization?.logoUrl || '';
+    const notesText = invoice.notes || `Invoice No: ${invoice.invoiceNo} - ${billedTo}`;
+    const signatoriesHtml = signatoryLabels.map(label => `
+      <div class="sign-box">
+        <div class="sign-label">${escapeHtml(label)}</div>
+        <div class="sign-line"></div>
+        <div class="sign-footer">NAME &amp; SIGNATURE</div>
+      </div>
+    `).join('');
 
     return `<!doctype html>
 <html>
@@ -1324,7 +1409,12 @@ const brandColor = organization?.primaryColor || '#059669';
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Invoice ${escapeHtml(invoice.invoiceNo)}</title>
     <style>
-      @page { size: A4; margin: 16mm; }
+      @page { size: A4; margin: 0; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
       body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
       .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; overflow: hidden; }
       .content { position: relative; z-index: 1; }
@@ -1345,10 +1435,23 @@ const brandColor = organization?.primaryColor || '#059669';
       }
       .muted { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }
-      .band { background:#d8ebf6; font-weight:700; }
+      .band { background:${invoicePrintAccent} !important; color:#fff !important; font-weight:700; }
       .totals { margin-left:auto; width:300px; font-size:12px; }
       .totals div { display:flex; justify-content:space-between; padding:4px 0; }
-      .totals .grand { font-weight:700; border-top:1px solid #d1d5db; margin-top:4px; padding-top:6px; }
+      .totals .grand { font-weight:700; border-top:1px solid ${invoicePrintAccent}; margin-top:4px; padding-top:6px; }
+      .print-box { border:1px solid ${invoicePrintAccent}; border-radius:4px; overflow:hidden; }
+      .notes { margin-top:28px; font-size:12px; }
+      .notes-title { color:${invoicePrintAccent}; font-weight:800; text-transform:uppercase; margin-bottom:6px; }
+      .signatories { margin-top:18px; display:grid; grid-template-columns:repeat(3,1fr); border:1px solid ${invoicePrintAccent}; border-radius:4px; overflow:hidden; }
+      .sign-box { min-height:116px; display:flex; flex-direction:column; border-right:1px solid ${invoicePrintAccent}; }
+      .sign-box:last-child { border-right:0; }
+      .sign-label { padding:10px 12px; font-size:11px; font-weight:800; text-transform:uppercase; }
+      .sign-line { margin:44px 28px 22px; border-bottom:1px solid #111827; flex:1; }
+      .sign-footer { background:${invoicePrintAccent} !important; color:#fff !important; text-align:center; font-weight:800; padding:7px; font-size:11px; }
+      @media print {
+        body { background:#fff !important; }
+        .band, .sign-footer { background:${invoicePrintAccent} !important; color:#fff !important; }
+      }
     </style>
   </head>
   <body>
@@ -1371,7 +1474,7 @@ const brandColor = organization?.primaryColor || '#059669';
       </div>
       <div style="margin-top:6px;font-size:13px;white-space:pre-line;">${escapeHtml(organization?.taxId || '')}</div>
 
-      <table style="margin-top:18px;">
+      <table class="print-box" style="margin-top:18px;">
         <thead>
           <tr class="band">
             <th style="padding:4px;text-align:left;">BILL TO:</th>
@@ -1386,7 +1489,7 @@ const brandColor = organization?.primaryColor || '#059669';
         </tbody>
       </table>
 
-      <table style="margin-top:14px;">
+      <table class="print-box" style="margin-top:14px;">
         <thead>
           <tr class="band">
             <th style="padding:4px;text-align:left;">CUSTOMER REF. NBR.</th>
@@ -1403,7 +1506,7 @@ const brandColor = organization?.primaryColor || '#059669';
         </tbody>
       </table>
 
-      <table style="margin-top:8px;">
+      <table class="print-box" style="margin-top:18px;">
         <thead>
           <tr class="band">
             <th style="padding:6px;text-align:left;">NO.</th>
@@ -1412,7 +1515,7 @@ const brandColor = organization?.primaryColor || '#059669';
             <th style="padding:6px;text-align:right;">UOM</th>
             <th style="padding:6px;text-align:right;">UNIT PRICE</th>
             <th style="padding:6px;text-align:right;">DISC.</th>
-            <th style="padding:6px;text-align:right;">EXTENDED PRICE</th>
+            <th style="padding:6px;text-align:right;">TOTAL AMOUNT</th>
           </tr>
         </thead>
         <tbody>${(invoice.lines || []).map((line, idx) => `
@@ -1437,7 +1540,11 @@ const brandColor = organization?.primaryColor || '#059669';
         <div class="grand"><span>Balance Due</span><span>${escapeHtml(formatCurrency(invoice.balanceDue || 0))}</span></div>
       </div>
 
-      ${invoice.notes ? `<div style="margin-top:20px;"><div class="muted">Notes</div><div>${escapeHtml(invoice.notes)}</div></div>` : ''}
+      <div class="notes">
+        <div class="notes-title">Notes</div>
+        <div>${escapeHtml(notesText)}</div>
+      </div>
+      <div class="signatories">${signatoriesHtml}</div>
       </div>
     </div>
   </body>
@@ -1487,6 +1594,92 @@ const brandColor = organization?.primaryColor || '#059669';
     return totals;
   }, [formData.lines, formData.sponsorId, sponsors]);
 
+  const getAccountLabel = (account?: ChartOfAccount | null, fallback = 'Unmapped G/L Account') => {
+    if (!account) return fallback;
+    return `${account.code ? `${account.code} - ` : ''}${account.name}`;
+  };
+
+  const glJournalPreview = useMemo(() => {
+    const sponsor = formData.sponsorId ? sponsors.find(s => s.id === formData.sponsorId) : null;
+    const arAccount =
+      accounts.find(a => a.id === (sponsor as any)?.arAccountId) ||
+      accounts.find(a => a.code === '1210') ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('receivable') && a.class === AccountClass.ASSET && !a.isHeader);
+
+    const fallbackRevenueAccount =
+      accounts.find(a => a.code === '4000') ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('tuition') && a.class === AccountClass.REVENUE && !a.isHeader) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('revenue') && a.class === AccountClass.REVENUE && !a.isHeader) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('income') && a.class === AccountClass.REVENUE && !a.isHeader);
+
+    const fallbackVatAccount =
+      accounts.find(a => a.code === '2200') ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('output vat')) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('vat payable')) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('output tax')) ||
+      accounts.find(a => (a.name || '').toLowerCase().includes('tax payable')) ||
+      accounts.find(a => /\bvat\b/i.test(a.name || ''));
+
+    const lines: Array<{ key: string; accountLabel: string; description: string; debit: number; credit: number; missing?: boolean }> = [];
+    const grandTotal = Number(formTotals.grandTotal || 0);
+
+    if (grandTotal > 0) {
+      lines.push({
+        key: 'ar',
+        accountLabel: getAccountLabel(arAccount, 'Accounts Receivable'),
+        description: formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId),
+        debit: grandTotal,
+        credit: 0,
+        missing: !arAccount,
+      });
+    }
+
+    formData.lines.forEach((line, idx) => {
+      const account = accounts.find(a => a.id === line.glAccountId) || fallbackRevenueAccount;
+      const netRevenue = Number(line.netAmount || 0);
+      if (netRevenue > 0) {
+        lines.push({
+          key: `rev-${line.id || idx}`,
+          accountLabel: getAccountLabel(account, 'Revenue Account Not Set'),
+          description: line.description || `Invoice line ${idx + 1}`,
+          debit: 0,
+          credit: netRevenue,
+          missing: !account,
+        });
+      }
+    });
+
+    const vatGrouped = new Map<string, { account?: ChartOfAccount; amount: number }>();
+    formData.lines.forEach(line => {
+      const amount = Number(line.vatAmount || 0);
+      if (amount <= 0) return;
+      const taxCat = localTaxCats.find(tc => tc.id === line.taxCategoryId);
+      const account = accounts.find(a => a.id === taxCat?.outputAccountId) || fallbackVatAccount;
+      const key = account?.id || 'missing-vat';
+      const current = vatGrouped.get(key) || { account, amount: 0 };
+      current.amount += amount;
+      vatGrouped.set(key, current);
+    });
+
+    vatGrouped.forEach((entry, key) => {
+      lines.push({
+        key: `vat-${key}`,
+        accountLabel: getAccountLabel(entry.account, 'Output VAT Account Not Set'),
+        description: `Output VAT: ${formData.invoiceNo}`,
+        debit: 0,
+        credit: Math.round(entry.amount * 100) / 100,
+        missing: !entry.account,
+      });
+    });
+
+    const totalDebit = Math.round(lines.reduce((sum, line) => sum + line.debit, 0) * 100) / 100;
+    const totalCredit = Math.round(lines.reduce((sum, line) => sum + line.credit, 0) * 100) / 100;
+    const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    return { lines, totalDebit, totalCredit, isBalanced };
+  }, [accounts, formData, formTotals.grandTotal, localTaxCats, sponsors, students]);
+
   // ============================================
   // GENERATE FROM ENROLLMENTS LOGIC
   // ============================================
@@ -1513,33 +1706,26 @@ const brandColor = organization?.primaryColor || '#059669';
     return sponsors.filter(s => unbilledEnrollmentsBySponsor.has(s.id) && !s.isDeleted);
   }, [sponsors, unbilledEnrollmentsBySponsor]);
 
-  // Batches already billed should not appear in New Invoice batch selection.
+  // Sponsored batches hide once billed. Private batches stay available until every student is billed.
   // Keep currently selected batch visible while editing its own invoice.
   const selectableBatches = useMemo(() => {
     const billedBatchIds = new Set(
       invoices
-        .filter(inv => !!inv.batchId && inv.status !== 'VOIDED' && inv.id !== editingInvoice?.id)
+        .filter(inv => !!inv.batchId && !!inv.sponsorId && inv.status !== 'VOIDED' && inv.id !== editingInvoice?.id)
         .map(inv => inv.batchId as string)
     );
 
-    return batches.filter(batch => !batch.isDeleted && !billedBatchIds.has(batch.id));
-  }, [batches, invoices, editingInvoice?.id]);
+    return batches.filter(batch =>
+      !batch.isDeleted &&
+      !billedBatchIds.has(batch.id) &&
+      !isPrivateBatchFullyBilled(batch)
+    );
+  }, [batches, invoices, editingInvoice?.id, enrollments, students]);
 
   const batchStudentsForBilling = useMemo(() => {
     if (!formData.batchId) return [] as Student[];
-    const enrolled = enrollments
-      .filter(e => e.batchId === formData.batchId && !e.isDeleted)
-      .map(e => students.find(s => s.id === e.studentId))
-      .filter((s): s is Student => !!s && !s.isDeleted);
-
-    if (enrolled.length > 0) return enrolled;
-
-    const batch = batches.find(b => b.id === formData.batchId);
-    if (!batch?.studentIds?.length) return [] as Student[];
-    return batch.studentIds
-      .map(id => students.find(s => s.id === id))
-      .filter((s): s is Student => !!s && !s.isDeleted);
-  }, [formData.batchId, enrollments, students, batches]);
+    return getBillableStudentsForBatch(formData.batchId, editingInvoice?.studentId || formData.studentId);
+  }, [formData.batchId, formData.studentId, editingInvoice?.studentId, enrollments, students, batches, invoices, editingInvoice?.id]);
 
   // Get unbilled enrollments for selected sponsor
   const unbilledEnrollmentsForSponsor = useMemo(() => {
@@ -1620,10 +1806,16 @@ const brandColor = organization?.primaryColor || '#059669';
 
   // Reset generate modal state
   const resetGenerateModal = () => {
+    const invoiceDate = todayISO();
     setSelectedSponsorId('');
     setSelectedEnrollmentIds(new Set());
-    setGenerateInvoiceDate(new Date().toISOString().split('T')[0]);
-    setGenerateDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    setGenerateInvoiceDate(invoiceDate);
+    setGenerateDueDate(calculateInvoiceDueDate(invoiceDate, 'Net 30'));
+  };
+
+  const handleGenerateInvoiceDateChange = (invoiceDate: string) => {
+    setGenerateInvoiceDate(invoiceDate);
+    setGenerateDueDate(calculateInvoiceDueDate(invoiceDate, 'Net 30'));
   };
 
   // Toggle enrollment selection
@@ -2373,19 +2565,33 @@ const brandColor = organization?.primaryColor || '#059669';
                 </button>
                 <div className="absolute left-0 mt-1 w-48 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                   <div className="py-1">
-                    {editingInvoice?.status === 'OPEN' && (
-                      <>
-                        <button type="button" onClick={handleWriteOffNavigation} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2">
-                          <Scissors size={16} /> Write Off
-                        </button>
-                        <button type="button" onClick={handleReversalNavigation} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2">
-                          <CornerUpLeft size={16} /> Reversal
-                        </button>
-                        <button type="button" onClick={handleVoidInvoiceClick} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                          <Ban size={16} /> Void Invoice
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleWriteOffNavigation}
+                      disabled={!canUseInvoiceActions}
+                      title={canUseInvoiceActions ? 'Write off this invoice' : invoiceActionUnavailableTitle}
+                      className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    >
+                      <Scissors size={16} /> Write Off
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateAdjustmentNavigation}
+                      disabled={!canUseInvoiceActions}
+                      title={canUseInvoiceActions ? 'Create an invoice adjustment' : invoiceActionUnavailableTitle}
+                      className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    >
+                      <CornerUpLeft size={16} /> Create Adjustment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleVoidInvoiceClick}
+                      disabled={!canUseInvoiceActions}
+                      title={canUseInvoiceActions ? 'Void this invoice' : invoiceActionUnavailableTitle}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    >
+                      <Ban size={16} /> Void Invoice
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2397,14 +2603,16 @@ const brandColor = organization?.primaryColor || '#059669';
               </div>
             )}
 
-            <div className="flex-1 p-6 space-y-8">
+            <div className="flex-1 p-6">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-6 items-start">
+                <div className="space-y-8 min-w-0">
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-brand/5 rounded-lg p-4 border border-brand/20">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                   {/* batch in center */}
                   <div>
-                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Already billed batches are hidden.</p>
+                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Sponsored batches hide after billing; private batches stay until every student is billed.</p>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
@@ -2463,7 +2671,7 @@ const brandColor = organization?.primaryColor || '#059669';
                       <input
                         type="date"
                         value={formData.invoiceDate}
-                        onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
+                        onChange={e => handleInvoiceDateChange(e.target.value)}
                         disabled={isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
@@ -2519,7 +2727,7 @@ const brandColor = organization?.primaryColor || '#059669';
                   <label className="text-xs font-medium text-gray-500">Terms</label>
                   <select
                     value={formData.terms}
-                    onChange={e => setFormData({ ...formData, terms: e.target.value })}
+                    onChange={e => handleTermsChange(e.target.value)}
                     disabled={isReadOnly}
                     className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
@@ -2928,11 +3136,72 @@ const brandColor = organization?.primaryColor || '#059669';
                     <span className="font-medium">Grand Total:</span>
                     <span className="font-bold text-lg">{formatCurrency(formTotals.grandTotal)}</span>
                   </div>
-
-                  </div>
                 </div>
               </div>
+                </div>
+
+                <aside className="xl:sticky xl:top-4 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 border-b bg-gray-50">
+                    <h4 className="text-sm font-black uppercase tracking-wide text-gray-700">GL Journal Entry Preview</h4>
+                  </div>
+
+                  <div className="p-5">
+                    <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-3 pb-3 text-[11px] font-black uppercase" style={{ color: brandColor }}>
+                      <div>GL Account</div>
+                      <div className="text-right">Debit ({currency || 'PHP'})</div>
+                      <div className="text-right">Credit ({currency || 'PHP'})</div>
+                    </div>
+
+                    <div className="divide-y divide-gray-200 border-y border-gray-200">
+                      {glJournalPreview.lines.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-gray-400">
+                          Add line items to preview the journal entry.
+                        </div>
+                      ) : (
+                        glJournalPreview.lines.map(line => (
+                          <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-3 py-4 text-sm">
+                            <div className="min-w-0">
+                              <p className={`font-semibold leading-5 ${line.missing ? 'text-amber-700' : 'text-gray-800'}`}>{line.accountLabel}</p>
+                              <p className="mt-1 text-xs font-medium text-gray-500 leading-5">{line.description || '-'}</p>
+                            </div>
+                            <div className="text-right font-semibold text-gray-800">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</div>
+                            <div className="text-right font-semibold text-gray-800">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</div>
+                          </div>
+                        ))
+                      )}
+
+                      {glJournalPreview.lines.length > 0 && (
+                        <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-3 py-4 text-sm font-black" style={{ color: brandColor }}>
+                          <div>Total</div>
+                          <div className="text-right">{formatCurrency(glJournalPreview.totalDebit)}</div>
+                          <div className="text-right">{formatCurrency(glJournalPreview.totalCredit)}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-6 rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                      <h5 className="font-black text-emerald-800">GL Entry Details</h5>
+                      <ul className="mt-3 space-y-2 text-sm text-emerald-800">
+                        <li className="flex gap-2"><span>•</span><span>Journal Entry Date: {formData.invoiceDate || '-'}</span></li>
+                        <li className="flex gap-2"><span>•</span><span>Reference: {formData.invoiceNo || '-'}</span></li>
+                        <li className="flex gap-2"><span>•</span><span>Customer: {formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId)}</span></li>
+                        <li className="flex gap-2">
+                          <span>•</span>
+                          <span>{glJournalPreview.isBalanced ? 'Total Debit = Total Credit' : 'Journal entry is not balanced'}</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className={`mt-5 rounded-lg border p-4 text-sm font-semibold ${glJournalPreview.isBalanced ? 'border-blue-100 bg-blue-50 text-blue-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
+                      {editingInvoice?.status === 'OPEN'
+                        ? 'Posted journal entry preview based on this invoice.'
+                        : 'Preview only - journal entry will be created upon posting the invoice.'}
+                    </div>
+                  </div>
+                </aside>
+              </div>
             </div>
+          </div>
         </>
       )}
 
@@ -3132,135 +3401,12 @@ const brandColor = organization?.primaryColor || '#059669';
               </div>
 
               <div className="flex-1 overflow-auto bg-gray-200 p-6">
-                <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg text-[12px] leading-5 p-[16mm] text-gray-800 relative overflow-hidden">
-                  {isPaidInvoice(resolvedPrintingInvoice) && (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-                      style={{
-                        transform: 'rotate(-20deg)',
-                        zIndex: 0,
-                        color: 'rgba(16, 185, 129, 0.16)',
-                        fontSize: 'calc(5rem * var(--app-font-scale))',
-                        fontWeight: 900,
-                        letterSpacing: '0.2em',
-                        textShadow: '2px 2px 8px #fff'
-                      }}
-                    >
-                      PAID
-                    </div>
-                  )}
-                  <div className="relative" style={{ zIndex: 1 }}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      {organization?.logoUrl ? (
-                        <img src={organization.logoUrl} alt="Tenant logo" className="max-w-[300px] max-h-[90px] object-contain" />
-                      ) : (
-                        <h2 className="text-2xl font-bold tracking-wide">{organization?.name || 'Tenant Organization'}</h2>
-                      )}
-                      <p className="mt-2 text-[13px]">{organization?.name || 'Tenant Organization'}</p>
-                      {organization?.taxId && <p className="text-gray-600">{organization.taxId}</p>}
-                    </div>
-                    <div className="min-w-[300px]">
-                      <h2 className="text-5xl font-bold leading-none mb-2">Invoice</h2>
-                      <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[14px]">
-                        <p className="font-semibold">Reference No.:</p><p className="text-right">{resolvedPrintingInvoice.invoiceNo}</p>
-                        <p className="font-semibold">Date:</p><p className="text-right">{resolvedPrintingInvoice.invoiceDate}</p>
-                        <p className="font-semibold">Due Date:</p><p className="text-right">{resolvedPrintingInvoice.dueDate}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 border border-[#d8ebf6]">
-                    <div className="grid grid-cols-2 bg-[#d8ebf6] text-[13px] font-semibold">
-                      <div className="px-2 py-1">BILL TO:</div>
-                      <div className="px-2 py-1">SHIP TO:</div>
-                    </div>
-                    <div className="grid grid-cols-2 text-[13px]">
-                      <div className="px-2 py-2 whitespace-pre-line">
-                        {resolvedPrintingInvoice.sponsorId ? getSponsorName(resolvedPrintingInvoice.sponsorId) : getStudentName(resolvedPrintingInvoice.studentId)}{'\n'}
-                        {resolvedPrintingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.address || '-')
-                          : (() => {
-                            const s = students.find(st => st.id === resolvedPrintingInvoice.studentId);
-                            return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
-                          })()}
-                      </div>
-                      <div className="px-2 py-2 whitespace-pre-line">
-                        {resolvedPrintingInvoice.sponsorId ? getSponsorName(resolvedPrintingInvoice.sponsorId) : getStudentName(resolvedPrintingInvoice.studentId)}{'\n'}
-                        {resolvedPrintingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.address || '-')
-                          : (() => {
-                            const s = students.find(st => st.id === resolvedPrintingInvoice.studentId);
-                            return s ? [s.street, s.barangay, s.district, s.city, s.province].filter(Boolean).join(', ') : '-';
-                          })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 border border-[#d8ebf6]">
-                    <div className="grid grid-cols-3 bg-[#d8ebf6] text-[13px] font-semibold">
-                      <div className="px-2 py-1">CUSTOMER REF. NBR.</div>
-                      <div className="px-2 py-1">TERMS</div>
-                      <div className="px-2 py-1">CONTACT</div>
-                    </div>
-                    <div className="grid grid-cols-3 text-[13px]">
-                      <div className="px-2 py-1">{getInvoiceGlRef(resolvedPrintingInvoice)}</div>
-                      <div className="px-2 py-1">{resolvedPrintingInvoice.terms || '-'}</div>
-                      <div className="px-2 py-1">
-                        {resolvedPrintingInvoice.sponsorId
-                          ? (sponsors.find(s => s.id === resolvedPrintingInvoice.sponsorId)?.contactPerson || '-')
-                          : (students.find(s => s.id === resolvedPrintingInvoice.studentId)?.contactNumber || '-')}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-[#d8ebf6]">
-                        <tr>
-                          <th className="px-3 py-2 text-left">NO.</th>
-                          <th className="px-3 py-2 text-left">ITEM</th>
-                          <th className="px-3 py-2 text-right">QTY.</th>
-                          <th className="px-3 py-2 text-right">UOM</th>
-                          <th className="px-3 py-2 text-right">UNIT PRICE</th>
-                          <th className="px-3 py-2 text-right">DISC.</th>
-                          <th className="px-3 py-2 text-right">EXTENDED PRICE</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(resolvedPrintingInvoice.lines || []).map((line, idx) => (
-                          <tr key={line.id || idx} className="border-t border-gray-100">
-                            <td className="px-3 py-2">{idx + 1}</td>
-                            <td className="px-3 py-2">{line.description}</td>
-                            <td className="px-3 py-2 text-right">{line.quantity}</td>
-                            <td className="px-3 py-2 text-right">EA</td>
-                            <td className="px-3 py-2 text-right">{formatCurrency(line.unitPrice || 0)}</td>
-                            <td className="px-3 py-2 text-right">0%</td>
-                            <td className="px-3 py-2 text-right">{formatCurrency(line.amount || 0)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <div className="w-[320px] space-y-1">
-                      <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.subtotal || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">VAT</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.vatAmount || 0)}</span></div>
-                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Grand Total</span><span className="font-bold">{formatCurrency(resolvedPrintingInvoice.grandTotal || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Net Amount Due</span><span className="font-semibold">{formatCurrency(resolvedPrintingInvoice.netAmountDue || 0)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Amount Paid</span><span className="font-medium">{formatCurrency(resolvedPrintingInvoice.amountPaid || 0)}</span></div>
-                      <div className="flex justify-between pt-2 border-t"><span className="font-semibold">Balance Due</span><span className="font-bold">{formatCurrency(resolvedPrintingInvoice.balanceDue || 0)}</span></div>
-                    </div>
-                  </div>
-
-                  {resolvedPrintingInvoice.notes && (
-                    <div className="mt-8">
-                      <p className="text-gray-500 uppercase text-[11px] tracking-wide">Notes</p>
-                      <p className="mt-1">{resolvedPrintingInvoice.notes}</p>
-                    </div>
-                  )}
-                  </div>
+                <div className="w-[210mm] min-h-[297mm] mx-auto bg-white shadow-lg overflow-hidden">
+                  <iframe
+                    title={`Invoice ${resolvedPrintingInvoice.invoiceNo} A4 preview`}
+                    srcDoc={buildInvoiceA4Html(resolvedPrintingInvoice)}
+                    className="block w-[210mm] h-[297mm] border-0 bg-white"
+                  />
                 </div>
               </div>
             </div>
@@ -3400,7 +3546,7 @@ const brandColor = organization?.primaryColor || '#059669';
                         <input
                           type="date"
                           value={generateInvoiceDate}
-                          onChange={e => setGenerateInvoiceDate(e.target.value)}
+                          onChange={e => handleGenerateInvoiceDateChange(e.target.value)}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-200"
                         />
                       </div>
