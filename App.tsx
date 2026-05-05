@@ -30,6 +30,7 @@ import ARAgingReportView from './views/ARAgingReportView';
 import ARWriteOffView from './views/ARWriteOffView';
 import ARCreditDebitMemoView from './views/ARCreditDebitMemoView';
 import ARCollectionReceiptView from './views/ARCollectionReceiptView';
+import ARCollectionReportView from './views/ARCollectionReportView';
 import ARCustomerLedgerView from './views/ARCustomerLedgerView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
@@ -6053,7 +6054,7 @@ export default function App() {
               </NavSection>
 
               <NavSection label="AR Reports" isOpen={openSections.inventory} onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))} compact={!sidebarOpen}>
-                <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'collection-report'} onClick={() => navigateTo('collection-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
@@ -6315,6 +6316,19 @@ export default function App() {
           )}
           {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
+          {activeTab === 'collection-report' && (
+            <ARCollectionReportView
+              payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
+              currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
+              orgName={currentOrg?.name}
+              preparedBy="AR Specialist"
+              onViewJournal={handleViewJournal}
+            />
+          )}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
