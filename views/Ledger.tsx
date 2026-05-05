@@ -35,8 +35,13 @@ const getJournalEntryReferenceNo = (entry: JournalEntry): string => {
   const sourceType = String(entry.sourceType || '').toUpperCase();
   const sourceReference = String(entry.reference || '').trim();
   const glReference = String(entry.glEntryNumber || '').trim();
+  const isCreditDebitMemo =
+    sourceType === 'CREDIT_MEMO' ||
+    /^((CM|DM)-\d{4}-\d+|(CDM|DBM)-)/i.test(sourceReference) ||
+    String(entry.description || '').toUpperCase().includes('CREDIT MEMO') ||
+    String(entry.description || '').toUpperCase().includes('DEBIT MEMO');
 
-  if (sourceType === 'APPLICATION' && sourceReference) {
+  if ((sourceType === 'APPLICATION' || isCreditDebitMemo) && sourceReference) {
     return sourceReference;
   }
 

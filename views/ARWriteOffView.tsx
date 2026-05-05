@@ -27,6 +27,7 @@ import {
   JournalLine,
   ChartOfAccount,
   AccountClass,
+  Organization,
   User as AppUser
 } from '../types';
 
@@ -47,6 +48,7 @@ interface ARWriteOffViewProps {
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
   initialContext?: { invoice?: Invoice };
   onClearContext?: () => void;
+  organization?: Organization;
   brandColor?: string;
 }
 
@@ -84,6 +86,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
   onNotify,
   initialContext,
   onClearContext,
+  organization,
   brandColor = '#4f46e5'
 }) => {
   const today = new Date().toISOString().split('T')[0];
@@ -738,6 +741,229 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
       printWindow.document.close();
       setTimeout(() => printWindow.print(), 400);
     }
+  };
+
+  const handlePrintWriteOff = () => {
+    if (formWriteOffAmount <= 0) {
+      onNotify('info', 'Enter a write-off amount before printing.');
+      return;
+    }
+
+    const orgName = organization?.name || 'Write-Off Registry';
+    const logoUrl = organization?.logoUrl || '';
+    const voucherAccent = '#006b2d';
+    const transactionDescription = reason || 'Accounts receivable write-off';
+    const statusLabel = formStatusLabel;
+    const dateLabel = formatDate(writeOffDate);
+    const isPostedViewingRecord = isViewingExistingRecord && statusLabel === 'POSTED';
+    const balanceBeforeWriteOff = isPostedViewingRecord
+      ? Number(customerBalance || 0) + Number(formWriteOffAmount || 0)
+      : Number(customerBalance || 0);
+    const balanceAfterWriteOff = isPostedViewingRecord
+      ? Math.max(0, Number(customerBalance || 0))
+      : Math.max(0, Number(customerBalance || 0) - Number(formWriteOffAmount || 0));
+
+    const selectedInvoiceRows = Array.from(selectedInvoiceIds)
+      .map(invoiceId => {
+        const invoice = invoices.find(item => item.id === invoiceId);
+        if (!invoice) return null;
+        const writeOffAmount = Number(invoiceWriteOffAmounts[invoice.id] || (selectedInvoiceIds.size === 1 ? formWriteOffAmount : 0));
+        const currentBalance = Number(invoice.balanceDue || 0);
+        const balanceBefore = isPostedViewingRecord ? currentBalance + writeOffAmount : currentBalance;
+        const balanceAfter = isPostedViewingRecord ? currentBalance : Math.max(0, currentBalance - writeOffAmount);
+
+        return {
+          invoiceNo: invoice.invoiceNo || invoice.id,
+          invoiceDate: formatDate(invoice.invoiceDate),
+          description: transactionDescription,
+          balanceBefore,
+          writeOffAmount,
+          balanceAfter
+        };
+      })
+      .filter(Boolean) as Array<{
+        invoiceNo: string;
+        invoiceDate: string;
+        description: string;
+        balanceBefore: number;
+        writeOffAmount: number;
+        balanceAfter: number;
+      }>;
+
+    const printableInvoiceRows = selectedInvoiceRows.length > 0
+      ? selectedInvoiceRows
+      : [{
+          invoiceNo: sourceInvoiceNo || 'Unapplied AR balance',
+          invoiceDate: '-',
+          description: transactionDescription,
+          balanceBefore: balanceBeforeWriteOff,
+          writeOffAmount: formWriteOffAmount,
+          balanceAfter: balanceAfterWriteOff
+        }];
+
+    const journalRows = [
+      {
+        account: getAccountLabel(expenseAccountId),
+        memo: transactionDescription,
+        debit: formWriteOffAmount,
+        credit: 0
+      },
+      {
+        account: getAccountLabel(arAccountId),
+        memo: customerName || '-',
+        debit: 0,
+        credit: formWriteOffAmount
+      }
+    ];
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Write-Off Voucher</title><style>
+      @page { size: A4; margin: 0; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing:border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff; }
+      .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; overflow: hidden; background:#fff; display:flex; flex-direction:column; }
+      .muted, .sub { color:#6b7280; font-size:12px; }
+      table { width:100%; border-collapse: collapse; font-size:12px; }
+      .band { background:${voucherAccent} !important; color:#fff !important; font-weight:700; }
+      .print-box { border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; flex:1 1 auto; display:flex; flex-direction:column; }
+      .summary { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+      .section { border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; }
+      .section-title { background:${voucherAccent} !important; color:#fff !important; font-size:12px; font-weight:700; text-transform:uppercase; padding:6px 8px; }
+      .section-body { padding:8px; }
+      .row { display:flex; justify-content:space-between; gap:14px; padding:4px 0; font-size:12px; }
+      .row span:first-child { color:#374151; }
+      .row span:last-child { font-weight:700; text-align:right; }
+      th { padding:6px 8px; text-align:left; font-size:12px; }
+      td { padding:6px 8px; border-bottom:1px solid #d1d5db; vertical-align:top; }
+      td.num, th.num { text-align:right; white-space:nowrap; }
+      .nothing-follows { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; color:#6b7280; font-size:11px; font-style:italic; letter-spacing:.08em; padding:12px 8px; }
+      .journal { margin-top:18px; border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; }
+      .signatures { margin-top:18px; display:grid; grid-template-columns:repeat(3,1fr); border:1px solid ${voucherAccent}; border-radius:4px; overflow:hidden; flex:0 0 auto; }
+      .sign-box { min-height:116px; display:flex; flex-direction:column; border-right:1px solid ${voucherAccent}; }
+      .sign-box:last-child { border-right:0; }
+      .sign-label { padding:10px 12px; font-size:11px; font-weight:800; text-transform:uppercase; }
+      .sign-space { flex:1; margin:44px 28px 22px; border-bottom:1px solid #111827; }
+      .sign-footer { background:${voucherAccent} !important; color:#fff !important; text-align:center; font-weight:800; padding:7px; font-size:11px; }
+      .footer { margin-top:18px; color:#6b7280; font-size:12px; text-align:right; }
+      @media print {
+        body { background:#fff !important; }
+        .band, .section-title, .sign-footer { background:${voucherAccent} !important; color:#fff !important; }
+      }
+    </style></head><body>
+      <div class="page">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
+          <div>
+            ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Tenant logo" style="max-width:300px;max-height:90px;object-fit:contain;" />` : `<div style="font-size:28px;font-weight:800;">${escapeHtml(orgName)}</div>`}
+            <div style="margin-top:8px;font-size:13px;">${escapeHtml(orgName)}</div>
+          </div>
+          <div style="text-align:left;min-width:310px;">
+            <div style="font-size:44px;font-weight:700;line-height:1;margin-bottom:8px;color:${voucherAccent};">Write-Off Voucher</div>
+            <table style="font-size:14px;">
+              <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Reference No.:</td><td style="padding:2px 0;text-align:right;border:0;">${escapeHtml(reference || '-')}</td></tr>
+              <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Date:</td><td style="padding:2px 0;text-align:right;border:0;">${escapeHtml(dateLabel)}</td></tr>
+              <tr><td style="padding:2px 8px 2px 0;font-weight:700;border:0;">Status:</td><td style="padding:2px 0;text-align:right;border:0;">${escapeHtml(statusLabel)}</td></tr>
+            </table>
+            <div class="muted" style="text-align:right;margin-top:6px;">Printed ${escapeHtml(new Date().toLocaleString('en-US'))}</div>
+          </div>
+        </div>
+
+        <div class="summary">
+          <div class="section">
+            <div class="section-title">Write-Off Information</div>
+            <div class="section-body">
+              <div class="row"><span>Payor</span><span>${escapeHtml(customerName || '-')}</span></div>
+              <div class="row"><span>Payor Type</span><span>${escapeHtml(customerType)}</span></div>
+              <div class="row"><span>Post Period</span><span>${escapeHtml(formatPostPeriod(writeOffDate))}</span></div>
+              <div class="row"><span>GL Reference No.</span><span>${escapeHtml(formGlReference)}</span></div>
+              <div class="row"><span>Prepared By</span><span>${escapeHtml(isViewingExistingRecord ? getCreatedByName(viewingEntry?.createdBy) : '-')}</span></div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Amount Summary</div>
+            <div class="section-body">
+              <div class="row"><span>Balance Before Write-Off</span><span>${formatCurrency(balanceBeforeWriteOff)}</span></div>
+              <div class="row"><span>Write-Off Amount</span><span>${formatCurrency(formWriteOffAmount)}</span></div>
+              <div class="row"><span>Balance After Write-Off</span><span>${formatCurrency(balanceAfterWriteOff)}</span></div>
+              <div class="row"><span>Invoices Affected</span><span>${printableInvoiceRows.length}</span></div>
+              <div class="row"><span>Created On</span><span>${escapeHtml(isViewingExistingRecord ? formatCreatedOn(viewingEntry?.createdAt) : '-')}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="print-box" style="margin-top:18px;">
+          <table>
+            <thead>
+              <tr class="band">
+                <th>Invoice</th>
+                <th>Invoice Date</th>
+                <th>Transaction Description</th>
+                <th class="num">Balance Before</th>
+                <th class="num">Write-Off Amount</th>
+                <th class="num">Balance After</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${printableInvoiceRows.map(row => `<tr>
+                <td>${escapeHtml(row.invoiceNo)}</td>
+                <td>${escapeHtml(row.invoiceDate)}</td>
+                <td>${escapeHtml(row.description)}</td>
+                <td class="num">${formatCurrency(row.balanceBefore)}</td>
+                <td class="num">${formatCurrency(row.writeOffAmount)}</td>
+                <td class="num">${formatCurrency(row.balanceAfter)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          <div class="nothing-follows">*** NOTHING FOLLOWS ***</div>
+        </div>
+
+        <div class="journal">
+          <div class="section-title">GL Journal Entry Preview</div>
+          <table>
+            <thead>
+              <tr>
+                <th>GL Account</th>
+                <th>Memo</th>
+                <th class="num">Debit</th>
+                <th class="num">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${journalRows.map(row => `<tr>
+                <td>${escapeHtml(row.account)}</td>
+                <td>${escapeHtml(row.memo)}</td>
+                <td class="num">${row.debit > 0 ? formatCurrency(row.debit) : '-'}</td>
+                <td class="num">${row.credit > 0 ? formatCurrency(row.credit) : '-'}</td>
+              </tr>`).join('')}
+              <tr>
+                <td colspan="2" style="font-weight:800;text-align:right;">Total</td>
+                <td class="num" style="font-weight:800;">${formatCurrency(formWriteOffAmount)}</td>
+                <td class="num" style="font-weight:800;">${formatCurrency(formWriteOffAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="signatures">
+          ${['Prepared By:', 'Reviewed By:', 'Approved By:'].map(label => `
+            <div class="sign-box">
+              <div class="sign-label">${label}</div>
+              <div class="sign-space"></div>
+              <div class="sign-footer">NAME &amp; SIGNATURE</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="footer">Generated by ${escapeHtml(orgName)}</div>
+      </div>
+    </body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      onNotify('error', 'Please allow popups to print the write-off voucher.');
+      return;
+    }
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 400);
   };
 
   const toggleInvoiceSelection = (invoice: Invoice) => {
@@ -1410,7 +1636,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
               <button
                 type="button"
                 title="Print"
-                onClick={() => window.print()}
+                onClick={handlePrintWriteOff}
                 className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
               >
                 <Printer size={20} />
