@@ -17,10 +17,8 @@ import {
   RotateCcw,
   Search,
   User as UserIcon,
-  Wallet,
-  X
+  Wallet
 } from 'lucide-react';
-import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { Payment, PaymentMethod, PaymentStatus, Sponsor, Student, User } from '../types';
 
@@ -241,20 +239,11 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<CollectionReportRow | null>(null);
   const [generatedAt, setGeneratedAt] = useState(() => new Date().toISOString());
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: SortDirection }>({ key: 'collectionDate', direction: 'desc' });
 
   const formatCurrency = (amount: number) =>
     `${currency} ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const brandTint = (opacity: number) => {
-    const normalized = brandColor.trim();
-    const match = normalized.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-    if (!match) return `rgb(249 250 251 / ${opacity})`;
-    const [, r, g, b] = match;
-    return `rgba(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)}, ${opacity})`;
-  };
 
   const getPayorName = (payment: Payment) => {
     if (payment.sponsorId) {
@@ -566,6 +555,10 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
   };
 
   const handlePrint = () => {
+    if (viewMode === 'PREVIEW') {
+      window.print();
+      return;
+    }
     printPreviewReport();
   };
 
@@ -809,80 +802,49 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
       <div className="space-y-5 pb-20 animate-in fade-in duration-500 print:pb-0">
         <style>{`
           .collection-report-voucher-page {
-            width: 210mm;
-            min-height: 297mm;
+            box-sizing: border-box;
+            width: 297mm;
+            height: 210mm;
             margin: 0 auto;
-            padding: 16mm;
+            padding: 12mm 16mm;
             background: #fff;
-            display: flex;
-            flex-direction: column;
             overflow: hidden;
           }
-          .collection-report-voucher-section {
-            border: 1px solid #006b2d;
-            border-radius: 4px;
+          .collection-report-voucher-table-wrap {
+            border: 1px solid #d7dee8;
+            border-radius: 6px;
             overflow: hidden;
-          }
-          .collection-report-voucher-title {
-            background: #006b2d;
-            color: #fff;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            padding: 6px 8px;
-          }
-          .collection-report-voucher-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 14px;
-            padding: 4px 0;
-            font-size: 12px;
-          }
-          .collection-report-voucher-row span:first-child {
-            color: #374151;
-          }
-          .collection-report-voucher-row span:last-child {
-            font-weight: 700;
-            text-align: right;
           }
           .collection-report-voucher-table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
-            font-size: 10px;
+            table-layout: auto;
+            font-size: 13px;
           }
           .collection-report-voucher-table th {
             background: #006b2d;
             color: #fff;
-            padding: 6px 5px;
-            font-size: 9px;
+            padding: 8px 10px;
+            font-size: 12px;
             font-weight: 700;
-            text-align: left;
+            text-align: center;
+            border: 1px solid #d7dee8;
           }
           .collection-report-voucher-table td {
-            padding: 6px 5px;
-            border-bottom: 1px solid #d1d5db;
-            vertical-align: top;
+            padding: 9px 11px;
+            border: 1px solid #d7dee8;
+            vertical-align: middle;
             word-break: break-word;
           }
-          .collection-report-signatures {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            border: 1px solid #006b2d;
-            border-radius: 4px;
-            overflow: hidden;
-          }
-          .collection-report-sign-box {
-            min-height: 112px;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #006b2d;
-          }
-          .collection-report-sign-box:last-child {
-            border-right: 0;
-          }
-          @page { size: A4; margin: 0; }
+          @page { size: A4 landscape; margin: 0; }
           @media print {
+            html,
+            body {
+              width: 297mm !important;
+              min-height: 210mm !important;
+              margin: 0 !important;
+              background: #fff !important;
+            }
             body * {
               visibility: hidden !important;
             }
@@ -894,23 +856,68 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
-              width: 210mm !important;
-              min-height: 297mm !important;
-              padding: 16mm !important;
+              box-sizing: border-box !important;
+              width: 297mm !important;
+              height: 210mm !important;
+              padding: 9mm 12mm !important;
               margin: 0 !important;
               box-shadow: none !important;
               border: 0 !important;
               border-radius: 0 !important;
+              overflow: hidden !important;
+            }
+            .collection-report-header h1 {
+              font-size: 18px !important;
+              line-height: 1.15 !important;
+              margin: 0 !important;
+            }
+            .collection-report-header h2,
+            .collection-report-header h3 {
+              font-size: 15px !important;
+              line-height: 1.15 !important;
+              margin-top: 5px !important;
+            }
+            .collection-report-date-line {
+              margin-top: 9mm !important;
+              gap: 8mm !important;
+              font-size: 12px !important;
+            }
+            .collection-report-main-table {
+              margin-top: 8mm !important;
             }
             .collection-report-print-table {
               min-width: 0 !important;
               width: 100% !important;
             }
-            .collection-report-voucher-title,
-            .collection-report-voucher-table th,
-            .collection-report-sign-footer {
+            .collection-report-voucher-table {
+              font-size: 10px !important;
+            }
+            .collection-report-voucher-table th {
               background: #006b2d !important;
               color: #fff !important;
+              padding: 5px 6px !important;
+              font-size: 10px !important;
+              line-height: 1.15 !important;
+            }
+            .collection-report-voucher-table td {
+              padding: 6px 7px !important;
+              line-height: 1.2 !important;
+            }
+            .collection-report-method-summary {
+              margin-top: 5mm !important;
+              max-width: 78mm !important;
+            }
+            .collection-report-method-summary h3 {
+              margin-bottom: 2mm !important;
+              font-size: 11px !important;
+            }
+            .collection-report-signature-row {
+              margin-top: 5mm !important;
+              gap: 28mm !important;
+              font-size: 10px !important;
+            }
+            .collection-report-signature-line {
+              margin-top: 8mm !important;
             }
           }
         `}</style>
@@ -925,7 +932,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
           <span className="text-slate-900">Report Preview</span>
         </div> */}
 
-        <div className="mx-auto flex w-full max-w-[210mm] flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="mx-auto flex w-full max-w-[297mm] flex-wrap items-center justify-between gap-3 print:hidden">
           <button
             type="button"
             onClick={() => setViewMode('LIST')}
@@ -964,46 +971,19 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
         </div>
 
         <section className="collection-report-print-area collection-report-voucher-page rounded-lg border border-gray-200 shadow-sm print:border-0 print:shadow-none">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <div className="text-[28px] font-extrabold leading-tight text-slate-900">{orgName}</div>
-              <div className="mt-2 text-[13px] text-slate-800">{orgName}</div>
-            </div>
-            <div className="min-w-[300px] text-left">
-              <div className="mb-2 text-[38px] font-bold leading-none text-[#006b2d]">Collection Report</div>
-              <table className="w-full border-collapse text-sm">
-                <tbody>
-                  <tr><td className="border-0 py-0.5 pr-2 font-bold">Report Type:</td><td className="border-0 py-0.5 text-right">{getReportPeriodLabel(previewContext.period)}</td></tr>
-                  <tr><td className="border-0 py-0.5 pr-2 font-bold">Date:</td><td className="border-0 py-0.5 text-right">{reportDateLabel}</td></tr>
-                  <tr><td className="border-0 py-0.5 pr-2 font-bold">Payments:</td><td className="border-0 py-0.5 text-right">{previewRows.length}</td></tr>
-                </tbody>
-              </table>
-              <div className="mt-1 text-right text-xs text-slate-500">Printed {new Date().toLocaleString('en-US')}</div>
-            </div>
+          <div className="collection-report-header text-center text-black">
+            <h1 className="text-2xl font-bold leading-tight">{orgName}</h1>
+            <h2 className="mt-3 text-xl font-bold leading-tight">Collection Report</h2>
+            <h3 className="mt-3 text-xl font-bold leading-tight">{getReportPeriodLabel(previewContext.period)}</h3>
           </div>
 
-          <div className="mt-[18px] grid grid-cols-2 gap-[18px]">
-            <div className="collection-report-voucher-section">
-              <div className="collection-report-voucher-title">Report Filters</div>
-              <div className="p-2">
-                <div className="collection-report-voucher-row"><span>Period</span><span>{getReportPeriodLabel(previewContext.period)}</span></div>
-                <div className="collection-report-voucher-row"><span>Date From</span><span>{formatDate(previewContext.dateFrom)}</span></div>
-                <div className="collection-report-voucher-row"><span>Date To</span><span>{formatDate(previewContext.dateTo)}</span></div>
-                <div className="collection-report-voucher-row"><span>Status</span><span>{activeStatusLabel}</span></div>
-              </div>
-            </div>
-            <div className="collection-report-voucher-section">
-              <div className="collection-report-voucher-title">Collection Summary</div>
-              <div className="p-2">
-                <div className="collection-report-voucher-row"><span>No. of Payments</span><span>{previewRows.length}</span></div>
-                <div className="collection-report-voucher-row"><span>Total Collections</span><span>{formatCurrency(previewTotal)}</span></div>
-                <div className="collection-report-voucher-row"><span>Payor Type</span><span>{activePayorLabel}</span></div>
-                <div className="collection-report-voucher-row"><span>Method</span><span>{activeMethodLabel}</span></div>
-              </div>
-            </div>
+          <div className="collection-report-date-line mt-8 flex items-center gap-8">
+            <div className="h-0.5 flex-1 bg-blue-500"></div>
+            <div className="whitespace-nowrap text-base font-bold text-[#06146f]">Date: {reportDateLabel}</div>
+            <div className="h-0.5 flex-1 bg-blue-500"></div>
           </div>
 
-          <div className="mt-[18px] flex flex-1 flex-col overflow-hidden rounded border border-[#006b2d]">
+          <div className="collection-report-main-table collection-report-voucher-table-wrap mt-8">
             <table className="collection-report-print-table collection-report-voucher-table">
               <thead>
                 <tr>
@@ -1016,14 +996,14 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                 {previewRows.map((row, index) => (
                   <tr key={row.payment.id}>
                     <td className="text-center">{index + 1}</td>
-                    <td>{row.payment.paymentNo || '-'}</td>
-                    <td>{row.payment.crNo || '-'}</td>
-                    <td>{row.payorType === 'SPONSOR' ? 'Sponsor' : row.payorType === 'STUDENT' ? 'Student' : '-'}</td>
-                    <td>{row.payorName}</td>
-                    <td>{getMethodLabel(row.method).toUpperCase()}</td>
-                    <td>{row.referenceNo}</td>
+                    <td className="text-center">{row.payment.paymentNo || '-'}</td>
+                    <td className="text-center">{row.payment.crNo || '-'}</td>
+                    <td className="text-center">{row.payorType === 'SPONSOR' ? 'Sponsor' : row.payorType === 'STUDENT' ? 'Student' : '-'}</td>
+                    <td className="text-center">{row.payorName}</td>
+                    <td className="text-center">{getMethodLabel(row.method).toUpperCase()}</td>
+                    <td className="text-center">{row.referenceNo}</td>
                     <td className="text-right font-bold">{formatCurrency(row.amountReceived)}</td>
-                    <td>{row.glReferenceNo}</td>
+                    <td className="text-center">{row.glReferenceNo}</td>
                   </tr>
                 ))}
                 {previewRows.length === 0 && (
@@ -1032,23 +1012,25 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                   </tr>
                 )}
                 <tr>
-                  <td colSpan={7} className="text-right font-extrabold">Grand Total Amount Received</td>
+                  <td colSpan={5}></td>
+                  <td colSpan={2} className="text-center font-extrabold">Grand Total Amount Received:</td>
                   <td className="text-right font-extrabold">{formatCurrency(previewTotal)}</td>
                   <td></td>
                 </tr>
               </tbody>
             </table>
-            <div className="flex flex-1 items-center justify-center px-2 py-3 text-center text-[11px] italic tracking-widest text-slate-500">*** NOTHING FOLLOWS ***</div>
           </div>
 
-          <div className="mt-[18px] grid grid-cols-[minmax(0,1fr)_230px] items-start gap-[18px]">
-            <div className="collection-report-voucher-section">
-              <div className="collection-report-voucher-title">Prepared Report Notes</div>
-              <div className="min-h-[86px] p-2 text-xs text-slate-700">Collection report generated from posted AR payment records using the selected filters.</div>
-            </div>
-            <div className="collection-report-voucher-section">
-              <div className="collection-report-voucher-title">Payment Method Totals</div>
+          <div className="collection-report-method-summary mt-5 w-full max-w-sm">
+            <h3 className="mb-1 text-base font-semibold text-black">Total Collection per Payment Method</h3>
+            <div className="overflow-hidden rounded border border-gray-200">
               <table className="collection-report-voucher-table">
+                <thead>
+                  <tr>
+                    <th>Method</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {methodSummary.map(item => (
                     <tr key={item.label}>
@@ -1065,19 +1047,18 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
             </div>
           </div>
 
-          <div className="collection-report-signatures mt-[18px]">
-            {[
-              { label: 'Prepared By:', name: preparedBy },
-              { label: 'Reviewed By:', name: '' },
-              { label: 'Approved By:', name: '' }
-            ].map(item => (
-              <div key={item.label} className="collection-report-sign-box">
-                <div className="px-3 py-2.5 text-[11px] font-extrabold uppercase">{item.label}</div>
-                <div className="mx-7 mt-10 border-b border-slate-900"></div>
-                <div className="-mt-3 min-h-[14px] text-center text-[11px] font-bold">{item.name || '\u00a0'}</div>
-                <div className="collection-report-sign-footer mt-auto bg-[#006b2d] p-2 text-center text-[11px] font-extrabold text-white">NAME &amp; SIGNATURE</div>
+          <div className="collection-report-signature-row mt-8 grid grid-cols-2 gap-48 text-sm font-semibold text-black">
+            <div className="flex items-end gap-4">
+              <span className="whitespace-nowrap">Prepared By:</span>
+              <div className="flex-1 text-center">
+                <div className="collection-report-signature-line border-b border-black"></div>
+                <div className="mt-2">{preparedBy || 'AR Specialist'}</div>
               </div>
-            ))}
+            </div>
+            <div className="flex items-end gap-4">
+              <span className="whitespace-nowrap">Reviewed By:</span>
+              <div className="collection-report-signature-line flex-1 border-b border-black"></div>
+            </div>
           </div>
         </section>
       </div>
@@ -1142,7 +1123,6 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               onChange={event => handleDateFromChange(event.target.value)}
               className="w-32 border-none bg-transparent text-[13px] font-bold text-slate-800 outline-none"
             />
-            <Calendar size={15} className="text-slate-400" />
           </div>
 
           <div className="relative flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-3">
@@ -1153,7 +1133,6 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               onChange={event => handleDateToChange(event.target.value)}
               className="w-32 border-none bg-transparent text-[13px] font-bold text-slate-800 outline-none"
             />
-            <Calendar size={15} className="text-slate-400" />
           </div>
 
           <DropdownFilter
@@ -1296,16 +1275,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               {paginatedRows.map(row => (
                 <tr
                   key={row.payment.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedRow(row)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setSelectedRow(row);
-                    }
-                  }}
-                  className="cursor-pointer transition-colors hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                  className="transition-colors hover:bg-gray-50"
                 >
                   <td className="px-4 py-4 text-xs font-semibold text-slate-700">{formatDate(row.collectionDate)}</td>
                   <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.postPeriod}</td>
@@ -1374,69 +1344,6 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
 
       <div className="hidden text-xs text-slate-500 print:block">Generated: {formatDate(generatedAt)}</div>
 
-      {selectedRow && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl">
-              <div className="flex items-start justify-between border-b px-5 py-4" style={{ backgroundColor: brandTint(0.08) }}>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">Collection Details</h3>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{selectedRow.payment.paymentNo || '-'} / {selectedRow.payment.crNo || 'No C.R. No.'}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRow(null)}
-                  className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
-                  aria-label="Close details"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-                <DetailItem label="Collection Date" value={formatDate(selectedRow.collectionDate)} />
-                <DetailItem label="Post Period" value={selectedRow.postPeriod} />
-                <DetailItem label="Payment No." value={selectedRow.payment.paymentNo || '-'} highlightColor={brandColor} />
-                <DetailItem label="C.R. No." value={selectedRow.payment.crNo || '-'} />
-                <DetailItem label="Payor Type" value={selectedRow.payorType === 'SPONSOR' ? 'Sponsor' : selectedRow.payorType === 'STUDENT' ? 'Student' : '-'} />
-                <DetailItem label="Payor Name" value={selectedRow.payorName} />
-                <DetailItem label="Payment Method" value={getMethodLabel(selectedRow.method)} />
-                <DetailItem label="Reference No." value={selectedRow.referenceNo} />
-                <DetailItem label="Amount Received" value={formatCurrency(selectedRow.amountReceived)} highlightColor={brandColor} />
-                <DetailItem label="Status" value={selectedRow.statusLabel} />
-                <DetailItem label="Created By" value={selectedRow.createdBy} />
-                <DetailItem label="Created On" value={formatDate(selectedRow.payment.createdAt)} />
-                <div className="md:col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">GL Reference No.</p>
-                  {selectedRow.payment.journalEntryId && onViewJournal ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const journalId = selectedRow.payment.journalEntryId;
-                        setSelectedRow(null);
-                        if (journalId) onViewJournal(journalId);
-                      }}
-                      className="mt-1 inline-flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm font-bold"
-                      style={{ color: brandColor, borderColor: brandTint(0.35), backgroundColor: brandTint(0.07) }}
-                    >
-                      {selectedRow.glReferenceNo}
-                      <span className="text-xs">View Journal Entry</span>
-                    </button>
-                  ) : (
-                    <p className="mt-1 rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">{selectedRow.glReferenceNo}</p>
-                  )}
-                </div>
-                {selectedRow.payment.notes && (
-                  <div className="md:col-span-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Notes</p>
-                    <p className="mt-1 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">{selectedRow.payment.notes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
     </div>
   );
 };
@@ -1488,15 +1395,6 @@ const FilterOption: React.FC<FilterOptionProps> = ({ active, brandColor, onClick
   >
     {children}
   </button>
-);
-
-const DetailItem: React.FC<{ label: string; value: string; highlightColor?: string }> = ({ label, value, highlightColor }) => (
-  <div>
-    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-    <p className="mt-1 rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900" style={highlightColor ? { color: highlightColor } : undefined}>
-      {value}
-    </p>
-  </div>
 );
 
 export default ARCollectionReportView;

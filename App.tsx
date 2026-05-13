@@ -32,6 +32,7 @@ import ARCreditDebitMemoView from './views/ARCreditDebitMemoView';
 import ARCollectionReceiptView from './views/ARCollectionReceiptView';
 import ARCollectionReportView from './views/ARCollectionReportView';
 import ARCustomerLedgerView from './views/ARCustomerLedgerView';
+import ReclassificationView from './views/ReclassificationView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
@@ -6049,7 +6050,7 @@ export default function App() {
               <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
                 <NavItem icon={<Zap size={18} />} label="Write Offs" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<CreditCard size={18} />} label="Credit/Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={false} onClick={() => {}} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={activeTab === 'reclassify'} onClick={() => navigateTo('reclassify')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
@@ -6566,6 +6567,7 @@ export default function App() {
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
               brandColor={brandColor}
+              orgName={currentOrg?.name || 'Institution'}
             />
           )}
           {activeTab === 'aging-report' && (
@@ -6599,6 +6601,22 @@ export default function App() {
               onClearContext={() => setNavigationContext(null)}
               organization={currentOrg}
               brandColor={brandColor}
+            />
+          )}
+          {activeTab === 'reclassify' && (
+            <ReclassificationView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
+              currentUser={currentUser}
+              onPostJournal={handlePostJournal}
+              onSaveJournal={handleSaveJournalDraft}
+              onViewJournal={handleViewJournal}
+              onNotify={handleNotify}
             />
           )}
           {activeTab === 'credit-debit-memo' && (
