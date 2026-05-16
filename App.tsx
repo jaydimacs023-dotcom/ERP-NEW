@@ -30,7 +30,9 @@ import ARAgingReportView from './views/ARAgingReportView';
 import ARWriteOffView from './views/ARWriteOffView';
 import ARCreditDebitMemoView from './views/ARCreditDebitMemoView';
 import ARCollectionReceiptView from './views/ARCollectionReceiptView';
+import ARCollectionReportView from './views/ARCollectionReportView';
 import ARCustomerLedgerView from './views/ARCustomerLedgerView';
+import ReclassificationView from './views/ReclassificationView';
 import ItemsView from './views/ItemsView';
 import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
@@ -715,17 +717,22 @@ export default function App() {
           const updates: Promise<any>[] = [];
           missing.forEach(e => {
             const newGl = generateNextGlRef();
+            const isCreditDebitMemoEntry =
+              String(e.sourceType || '').toUpperCase() === 'CREDIT_MEMO' ||
+              /^(CM|DM|CDM|DBM)-/i.test(String(e.reference || '').trim()) ||
+              String(e.description || '').toUpperCase().includes('CREDIT MEMO') ||
+              String(e.description || '').toUpperCase().includes('DEBIT MEMO');
             updates.push(
-              dataService.updateJournalEntry(e.id, { glEntryNumber: newGl, reference: newGl })
+              dataService.updateJournalEntry(e.id, isCreditDebitMemoEntry ? { glEntryNumber: newGl } : { glEntryNumber: newGl, reference: newGl })
                 .then(updated => {
                   e.glEntryNumber = updated.glEntryNumber;
-                  e.reference = updated.reference;
+                  e.reference = isCreditDebitMemoEntry ? e.reference : updated.reference;
                 })
                 .catch(err => console.warn('[App] failed to backfill GL for entry', e.id, err))
             );
             // also update local copy immediately so UI shows something
             e.glEntryNumber = newGl;
-            e.reference = newGl;
+            if (!isCreditDebitMemoEntry) e.reference = newGl;
           });
           Promise.all(updates)
             .then(() => console.info('[App] backfilled missing GL numbers'))
@@ -1860,6 +1867,107 @@ export default function App() {
     }
   };
 
+  const handleUpdateJournalDraft = async (entryId: string, entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
+    const existingEntry = journalEntries.find(e => e.id === entryId);
+    if (!existingEntry) {
+      handleNotify('error', 'Journal entry draft not found.');
+      return null;
+    }
+
+    const normalizedStatus = String(existingEntry.status || '').toUpperCase();
+    if (normalizedStatus === 'POSTED' || normalizedStatus === 'REVERSED') {
+      handleNotify('error', 'Posted or reversed journal entries cannot be updated.');
+      return null;
+    }
+
+    const resolvedPeriodId = resolvePostingPeriodId(entry.periodId || existingEntry.periodId, entry.date || existingEntry.date);
+    if (!resolvedPeriodId) {
+      handleNotify('error', 'Cannot update journal entry draft: no open accounting period found for this date.');
+      return null;
+    }
+
+    try {
+      const { lines: _existingEntryLines, ...existingEntryWithoutLines } = existingEntry as JournalEntry & { lines?: unknown };
+      const { lines: _incomingEntryLines, ...incomingEntryWithoutLines } = entry as Partial<JournalEntry> & { lines?: unknown };
+      const updatedEntry = {
+        ...existingEntryWithoutLines,
+        ...incomingEntryWithoutLines,
+        id: entryId,
+        orgId: currentOrgId,
+        periodId: resolvedPeriodId,
+        status: 'ON_HOLD' as const,
+        createdBy: existingEntry.createdBy || currentUser?.id || 'system',
+        createdAt: existingEntry.createdAt || new Date().toISOString(),
+        updatedBy: currentUser?.id || 'system',
+        updatedAt: new Date().toISOString()
+      } as JournalEntry;
+
+      const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
+      const normalizedSavedEntry = {
+        ...savedEntry,
+        status: savedEntry.status === 'DRAFT' ? 'ON_HOLD' : savedEntry.status,
+        sourceType: (savedEntry.sourceType === 'MANUAL' && /^JV/i.test(String(savedEntry.reference || '').trim()))
+          ? 'JOURNAL'
+          : savedEntry.sourceType
+      } as JournalEntry;
+
+      const existingLines = journalLines.filter(line => line.journalEntryId === entryId);
+      const normalizedLines = lines.map(normalizeJournalLineForSave).map(line => ({
+        ...line,
+        journalEntryId: entryId,
+        orgId: currentOrgId
+      }));
+
+      const savedLines: JournalLine[] = [];
+      for (let idx = 0; idx < normalizedLines.length; idx++) {
+        const sourceLine = normalizedLines[idx];
+        const existingLine = existingLines[idx];
+        if (existingLine) {
+          const updatedLine = await dataService.updateJournalLine(existingLine.id, {
+            ...sourceLine,
+            id: existingLine.id,
+            journalEntryId: entryId
+          });
+          savedLines.push(updatedLine);
+        } else {
+          const createdLine = await dataService.createJournalLine(sourceLine as JournalLine);
+          savedLines.push(createdLine);
+        }
+      }
+
+      const extraLines = existingLines.slice(normalizedLines.length);
+      for (const line of extraLines) {
+        await dataService.deleteJournalLine(line.id);
+      }
+
+      setJournalEntries(prev => prev.map(e => e.id === entryId ? normalizedSavedEntry : e));
+      const savedLineIds = new Set(savedLines.map(line => line.id));
+      const extraLineIds = new Set(extraLines.map(line => line.id));
+      setJournalLines(prev => [
+        ...prev.filter(line => line.journalEntryId !== entryId || (!savedLineIds.has(line.id) && !extraLineIds.has(line.id))),
+        ...savedLines
+      ]);
+
+      AuditService.update(
+        currentOrgId,
+        currentUser?.id || 'system',
+        currentUser?.name || 'System',
+        'JOURNAL_ENTRY',
+        entryId,
+        normalizedSavedEntry.reference || normalizedSavedEntry.glEntryNumber || entryId,
+        existingEntry,
+        normalizedSavedEntry
+      );
+
+      handleNotify('success', 'Journal entry draft updated.');
+      return normalizedSavedEntry;
+    } catch (error) {
+      console.error('[App] Error updating journal draft:', error);
+      handleNotify('error', 'Failed to update journal entry draft.');
+      return null;
+    }
+  };
+
   const handleSaveOrPostJournal = (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
     const status = (entry.status || 'ON_HOLD').toString().toUpperCase();
     if (status === 'ON_HOLD' || status === 'DRAFT') {
@@ -1868,10 +1976,20 @@ export default function App() {
     return handlePostJournal(entry, lines);
   };
 
-  const handleApproveJournal = async (entryId: string) => {
+  const handleApproveJournal = async (entryId: string, referenceOverride?: string) => {
     try {
-      const entry = journalEntries.find(e => e.id === entryId);
+      const stateEntry = journalEntries.find(e => e.id === entryId);
+      const persistedEntry = await dataService.getJournalEntryById(entryId);
+      const entry = persistedEntry || stateEntry;
       if (!entry) return;
+
+      const isCreditDebitMemoEntry =
+        String(entry.sourceType || '').toUpperCase() === 'CREDIT_MEMO' ||
+        /^(CM|DM|CDM|DBM)-/i.test(String(referenceOverride || '').trim()) ||
+        /^(CM|DM|CDM|DBM)-/i.test(String(entry.reference || '').trim()) ||
+        String(entry.description || '').toUpperCase().includes('CREDIT MEMO') ||
+        String(entry.description || '').toUpperCase().includes('DEBIT MEMO');
+      const memoReference = String(referenceOverride || entry.reference || '').trim();
 
       const updatedEntry = {
         ...entry,
@@ -1884,7 +2002,9 @@ export default function App() {
         updatedEntry.glEntryNumber = generateNextGlRef();
       }
 
-      updatedEntry.reference = updatedEntry.reference || updatedEntry.glEntryNumber;
+      updatedEntry.reference = isCreditDebitMemoEntry
+        ? (memoReference || updatedEntry.reference)
+        : (updatedEntry.reference || updatedEntry.glEntryNumber);
 
       const savedEntry = await dataService.updateJournalEntry(entryId, updatedEntry);
       const normalizedSavedEntry = {
@@ -5930,12 +6050,12 @@ export default function App() {
               <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
                 <NavItem icon={<Zap size={18} />} label="Write Offs" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<CreditCard size={18} />} label="Credit/Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={false} onClick={() => {}} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={activeTab === 'reclassify'} onClick={() => navigateTo('reclassify')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
               <NavSection label="AR Reports" isOpen={openSections.inventory} onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))} compact={!sidebarOpen}>
-                <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'collection-report'} onClick={() => navigateTo('collection-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
@@ -6197,6 +6317,19 @@ export default function App() {
           )}
           {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
+          {activeTab === 'collection-report' && (
+            <ARCollectionReportView
+              payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
+              currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
+              orgName={currentOrg?.name}
+              preparedBy="AR Specialist"
+              onViewJournal={handleViewJournal}
+            />
+          )}
 
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
@@ -6434,6 +6567,7 @@ export default function App() {
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
               brandColor={brandColor}
+              orgName={currentOrg?.name || 'Institution'}
             />
           )}
           {activeTab === 'aging-report' && (
@@ -6465,7 +6599,24 @@ export default function App() {
               onNotify={handleNotify}
               initialContext={navigationContext}
               onClearContext={() => setNavigationContext(null)}
+              organization={currentOrg}
               brandColor={brandColor}
+            />
+          )}
+          {activeTab === 'reclassify' && (
+            <ReclassificationView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency || 'USD'}
+              brandColor={brandColor}
+              currentUser={currentUser}
+              onPostJournal={handlePostJournal}
+              onSaveJournal={handleSaveJournalDraft}
+              onViewJournal={handleViewJournal}
+              onNotify={handleNotify}
             />
           )}
           {activeTab === 'credit-debit-memo' && (
@@ -6473,12 +6624,20 @@ export default function App() {
               orgId={currentOrgId}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+              users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
               entries={activeJournalEntries}
               lines={filteredLines}
               accounts={filteredAccounts}
               currency={currentOrg?.currency || 'USD'}
               onPostJournal={handlePostJournal}
+              onSaveJournal={handleSaveJournalDraft}
+              onUpdateJournal={handleUpdateJournalDraft}
+              onApproveJournal={handleApproveJournal}
+              onReverseJournal={reverseJournalEntry}
+              onViewJournal={handleViewJournal}
               onNotify={handleNotify}
+              organization={currentOrg}
               brandColor={brandColor}
             />
           )}

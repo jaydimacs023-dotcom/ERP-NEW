@@ -26,6 +26,10 @@ export class SupabaseDataService implements IDataService {
     return `${this.supabaseUrl}/rest/v1`;
   }
 
+  private isUuid(value?: string | null): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+  }
+
   // Helper method to get standard headers for Supabase requests.
   // Reads default to anon for broad visibility, while selected writes can prefer
   // the authenticated AT-ERP token when RLS depends on user claims.
@@ -4116,6 +4120,7 @@ export class SupabaseDataService implements IDataService {
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
+      if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
       // Normalize app-specific statuses/types to DB constraints
       if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
@@ -4146,16 +4151,30 @@ export class SupabaseDataService implements IDataService {
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
+      if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
       // Normalize app-specific statuses/types to DB constraints
       if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
 
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        response = await fetch(url, {
+          method: 'PATCH',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) break;
+
+        const errorText = await response.text();
+        const missingColumn = this.extractMissingColumnFromSchemaError(errorText);
+        if (response.status === 400 && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+          console.warn(`[Supabase] updateJournalEntry retrying without unknown column '${missingColumn}'`);
+          delete payload[missingColumn];
+          continue;
+        }
+        throw new Error(`Failed to update journal entry: ${response.status} - ${errorText}`);
+      }
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to update journal entry: ${response.status} - ${errorText}`);
@@ -4209,8 +4228,79 @@ export class SupabaseDataService implements IDataService {
       return this.snakeToCamel(Array.isArray(data) ? data[0] : data);
     } catch (error) {
       console.error('[Supabase] Error reversing journal entry:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('column "source_ref" is of type uuid') || message.includes('Journal reversal RPC is missing')) {
+        console.warn('[Supabase] Falling back to REST journal reversal.');
+        return this.reverseJournalEntryViaRest(entryId);
+      }
       throw error;
     }
+  }
+
+  private async reverseJournalEntryViaRest(entryId: string): Promise<any> {
+    const original = await this.getJournalEntryById(entryId);
+    if (!original) throw new Error('Journal entry not found.');
+    if (String(original.status || '').toUpperCase() !== 'POSTED') {
+      throw new Error('Only posted journal entries can be reversed.');
+    }
+    if (original.originalEntryId || String(original.sourceType || '').toUpperCase() === 'REVERSAL') {
+      throw new Error('This journal entry is already a reversal and cannot be reversed again.');
+    }
+
+    const originalLines = await this.getJournalLinesByEntry(entryId);
+    if (originalLines.length === 0) {
+      throw new Error(`Journal entry ${entryId} has no lines to reverse.`);
+    }
+
+    const allEntries = await this.getJournalEntriesByOrg(original.orgId);
+    const nextSequence = allEntries.reduce((max, entry) => {
+      const ref = String(entry.glEntryNumber || entry.reference || '').trim().toUpperCase();
+      const match = ref.match(/^GL(?:\s*NO\.?)?[\s-]*(\d+)$/);
+      return match ? Math.max(max, Number(match[1] || 0)) : max;
+    }, 0) + 1;
+    const newGl = `GL${String(nextSequence).padStart(8, '0')}`;
+    const now = new Date().toISOString();
+
+    const reversalEntry = await this.createJournalEntry({
+      orgId: original.orgId,
+      periodId: original.periodId || null,
+      date: new Date().toISOString().split('T')[0],
+      description: `Reversal: ${original.description || original.glEntryNumber || original.reference || original.id}`,
+      reference: newGl,
+      glEntryNumber: newGl,
+      status: 'POSTED',
+      createdBy: original.createdBy,
+      createdAt: now,
+      sourceType: 'REVERSAL',
+      sourceRef: entryId,
+      reversedAt: now,
+      reversalReason: `Auto-generated reversal for ${original.glEntryNumber || original.reference || original.id}`,
+      originalEntryId: entryId
+    });
+
+    await this.createJournalLines(originalLines.map((line: any) => ({
+      orgId: line.orgId || original.orgId,
+      journalEntryId: reversalEntry.id,
+      accountId: line.accountId,
+      debit: Number(line.credit || 0),
+      credit: Number(line.debit || 0),
+      memo: line.memo,
+      description: line.description,
+      contactId: line.contactId,
+      contactType: line.contactType,
+      batchId: line.batchId,
+      itemId: line.itemId,
+      assetId: line.assetId,
+      isCleared: line.isCleared
+    })));
+
+    await this.updateJournalEntry(entryId, {
+      status: 'REVERSED',
+      reversedAt: now,
+      reversalReason: `Auto-generated reversal for ${original.glEntryNumber || original.reference || original.id}`
+    });
+
+    return reversalEntry;
   }
 
   async deleteJournalEntry(id: string): Promise<void> {
@@ -4386,11 +4476,24 @@ export class SupabaseDataService implements IDataService {
       if (payload.asset_id === '') payload.asset_id = null;
 
       const url = `${this.baseUrl}/journal_lines?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        response = await fetch(url, {
+          method: 'PATCH',
+          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) break;
+
+        const errorText = await response.text();
+        const missingColumn = this.extractMissingColumnFromSchemaError(errorText);
+        if (response.status === 400 && missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+          console.warn(`[Supabase] updateJournalLine retrying without unknown column '${missingColumn}'`);
+          delete payload[missingColumn];
+          continue;
+        }
+        throw new Error(`Failed to update journal line: ${response.status} - ${errorText}`);
+      }
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to update journal line: ${response.status} - ${errorText}`);

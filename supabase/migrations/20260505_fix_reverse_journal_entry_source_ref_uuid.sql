@@ -1,18 +1,3 @@
-alter table public.journal_entries
-  add column if not exists reversed_by text,
-  add column if not exists reversed_at timestamptz,
-  add column if not exists reversal_reason text,
-  add column if not exists original_entry_id uuid;
-
-create unique index if not exists journal_entries_one_reversal_per_original_idx
-  on public.journal_entries (original_entry_id)
-  where original_entry_id is not null;
-
-update public.journal_entries
-set description = regexp_replace(description, '^REV:\s*', 'Reversal: ')
-where upper(coalesce(source_type, '')) = 'REVERSAL'
-  and description ~ '^REV:\s*';
-
 create or replace function public.reverse_journal_entry(p_entry_id uuid)
 returns public.journal_entries
 language plpgsql
