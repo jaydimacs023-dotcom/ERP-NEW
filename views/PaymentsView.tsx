@@ -2662,6 +2662,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               Manage payment receipts and invoice application activity from one formal registry workspace.
             </p>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col sm:flex-row sm:items-stretch">
             <button
               onClick={() => handleListTabChange('payments')}
@@ -2688,19 +2691,17 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
               Payment Applications
             </button>
           </div>
+          <button
+            onClick={listTab === 'payments' ? startNewPayment : startNewPaymentApplication}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
+          >
+            <Plus size={20} />
+            {listTab === 'payments' ? 'New Payment' : 'New Payment Application'}
+          </button>
         </div>
 
         {listTab === 'payments' && (
           <>
-        <div className="flex justify-end">
-          <button
-            onClick={startNewPayment}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
-          >
-            <Plus size={20} />
-            New Payment
-          </button>
-        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">On Hold</p>
@@ -2828,16 +2829,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
         {listTab === 'applications' && (
           <>
-            <div className="flex justify-end">
-              <button
-                onClick={startNewPaymentApplication}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
-              >
-                <Plus size={20} />
-                New Payment Application
-              </button>
-            </div>
-
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Not Yet Applied</p>
