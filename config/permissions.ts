@@ -49,6 +49,7 @@ export type ModuleTab =
   | 'payments'
   | 'bank-deposits'
   | 'customers'
+  | 'ar-calendar-tasks'
   | 'credit-debit-memo'
   | 'write-off'
   | 'aging-report'
@@ -165,9 +166,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'coa', 'periods', 'audit'
   ],
 
-  // AR_SPECIALIST: Accounts Receivable focused - Exactly 11 modules as requested
+  // AR_SPECIALIST: Accounts Receivable focused
   AR_SPECIALIST: [
     'dashboard',
+    'ar-calendar-tasks',
     'customers',
     'invoices',
     'payments',
@@ -244,7 +246,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 // ===== Module Groups for Sidebar Sections =====
 export const MODULE_GROUPS = {
   FINANCIAL_CORE: ['dashboard', 'ledger', 'reports', 'banking', 'checks'] as ModuleTab[],
-  AR_MODULES: ['ar', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees'] as ModuleTab[],
+  AR_MODULES: ['ar', 'ar-calendar-tasks', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees'] as ModuleTab[],
   AP_MODULES: ['payables', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],

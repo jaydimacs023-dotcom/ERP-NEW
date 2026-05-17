@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { AccountClass, ChartOfAccount, JournalEntry, JournalLine, Sponsor, Student, User } from '../types';
+import ModalPortal from '../components/ModalPortal';
 
 interface ReclassificationViewProps {
   entries: JournalEntry[];
@@ -22,7 +23,6 @@ interface ReclassificationViewProps {
   brandColor?: string;
   currentUser?: User | null;
   onPostJournal: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void | Promise<JournalEntry | null>;
-  onSaveJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void | Promise<JournalEntry | null>;
   onViewJournal?: (journalEntryId: string) => void;
   onNotify?: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
 }
@@ -49,7 +49,42 @@ interface SourceCandidate {
   balance: number;
 }
 
+interface ReclassificationDraft {
+  id: string;
+  reclassNo: string;
+  status: 'DRAFT';
+  reclassDate: string;
+  scope: Scope;
+  reclassType: ReclassType;
+  payorType: 'SPONSOR' | 'STUDENT';
+  sourceAccountId: string;
+  targetAccountId: string;
+  sourcePayorId: string;
+  targetPayorId: string;
+  basisType: BasisType;
+  basisValue: string;
+  loadedSourceId: string;
+  amount: number;
+  remarks: string;
+  sourceTransactionNo: string;
+  sourcePayor: string;
+  sourceAccountName: string;
+  targetAccountName: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const todayKey = () => new Date().toISOString().split('T')[0];
+
+const formatReclassNo = (year: number, sequence: number) =>
+  `RC-${year}-${String(sequence).padStart(5, '0')}`;
+
+const extractReclassSequence = (reference: string | undefined, year: number) => {
+  const match = String(reference || '').trim().match(/^RC-(\d{4})-(\d+)$/i);
+  if (!match || Number(match[1]) !== year) return 0;
+  return Number(match[2]) || 0;
+};
 
 const formatPostPeriod = (date: string) => {
   const parsed = new Date(`${date}T00:00:00`);
@@ -82,11 +117,14 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
   brandColor = '#0b8f4d',
   currentUser,
   onPostJournal,
-  onSaveJournal,
   onViewJournal,
   onNotify,
 }) => {
-  const [reclassNo] = useState(() => `RC-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`);
+  const [reclassNo, setReclassNo] = useState(() => {
+    const year = new Date().getFullYear();
+    const postedMax = entries.reduce((max, entry) => Math.max(max, extractReclassSequence(entry.reference, year)), 0);
+    return formatReclassNo(year, postedMax + 1);
+  });
   const [status, setStatus] = useState<'DRAFT' | 'POSTED'>('DRAFT');
   const [reclassDate, setReclassDate] = useState(todayKey());
   const [scope, setScope] = useState<Scope>('AR');
@@ -102,6 +140,22 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
   const [amount, setAmount] = useState(0);
   const [remarks, setRemarks] = useState('');
   const [postedEntry, setPostedEntry] = useState<JournalEntry | null>(null);
+  const [drafts, setDrafts] = useState<ReclassificationDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState('');
+  const [showPostConfirm, setShowPostConfirm] = useState(false);
+
+  const getNextReclassNo = (currentDrafts: ReclassificationDraft[]) => {
+    const year = new Date().getFullYear();
+    const postedMax = entries.reduce((max, entry) => Math.max(max, extractReclassSequence(entry.reference, year)), 0);
+    const draftMax = currentDrafts.reduce((max, draft) => Math.max(max, extractReclassSequence(draft.reclassNo, year)), 0);
+    return formatReclassNo(year, Math.max(postedMax, draftMax) + 1);
+  };
+
+  useEffect(() => {
+    if (activeDraftId || status !== 'DRAFT') return;
+    const nextNo = getNextReclassNo(drafts);
+    setReclassNo(prev => prev === nextNo ? prev : nextNo);
+  }, [activeDraftId, drafts, entries, status]);
 
   const formatCurrency = (value: number) =>
     `${currency} ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -255,36 +309,79 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
     description: remarks || `Reclassification ${reclassNo}`,
   });
 
-  const handleSave = async () => {
-    if (!onSaveJournal) {
-      onNotify?.('info', 'Draft save is not available for this module.');
-      return;
-    }
+  const validateReclassification = (action: 'saving' | 'posting') => {
     if (!isBalanced) {
-      onNotify?.('error', 'Complete the source, target, and amount before saving.');
+      onNotify?.('error', `Complete the source, target, and amount before ${action}.`);
+      return false;
+    }
+    if (!loadedSource) {
+      onNotify?.('error', `Load a source transaction before ${action}.`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSave = () => {
+    if (!validateReclassification('saving')) {
       return;
     }
-    const saved = await onSaveJournal(buildEntry(), buildJournalLines());
-    if (saved) {
-      setPostedEntry(saved);
-      onNotify?.('success', 'Reclassification draft saved.');
+
+    const now = new Date().toISOString();
+    const userName = currentUser?.name || 'AR Specialist';
+    const draft: ReclassificationDraft = {
+      id: activeDraftId || `draft-${Date.now()}`,
+      reclassNo,
+      status: 'DRAFT',
+      reclassDate,
+      scope,
+      reclassType,
+      payorType,
+      sourceAccountId: sourceAccount?.id || sourceAccountId,
+      targetAccountId,
+      sourcePayorId,
+      targetPayorId,
+      basisType,
+      basisValue,
+      loadedSourceId,
+      amount: normalizedAmount,
+      remarks,
+      sourceTransactionNo: loadedSource?.transactionNo || '-',
+      sourcePayor: loadedSource?.payor || sourcePayor?.name || '-',
+      sourceAccountName: sourceAccount ? `${sourceAccount.code} - ${sourceAccount.name}` : '-',
+      targetAccountName: targetAccount ? `${targetAccount.code} - ${targetAccount.name}` : '-',
+      createdBy: drafts.find(item => item.id === activeDraftId)?.createdBy || userName,
+      createdAt: drafts.find(item => item.id === activeDraftId)?.createdAt || now,
+      updatedAt: now,
+    };
+
+    setDrafts(prev => activeDraftId
+      ? prev.map(item => item.id === activeDraftId ? draft : item)
+      : [draft, ...prev]);
+    setActiveDraftId(draft.id);
+    onNotify?.('success', 'Reclassification draft saved locally. It has not been posted to the journal.');
+  };
+
+  const requestPost = () => {
+    if (!validateReclassification('posting')) {
+      return;
     }
+    setShowPostConfirm(true);
   };
 
   const handlePost = async () => {
-    if (!isBalanced) {
-      onNotify?.('error', 'Cannot post: the reclassification entry is incomplete.');
-      return;
-    }
     const posted = await onPostJournal(buildEntry(), buildJournalLines());
     if (posted) {
       setPostedEntry(posted);
       setStatus('POSTED');
+      setDrafts(prev => prev.filter(item => item.id !== activeDraftId));
+      setActiveDraftId('');
+      setShowPostConfirm(false);
       onNotify?.('success', 'Reclassification posted successfully.');
     }
   };
 
   const resetForm = () => {
+    setReclassNo(getNextReclassNo(drafts));
     setStatus('DRAFT');
     setReclassDate(todayKey());
     setScope('AR');
@@ -300,6 +397,28 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
     setAmount(0);
     setRemarks('');
     setPostedEntry(null);
+    setActiveDraftId('');
+    setShowPostConfirm(false);
+  };
+
+  const loadDraft = (draft: ReclassificationDraft) => {
+    setReclassNo(draft.reclassNo);
+    setStatus('DRAFT');
+    setReclassDate(draft.reclassDate);
+    setScope(draft.scope);
+    setReclassType(draft.reclassType);
+    setPayorType(draft.payorType);
+    setSourceAccountId(draft.sourceAccountId);
+    setTargetAccountId(draft.targetAccountId);
+    setSourcePayorId(draft.sourcePayorId);
+    setTargetPayorId(draft.targetPayorId);
+    setBasisType(draft.basisType);
+    setBasisValue(draft.basisValue);
+    setLoadedSourceId(draft.loadedSourceId);
+    setAmount(draft.amount);
+    setRemarks(draft.remarks);
+    setPostedEntry(null);
+    setActiveDraftId(draft.id);
   };
 
   const previewDebitTarget = isSourceDebitBalance;
@@ -368,10 +487,11 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-xl font-semibold tracking-tight text-slate-900">New Reclassification</h2>
-            <span className="text-xl font-semibold tracking-tight text-slate-900">{reclassNo}</span>
+            <h2 className="text-xl font-semibold text-slate-900 tracking-tighter">New Reclassification</h2>
+            <span className="text-xl font-semibold text-slate-900 tracking-tighter">{reclassNo}</span>
             <span className="rounded px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: brandTint(0.1), color: brandColor }}>{status}</span>
           </div>
+          <p className="mt-1 text-sm italic font-medium text-slate-500">Transfer balances between accounts, customers, and classifications with a clear audit trail.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" onClick={resetForm} className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-3 text-xs font-bold shadow-sm">
               <RotateCcw size={18} />
@@ -379,7 +499,7 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
             <button type="button" onClick={handleSave} disabled={status === 'POSTED'} className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-4 text-xs font-bold shadow-sm disabled:opacity-50">
               <Save size={18} /> Save
             </button>
-            <button type="button" onClick={handlePost} disabled={status === 'POSTED'} className="inline-flex h-10 items-center gap-2 rounded px-5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ backgroundColor: brandColor }}>
+            <button type="button" onClick={requestPost} disabled={status === 'POSTED'} className="inline-flex h-10 items-center gap-2 rounded px-5 text-xs font-bold text-white shadow-sm disabled:opacity-50" style={{ backgroundColor: brandColor }}>
               <FileText size={18} /> Post Reclassification
             </button>
             <button type="button" onClick={() => window.print()} className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-4 text-xs font-bold shadow-sm">
@@ -390,16 +510,53 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-right">
-          <div>
-            <div className="text-sm font-bold text-slate-900">{currentUser?.name || 'AR Specialist'}</div>
-            <div className="text-xs font-bold" style={{ color: brandColor }}>{String(currentUser?.role || 'AR_SPECIALIST').replace('_', ' ')}</div>
-          </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold text-white" style={{ backgroundColor: brandColor }}>
-            {(currentUser?.name || 'AR').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase()}
-          </div>
-        </div>
       </div>
+
+      <section className="rounded-md border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: brandColor }}>Draft Reclassifications</h3>
+            <p className="mt-1 text-xs font-semibold text-slate-500">Saved drafts stay in this workspace and are posted to the journal only after confirmation.</p>
+          </div>
+          <span className="rounded px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: brandTint(0.1), color: brandColor }}>{drafts.length} Draft{drafts.length === 1 ? '' : 's'}</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-[980px] w-full text-xs">
+            <thead className="bg-gray-50 text-xs uppercase text-slate-500">
+              <tr>
+                {['Reclass No.', 'Date', 'Scope', 'Source Transaction', 'Payor', 'From Account', 'To Account', 'Amount', 'Status', 'Last Updated', 'Action'].map(label => (
+                  <th key={label} className="px-4 py-3 text-left font-bold">{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {drafts.length > 0 ? drafts.map(draft => (
+                <tr key={draft.id} className={`font-semibold ${activeDraftId === draft.id ? 'bg-slate-50' : 'bg-white'}`}>
+                  <td className="px-4 py-3 font-bold text-slate-900">{draft.reclassNo}</td>
+                  <td className="px-4 py-3 text-slate-600">{draft.reclassDate}</td>
+                  <td className="px-4 py-3 text-slate-600">{draft.scope}</td>
+                  <td className="px-4 py-3 text-slate-700">{draft.sourceTransactionNo}</td>
+                  <td className="px-4 py-3 text-slate-600">{draft.sourcePayor}</td>
+                  <td className="max-w-[210px] truncate px-4 py-3 text-slate-600">{draft.sourceAccountName}</td>
+                  <td className="max-w-[210px] truncate px-4 py-3 text-slate-600">{draft.targetAccountName}</td>
+                  <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(draft.amount)}</td>
+                  <td className="px-4 py-3"><span className="rounded px-2 py-1 text-xs font-bold" style={{ backgroundColor: brandTint(0.1), color: brandColor }}>{draft.status}</span></td>
+                  <td className="px-4 py-3 text-slate-500">{new Date(draft.updatedAt).toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <button type="button" onClick={() => loadDraft(draft)} className="rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold shadow-sm" style={{ color: brandColor }}>
+                      Open
+                    </button>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={11} className="px-4 py-8 text-center text-xs font-semibold text-slate-400">No draft reclassifications yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-4">
@@ -603,6 +760,52 @@ const ReclassificationView: React.FC<ReclassificationViewProps> = ({
           <Notice tone="warning" title="Important" body="Once posted, this reclassification cannot be edited. You may reverse the reclassification if needed." icon={<AlertTriangle size={28} />} />
         </aside>
       </div>
+
+      {showPostConfirm && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-md border border-white/10 bg-white p-5 shadow-2xl">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: brandTint(0.12), color: brandColor }}>
+                  <FileText size={22} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xl font-semibold text-slate-900 tracking-tighter">Post Reclassification?</h3>
+                  <p className="mt-1 text-sm italic font-medium text-slate-500">This will create the journal entry and remove the item from draft reclassifications.</p>
+                </div>
+              </div>
+              <div className="mt-5 rounded-md border border-gray-200 bg-slate-50 p-4 text-xs font-semibold text-slate-600">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-400">Reclass No.</div>
+                    <div className="mt-1 font-bold text-slate-900">{reclassNo}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-400">Amount</div>
+                    <div className="mt-1 font-bold text-slate-900">{formatCurrency(normalizedAmount)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-400">Source</div>
+                    <div className="mt-1 truncate font-bold text-slate-900">{sourceAccount ? `${sourceAccount.code} - ${sourceAccount.name}` : '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-400">Target</div>
+                    <div className="mt-1 truncate font-bold text-slate-900">{targetAccount ? `${targetAccount.code} - ${targetAccount.name}` : '-'}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => setShowPostConfirm(false)} className="h-10 rounded border border-gray-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm">
+                  Cancel
+                </button>
+                <button type="button" onClick={handlePost} className="h-10 rounded px-5 text-xs font-bold text-white shadow-sm" style={{ backgroundColor: brandColor }}>
+                  Confirm Post
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   );
 };

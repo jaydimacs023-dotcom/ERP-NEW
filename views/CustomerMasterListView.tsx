@@ -9,7 +9,7 @@ import {
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
     Filter, Plus, FileText, LayoutDashboard, X, User as UserIcon,
     CheckCircle2, AlertCircle, Clock, ShieldCheck, Printer, Heart, Loader2, Receipt, Building2,
-    ChevronDown, RotateCcw
+    ChevronDown, ChevronUp, RotateCcw, ArrowUpDown
 } from 'lucide-react';
 
 interface CustomerMasterListViewProps {
@@ -41,6 +41,8 @@ const MANDATORY_DOCS = [
 ];
 
 type BillingFilter = 'ALL' | 'BILLED' | 'UNBILLED' | 'PARTIAL' | 'NO_ENROLLMENT';
+type CustomerColumnKey = 'identity' | 'contact' | 'details' | 'billing';
+type SortDirection = 'asc' | 'desc' | 'none';
 
 const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     sponsors,
@@ -63,6 +65,13 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     const [showBillingDropdown, setShowBillingDropdown] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [sponsorColumnOrder, setSponsorColumnOrder] = useState<CustomerColumnKey[]>(['identity', 'contact', 'details', 'billing']);
+    const [studentColumnOrder, setStudentColumnOrder] = useState<CustomerColumnKey[]>(['identity', 'contact', 'details', 'billing']);
+    const [draggedColumn, setDraggedColumn] = useState<CustomerColumnKey | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: CustomerColumnKey; direction: SortDirection }>({
+        key: 'identity',
+        direction: 'none'
+    });
 
     // Detail Modals
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -236,18 +245,115 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         };
     }, [activeSubTab, activeTabData, filteredData.length, enrollments, invoices]);
 
+    const activeColumnOrder = activeSubTab === 'sponsors' ? sponsorColumnOrder : studentColumnOrder;
+
+    const tableColumns: Record<CustomerColumnKey, { key: CustomerColumnKey; label: string; width: string }> = activeSubTab === 'sponsors'
+        ? {
+            identity: { key: 'identity', label: 'Sponsor Identification', width: 'w-[34%]' },
+            contact: { key: 'contact', label: 'Contact Person', width: 'w-[22%]' },
+            details: { key: 'details', label: 'Contact Details', width: 'w-[24%]' },
+            billing: { key: 'billing', label: 'Billing Status', width: 'w-[20%]' },
+        }
+        : {
+            identity: { key: 'identity', label: 'Learner Identification', width: 'w-[34%]' },
+            contact: { key: 'contact', label: 'Contact Number', width: 'w-[22%]' },
+            details: { key: 'details', label: 'Residence', width: 'w-[24%]' },
+            billing: { key: 'billing', label: 'Billing Status', width: 'w-[20%]' },
+        };
+
+    const getSortValue = (item: Sponsor | Student, key: CustomerColumnKey): string => {
+        if (activeSubTab === 'sponsors') {
+            const sponsor = item as Sponsor;
+            switch (key) {
+                case 'identity':
+                    return `${sponsor.name || ''} ${sponsor.sponsorCode || ''}`;
+                case 'contact':
+                    return sponsor.contactPerson || '';
+                case 'details':
+                    return `${sponsor.email || ''} ${sponsor.phone || ''}`;
+                case 'billing':
+                    return getSponsorBillingStatus(sponsor.id);
+                default:
+                    return '';
+            }
+        }
+
+        const student = item as Student;
+        switch (key) {
+            case 'identity':
+                return `${student.lastName || ''} ${student.firstName || ''} ${student.uli || ''}`;
+            case 'contact':
+                return student.contactNumber || '';
+            case 'details':
+                return `${student.city || ''} ${student.province || ''}`;
+            case 'billing':
+                return getStudentBillingStatus(student.id);
+            default:
+                return '';
+        }
+    };
+
+    const sortedData = useMemo(() => {
+        if (sortConfig.direction === 'none') return filteredData;
+
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
+        return [...filteredData].sort((a, b) => (
+            getSortValue(a as Sponsor | Student, sortConfig.key)
+                .localeCompare(getSortValue(b as Sponsor | Student, sortConfig.key), undefined, { numeric: true, sensitivity: 'base' }) * dir
+        ));
+    }, [filteredData, sortConfig, activeSubTab, invoices, enrollments]);
+
+    const handleSort = (key: CustomerColumnKey) => {
+        setCurrentPage(1);
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const handleColumnDrop = (targetKey: CustomerColumnKey) => {
+        if (!draggedColumn || draggedColumn === targetKey) return;
+
+        const reorder = (currentOrder: CustomerColumnKey[]) => {
+            const nextOrder = currentOrder.filter(key => key !== draggedColumn);
+            const targetIndex = nextOrder.indexOf(targetKey);
+            nextOrder.splice(targetIndex, 0, draggedColumn);
+            return nextOrder;
+        };
+
+        if (activeSubTab === 'sponsors') {
+            setSponsorColumnOrder(reorder);
+        } else {
+            setStudentColumnOrder(reorder);
+        }
+
+        setDraggedColumn(null);
+    };
+
+    const SortIndicator = ({ columnKey }: { columnKey: CustomerColumnKey }) => {
+        if (sortConfig.key !== columnKey || sortConfig.direction === 'none') {
+            return <ArrowUpDown size={12} className="ml-1 text-white/70" />;
+        }
+
+        return sortConfig.direction === 'asc'
+            ? <ChevronUp size={12} className="ml-1 text-white" />
+            : <ChevronDown size={12} className="ml-1 text-white" />;
+    };
+
     // --- Pagination ---
-    const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * PAGE_SIZE;
-        return filteredData.slice(start, start + PAGE_SIZE);
-    }, [filteredData, currentPage]);
+        return sortedData.slice(start, start + PAGE_SIZE);
+    }, [sortedData, currentPage]);
 
     const handleTabChange = (tab: 'sponsors' | 'students') => {
         setActiveSubTab(tab);
         setSearchTerm('');
         setBillingFilter('ALL');
         setShowBillingDropdown(false);
+        setDraggedColumn(null);
+        setSortConfig({ key: 'identity', direction: 'none' });
         setCurrentPage(1);
     };
 
@@ -275,6 +381,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 
     const billingFilterLabel = availableBillingFilters.find(option => option.value === billingFilter)?.label || 'All';
     const hasActiveFilters = searchTerm.trim().length > 0 || billingFilter !== 'ALL';
+    const registryCellClass = 'h-16 px-6 py-3 align-middle';
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -414,24 +521,35 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 
             {/* Table */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-100 text-left">
+                <table className="min-w-full table-fixed divide-y divide-gray-100 text-left">
                     <thead style={{ backgroundColor: brandColor }}>
                         <tr>
-                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">
-                                {activeSubTab === 'sponsors' ? 'Sponsor Identification' : 'Learner Identification'}
-                            </th>
-                            {activeSubTab === 'sponsors' ? (
-                                <>
-                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Person</th>
-                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Details</th>
-                                </>
-                            ) : (
-                                <>
-                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Contact Number</th>
-                                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Residence</th>
-                                </>
-                            )}
-                            <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-white">Billing Status</th>
+                            {activeColumnOrder.map(columnKey => {
+                                const column = tableColumns[columnKey];
+                                const isDragged = draggedColumn === columnKey;
+
+                                return (
+                                    <th
+                                        key={column.key}
+                                        draggable
+                                        onDragStart={() => setDraggedColumn(column.key)}
+                                        onDragOver={(event) => event.preventDefault()}
+                                        onDrop={() => handleColumnDrop(column.key)}
+                                        onDragEnd={() => setDraggedColumn(null)}
+                                        className={`px-6 py-4 text-xs font-bold uppercase tracking-wide text-white ${column.width} ${isDragged ? 'opacity-50' : ''}`}
+                                        title="Drag to reorder. Click to sort."
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSort(column.key)}
+                                            className="flex items-center gap-1 text-left uppercase tracking-wide"
+                                        >
+                                            {column.label}
+                                            <SortIndicator columnKey={column.key} />
+                                        </button>
+                                    </th>
+                                );
+                            })}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -439,100 +557,113 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                             if (activeSubTab === 'sponsors') {
                                 const sponsor = item as Sponsor;
                                 const status = getSponsorBillingStatus(sponsor.id);
+                                const cells: Record<CustomerColumnKey, React.ReactNode> = {
+                                    identity: (
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div
+                                                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                                                style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
+                                            >
+                                                <Building size={20} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <button
+                                                    onClick={() => setSelectedSponsor(sponsor)}
+                                                    className="block max-w-full truncate text-left text-sm font-semibold uppercase tracking-tight text-slate-900 transition-colors"
+                                                    style={{ color: undefined }}
+                                                >
+                                                    {sponsor.name}
+                                                </button>
+                                                <div className="truncate text-[10px] font-mono font-bold uppercase text-slate-400">{sponsor.sponsorCode || 'NO-CODE'}</div>
+                                            </div>
+                                        </div>
+                                    ),
+                                    contact: <div className="truncate text-sm font-bold text-slate-600">{sponsor.contactPerson || '---'}</div>,
+                                    details: <div className="truncate text-xs font-bold text-slate-500">{sponsor.email || sponsor.phone || '---'}</div>,
+                                    billing: status === 'BILLED' ? (
+                                        <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                                            <CheckCircle2 size={12} /> Billed
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            <Clock size={12} /> Unbilled
+                                        </span>
+                                    )
+                                };
+
                                 return (
                                     <tr key={sponsor.id} className="hover:bg-gray-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                                                    style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
-                                                >
-                                                    <Building size={20} />
-                                                </div>
-                                                <div>
-                                                    <button
-                                                        onClick={() => setSelectedSponsor(sponsor)}
-                                                        className="text-sm font-semibold text-slate-900 uppercase tracking-tight transition-colors text-left"
-                                                        style={{ color: undefined }}
-                                                    >
-                                                        {sponsor.name}
-                                                    </button>
-                                                    <div className="text-[10px] font-mono font-bold text-slate-400 uppercase">{sponsor.sponsorCode || 'NO-CODE'}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-slate-600">{sponsor.contactPerson || '---'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs font-bold text-slate-500">{sponsor.email || sponsor.phone || '---'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {status === 'BILLED' ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                                                    <CheckCircle2 size={12} /> Billed
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100">
-                                                    <Clock size={12} /> Unbilled
-                                                </span>
-                                            )}
-                                        </td>
+                                        {activeColumnOrder.map(columnKey => (
+                                            <td key={columnKey} className={registryCellClass}>
+                                                {cells[columnKey]}
+                                            </td>
+                                        ))}
                                     </tr>
                                 );
                             } else {
                                 const student = item as Student;
                                 const status = getStudentBillingStatus(student.id);
+                                const statusCell = (
+                                    <>
+                                        {status === 'BILLED' && (
+                                            <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                                                <CheckCircle2 size={12} /> Billed
+                                            </span>
+                                        )}
+                                        {status === 'UNBILLED' && (
+                                            <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-brand-light bg-brand/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-brand">
+                                                <AlertCircle size={12} /> Unbilled
+                                            </span>
+                                        )}
+                                        {status === 'PARTIAL' && (
+                                            <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                                                <Clock size={12} /> Partial
+                                            </span>
+                                        )}
+                                        {status === 'NO_ENROLLMENT' && (
+                                            <span className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                No Enrollment
+                                            </span>
+                                        )}
+                                    </>
+                                );
+                                const cells: Record<CustomerColumnKey, React.ReactNode> = {
+                                    identity: (
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div
+                                                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                                                style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
+                                            >
+                                                <UserIcon size={20} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <button
+                                                    onClick={() => setSelectedStudent(student)}
+                                                    className="block max-w-full truncate text-left text-sm font-black uppercase tracking-tight text-slate-900 transition-colors"
+                                                >
+                                                    {student.lastName.toUpperCase()}, {student.firstName}
+                                                </button>
+                                                <div className="truncate text-[10px] font-mono font-bold uppercase" style={{ color: brandColor }}>ULI: {student.uli}</div>
+                                            </div>
+                                        </div>
+                                    ),
+                                    contact: <div className="truncate text-sm font-bold text-slate-600">{student.contactNumber || '---'}</div>,
+                                    details: (
+                                        <>
+                                            <div className="truncate text-[10px] font-black uppercase tracking-widest text-slate-500">{student.city || '---'}</div>
+                                            <div className="truncate text-[10px] font-bold uppercase text-slate-400">{student.province || '---'}</div>
+                                        </>
+                                    ),
+                                    billing: statusCell
+                                };
+
                                 return (
                                     <tr key={student.id} className="hover:bg-gray-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-                                                    style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor, border: `1px solid var(--acm-primary-light)` }}
-                                                >
-                                                    <UserIcon size={20} />
-                                                </div>
-                                                <div>
-                                                    <button
-                                                        onClick={() => setSelectedStudent(student)}
-                                                        className="text-sm font-black text-slate-900 uppercase tracking-tight transition-colors text-left"
-                                                    >
-                                                        {student.lastName.toUpperCase()}, {student.firstName}
-                                                    </button>
-                                                    <div className="text-[10px] font-mono font-bold uppercase" style={{ color: brandColor }}>ULI: {student.uli}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-slate-600">{student.contactNumber || '---'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{student.city || '---'}</div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase">{student.province || '---'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {status === 'BILLED' && (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                                                    <CheckCircle2 size={12} /> Billed
-                                                </span>
-                                            )}
-                                            {status === 'UNBILLED' && (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand/10 text-brand rounded-full text-[10px] font-black uppercase tracking-widest border border-brand-light">
-                                                    <AlertCircle size={12} /> Unbilled
-                                                </span>
-                                            )}
-                                            {status === 'PARTIAL' && (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100">
-                                                    <Clock size={12} /> Partial
-                                                </span>
-                                            )}
-                                            {status === 'NO_ENROLLMENT' && (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100">
-                                                    No Enrollment
-                                                </span>
-                                            )}
-                                        </td>
+                                        {activeColumnOrder.map(columnKey => (
+                                            <td key={columnKey} className={registryCellClass}>
+                                                {cells[columnKey]}
+                                            </td>
+                                        ))}
                                     </tr>
                                 );
                             }

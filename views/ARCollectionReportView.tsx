@@ -526,7 +526,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
     const reportDate = getReportDateLabel(context.period, context.dateFrom, context.dateTo);
 
     let html = '<html><head><meta charset="utf-8"/><style>';
-    html += 'body{font-family:Arial,sans-serif;color:#111}table{border-collapse:collapse;width:100%}th{background:#047a3b;color:#fff;font-weight:700}td,th{border:1px solid #d7dee8;padding:8px 10px;font-size:12px}td.num{text-align:right}h1,h2,h3{text-align:center;margin:4px 0}.summary{margin-top:14px;width:360px}.sign{margin-top:34px;width:100%}.line{border-bottom:1px solid #111;height:24px}';
+    html += 'body{font-family:Inter,"Open Sans","Segoe UI",Arial,sans-serif;color:#111}table{border-collapse:collapse;width:100%}th{background:#047a3b;color:#fff;font-weight:700}td,th{border:1px solid #d7dee8;padding:8px 10px;font-size:12px}td.num{text-align:right}h1,h2,h3{text-align:center;margin:4px 0}.summary{margin-top:14px;width:360px}.sign{margin-top:34px;width:100%}.line{border-bottom:1px solid #111;height:24px}';
     html += '</style></head><body>';
     html += `<h1>${esc(orgName)}</h1><h2>Collection Report</h2><h3>${esc(getReportPeriodLabel(context.period))}</h3>`;
     html += `<p style="text-align:center"><b>Date:</b> ${esc(reportDate)}</p>`;
@@ -611,7 +611,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Collection Report</title><style>
       @page { size: A4; margin: 0; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing:border-box; }
-      body { margin:0; font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff; }
+      body { margin:0; font-family: Inter, "Open Sans", "Segoe UI", Arial, sans-serif; color:#111827; background:#fff; }
       .page { position:relative; width:210mm; min-height:297mm; margin:0 auto; padding:16mm; overflow:hidden; background:#fff; display:flex; flex-direction:column; }
       .muted, .sub { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse:collapse; font-size:10px; table-layout:fixed; }
@@ -1218,9 +1218,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               onClick={() => setShowExportDropdown(prev => !prev)}
               className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-4 text-[13px] font-bold text-slate-700 shadow-sm transition-colors hover:bg-gray-50"
             >
-              <Download size={17} />
               Export
-              <ChevronDown size={14} className="text-slate-400" />
+              <Download size={14} className="text-slate-400" />
             </button>
             {showExportDropdown && (
               <>
@@ -1239,14 +1238,14 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
             )}
           </div>
 
-          <button
+          {/* <button
             type="button"
             onClick={handlePrint}
             className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 bg-white px-4 text-[13px] font-bold text-slate-700 shadow-sm transition-colors hover:bg-gray-50"
           >
             <Printer size={17} />
-            Print
-          </button>
+            
+          </button> */}
         </div>
       </section>
 

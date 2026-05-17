@@ -38,13 +38,15 @@ interface ARViewProps {
   orgId: string;
 }
 
-type ARTab = 'invoices' | 'collections' | 'aging' | 'item-groups';
+type ARTab = 'overview' | 'invoices' | 'collections' | 'aging' | 'item-groups';
+type ARDashboardMode = 'sponsors' | 'students';
 
 const ARView: React.FC<ARViewProps> = ({
   entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], taxCategories = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
   orgId
 }) => {
-  const [activeTab, setActiveTab] = useState<ARTab>('invoices');
+  const [activeTab, setActiveTab] = useState<ARTab>('overview');
+  const [dashboardMode, setDashboardMode] = useState<ARDashboardMode>('sponsors');
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [showItemGroupModal, setShowItemGroupModal] = useState(false);
@@ -346,6 +348,130 @@ const ARView: React.FC<ARViewProps> = ({
     });
     return Object.values(buckets).filter(b => Math.abs(b.total) > 0.01);
   }, [agingAsOf, lines, entries, accounts, students, sponsors]);
+
+  const dashboardData = useMemo(() => {
+    const modeType = dashboardMode === 'sponsors' ? 'SPONSOR' : 'STUDENT';
+    const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
+    const postedLines = lines.filter(line => postedEntryIds.has(line.journalEntryId));
+    const arAccountIds = new Set(accounts.filter(a =>
+      a.class === AccountClass.ASSET &&
+      (a.name || '').toLowerCase().includes('receivable')
+    ).map(a => a.id));
+
+    const receivableLines = postedLines.filter(line =>
+      arAccountIds.has(line.accountId) &&
+      line.contactType === modeType &&
+      line.contactId
+    );
+
+    const balanceByContact = new Map<string, number>();
+    receivableLines.forEach(line => {
+      const contactId = line.contactId || '';
+      balanceByContact.set(contactId, (balanceByContact.get(contactId) || 0) + (line.debit - line.credit));
+    });
+
+    const outstandingRows = Array.from(balanceByContact.entries())
+      .map(([contactId, amount]) => {
+        const sponsor = modeType === 'SPONSOR' ? sponsors.find(s => s.id === contactId) : undefined;
+        const student = modeType === 'STUDENT' ? students.find(s => s.id === contactId) : undefined;
+        return {
+          id: contactId,
+          name: sponsor?.name || (student ? `${student.firstName} ${student.lastName}` : 'Unknown Customer'),
+          amount
+        };
+      })
+      .filter(row => row.amount > 0.01)
+      .sort((a, b) => b.amount - a.amount);
+
+    const totalOutstanding = outstandingRows.reduce((sum, row) => sum + row.amount, 0);
+
+    const collectionEntryIds = new Set(arCollections.filter(entry => entry.status === 'POSTED').map(entry => entry.id));
+    const collectionLines = lines.filter(line =>
+      collectionEntryIds.has(line.journalEntryId) &&
+      line.contactType === modeType &&
+      line.contactId
+    );
+    const totalCollections = collectionLines
+      .filter(line => line.credit > 0)
+      .reduce((sum, line) => sum + line.credit, 0);
+
+    const billedAmount = totalOutstanding + totalCollections;
+    const collectionRate = billedAmount > 0 ? (totalCollections / billedAmount) * 100 : 0;
+
+    const agingBuckets = { current: 0, thirty: 0, sixty: 0, ninety: 0, overNinety: 0 };
+    const referenceDate = new Date(agingAsOf);
+    receivableLines.forEach(line => {
+      const entry = entries.find(e => e.id === line.journalEntryId);
+      if (!entry) return;
+      const amount = line.debit - line.credit;
+      if (amount <= 0) return;
+      const diffDays = Math.ceil(Math.abs(referenceDate.getTime() - new Date(entry.date).getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 30) agingBuckets.current += amount;
+      else if (diffDays <= 60) agingBuckets.thirty += amount;
+      else if (diffDays <= 90) agingBuckets.sixty += amount;
+      else if (diffDays <= 120) agingBuckets.ninety += amount;
+      else agingBuckets.overNinety += amount;
+    });
+
+    const monthKeys = Array.from({ length: 12 }, (_, index) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - (11 - index));
+      return {
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: date.toLocaleDateString('en-US', { month: 'short' }),
+        year: date.getFullYear()
+      };
+    });
+
+    const monthlyCollections = monthKeys.map(month => {
+      const total = arCollections
+        .filter(entry => entry.status === 'POSTED' && (entry.date || '').startsWith(month.key))
+        .reduce((sum, entry) => {
+          const amount = lines
+            .filter(line => line.journalEntryId === entry.id && line.contactType === modeType && line.credit > 0)
+            .reduce((lineSum, line) => lineSum + line.credit, 0);
+          return sum + amount;
+        }, 0);
+      return { ...month, total };
+    });
+
+    const invoicedBatchIds = new Set(lines.filter(line =>
+      postedEntryIds.has(line.journalEntryId) &&
+      line.batchId &&
+      line.contactType === modeType
+    ).map(line => line.batchId as string));
+
+    const pendingBatches = batches
+      .filter(batch => !batch.isDeleted)
+      .filter(batch => {
+        if (modeType === 'SPONSOR') {
+          return Boolean(batch.sponsorId) && !invoicedBatchIds.has(batch.id);
+        }
+        return (batch.studentIds || []).length > 0 && !invoicedBatchIds.has(batch.id);
+      })
+      .slice(0, 3)
+      .map(batch => {
+        const sponsor = batch.sponsorId ? sponsors.find(s => s.id === batch.sponsorId) : undefined;
+        return {
+          id: batch.id,
+          name: batch.batchCode || batch.name,
+          owner: modeType === 'SPONSOR' ? sponsor?.name || 'No Sponsor' : qualifications.find(q => q.id === batch.qualificationId)?.name || 'Program',
+          count: (batch.studentIds || []).length,
+          status: batch.status
+        };
+      });
+
+    return {
+      totalOutstanding,
+      totalCollections,
+      billedAmount,
+      collectionRate,
+      outstandingRows,
+      agingBuckets,
+      monthlyCollections,
+      pendingBatches
+    };
+  }, [dashboardMode, entries, lines, accounts, sponsors, students, batches, qualifications, arCollections, agingAsOf]);
 
   const handleAddInvoiceLine = () => setInvoiceLines([...invoiceLines, { itemId: '', qty: 1, price: 0, taxCategoryId: '' }]);
   const handleRemoveInvoiceLine = (i: number) => setInvoiceLines(invoiceLines.filter((_, idx) => idx !== i));
@@ -728,10 +854,203 @@ const ARView: React.FC<ARViewProps> = ({
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Receivables & Collections</h2>
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">
+            {activeTab === 'overview'
+              ? `Overview : ${dashboardMode === 'sponsors' ? 'Billing and Collection' : 'Student Billing and Collection'}`
+              : 'Receivables & Collections'}
+          </h2>
+          {activeTab === 'overview' && (
+            <p className="text-xs font-semibold text-gray-500 mt-1">Specialist View • {new Date().toLocaleDateString()}</p>
+          )}
+        </div>
+        <div className="flex flex-col items-stretch gap-3 md:items-end">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'overview' as ARTab, label: 'Overview' },
+              { id: 'invoices' as ARTab, label: 'Invoices' },
+              { id: 'collections' as ARTab, label: 'Collections' },
+              { id: 'aging' as ARTab, label: 'Aging' },
+              { id: 'item-groups' as ARTab, label: 'Item Groups' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-all ${
+                  activeTab === tab.id ? 'bg-white text-brand shadow-sm border border-brand-light' : 'text-gray-500 hover:bg-white hover:text-gray-900 border border-transparent'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+            <span className="px-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Dashboard</span>
+            <button
+              onClick={() => { setDashboardMode('sponsors'); setActiveTab('overview'); }}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-all ${
+                dashboardMode === 'sponsors' && activeTab === 'overview' ? 'bg-brand text-white' : 'text-gray-500 hover:bg-brand/10 hover:text-brand'
+              }`}
+            >
+              <Handshake size={14} /> Sponsors
+            </button>
+            <button
+              onClick={() => { setDashboardMode('students'); setActiveTab('overview'); }}
+              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-all ${
+                dashboardMode === 'students' && activeTab === 'overview' ? 'bg-brand text-white' : 'text-gray-500 hover:bg-brand/10 hover:text-brand'
+              }`}
+            >
+              <User size={14} /> Students
+            </button>
+          </div>
         </div>
       </div>
 
+      {activeTab === 'overview' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {[
+              { label: dashboardMode === 'sponsors' ? 'Total Outstanding' : 'Total Student Billings', value: formatCurrency(dashboardMode === 'sponsors' ? dashboardData.totalOutstanding : dashboardData.billedAmount) },
+              { label: dashboardMode === 'sponsors' ? 'Top Sponsors' : 'Total Collections', value: dashboardMode === 'sponsors' ? String(dashboardData.outstandingRows.slice(0, 2).length) : formatCurrency(dashboardData.totalCollections), accent: dashboardMode === 'students' },
+              { label: dashboardMode === 'sponsors' ? 'Total Collections' : 'Outstanding Balance', value: formatCurrency(dashboardMode === 'sponsors' ? dashboardData.totalCollections : dashboardData.totalOutstanding), accent: dashboardMode === 'sponsors' },
+              { label: dashboardMode === 'sponsors' ? 'Unbilled Batches' : 'Students with Balance', value: dashboardMode === 'sponsors' ? String(dashboardData.pendingBatches.length) : String(dashboardData.outstandingRows.length) },
+              { label: 'Collection Rate', value: `${dashboardData.collectionRate.toFixed(1)}%` },
+            ].map(card => (
+              <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold text-gray-500">{card.label}</p>
+                <p className={`mt-3 text-2xl font-bold ${card.accent ? 'text-emerald-600' : 'text-gray-900'}`}>{card.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  {dashboardMode === 'sponsors' ? <Handshake size={18} className="text-emerald-600" /> : <User size={18} className="text-emerald-600" />}
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Outstanding Receivables by {dashboardMode === 'sponsors' ? 'Sponsor' : 'Student'}
+                  </h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase">Top 5 Total</p>
+                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(dashboardData.outstandingRows.slice(0, 5).reduce((sum, row) => sum + row.amount, 0))}</p>
+                </div>
+              </div>
+              <div className="mt-7 space-y-5">
+                {dashboardData.outstandingRows.slice(0, 5).map((row, index) => {
+                  const percent = dashboardData.totalOutstanding > 0 ? (row.amount / dashboardData.totalOutstanding) * 100 : 0;
+                  return (
+                    <div key={row.id} className="grid grid-cols-[36px_1fr_160px_80px] items-center gap-3 text-xs">
+                      <span className={`flex h-7 w-7 items-center justify-center rounded-full font-bold ${index % 2 === 0 ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>{index + 1}</span>
+                      <div>
+                        <p className="font-bold text-gray-800 truncate">{row.name}</p>
+                        <div className="mt-2 h-3 rounded bg-gray-100 overflow-hidden">
+                          <div className={`h-full rounded ${index % 2 === 0 ? 'bg-emerald-600' : 'bg-blue-600'}`} style={{ width: `${Math.max(8, Math.min(100, percent))}%` }} />
+                        </div>
+                      </div>
+                      <p className="text-right font-bold text-gray-900">{formatCurrency(row.amount)}</p>
+                      <p className={`text-right font-bold ${index % 2 === 0 ? 'text-emerald-600' : 'text-blue-600'}`}>{percent.toFixed(1)}%</p>
+                    </div>
+                  );
+                })}
+                {dashboardData.outstandingRows.length === 0 && <p className="py-8 text-center text-sm font-semibold text-gray-400">No outstanding receivables found.</p>}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Calendar size={18} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-gray-900">Aging of Receivables</h3>
+              </div>
+              <div className="mt-6 flex h-4 overflow-hidden rounded">
+                {[
+                  ['current', 'bg-emerald-600'],
+                  ['thirty', 'bg-blue-600'],
+                  ['sixty', 'bg-amber-400'],
+                  ['ninety', 'bg-gray-300'],
+                  ['overNinety', 'bg-red-500'],
+                ].map(([key, color]) => {
+                  const value = dashboardData.agingBuckets[key as keyof typeof dashboardData.agingBuckets];
+                  const width = dashboardData.totalOutstanding > 0 ? (value / dashboardData.totalOutstanding) * 100 : 0;
+                  return <div key={key} className={color} style={{ width: `${width}%` }} />;
+                })}
+              </div>
+              <div className="mt-6 space-y-4">
+                {[
+                  ['Current', 'current', 'bg-emerald-600'],
+                  ['1-30 Days', 'thirty', 'bg-blue-600'],
+                  ['31-60 Days', 'sixty', 'bg-amber-400'],
+                  ['61-90 Days', 'ninety', 'bg-gray-300'],
+                  ['Over 90 Days', 'overNinety', 'bg-red-500'],
+                ].map(([label, key, color]) => (
+                  <div key={key} className="flex items-center justify-between border-b border-dashed border-gray-100 pb-2 text-xs">
+                    <span className="flex items-center gap-2 font-medium text-gray-700"><span className={`h-2.5 w-2.5 rounded-full ${color}`} />{label}</span>
+                    <span className="font-bold text-gray-900">{formatCurrency(dashboardData.agingBuckets[key as keyof typeof dashboardData.agingBuckets])}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-2 text-sm font-bold">
+                  <span>Total Outstanding</span>
+                  <span>{formatCurrency(dashboardData.totalOutstanding)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-4">
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <BarChart3 size={18} className="text-emerald-600" />
+                  <h3 className="text-sm font-bold text-gray-900">Collection Trend per Month</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase">Total Collections</p>
+                  <p className="text-sm font-bold text-emerald-600">{formatCurrency(dashboardData.totalCollections)}</p>
+                </div>
+              </div>
+              <div className="mt-8 flex h-48 items-end gap-3 border-b border-gray-200">
+                {dashboardData.monthlyCollections.map(month => {
+                  const max = Math.max(...dashboardData.monthlyCollections.map(item => item.total), 1);
+                  return (
+                    <div key={month.key} className="flex flex-1 flex-col items-center justify-end gap-2">
+                      <div className="w-2 rounded-t bg-emerald-600" style={{ height: `${Math.max(4, (month.total / max) * 150)}px` }} />
+                      <span className="text-[10px] font-medium text-gray-500">{month.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Package size={18} className="text-emerald-600" />
+                  <h3 className="text-sm font-bold text-gray-900">{dashboardMode === 'sponsors' ? 'Unbilled Batches' : 'Pending Student Billings'}</h3>
+                </div>
+                <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-bold text-orange-500">{dashboardData.pendingBatches.length}</span>
+              </div>
+              <div className="mt-6 space-y-3">
+                {dashboardData.pendingBatches.map(batch => (
+                  <div key={batch.id} className="grid grid-cols-[40px_1fr_90px_70px] items-center gap-3 rounded-lg border border-gray-100 p-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-orange-500">
+                      <FileText size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-gray-900">{batch.name}</p>
+                      <p className="truncate text-xs font-medium text-gray-500">{batch.owner}</p>
+                    </div>
+                    <span className="rounded-md bg-orange-50 px-3 py-1 text-center text-[10px] font-bold uppercase text-orange-500">{batch.status}</span>
+                    <span className="text-right text-xs font-semibold text-gray-700">{batch.count}<br />{dashboardMode === 'students' ? 'students' : 'learners'}</span>
+                  </div>
+                ))}
+                {dashboardData.pendingBatches.length === 0 && <p className="py-10 text-center text-sm font-semibold text-gray-400">No pending batches.</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab !== 'overview' && (
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-6 w-full justify-start">
         <button
           onClick={() => { resetInvoiceForm(); setShowInvoiceModal(true); }}
@@ -847,6 +1166,7 @@ const ARView: React.FC<ARViewProps> = ({
           </div>
         </button>
       </div>
+      )}
 
       {activeTab === 'invoices' && (
         <div className="bg-white rounded-b-md border border-gray-200 border-t-0 overflow-hidden shadow-sm -mt-2">

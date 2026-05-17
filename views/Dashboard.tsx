@@ -1,7 +1,7 @@
 
-import React, { useMemo } from 'react';
-import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus, Qualification, Enrollment } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock, Award } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus, Qualification, Enrollment, Payment } from '../types';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock, Award, Handshake, UserRound } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, Cell, AreaChart, Area, PieChart, Pie
@@ -19,9 +19,30 @@ interface DashboardProps {
   batches?: Batch[];
   qualifications?: Qualification[];
   enrollments?: Enrollment[];
+  payments?: Payment[];
 }
 
-const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [] }) => {
+const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [], payments = [] }) => {
+  const [dashboardMode, setDashboardMode] = useState<'sponsors' | 'students'>('sponsors');
+  const activeContactType = dashboardMode === 'sponsors' ? 'SPONSOR' : 'STUDENT';
+
+  const isFinalizedCollection = (payment: Payment) =>
+    payment.status !== 'DRAFT' &&
+    payment.status !== 'VOIDED' &&
+    (
+      payment.status === 'OPEN' ||
+      payment.status === 'POSTED' ||
+      payment.status === 'CLOSED' ||
+      Boolean(payment.journalEntryId || payment.postedAt || payment.glEntryNumber)
+    );
+
+  const parseCollectionDate = (dateValue?: string) => {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return null;
+    const parsed = new Date(raw.includes('T') ? raw : `${raw}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
   const formatCurrency = (val: number) => {
     const symbol = currency === 'USD' ? '$' : '\u20B1';
     const formatted = Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,27 +69,32 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
     .filter(s => arAccounts.some(a => a.id === s.accountId))
     .reduce((sum, s) => sum + s.balance, 0);
 
-  // 2. Receivables by Donor/Sponsor
-  const receivablesByDonor = useMemo(() => {
+  // 2. Receivables by Sponsor/Student
+  const receivablesByCustomer = useMemo(() => {
     const postedEntryIds = new Set(entries.filter(e => e.status === 'POSTED').map(e => e.id));
     const arAccountIds = new Set(arAccounts.map(a => a.id));
     const balances: Record<string, number> = {};
 
-    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId) && l.contactType === 'SPONSOR' && l.contactId).forEach(l => {
+    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId) && l.contactType === activeContactType && l.contactId).forEach(l => {
       balances[l.contactId!] = (balances[l.contactId!] || 0) + (l.debit - l.credit);
     });
 
     return Object.entries(balances)
       .map(([id, balance]) => ({
-        name: sponsors.find(s => s.id === id)?.name || 'Unknown Sponsor',
+        name: activeContactType === 'SPONSOR'
+          ? sponsors.find(s => s.id === id)?.name || 'Unknown Sponsor'
+          : (() => {
+              const student = students.find(s => s.id === id);
+              return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
+            })(),
         value: balance
       }))
       .filter(i => i.value > 1) // Filter out zero/negative balances or very small amounts
       .sort((a, b) => b.value - a.value)
       .slice(0, 10); // Top 10
-  }, [lines, entries, sponsors, arAccounts]);
+  }, [lines, entries, sponsors, students, arAccounts, activeContactType]);
 
-  const topDonorTotal = receivablesByDonor.reduce((sum, item) => sum + item.value, 0);
+  const topCustomerTotal = receivablesByCustomer.reduce((sum, item) => sum + item.value, 0);
 
   // 3. AR Aging Summary
   const agingSummary = useMemo(() => {
@@ -82,7 +108,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
     let ninety = 0;
     let overNinety = 0;
 
-    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
+    lines.filter(l => postedEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId) && l.contactType === activeContactType).forEach(l => {
       const entry = entries.find(e => e.id === l.journalEntryId);
       if (!entry) return;
 
@@ -108,7 +134,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
       { name: '31-60 Days', value: sixty, color: '#F59E0B' }, // Amber
       { name: '> 60 Days', value: overNinety, color: '#EF4444' }, // Red
     ];
-  }, [lines, entries, arAccounts]);
+  }, [lines, entries, arAccounts, activeContactType]);
 
   // 4. Unbilled Batches Logic
   const unbilledBatches = useMemo(() => {
@@ -133,8 +159,10 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
       });
     });
 
-    return candidates.filter(b => !invoicedBatchCodes.has(b.id));
-  }, [batches, entries]);
+    return candidates
+      .filter(b => dashboardMode === 'sponsors' ? Boolean(b.sponsorId) : (b.studentIds || []).length > 0)
+      .filter(b => !invoicedBatchCodes.has(b.id));
+  }, [batches, entries, dashboardMode]);
 
   // 5. Receivables by Income Source (using Revenue accounts from invoices)
   // This is tricky because AR lines don't map 1:1 to Revenue lines purely by account.
@@ -151,109 +179,99 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
   // 6. Collections per Month (Bar Chart)
   const collectionsPerMonth = useMemo(() => {
     const today = new Date();
-    const last12Months: { month: string; amount: number; order: number }[] = [];
-
-    // Initialize last 12 months
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      last12Months.push({
-        month: d.toLocaleDateString('en-US', { month: 'short' }),
-        amount: 0,
-        order: d.getFullYear() * 100 + d.getMonth()
-      });
-    }
-
-    // Filter for Collections
-    // Logic: Look for Journal Entries with sourceType = 'COLLECTION' or 'PAYMENT'
-    // Then find the Credit to AR Accounts in those entries.
-    const collectionEntries = entries.filter(e =>
-      (e.sourceType === 'COLLECTION' || e.sourceType === 'PAYMENT') &&
-      e.status === 'POSTED'
-    );
-
-    const collectionEntryIds = new Set(collectionEntries.map(e => e.id));
-    const arAccountIds = new Set(arAccounts.map(a => a.id));
-
-    lines.filter(l => collectionEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
-      // In AR, a Credit reduces the balance (Payment).
-      // We only care about Credits to AR.
-      if (l.credit > 0) {
-        const entry = entries.find(e => e.id === l.journalEntryId);
-        if (entry) {
-          const d = new Date(entry.date);
-          const label = d.toLocaleDateString('en-US', { month: 'short' });
-          const item = last12Months.find(m => m.month === label); // Simple string match might be risky if crossing years with same month name? 
-          // Better to match by approximate time or just check the array index if we mapped strictly.
-          // Actually, simplest is to iterate the finding logic more robustly or just map to "Mon" keys.
-          // Given it's last 12 months, names are unique unless we wrap exactly 12 months today (e.g. Feb to Feb).
-          // Let's use the order key or simply find matching month/year.
-
-          const bucket = last12Months.find(m => {
-            // Re-construct date from bucket logic to compare?
-            // Easier:
-            return d.getMonth() === new Date(Date.parse(m.month + " 1, 2000")).getMonth();
-            // Wait, this is flawed for "Feb" vs "Feb" across years.
-          });
-
-          // Correct approach: generate key YYYY-MM
-          const key = `${d.getFullYear()}-${d.getMonth()}`;
-          // ... actually, let's just loop.
-        }
-      }
-    });
-
-    // Re-implementation with robust Map
     const monthlyMap = new Map<string, number>();
     const months: any[] = [];
 
     for (let i = 11; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short' });
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      const year = String(d.getFullYear());
       monthlyMap.set(key, 0);
-      months.push({ key, label, amount: 0 });
+      months.push({ key, month, year, periodLabel: `${month} ${year}`, amount: 0 });
     }
 
-    lines.filter(l => collectionEntryIds.has(l.journalEntryId) && arAccountIds.has(l.accountId)).forEach(l => {
-      if (l.credit > 0) {
-        const entry = entries.find(e => e.id === l.journalEntryId);
-        if (entry) {
-          const d = new Date(entry.date);
-          const key = `${d.getFullYear()}-${d.getMonth()}`;
-          if (monthlyMap.has(key)) {
-            monthlyMap.set(key, monthlyMap.get(key)! + l.credit);
-          }
-        }
-      }
-    });
+    payments
+      .filter(payment => !payment.isDeleted)
+      .filter(isFinalizedCollection)
+      .filter(payment => activeContactType === 'SPONSOR' ? Boolean(payment.sponsorId) : Boolean(payment.studentId))
+      .forEach(payment => {
+        (payment.applications || [])
+          .filter(application => !application.isReversed)
+          .forEach(application => {
+            const d = parseCollectionDate(application.createdAt || payment.paymentDate);
+            if (!d) return;
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            if (monthlyMap.has(key)) {
+              monthlyMap.set(key, monthlyMap.get(key)! + Number(application.amountApplied || 0));
+            }
+          });
+      });
 
     return months.map(m => ({
-      month: m.label,
+      month: m.month,
+      year: m.year,
+      periodLabel: m.periodLabel,
       amount: monthlyMap.get(m.key) || 0
     }));
 
-  }, [entries, lines, arAccounts]);
+  }, [payments, activeContactType]);
+
+  const CollectionsMonthTick = ({ x = 0, y = 0, payload }: any) => {
+    const [month, year] = String(payload?.value || '').split(' ');
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fill="#64748B" fontSize={12} fontWeight={600}>
+          <tspan x={0} dy={12}>{month}</tspan>
+          <tspan x={0} dy={14} fill="#94A3B8" fontSize={10}>{year}</tspan>
+        </text>
+      </g>
+    );
+  };
 
 
   return (
     <div className="space-y-6 pb-10 font-sans">
       <header className="flex justify-between items-end border-b pb-4 border-gray-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Overview : Billing and Collection</h2>
-          <p className="text-sm text-gray-500 mt-1">Specialist View &bull; {new Date().toLocaleDateString()}</p>
+          <h2 className="text-xl font-semibold text-slate-900 tracking-tighter">
+            Overview : {dashboardMode === 'sponsors' ? 'Billing and Collection' : 'Student Billing and Collection'}
+          </h2>
+          <p className="text-sm italic text-slate-500 font-medium mt-1">Specialist View &bull; {new Date().toLocaleDateString()}</p>
         </div>
-
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+          <span className="px-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">View</span>
+          <button
+            type="button"
+            onClick={() => setDashboardMode('sponsors')}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold uppercase tracking-wide transition-all ${
+              dashboardMode === 'sponsors' ? 'bg-brand text-white shadow-sm' : 'text-gray-500 hover:bg-brand/10 hover:text-brand'
+            }`}
+          >
+            <Handshake size={14} /> Sponsors
+          </button>
+          <button
+            type="button"
+            onClick={() => setDashboardMode('students')}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold uppercase tracking-wide transition-all ${
+              dashboardMode === 'students' ? 'bg-brand text-white shadow-sm' : 'text-gray-500 hover:bg-brand/10 hover:text-brand'
+            }`}
+          >
+            <UserRound size={14} /> Students
+          </button>
+        </div>
       </header>
 
       <div className="space-y-6">
         {/* Row 1: Receivables & Aging */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Receivables by Donor Chart */}
+          {/* Receivables by Sponsor/Student Chart */}
           <div className="md:col-span-2">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  Outstanding Receivables by Donor
+                  Outstanding Receivables by {dashboardMode === 'sponsors' ? 'Sponsor' : 'Student'}
                 </h3>
                 <div className="text-right">
                   <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Total Outstanding</p>
@@ -266,12 +284,12 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                 <div className="w-full md:w-5/12 h-[260px] relative">
                   <div className="absolute inset-y-0 left-[40%] -translate-x-1/2 flex flex-col items-center justify-center pointer-events-none z-0">
                     <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Top 10 Total</span>
-                    <span className="text-xl font-bold text-gray-800 mt-0.5">{formatCurrency(topDonorTotal)}</span>
+                    <span className="text-xl font-bold text-gray-800 mt-0.5">{formatCurrency(topCustomerTotal)}</span>
                   </div>
                   <ResponsiveContainer width="99%" height={260}>
                     <PieChart>
                       <Pie
-                        data={receivablesByDonor}
+                        data={receivablesByCustomer}
                         cx="40%"
                         cy="50%"
                         innerRadius={80}
@@ -282,7 +300,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                         startAngle={90}
                         endAngle={-270}
                       >
-                        {receivablesByDonor.map((entry, index) => (
+                        {receivablesByCustomer.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="white" strokeWidth={2} />
                         ))}
                       </Pie>
@@ -296,17 +314,17 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
                   </ResponsiveContainer>
                 </div>
 
-                {/* Right: Detailed Donor List */}
+                {/* Right: Detailed Customer List */}
                 <div className="w-full md:w-7/12">
                   <div className="flex justify-between px-2 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b pb-2">
-                    <span>Rank / Sponsor</span>
+                    <span>Rank / {dashboardMode === 'sponsors' ? 'Sponsor' : 'Student'}</span>
                     <div className="text-right flex gap-8">
                       <span className="w-20">Amount</span>
                       <span className="w-10">% Total</span>
                     </div>
                   </div>
                   <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
-                    {receivablesByDonor.map((item, index) => (
+                    {receivablesByCustomer.map((item, index) => (
                       <div key={index} className="group flex justify-between items-center py-2.5 px-3 rounded-md hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full ${index < 3 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -371,14 +389,14 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
 
               <div className="h-[250px] w-full">
                 <ResponsiveContainer width="99%" height={250}>
-                  <BarChart data={collectionsPerMonth} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <BarChart data={collectionsPerMonth} margin={{ top: 10, right: 10, left: 0, bottom: 16 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis
-                      dataKey="month"
+                      dataKey="periodLabel"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#64748B', fontSize: 12 }}
-                      dy={10}
+                      tick={<CollectionsMonthTick />}
+                      height={42}
                     />
                     <YAxis
                       axisLine={false}
@@ -408,7 +426,7 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full min-h-[300px]">
               <div className="flex justify-between items-center mb-4 shrink-0">
                 <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <Layers size={18} className="text-[#F47721]" /> Unbilled Batches
+                  <Layers size={18} className="text-[#F47721]" /> {dashboardMode === 'sponsors' ? 'Unbilled Batches' : 'Pending Student Billings'}
                 </h3>
                 <span className="bg-orange-100 text-[#F47721] text-xs font-bold px-2 py-0.5 rounded-full">{unbilledBatches.length}</span>
               </div>
@@ -756,7 +774,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#9CA3AF' }} />
                 <Tooltip
-                  contentStyle={{ borderRadius: '4px', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '10px', fontFamily: "'Open Sans', sans-serif" }}
+                  contentStyle={{ borderRadius: '4px', border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: '10px', fontFamily: '"Inter", "Open Sans", "Segoe UI", Arial, sans-serif' }}
                   labelStyle={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '16px', fontSize: '11px', fontWeight: 600 }} />
@@ -778,7 +796,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 <BarChart data={classDistributionData} layout="vertical">
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" hide />
-                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '4px', color: '#1F2937', fontFamily: "'Open Sans', sans-serif" }} />
+                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '4px', color: '#1F2937', fontFamily: '"Inter", "Open Sans", "Segoe UI", Arial, sans-serif' }} />
                   <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={30}>
                     {classDistributionData.map((entry, index) => (
                       <Cell key={`cell - ${index} `} fill={entry.color} />

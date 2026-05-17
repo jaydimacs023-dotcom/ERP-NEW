@@ -571,7 +571,7 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
       return;
     }
 
-    const headers = ['Date', 'Post Period', 'Memo No.', 'Type', 'Invoice No.', 'Status', 'GL Reference No.', 'Customer', 'Memo Amount', 'Balance After', 'Created By', 'Created On'];
+    const headers = ['Transaction Date', 'Post Period', 'Memo No.', 'Type', 'Invoice No.', 'Status', 'GL Reference No.', 'Customer', 'Memo Amount', 'Balance After', 'Created By', 'Created On'];
     const csvRows = filteredMemoRows.map(row => [
       formatDate(row.entry.date),
       row.postPeriod,
@@ -642,7 +642,7 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
   };
 
   const memoRegistryColumns = [
-    { key: 'date', label: 'Date', sortKey: 'date', align: 'text-left' as const },
+    { key: 'date', label: 'Transaction Date', sortKey: 'date', align: 'text-left' as const },
     { key: 'postPeriod', label: 'Post Period', sortKey: 'postPeriod', align: 'text-left' as const },
     { key: 'memoNo', label: 'Memo No.', sortKey: 'memoNo', align: 'text-left' as const },
     { key: 'type', label: 'Type', sortKey: 'type', align: 'text-left' as const },
@@ -967,7 +967,7 @@ const ARCreditDebitMemoView: React.FC<ARCreditDebitMemoViewProps> = ({
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(memoTitle)}</title><style>
       @page { size: A4; margin: 0; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing:border-box; }
-      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff; }
+      body { margin: 0; font-family: Inter, "Open Sans", "Segoe UI", Arial, sans-serif; color:#111827; background:#fff; }
       .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; overflow: hidden; background:#fff; display:flex; flex-direction:column; }
       .muted, .sub { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }

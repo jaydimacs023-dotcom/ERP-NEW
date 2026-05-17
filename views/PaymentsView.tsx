@@ -838,7 +838,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Payment Voucher</title><style>
       @page { size: A4; margin: 0; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+      body { margin: 0; font-family: Inter, "Open Sans", "Segoe UI", Arial, sans-serif; color:#111827; }
       .page { position: relative; width: 210mm; height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; overflow: hidden; background:#fff; display:flex; flex-direction:column; }
       .muted, .sub { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }
@@ -1575,7 +1575,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const paymentRegistryColumns: PaymentRegistryColumn[] = [
     {
       key: 'date',
-      label: 'Date',
+      label: 'Transaction Date',
       align: 'text-left',
       minWidth: 128,
       sortKey: 'date',
@@ -1808,7 +1808,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const columns = getRegistryExportColumns();
     const headers = columns.map(c => c.label);
     const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] as string));
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
@@ -1842,7 +1842,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     let html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(getExportDocumentTitle())}</title><style>
       @page { size: landscape; margin: 12mm; }
       * { box-sizing: border-box; }
-      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      body { margin:0; font-family:Inter,"Open Sans","Segoe UI",Arial,sans-serif; color:#111827; padding:20px; }
       h2 { margin:0 0 4px; font-size:18px; }
       .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; font-size:11px; }
@@ -1998,7 +1998,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const applicationRegistryColumns: ApplicationRegistryColumn[] = [
     {
       key: 'date',
-      label: 'Date',
+      label: 'Transaction Date',
       align: 'text-left',
       minWidth: 128,
       sortKey: 'date',

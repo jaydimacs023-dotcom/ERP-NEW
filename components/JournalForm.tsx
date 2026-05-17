@@ -273,7 +273,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
 
     const headers = ['#', 'Account No.', 'Account', 'Transaction Description', 'Class', 'Debit Amount', 'Credit Amount'];
 
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:\"#,##0.00\"}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:\"#,##0.00\"}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
@@ -638,7 +638,7 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' }}>
+              <table className="w-full text-sm" style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--app-text-size-13)' }}>
                 <thead className="bg-gray-50">
                   <tr>
                         {(() => {

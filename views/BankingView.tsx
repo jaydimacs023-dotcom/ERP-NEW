@@ -270,11 +270,11 @@ const BankingView: React.FC<BankingViewProps> = ({
               <div
                 key={bank.id}
                 onClick={() => setSelectedBank(bank)}
-                className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm hover:border-orange-200 transition-all overflow-hidden cursor-pointer group flex flex-col"
+                className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-sm hover:border-brand-light transition-all overflow-hidden cursor-pointer group flex flex-col"
               >
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-8">
-                    <div className="w-14 h-14 rounded bg-gray-50 text-gray-400 group-hover:bg-[#F47721] group-hover:text-white flex items-center justify-center border border-gray-100 transition-all shadow-sm">
+                    <div className="w-14 h-14 rounded bg-gray-50 text-gray-400 group-hover:bg-brand group-hover:text-white flex items-center justify-center border border-gray-100 transition-all shadow-sm">
                       {bank.type === 'CASH' ? <Wallet size={28} /> : <Landmark size={28} />}
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -282,11 +282,11 @@ const BankingView: React.FC<BankingViewProps> = ({
                         {bank.type}
                       </div>
                       {unclearedCount > 0 ? (
-                        <span className="flex items-center gap-1 text-xs font-semibold uppercase text-[#F47721] bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                        <span className="flex items-center gap-1 text-xs font-semibold uppercase text-brand bg-brand/10 px-2 py-0.5 rounded border border-brand-light">
                           <Clock size={10} /> {unclearedCount} Outstanding
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-xs font-semibold uppercase text-[#F47721] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                        <span className="flex items-center gap-1 text-xs font-semibold uppercase text-brand bg-brand/10 px-2 py-0.5 rounded border border-brand-light">
                           <CheckCircle size={10} /> Reconciled
                         </span>
                       )}
@@ -305,17 +305,17 @@ const BankingView: React.FC<BankingViewProps> = ({
                         {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </div>
-                    <div className="text-xs font-semibold text-[#F47721] bg-orange-50 px-2 py-1 rounded border border-orange-100 uppercase">
+                    <div className="text-xs font-semibold text-brand bg-brand/10 px-2 py-1 rounded border border-brand-light uppercase">
                       {bank.currency}
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50/80 px-8 py-5 flex items-center justify-between border-t border-gray-100">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide group-hover:text-[#F47721] transition-colors">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide group-hover:text-brand transition-colors">
                     <History size={16} /> Open Treasury Console
                   </div>
-                  <ChevronRight size={20} className="text-gray-300 group-hover:text-[#F47721] group-hover:translate-x-1 transition-all" />
+                  <ChevronRight size={20} className="text-gray-300 group-hover:text-brand group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
             );
@@ -326,9 +326,9 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
             <button
               onClick={() => { setSelectedBank(null); setActiveTab('ledger'); }}
-              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-[#F47721] transition-colors group"
+              className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-brand transition-colors group"
             >
-              <div className="p-1.5 rounded-lg border border-gray-200 group-hover:border-orange-200 transition-all">
+              <div className="p-1.5 rounded-lg border border-gray-200 group-hover:border-brand-light transition-all">
                 <ChevronRight size={14} className="rotate-180" />
               </div>
               Exit Console
@@ -370,9 +370,9 @@ const BankingView: React.FC<BankingViewProps> = ({
           <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             {activeTab === 'ledger' ? (
               <>
-                <div className="p-5 border-b bg-gray-50 flex flex-col lg:flex-row justify-between items-center gap-8">
+                <div className="p-5 border-b bg-brand/5 flex flex-col lg:flex-row justify-between items-center gap-8">
                   <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 rounded bg-[#F47721] text-white flex items-center justify-center shadow-md shadow-gray-200 border-4 border-white">
+                    <div className="w-20 h-20 rounded bg-brand text-white flex items-center justify-center shadow-md shadow-brand/20 border-4 border-white">
                       {selectedBank.type === 'CASH' ? <Wallet size={36} /> : <Landmark size={36} />}
                     </div>
                     <div>
@@ -380,14 +380,14 @@ const BankingView: React.FC<BankingViewProps> = ({
                       <div className="flex items-center gap-3 mt-2">
                         <span className="text-sm font-mono text-gray-400 font-medium">{selectedBank.accountNumber}</span>
                         <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
-                        <span className="text-xs font-semibold text-[#F47721] uppercase tracking-wide">{selectedBank.type} TRUST ACCOUNT</span>
+                        <span className="text-xs font-semibold text-brand uppercase tracking-wide">{selectedBank.type} TRUST ACCOUNT</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-center lg:text-right">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Ledger Snapshot</p>
                     <div className="flex items-baseline justify-center lg:justify-end gap-2">
-                      <span className="text-lg font-semibold text-[#F47721]">{selectedBank.currency}</span>
+                      <span className="text-lg font-semibold text-brand">{selectedBank.currency}</span>
                       <span className="text-2xl font-mono font-semibold text-gray-900 tracking-tighter">
                         {reconciliationData?.bookBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
@@ -424,18 +424,18 @@ const BankingView: React.FC<BankingViewProps> = ({
                               <div className="text-xs text-gray-400 uppercase tracking-tight mt-1 font-medium italic">{line.memo || 'Institutional Disbursement'}</div>
                             </td>
                             <td className="px-5 py-6 text-right">
-                              {line.debit > 0 && <span className="font-mono text-sm text-[#F47721] font-bold">{formatCurrency(line.debit)}</span>}
+                              {line.debit > 0 && <span className="font-mono text-sm text-brand font-bold">{formatCurrency(line.debit)}</span>}
                             </td>
                             <td className="px-5 py-6 text-right">
                               {line.credit > 0 && <span className="font-mono text-sm text-rose-600 font-bold">({formatCurrency(line.credit)})</span>}
                             </td>
                             <td className="px-5 py-6 text-right">
                               {line.isCleared ? (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-[#F47721] rounded-full border border-orange-100 text-xs font-semibold uppercase tracking-wide">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand/10 text-brand rounded-full border border-brand-light text-xs font-semibold uppercase tracking-wide">
                                   <CheckCircle2 size={12} /> Reconciled
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-[#F47721] rounded-full border border-amber-100 text-xs font-semibold uppercase tracking-wide">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand/10 text-brand rounded-full border border-brand-light text-xs font-semibold uppercase tracking-wide">
                                   <Clock size={12} /> Outstanding
                                 </span>
                               )}
@@ -449,9 +449,9 @@ const BankingView: React.FC<BankingViewProps> = ({
               </>
             ) : (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                <div className="p-5 border-b bg-gray-50 flex flex-col lg:flex-row justify-between items-center gap-5">
+                <div className="p-5 border-b bg-brand/5 flex flex-col lg:flex-row justify-between items-center gap-5">
                   <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 rounded bg-[#F47721] text-white flex items-center justify-center shadow-md shadow-gray-200 border-4 border-white">
+                    <div className="w-20 h-20 rounded bg-brand text-white flex items-center justify-center shadow-md shadow-brand/20 border-4 border-white">
                       <Scale size={36} />
                     </div>
                     <div className="space-y-4">
@@ -462,28 +462,28 @@ const BankingView: React.FC<BankingViewProps> = ({
                       <div className="flex items-center gap-4">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Period End</label>
-                          <input type="date" className="bg-white border border-gray-200 rounded px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-400" value={reconcileAsOf} onChange={e => setReconcileAsOf(e.target.value)} />
+                          <input type="date" className="bg-white border border-gray-200 rounded px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand" value={reconcileAsOf} onChange={e => setReconcileAsOf(e.target.value)} />
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual Statement Balance</label>
                           <div className="relative">
-                            <input type="number" step="0.01" className="bg-white border-2 border-orange-500/20 rounded pl-8 pr-4 py-1.5 text-base font-mono font-semibold text-gray-900 outline-none focus:border-orange-500" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
+                            <input type="number" step="0.01" className="bg-white border-2 border-brand-light rounded pl-8 pr-4 py-1.5 text-base font-mono font-semibold text-gray-900 outline-none focus:border-brand" value={statementBalance || ''} onChange={e => setStatementBalance(Number(e.target.value))} placeholder="0.00" />
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold">{"\u20B1"}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className={`p-8 rounded border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-orange-50 border-orange-200' : 'bg-rose-50 border-rose-200'}`}>
+                  <div className={`p-8 rounded border-2 flex flex-col items-center justify-center min-w-[320px] transition-all ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'bg-brand/10 border-brand-light' : 'bg-rose-50 border-rose-200'}`}>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Unreconciled Difference</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs font-semibold">{"\u20B1"}</span>
-                      <div className={`text-xl font-mono font-semibold tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-orange-700' : 'text-rose-700'}`}>
+                      <div className={`text-xl font-mono font-semibold tracking-tighter ${Math.abs(reconciliationData?.difference || 0) < 0.01 ? 'text-brand' : 'text-rose-700'}`}>
                         {reconciliationData?.difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </div>
                     </div>
                     {Math.abs(reconciliationData?.difference || 0) < 0.01 ? (
-                      <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#F47721] uppercase tracking-wide animate-bounce">
+                      <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-brand uppercase tracking-wide animate-bounce">
                         <ShieldCheck size={18} /> Verified Match
                       </div>
                     ) : (
@@ -497,7 +497,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                 <div className="p-5 space-y-6 bg-white">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-50 text-[#F47721] rounded"><ListChecks size={18} /></div>
+                      <div className="p-2 bg-brand/10 text-brand rounded"><ListChecks size={18} /></div>
                       <h4 className="text-sm font-semibold text-gray-800 uppercase tracking-tight">Audit Checklist</h4>
                     </div>
                     <div className="flex items-center gap-4">
@@ -506,7 +506,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                       </p>
                       <button
                         onClick={handleBulkClear}
-                        className="px-3 py-1 bg-orange-50 text-orange-700 border border-orange-100 rounded-lg text-xs font-semibold uppercase tracking-wide hover:bg-orange-100 transition-colors"
+                        className="px-3 py-1 bg-brand/10 text-brand border border-brand-light rounded-lg text-xs font-semibold uppercase tracking-wide hover:bg-brand/20 transition-colors"
                       >
                         Clear All
                       </button>
@@ -526,19 +526,19 @@ const BankingView: React.FC<BankingViewProps> = ({
                         <button
                           key={line.id}
                           onClick={() => onToggleClearLine(line.id)}
-                          className="w-full flex items-center justify-between p-6 bg-white rounded border border-gray-100 hover:border-orange-500 hover:shadow-lg transition-all text-left group"
+                          className="w-full flex items-center justify-between p-6 bg-white rounded border border-gray-100 hover:border-brand hover:shadow-lg transition-all text-left group"
                         >
                           <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 rounded border-2 border-gray-100 flex items-center justify-center text-gray-200 group-hover:border-orange-500 group-hover:text-[#F47721] group-hover:bg-orange-50 transition-all">
+                            <div className="w-12 h-12 rounded border-2 border-gray-100 flex items-center justify-center text-gray-200 group-hover:border-brand group-hover:text-brand group-hover:bg-brand/10 transition-all">
                               <Check size={24} strokeWidth={4} />
                             </div>
                             <div>
-                              <p className="text-xs font-mono font-semibold text-[#F47721]">{entry?.date} • {entry?.reference}</p>
+                              <p className="text-xs font-mono font-semibold text-brand">{entry?.date} • {entry?.reference}</p>
                               <p className="text-sm font-bold text-gray-800 uppercase tracking-tight">{entry?.description}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={`text-lg font-mono font-semibold ${line.debit > 0 ? 'text-[#F47721]' : 'text-rose-600'}`}>
+                            <p className={`text-lg font-mono font-semibold ${line.debit > 0 ? 'text-brand' : 'text-rose-600'}`}>
                               {line.debit > 0 ? `+${formatCurrency(line.debit)}` : `-${formatCurrency(line.credit)}`}
                             </p>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{line.memo || 'Direct Ledger Posting'}</p>
@@ -564,7 +564,7 @@ const BankingView: React.FC<BankingViewProps> = ({
                         <button
                           onClick={handleSaveReconciliation}
                           disabled={Math.abs(reconciliationData?.difference || 0) > 0.01}
-                          className="px-12 py-5 bg-[#F47721] text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm hover:bg-[#E06610] active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                          className="px-12 py-5 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm hover:bg-brand-hover active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
                         >
                           Anchor Balance Snapshot
                         </button>
@@ -793,9 +793,9 @@ const BankingView: React.FC<BankingViewProps> = ({
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-md shadow-md w-full max-w-md overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
-            <div className="p-8 border-b flex justify-between items-center bg-gray-50">
+            <div className="p-8 border-b flex justify-between items-center bg-brand/5">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#F47721] text-white rounded shadow-sm">
+                <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
                   <Save size={24} />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Edit Account</h3>
@@ -839,10 +839,10 @@ const BankingView: React.FC<BankingViewProps> = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[#F47721] uppercase tracking-wide flex items-center gap-2">
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide flex items-center gap-2">
                     <BookOpen size={16} /> G/L Ledger Mapping
                   </label>
-                  <select required className="w-full px-4 py-3 bg-orange-50/50 border-2 border-orange-100 rounded outline-none font-semibold text-sm text-orange-700 appearance-none"
+                  <select required className="w-full px-4 py-3 bg-brand/10 border-2 border-brand-light rounded outline-none font-semibold text-sm text-brand appearance-none focus:border-brand"
                     value={editingBank.glAccountId} onChange={e => setEditingBank({ ...editingBank, glAccountId: e.target.value })}>
                     <option value="">Select Asset Account...</option>
                     {accounts.filter(a => a.class === AccountClass.ASSET && !a.isHeader).map(acc => (
@@ -854,7 +854,7 @@ const BankingView: React.FC<BankingViewProps> = ({
 
               <div className="pt-4 flex gap-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-4 text-sm font-semibold text-gray-400 hover:bg-gray-50 rounded transition-all">Cancel</button>
-                <button type="submit" className="flex-1 py-4 bg-[#F47721] text-white rounded text-sm font-semibold shadow-md shadow-gray-100 transition-all active:scale-95">Save Changes</button>
+                <button type="submit" className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 transition-all active:scale-95 hover:bg-brand-hover">Save Changes</button>
               </div>
             </form>
           </div>

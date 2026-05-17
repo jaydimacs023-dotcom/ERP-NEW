@@ -77,6 +77,7 @@ import PaymentsView from './views/PaymentsView';
 import BankDepositsView from './views/BankDepositsView';
 import AlumniEmploymentView from './views/AlumniEmploymentView';
 import CustomerMasterListView from './views/CustomerMasterListView';
+import ARCalendarTasksView from './views/ARCalendarTasksView';
 
 // Lucide Icons
 import {
@@ -89,7 +90,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck
+  ArrowDownToLine, UserCheck, ListTodo
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -133,6 +134,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   // Navigation section state
   const [openSections, setOpenSections] = useState<{ financial: boolean; operations: boolean; registries: boolean; inventory: boolean; administration: boolean }>({ financial: true, operations: true, registries: true, inventory: true, administration: true });
@@ -381,6 +383,7 @@ export default function App() {
 
   // Logout handler
   const handleLogout = async () => {
+    setShowLogoutConfirm(false);
     // Audit: Logout event (log before clearing user)
     if (currentUser) {
       AuditService.logout(currentOrgId, currentUser.id, currentUser.name);
@@ -1384,6 +1387,12 @@ export default function App() {
   const isRegistrar = hasOperationsAccess(currentUser?.role);
   const isAR = hasARAccess(currentUser?.role);
   const isAP = hasAPAccess(currentUser?.role);
+
+  useEffect(() => {
+    if (activeTab === 'subscription' && !isSysAdmin) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isSysAdmin]);
 
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
@@ -6039,6 +6048,7 @@ export default function App() {
           {currentUser.role === 'AR_SPECIALIST' && (
             <div className="space-y-6">
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<ListTodo size={18} />} label="Calendar & Tasks" active={activeTab === 'ar-calendar-tasks'} onClick={() => navigateTo('ar-calendar-tasks')} compact={!sidebarOpen} brandColor={brandColor} />
 
               <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6161,7 +6171,6 @@ export default function App() {
               <NavItem icon={<Settings size={20} />} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => navigateTo('coa')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<CalendarCheck size={20} />} label="Period Closing" active={activeTab === 'periods'} onClick={() => navigateTo('periods')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Palette size={20} />} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => navigateTo('branding')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <div className="relative">
                 <NavItem icon={<CreditCard size={20} />} label="Payment History" active={activeTab === 'payment-history'} onClick={() => navigateTo('payment-history')} compact={!sidebarOpen} brandColor={brandColor} />
                 {paymentsDueSoon.length > 0 && (
@@ -6183,6 +6192,7 @@ export default function App() {
               <NavItem icon={<Wrench size={20} />} label="Maintenance" active={activeTab === 'maintenance'} onClick={() => navigateTo('maintenance')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<HardDrive size={20} />} label="Backup & Restore" active={activeTab === 'backup-restore'} onClick={() => navigateTo('backup-restore')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Terminal size={20} />} label="Tenant Mgmt" active={activeTab === 'tenant-mgmt'} onClick={() => navigateTo('tenant-mgmt')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => navigateTo('schema')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => navigateTo('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
@@ -6203,7 +6213,7 @@ export default function App() {
         )}
 
         <div className="p-6 mt-auto border-t border-slate-200">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
+          <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
             <LogOut size={20} />
             {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
           </button>
@@ -6310,6 +6320,17 @@ export default function App() {
               qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
               entries={activeJournalEntries}
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+              payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+            />
+          )}
+          {activeTab === 'ar-calendar-tasks' && (
+            <ARCalendarTasksView
+              sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+              currentUser={currentUser}
+              brandColor={brandColor}
+              onNotify={handleNotify}
             />
           )}
           {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
@@ -6366,7 +6387,7 @@ export default function App() {
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
-          {activeTab === 'subscription' && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'subscription' && isSysAdmin && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} organization={currentOrg} />}
 
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
@@ -6611,7 +6632,6 @@ export default function App() {
               brandColor={brandColor}
               currentUser={currentUser}
               onPostJournal={handlePostJournal}
-              onSaveJournal={handleSaveJournalDraft}
               onViewJournal={handleViewJournal}
               onNotify={handleNotify}
             />
@@ -6686,6 +6706,60 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {showLogoutConfirm && (
+        <div className="modal-overlay-graceful fixed inset-0 z-[10000] flex items-center justify-center overflow-hidden bg-[#06162B]/90 px-4 text-white backdrop-blur-xl">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)',
+              backgroundSize: '120px 120px',
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,rgba(59,130,246,0.24),transparent_34%),radial-gradient(circle_at_50%_70%,rgba(0,0,0,0.8),transparent_58%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,13,28,0.35)_0%,rgba(4,13,28,0.84)_100%)]" />
+          <div className="absolute left-[12%] top-[20%] h-56 w-56 rounded-full bg-[#F47721]/10 blur-3xl" />
+          <div className="absolute right-[14%] bottom-[18%] h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
+
+          <div className="modal-panel-graceful relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-3xl md:p-8">
+            <div className="flex items-start gap-4">
+              <div className="modal-icon-graceful flex h-12 w-12 shrink-0 items-center justify-center text-[#F47721]">
+                <LogOut size={32} strokeWidth={1.8} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold uppercase tracking-tight text-white">Confirm Logout</h2>
+                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  You are about to end your current ERP session.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-xs font-medium leading-relaxed text-slate-300">
+                Any unsaved changes in open forms may be lost.
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="rounded-full border border-white/10 bg-slate-900/60 px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-300 transition-colors hover:border-[#F47721]/40 hover:text-[#F47721]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="rounded-full bg-[#F47721] px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(244,119,33,0.35)] transition-all hover:bg-[#E06610] active:scale-95"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -6700,13 +6774,28 @@ interface NavItemProps {
 }
 
 function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemProps) {
+  const activeIconUsesBrandStroke = active && ['Customer List', 'Invoice', 'Learners & Customers', 'Invoices'].includes(label);
+
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-4 p-3.5 rounded-2xl transition-all group ${active ? 'text-white shadow-xl' : 'text-slate-600 hover:text-brand hover:bg-brand/10'} `}
-      style={active ? { backgroundColor: brandColor, boxShadow: `0 20px 25px -5px ${brandColor}66` } : {}}
+      className={`w-full border border-transparent text-left flex items-center gap-4 p-3.5 rounded-2xl outline-none transition-colors group focus:outline-none ${active ? 'text-white shadow-none' : 'text-slate-600 hover:text-brand hover:bg-brand/10 focus-visible:bg-brand/10'} `}
+      style={{
+        ...(active ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: 'none' } : {}),
+      } as React.CSSProperties}
     >
-      <div className={`shrink-0 transition-transform duration-500 ${active ? 'scale-110 text-white' : 'group-hover:scale-110 text-slate-500 group-hover:text-brand'} `}>{icon}</div>
+      <div
+        className={`shrink-0 transition-transform duration-500 ${
+          activeIconUsesBrandStroke
+            ? 'flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 shadow-sm'
+            : active
+              ? 'scale-110 text-white'
+              : 'group-hover:scale-110 text-slate-500 group-hover:text-brand'
+        } `}
+        style={activeIconUsesBrandStroke ? { color: brandColor } : undefined}
+      >
+        {icon}
+      </div>
       {!compact && <span className="text-[11px] uppercase tracking-widest truncate">{label}</span>}
     </button>
   );

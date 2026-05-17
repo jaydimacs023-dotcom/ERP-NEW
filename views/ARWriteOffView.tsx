@@ -626,7 +626,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
   };
 
   const registryBaseColumns = [
-    { key: 'date', label: 'Date', sortKey: 'date', width: 'w-32', align: 'text-left' as const, render: (record: WriteOffRecord) => formatDate(record.entry.date) },
+    { key: 'date', label: 'Transaction Date', sortKey: 'date', width: 'w-32', align: 'text-left' as const, render: (record: WriteOffRecord) => formatDate(record.entry.date) },
     { key: 'postPeriod', label: 'Post Period', sortKey: 'postPeriod', width: 'w-32', align: 'text-left' as const, render: (record: WriteOffRecord) => formatPostPeriod(record.entry.date) },
     { key: 'writeOffNo', label: 'Write-Off No.', sortKey: 'writeOffNo', width: 'w-40', align: 'text-left' as const, render: (record: WriteOffRecord) => record.entry.reference || '-' },
     { key: 'invoiceNo', label: 'Invoice No.', sortKey: 'invoiceNo', width: 'w-40', align: 'text-left' as const, render: (record: WriteOffRecord) => record.invoiceNo },
@@ -645,7 +645,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
 
   const getRegistryExportColumns = () => {
     const exportColumns = [
-      { key: 'date', label: 'Date', value: (record: WriteOffRecord) => formatDate(record.entry.date) },
+      { key: 'date', label: 'Transaction Date', value: (record: WriteOffRecord) => formatDate(record.entry.date) },
       { key: 'postPeriod', label: 'Post Period', value: (record: WriteOffRecord) => formatPostPeriod(record.entry.date) },
       { key: 'writeOffNo', label: 'Write-Off No.', value: (record: WriteOffRecord) => record.entry.reference || '-' },
       { key: 'invoiceNo', label: 'Invoice No.', value: (record: WriteOffRecord) => record.invoiceNo },
@@ -677,7 +677,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
     if (rows.length === 0) { alert('No write-offs to export.'); return; }
     const columns = getRegistryExportColumns();
     const headers = columns.map(column => column.label);
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
     html += '<tr>' + headers.map(header => `<th>${escapeHtml(header)}</th>`).join('') + '</tr>';
     rows.forEach(row => {
       html += '<tr>';
@@ -709,7 +709,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
     let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Write-Off Registry</title><style>
       @page { size: landscape; margin: 12mm; }
       * { box-sizing: border-box; }
-      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      body { margin:0; font-family:Inter,"Open Sans","Segoe UI",Arial,sans-serif; color:#111827; padding:20px; }
       h2 { margin:0 0 4px; font-size:18px; }
       .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; font-size:11px; }
@@ -819,7 +819,7 @@ const ARWriteOffView: React.FC<ARWriteOffViewProps> = ({
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Write-Off Voucher</title><style>
       @page { size: A4; margin: 0; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing:border-box; }
-      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff; }
+      body { margin: 0; font-family: Inter, "Open Sans", "Segoe UI", Arial, sans-serif; color:#111827; background:#fff; }
       .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; overflow: hidden; background:#fff; display:flex; flex-direction:column; }
       .muted, .sub { color:#6b7280; font-size:12px; }
       table { width:100%; border-collapse: collapse; font-size:12px; }

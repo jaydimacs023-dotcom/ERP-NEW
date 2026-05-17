@@ -10,7 +10,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Open Sans', 'sans-serif'],
+        sans: ['Inter', 'Open Sans', 'Segoe UI', 'Arial', 'sans-serif'],
       },
     },
   },

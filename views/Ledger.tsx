@@ -55,6 +55,8 @@ const Ledger: React.FC<LedgerProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ON_HOLD' | 'POSTED' | 'REVERSED'>('ALL');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('ALL');
+  const [postPeriodFilter, setPostPeriodFilter] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
@@ -95,6 +97,27 @@ const Ledger: React.FC<LedgerProps> = ({
     return ids;
   }, [entries]);
 
+  const formatPeriod = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return `${format(d, 'MM')}-${format(d, 'yyyy')}`;
+  };
+
+  const transactionTypeOptions = useMemo(() => (
+    Array.from(new Set(entries.map(entry => entry.sourceType).filter(Boolean))).sort()
+  ), [entries]);
+
+  const postPeriodOptions = useMemo(() => (
+    Array.from(new Set(entries.map(entry => formatPeriod(entry.date)).filter(period => period !== '—'))).sort((a, b) => {
+      const [aMonth, aYear] = a.split('-').map(Number);
+      const [bMonth, bYear] = b.split('-').map(Number);
+
+      if (aYear !== bYear) return bYear - aYear;
+      return bMonth - aMonth;
+    })
+  ), [entries]);
+
   const handleReverseOpenedEntry = async (): Promise<void> => {
     if (!editingEntry?.id || !onReverseJournal) return;
 
@@ -120,6 +143,8 @@ const Ledger: React.FC<LedgerProps> = ({
     return entries.filter(entry => {
       const entryStatus = (entry.status === 'DRAFT' ? 'ON_HOLD' : (entry.status || 'ON_HOLD')) as JournalEntry['status'] | 'ON_HOLD';
       const matchesStatus = statusFilter === 'ALL' || entryStatus === statusFilter;
+      const matchesTransactionType = transactionTypeFilter === 'ALL' || entry.sourceType === transactionTypeFilter;
+      const matchesPostPeriod = postPeriodFilter === 'ALL' || formatPeriod(entry.date) === postPeriodFilter;
 
       let matchesDate = true;
       const today = new Date().toISOString().split('T')[0];
@@ -136,7 +161,7 @@ const Ledger: React.FC<LedgerProps> = ({
       }
 
       if (!term) {
-        return matchesStatus && matchesDate;
+        return matchesStatus && matchesTransactionType && matchesPostPeriod && matchesDate;
       }
 
       const glRef = (entry.glEntryNumber || entry.reference || '').toLowerCase();
@@ -155,9 +180,9 @@ const Ledger: React.FC<LedgerProps> = ({
 
       const matchesSearch = matchesGlRef || matchesOpenOnHoldDescription || matchesTotal;
 
-      return matchesSearch && matchesStatus && matchesDate;
+      return matchesSearch && matchesStatus && matchesTransactionType && matchesPostPeriod && matchesDate;
     });
-  }, [entries, entryTotals, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [entries, entryTotals, searchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
 
   const sortedEntries = useMemo(() => {
     if (sortConfig.direction === 'none') return filteredEntries;
@@ -196,7 +221,7 @@ const Ledger: React.FC<LedgerProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [searchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
 
   useEffect(() => {
     setCurrentPage(page => Math.min(Math.max(page, 1), totalPages));
@@ -222,13 +247,6 @@ const Ledger: React.FC<LedgerProps> = ({
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return format(parsed, 'MM-dd-yyyy');
-  };
-
-  const formatPeriod = (dateStr?: string) => {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return dateStr;
-    return `${format(d, 'MM')}-${format(d, 'yyyy')}`;
   };
 
   const getCreatedByName = (createdBy?: string) => {
@@ -344,7 +362,7 @@ const Ledger: React.FC<LedgerProps> = ({
 
   const getRegistryExportColumns = () => ([
     { key: 'source', label: 'Memo / Source', value: (e: JournalEntry) => e.sourceType || '-' },
-    { key: 'date', label: 'Date', value: (e: JournalEntry) => formatEntryDate(e.date) },
+    { key: 'date', label: 'Transaction Date', value: (e: JournalEntry) => formatEntryDate(e.date) },
     { key: 'glReference', label: 'GL Reference No.', value: (e: JournalEntry) => (e.glEntryNumber || e.reference || '-').trim() },
     { key: 'description', label: 'Description', value: (e: JournalEntry) => e.description || '-' },
     { key: 'total', label: 'Transaction Total', value: (e: JournalEntry) => entryTotals.get(e.id) || 0 },
@@ -370,7 +388,7 @@ const Ledger: React.FC<LedgerProps> = ({
     const columns = getRegistryExportColumns();
     const headers = columns.map(c => c.label);
     const esc = (v: any) => escapeHtml(v);
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:\"#,##0.00\"}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:\"#,##0.00\"}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
@@ -404,7 +422,7 @@ const Ledger: React.FC<LedgerProps> = ({
     let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Journal Entries</title><style>
       @page { size: landscape; margin: 12mm; }
       * { box-sizing: border-box; }
-      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      body { margin:0; font-family:Inter,"Open Sans","Segoe UI",Arial,sans-serif; color:#111827; padding:20px; }
       h2 { margin:0 0 4px; font-size:18px; }
       .subtitle { font-size:12px; color:#6b7280; margin-bottom:12px; }
       table { width:100%; border-collapse:collapse; }
@@ -492,13 +510,45 @@ const Ledger: React.FC<LedgerProps> = ({
             <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
           </div>
 
+          {/* Transaction Type Filter */}
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Transaction Type:</span>
+            <select
+              value={transactionTypeFilter}
+              onChange={e => setTransactionTypeFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[150px]"
+            >
+              <option value="ALL">All</option>
+              {transactionTypeOptions.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
+          {/* Post Period Filter */}
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Post Period:</span>
+            <select
+              value={postPeriodFilter}
+              onChange={e => setPostPeriodFilter(e.target.value)}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer"
+            >
+              <option value="ALL">All</option>
+              {postPeriodOptions.map(period => (
+                <option key={period} value={period}>{period}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
           {/* Date Filter Dropdown */}
           <div className="relative">
             <div
               onClick={() => setShowDateDropdown(!showDateDropdown)}
               className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none"
             >
-              <span className="text-[13px] text-gray-500 mr-1">Date:</span>
+              <span className="text-[13px] text-gray-500 mr-1">Date Range:</span>
               <span className="text-[13px] font-bold text-gray-800 pr-5 truncate max-w-[120px]">
                 {dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...'}
               </span>
@@ -584,6 +634,8 @@ const Ledger: React.FC<LedgerProps> = ({
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('ALL');
+              setTransactionTypeFilter('ALL');
+              setPostPeriodFilter('ALL');
               setDateFilterMode('ALL');
               setDateFrom('');
               setDateTo('');
@@ -646,7 +698,7 @@ const Ledger: React.FC<LedgerProps> = ({
               {(() => {
                 const columns = {
                   source: { key: 'source', label: 'Transaction Type', align: 'text-left', width: 160, sortKey: 'source' },
-                  date: { key: 'date', label: 'Date', align: 'text-left', width: 110, sortKey: 'date' },
+                  date: { key: 'date', label: 'Transaction Date', align: 'text-left', width: 150, sortKey: 'date' },
                   glReference: { key: 'glReference', label: 'GL Reference No.', align: 'text-left', width: 170, sortKey: 'glReference' },
                   postPeriod: { key: 'postPeriod', label: 'Post Period', align: 'text-left', width: 130, sortKey: 'postPeriod' },
                   description: { key: 'description', label: 'Description', align: 'text-left', width: 180, sortKey: 'description' },
@@ -927,7 +979,13 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
   
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+        <div
+          className="p-6 border-b flex justify-between items-center"
+          style={{
+            backgroundColor: 'rgba(var(--acm-primary-rgb), 0.08)',
+            borderColor: 'rgba(var(--acm-primary-rgb), 0.18)'
+          }}
+        >
           <div className="flex items-center gap-4">
             <button 
               type="button" 
@@ -938,7 +996,12 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
               <X size={20} />
             </button>
             <div className="h-8 w-px bg-slate-200"></div>
-            <div className="p-2 bg-[#F47721] text-white rounded-xl shadow-md font-bold text-xs">VOUCHER</div>
+            <div
+              className="p-2 text-white rounded-xl shadow-md font-bold text-xs"
+              style={{ backgroundColor: 'var(--acm-primary)' }}
+            >
+              VOUCHER
+            </div>
             <div>
                <h3 className="text-lg font-bold text-slate-800 tracking-tight">Journal Entry Details</h3>
                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-0.5">{getJournalEntryReferenceNo(entry)}</p>

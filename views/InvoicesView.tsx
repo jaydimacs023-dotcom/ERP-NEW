@@ -668,7 +668,7 @@ const brandColor = organization?.primaryColor || '#059669';
     if (formData.lines.length === 0) { alert('No line items to export.'); return; }
     const headers = columns.map(c => c.label);
     const esc = (v: any) => escapeHtml(v);
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 8px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px;}th{padding:6px 8px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:12px;background:#059669;color:#fff;font-weight:700;}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 8px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:12px;}th{padding:6px 8px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:12px;background:#059669;color:#fff;font-weight:700;}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     formData.lines.forEach(line => {
       html += '<tr>' + columns.map(c => `<td>${esc(c.getter(line))}</td>`).join('') + '</tr>';
@@ -1579,7 +1579,7 @@ const brandColor = organization?.primaryColor || '#059669';
     const columns = getRegistryExportColumns();
     const headers = columns.map(c => c.label);
     const esc = (v: any) => escapeHtml(v);
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;color:#222;font-weight:500;}th{padding:6px 10px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:13px;background:#059669;color:#fff;font-weight:700;}td.num{text-align:right;mso-number-format:"#,##0.00"}</style></head><body><table>';
     html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
     rows.forEach(r => {
       html += '<tr>';
@@ -1613,7 +1613,7 @@ const brandColor = organization?.primaryColor || '#059669';
     let html = `<!doctype html><html><head><meta charset="utf-8"/><title>Invoice Registry</title><style>
       @page { size: landscape; margin: 12mm; }
       * { box-sizing: border-box; }
-      body { margin:0; font-family:Arial,Helvetica,sans-serif; color:#111827; padding:20px; }
+      body { margin:0; font-family:Inter,"Open Sans","Segoe UI",Arial,sans-serif; color:#111827; padding:20px; }
       h2 { margin:0 0 4px; font-size:18px; }
       .subtitle { color:#6b7280; font-size:12px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; font-size:11px; }
@@ -1680,7 +1680,7 @@ const brandColor = organization?.primaryColor || '#059669';
         print-color-adjust: exact !important;
         color-adjust: exact !important;
       }
-      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+      body { margin: 0; font-family: Inter, "Open Sans", "Segoe UI", Arial, sans-serif; color:#111827; }
       .page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; box-sizing: border-box; overflow: hidden; }
       .content { position: relative; z-index: 1; }
       .watermark {
@@ -3129,7 +3129,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 )}
 
                 <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm" style={{ fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' }}>
+                  <table className="w-full text-sm" style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--app-text-size-13)' }}>
                     <thead className="bg-gray-50">
                       <tr>
                         {/* Column definitions for line items table */}
@@ -3145,7 +3145,7 @@ const brandColor = organization?.primaryColor || '#059669';
                             amount: { key: 'amount', label: 'Amount (₱)', align: 'text-right', width: 110 },
                             actions: { key: 'actions', label: '', align: 'text-center', width: 40 },
                           };
-                          const lineCellStyle = { fontFamily: 'Arial, sans-serif', fontSize: 'var(--app-text-size-13)' };
+                          const lineCellStyle = { fontFamily: 'var(--font-sans)', fontSize: 'var(--app-text-size-13)' };
                           return lineColOrder.map((colKey, idx) => {
                             const col = lineColDefs[colKey];
                             return (
@@ -3303,7 +3303,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                       >
                                         <option value="">-- Select --</option>
                                         {courseFees.map(cf => (
-                                          <option key={cf.id} value={cf.id} style={{ fontFamily: 'Arial, sans-serif' }}>{cf.feeCode} - {cf.feeName}</option>
+                                          <option key={cf.id} value={cf.id} style={{ fontFamily: 'var(--font-sans)' }}>{cf.feeCode} - {cf.feeName}</option>
                                         ))}
                                       </select>
                                     </td>;
