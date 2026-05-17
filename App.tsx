@@ -55,7 +55,6 @@ import PayrollView from './views/PayrollView';
 import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
-import FontScalePicker from './components/FontScale';
 import MaintenanceView from './views/MaintenanceView';
 import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
@@ -6224,8 +6223,6 @@ export default function App() {
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{showJournalForm ? 'new journal entry' : activeTab.replace('-', ' ')}</h2>
           </div>
           <div className="flex items-center gap-4">
-            <FontScalePicker />
-            <div className="h-10 w-px bg-slate-100 mx-2" />
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>

@@ -11,7 +11,8 @@ import {
   XCircle, AlertTriangle, Receipt, Download, Printer,
   RotateCcw, MoreHorizontal, Scissors, CornerUpLeft,
   ChevronDown, ChevronUp, MoreVertical, Ban, Wand2, Users,
-  GraduationCap, CheckSquare, Square, Calculator, FileSpreadsheet, ArrowUpDown
+  GraduationCap, CheckSquare, Square, Calculator, FileSpreadsheet, ArrowUpDown,
+  BookText
 } from 'lucide-react';
 
 
@@ -1289,6 +1290,260 @@ const brandColor = organization?.primaryColor || '#059669';
     return map[s] || s;
   };
 
+  type RelatedTransactionHistoryRow = {
+    id: string;
+    date: string;
+    transactionType: 'Invoice' | 'Payment' | 'Application';
+    referenceNo: string;
+    glReference: string;
+    description: string;
+    debitAmount: number;
+    creditAmount: number;
+    balanceAfter: number;
+    status: string;
+    statusClass: string;
+    actionJournalTarget?: string;
+  };
+
+  const getRelatedTransactionStatusClass = (status: string) => {
+    switch (status) {
+      case 'POSTED':
+      case 'OPEN':
+      case 'CLOSED':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'ON HOLD':
+      case 'DRAFT':
+        return 'bg-blue-100 text-blue-700';
+      case 'VOIDED':
+      case 'REVERSED':
+        return 'bg-rose-100 text-rose-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const getPaymentApplicationGlReference = (application: any) => {
+    const directReference = normalizeGlReference(application?.glReference);
+    if (directReference) return directReference;
+    const journalEntry = journalEntries.find(j => j.id === application?.journalEntryId);
+    const journalReference = normalizeGlReference(journalEntry?.glEntryNumber || journalEntry?.reference);
+    return journalReference || '-';
+  };
+
+  const activeRelatedHistoryInvoice = showViewModal ? resolvedViewingInvoice : editingInvoice;
+
+  const relatedTransactionHistoryRows = useMemo<RelatedTransactionHistoryRow[]>(() => {
+    if (!activeRelatedHistoryInvoice) return [];
+
+    const invoiceAmount = Number(activeRelatedHistoryInvoice.netAmountDue ?? activeRelatedHistoryInvoice.grandTotal ?? 0);
+    const events: Array<Omit<RelatedTransactionHistoryRow, 'balanceAfter'> & { sequence: number; affectsBalance?: boolean }> = [
+      {
+        id: `invoice-${activeRelatedHistoryInvoice.id}`,
+        date: activeRelatedHistoryInvoice.invoiceDate || activeRelatedHistoryInvoice.createdAt || '',
+        transactionType: 'Invoice',
+        referenceNo: activeRelatedHistoryInvoice.invoiceNo || '-',
+        glReference: getInvoiceGlRef(activeRelatedHistoryInvoice),
+        description: activeRelatedHistoryInvoice.notes || 'Invoice created',
+        debitAmount: invoiceAmount,
+        creditAmount: 0,
+        status: getDisplayStatusLabel(activeRelatedHistoryInvoice.status),
+        statusClass: getRelatedTransactionStatusClass(getDisplayStatusLabel(activeRelatedHistoryInvoice.status)),
+        actionJournalTarget: resolveInvoiceJournalTarget(activeRelatedHistoryInvoice),
+        sequence: 0,
+        affectsBalance: true,
+      },
+    ];
+
+    payments
+      .filter(payment =>
+        !payment.isDeleted &&
+        payment.status !== 'VOIDED' &&
+        (
+          payment.sourceInvoiceId === activeRelatedHistoryInvoice.id ||
+          (payment.applications || []).some(app => app.invoiceId === activeRelatedHistoryInvoice.id && !app.isReversed)
+        )
+      )
+      .forEach((payment, paymentIndex) => {
+        const activeApplications = (payment.applications || []).filter(
+          app => app.invoiceId === activeRelatedHistoryInvoice.id && !app.isReversed
+        );
+        const paymentStatus = payment.status === 'POSTED' || payment.status === 'OPEN' || payment.status === 'CLOSED'
+          ? 'POSTED'
+          : payment.status;
+        const paymentGlReference = normalizeGlReference(payment.glEntryNumber) || '-';
+        const paymentJournalTarget = payment.journalEntryId || payment.glEntryNumber || '';
+
+        if (payment.sourceInvoiceId === activeRelatedHistoryInvoice.id) {
+          events.push({
+            id: `payment-${payment.id}`,
+            date: payment.paymentDate || payment.createdAt || '',
+            transactionType: 'Payment',
+            referenceNo: payment.paymentNo || '-',
+            glReference: paymentGlReference,
+            description: payment.notes || 'Payment received',
+            debitAmount: 0,
+            creditAmount: Number(payment.amountReceived || 0),
+            status: paymentStatus,
+            statusClass: getRelatedTransactionStatusClass(paymentStatus),
+            actionJournalTarget: paymentJournalTarget,
+            sequence: 10 + paymentIndex * 10,
+            affectsBalance: activeApplications.length === 0,
+          });
+        }
+
+        activeApplications.forEach((application, applicationIndex) => {
+          const applicationStatus = application.isReversed ? 'REVERSED' : 'POSTED';
+          events.push({
+            id: `application-${application.id}`,
+            date: application.createdAt || payment.paymentDate || payment.createdAt || '',
+            transactionType: 'Application',
+            referenceNo: application.applicationNo || `${payment.paymentNo}-APP-${applicationIndex + 1}`,
+            glReference: getPaymentApplicationGlReference(application),
+            description: `Payment applied from ${payment.paymentNo || 'payment'}`,
+            debitAmount: 0,
+            creditAmount: Number(application.amountApplied || 0),
+            status: applicationStatus,
+            statusClass: getRelatedTransactionStatusClass(applicationStatus),
+            actionJournalTarget: application.journalEntryId || application.glReference,
+            sequence: 11 + paymentIndex * 10 + applicationIndex,
+            affectsBalance: true,
+          });
+        });
+      });
+
+    let runningBalance = 0;
+    return events
+      .sort((a, b) => {
+        const dateDiff = new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        return dateDiff || a.sequence - b.sequence;
+      })
+      .map(event => {
+        if (event.affectsBalance !== false) {
+          runningBalance += event.debitAmount - event.creditAmount;
+        }
+        return {
+          id: event.id,
+          date: event.date,
+          transactionType: event.transactionType,
+          referenceNo: event.referenceNo,
+          glReference: event.glReference,
+          description: event.description,
+          debitAmount: event.debitAmount,
+          creditAmount: event.creditAmount,
+          balanceAfter: runningBalance,
+          status: event.status,
+          statusClass: event.statusClass,
+          actionJournalTarget: event.actionJournalTarget,
+        };
+      });
+  }, [activeRelatedHistoryInvoice, payments, journalEntries]);
+
+  const {
+    currentPage: relatedHistoryPage,
+    totalPages: relatedHistoryTotalPages,
+    pageStartIndex: relatedHistoryStartIndex,
+    pageEndIndex: relatedHistoryEndIndex,
+    paginatedRows: paginatedRelatedHistoryRows,
+    setCurrentPage: setRelatedHistoryPage,
+  } = usePaginatedRows(relatedTransactionHistoryRows, [activeRelatedHistoryInvoice?.id, showViewModal], 5);
+
+  const renderRelatedTransactionHistory = () => (
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <div className="flex flex-col gap-3 border-b bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-black text-gray-800">Related Transaction History</h4>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] font-bold text-gray-500" title="Payments and applications linked to this invoice">
+              i
+            </span>
+          </div>
+          <p className="mt-1 text-xs font-medium text-gray-500">
+            View payments, applications, adjustments, and other transactions linked to this invoice.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (showViewModal) setShowViewModal(false);
+            onNavigate?.('customer-ledger', { invoice: activeRelatedHistoryInvoice });
+          }}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          <BookText size={14} />
+          View Customer Ledger
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[980px] w-full text-[12px]">
+          <thead className="bg-white text-[10px] uppercase tracking-wide text-gray-500">
+            <tr className="border-b border-gray-200">
+              <th className="px-3 py-3 text-left font-black">Date</th>
+              <th className="px-3 py-3 text-left font-black">Transaction Type</th>
+              <th className="px-3 py-3 text-left font-black">Reference No.</th>
+              <th className="px-3 py-3 text-left font-black">GL Reference No.</th>
+              <th className="px-3 py-3 text-left font-black">Description</th>
+              <th className="px-3 py-3 text-right font-black">Debit / Charges ({currency || 'PHP'})</th>
+              <th className="px-3 py-3 text-right font-black">Credit / Payments ({currency || 'PHP'})</th>
+              <th className="px-3 py-3 text-right font-black">Balance After ({currency || 'PHP'})</th>
+              <th className="px-3 py-3 text-left font-black">Status</th>
+              <th className="px-3 py-3 text-center font-black">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {paginatedRelatedHistoryRows.map(row => {
+              return (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-700">
+                    {row.date ? format(new Date(row.date), 'MMM d, yyyy') : '-'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-700">{row.transactionType}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-700">{row.referenceNo}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-600">{row.glReference}</td>
+                  <td className="min-w-56 px-3 py-3 text-gray-600">{row.description}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-gray-700">
+                    {row.debitAmount > 0 ? formatCurrency(row.debitAmount) : '-'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-gray-700">
+                    {row.creditAmount > 0 ? formatCurrency(row.creditAmount) : '-'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-gray-800">
+                    {formatCurrency(row.balanceAfter)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-gray-700">{row.status}</td>
+                  <td className="px-3 py-3 text-center">
+                    {row.actionJournalTarget && onViewJournal ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewJournal(row.actionJournalTarget!)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                        title="View related journal entry"
+                      >
+                        <Eye size={15} />
+                      </button>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <PaginationControls
+        currentPage={relatedHistoryPage}
+        totalPages={relatedHistoryTotalPages}
+        totalItems={relatedTransactionHistoryRows.length}
+        pageStartIndex={relatedHistoryStartIndex}
+        pageEndIndex={relatedHistoryEndIndex}
+        onPageChange={setRelatedHistoryPage}
+        itemLabel="transactions"
+      />
+    </div>
+  );
+
   const getRegistryExportColumns = () => {
     const allColumns = [
       { key: 'invoiceDate', label: 'Date', value: (inv: Invoice) => inv.invoiceDate ? format(new Date(inv.invoiceDate), 'MM-dd-yyyy') : '-' },
@@ -2277,7 +2532,7 @@ const brandColor = organization?.primaryColor || '#059669';
               // ── 1. Date ───────────────────────────────────
               {
                 key: 'invoiceDate',
-                label: 'Date',
+                label: 'Transaction Date',
                 sortKey: 'invoiceDate',
                 width: 'w-32',
                 align: 'text-left' as const,
@@ -3219,6 +3474,11 @@ const brandColor = organization?.primaryColor || '#059669';
                   </div>
                 </aside>
               </div>
+              {editingInvoice && (
+                <div className="mt-6">
+                  {renderRelatedTransactionHistory()}
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -3230,7 +3490,7 @@ const brandColor = organization?.primaryColor || '#059669';
         showViewModal && resolvedViewingInvoice && (
           <ModalPortal>
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden relative">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden relative">
                 {/* PAID Watermark Overlay */}
                 {isPaidInvoice(resolvedViewingInvoice) && (
                   <div
@@ -3364,6 +3624,9 @@ const brandColor = organization?.primaryColor || '#059669';
                       <p className="text-sm text-gray-700">{resolvedViewingInvoice.notes}</p>
                     </div>
                   )}
+
+                  {/* Related Transaction History */}
+                  {renderRelatedTransactionHistory()}
 
                   {/* Annex: Student Breakdown for Sponsor/Batch Invoices */}
                   {resolvedViewingInvoice.sponsorId && resolvedViewingInvoice.batchId && batchStudents?.length > 0 && (
