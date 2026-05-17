@@ -2655,13 +2655,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   if (viewMode === 'list') {
     return (
       <div className="space-y-4">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-5 py-4">
-            <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Manage payment receipts and invoice application activity from one formal registry workspace.
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800">Payments and Applications</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage payment receipts and invoice application activity from one formal registry workspace.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
