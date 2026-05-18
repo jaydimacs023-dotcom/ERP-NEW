@@ -37,6 +37,7 @@ export type ModuleTab =
   // Portals
   | 'student-portal'
   | 'trainer-portal'
+  | 'feedback'
   // Financial Core
   | 'dashboard'
   | 'ledger'
@@ -120,7 +121,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
     'enrollments', 'course-fees', 'alumni-reports',
     'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
-    'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'
+    'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'
   ],
 
   // ADMIN: Full organization access (no system admin modules)
@@ -133,7 +134,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
     'enrollments', 'course-fees',
-    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'
+    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'
   ],
 
   // PRESIDENT: Executive view - dashboards, reports, approvals
@@ -142,7 +143,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'ar', 'payables',
     'payroll', 'budgets',
     'students', 'trainers', 'qualifications', 'batches',
-    'employees', 'audit'
+    'employees', 'audit', 'feedback'
   ],
 
   // FINANCE_MANAGER: All finance modules
@@ -153,7 +154,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
-    'employees', 'coa', 'periods', 'audit'
+    'employees', 'coa', 'periods', 'audit', 'feedback'
   ],
 
   // ACCOUNTANT: General Ledger, Reporting, Journal Entries
@@ -163,7 +164,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
     'sponsors', 'vendors', 'items', 'assets',
-    'coa', 'periods', 'audit'
+    'coa', 'periods', 'audit', 'feedback'
   ],
 
   // AR_SPECIALIST: Accounts Receivable focused
@@ -179,7 +180,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'soa',
     'customer-ledger',
     'collection-receipt',
-    'audit'
+    'audit', 'feedback'
   ],
 
   // AP_SPECIALIST: Accounts Payable focused
@@ -188,13 +189,13 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
-    'audit'
+    'audit', 'feedback'
   ],
 
   // AP_CLERK: Limited AP data entry
   AP_CLERK: [
     'payables', 'po', 'goods-receipt',
-    'vendors', 'items'
+    'vendors', 'items', 'feedback'
   ],
 
   // AP_SUPERVISOR: AP with approvals
@@ -203,7 +204,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
-    'audit'
+    'audit', 'feedback'
   ],
 
   // TREASURY: Banking and cash management
@@ -211,7 +212,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'dashboard', 'reports', 'banking', 'checks',
     'ar', // View receivables for cash forecasting
     'payables', // View payables for cash forecasting
-    'audit'
+    'audit', 'feedback'
   ],
 
   // AUDITOR: Read-only access to all financial data
@@ -222,24 +223,25 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payroll',
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'inventory-transactions', 'inventory-reports',
-    'coa', 'periods', 'audit'
+    'coa', 'periods', 'audit', 'feedback'
   ],
 
   // REGISTRAR: Training/Student management
   REGISTRAR: [
     'dashboard',
     'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
-    'sponsors' // For scholarship management
+    'sponsors', // For scholarship management
+    'feedback'
   ],
 
   // TRAINER: Trainer portal only
   TRAINER: [
-    'trainer-portal'
+    'trainer-portal', 'feedback'
   ],
 
   // STUDENT: Student portal only
   STUDENT: [
-    'student-portal'
+    'student-portal', 'feedback'
   ]
 };
 
@@ -252,9 +254,9 @@ export const MODULE_GROUPS = {
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],
   INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports'] as ModuleTab[],
   OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports'] as ModuleTab[],
-  ADMIN: ['employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit'] as ModuleTab[],
-  SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring'] as ModuleTab[],
-  PORTALS: ['student-portal', 'trainer-portal'] as ModuleTab[],
+  ADMIN: ['employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'] as ModuleTab[],
+  SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'] as ModuleTab[],
+  PORTALS: ['student-portal', 'trainer-portal', 'feedback'] as ModuleTab[],
 };
 
 // ===== Helper Functions =====

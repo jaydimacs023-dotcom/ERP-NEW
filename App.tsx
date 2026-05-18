@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -78,6 +78,7 @@ import BankDepositsView from './views/BankDepositsView';
 import AlumniEmploymentView from './views/AlumniEmploymentView';
 import CustomerMasterListView from './views/CustomerMasterListView';
 import ARCalendarTasksView from './views/ARCalendarTasksView';
+import FeedbackManagementView from './views/FeedbackManagementView';
 
 // Lucide Icons
 import {
@@ -90,7 +91,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -518,6 +519,7 @@ export default function App() {
   const [revenueSchedules, setRevenueSchedules] = useState<RevenueSchedule[]>([]);
   const [revenueRecognitionEntries, setRevenueRecognitionEntries] = useState<RevenueRecognitionEntry[]>([]);
   const [alumniReports, setAlumniReports] = useState<AlumniEmploymentReport[]>([]);
+  const [feedbackTickets, setFeedbackTickets] = useState<FeedbackTicket[]>([]);
 
   // Inventory Management State
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
@@ -1277,6 +1279,7 @@ export default function App() {
         setReorderPoints(data.reorderPoints || []);
         setEnrollments(data.enrollments || []);
         setAlumniReports(data.alumniReports || []);
+        setFeedbackTickets(data.feedbackTickets || []);
 
         // Load Course Fees
         setCourseFees(data.courseFees || []);
@@ -1349,6 +1352,36 @@ export default function App() {
 
     loadPeriods();
   }, [currentOrgId]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setFeedbackTickets([]);
+      return;
+    }
+
+    if (currentUser.role !== 'SYSTEM_ADMIN' && !currentOrgId) {
+      setFeedbackTickets([]);
+      return;
+    }
+
+    async function loadFeedbackTickets() {
+      try {
+        const service = DataServiceFactory.getService();
+        const tickets = await service.getFeedbackTickets({
+          orgId: currentUser.role === 'SYSTEM_ADMIN' ? undefined : currentOrgId,
+          isSystemAdmin: currentUser.role === 'SYSTEM_ADMIN',
+          userId: currentUser.id
+        });
+        setFeedbackTickets(tickets);
+      } catch (error) {
+        console.error('[App] Error loading feedback tickets:', error);
+        handleNotify('error', 'Failed to load feedback tickets from Supabase.');
+        setFeedbackTickets([]);
+      }
+    }
+
+    loadFeedbackTickets();
+  }, [currentUser, currentOrgId]);
 
   // Derived Accounting Context
   const currentOrg = useMemo(() => organizations.find(o => o.id === currentOrgId), [organizations, currentOrgId]);
@@ -2458,6 +2491,36 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error restoring backup:', error);
       handleNotify('error', `Failed to restore backup: ${error instanceof Error ? error.message : 'Unknown error'} `);
+    }
+  };
+
+  const handleCreateFeedbackTicket = async (ticket: FeedbackTicket) => {
+    try {
+      const savedTicket = await dataService.createFeedbackTicket(ticket);
+      setFeedbackTickets(prev => [...prev, savedTicket]);
+      AuditService.create(ticket.orgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FEEDBACK_TICKET', savedTicket.id, savedTicket.title);
+      handleNotify('success', 'Feedback ticket submitted successfully');
+    } catch (error) {
+      console.error('[App] Error creating feedback ticket:', error);
+      handleNotify('error', `Failed to submit feedback to Supabase: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
+  };
+
+  const handleUpdateFeedbackTicket = async (id: string, updates: Partial<FeedbackTicket>) => {
+    if (currentUser?.role !== 'SYSTEM_ADMIN') {
+      handleNotify('error', 'Only system administrators can update feedback status.');
+      return;
+    }
+
+    try {
+      const updatedTicket = await dataService.updateFeedbackTicket(id, updates);
+      setFeedbackTickets(prev => prev.map(ticket => ticket.id === id ? { ...ticket, ...updatedTicket } : ticket));
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'FEEDBACK_TICKET', id, updatedTicket.title, undefined, updatedTicket);
+      handleNotify('success', 'Feedback status updated');
+    } catch (error) {
+      console.error('[App] Error updating feedback ticket:', error);
+      handleNotify('error', `Failed to update feedback in Supabase: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -6045,6 +6108,13 @@ export default function App() {
             </div>
           )}
 
+          {userCanAccess('feedback') && (
+            <div className="mb-8">
+              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Support</p>}
+              <NavItem icon={<MessageSquare size={20} />} label="Feedback Ticket" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
+            </div>
+          )}
+
           {currentUser.role === 'AR_SPECIALIST' && (
             <div className="space-y-6">
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6195,6 +6265,7 @@ export default function App() {
               <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => navigateTo('schema')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => navigateTo('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<MessageSquare size={20} />} label="Users Feedback" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
         </nav>
@@ -6577,6 +6648,18 @@ export default function App() {
           {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />}
           {activeTab === 'schema' && <SchemaManualView />}
           {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
+          {activeTab === 'feedback' && (
+            <FeedbackManagementView
+              tickets={feedbackTickets}
+              currentUser={currentUser}
+              currentOrgId={currentOrgId}
+              organizations={organizations}
+              users={users}
+              onCreateTicket={handleCreateFeedbackTicket}
+              onUpdateTicket={handleUpdateFeedbackTicket}
+              onNotify={handleNotify}
+            />
+          )}
           {activeTab === 'soa' && (
             <SOAView
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}

@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.users-write]
 verify_jwt = false
+
+[functions.feedback-tickets]
+verify_jwt = false

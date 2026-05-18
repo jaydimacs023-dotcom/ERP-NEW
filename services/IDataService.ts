@@ -7,7 +7,8 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication
+  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
+  FeedbackTicket
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -81,6 +82,7 @@ export interface InitialData {
   invoices: Invoice[];
   invoiceLines: InvoiceLine[];
   taxCategories: TaxCategoryEntry[];
+  feedbackTickets: FeedbackTicket[];
 }
 
 export interface IDataService {
@@ -340,6 +342,11 @@ export interface IDataService {
   // Audit Log CRUD
   createAuditLog(log: AuditLog): Promise<AuditLog>;
   getAuditLogsByOrg(orgId: string): Promise<AuditLog[]>;
+
+  // Feedback Ticket CRUD
+  createFeedbackTicket(ticket: FeedbackTicket): Promise<FeedbackTicket>;
+  updateFeedbackTicket(id: string, updates: Partial<FeedbackTicket>): Promise<FeedbackTicket>;
+  getFeedbackTickets(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]>;
 
   // Purchase Order CRUD
   createPurchaseOrder(order: PurchaseOrder): Promise<PurchaseOrder>;

@@ -2,7 +2,7 @@
 import { IDataService, InitialData } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
-import { Invoice, TaxCategoryEntry } from '../types';
+import { FeedbackTicket, Invoice, TaxCategoryEntry } from '../types';
 import { normalizeStudentDocuments } from './StudentDocumentService';
 
 /**
@@ -311,6 +311,7 @@ export class SupabaseDataService implements IDataService {
         invoices: invoicesWithLines,
         invoiceLines: this.snakeToCamel(invoice_lines as any) || [],
         taxCategories: this.snakeToCamel(taxCategories as any) || [],
+        feedbackTickets: [],
       };
     } catch (error) {
       console.error("[Supabase] ❌ Fatal error loading data:", error);
@@ -777,6 +778,12 @@ export class SupabaseDataService implements IDataService {
         'gl_reference', 'journal_entry_id',
         'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
+      feedback_tickets: [
+        'id', 'org_id', 'title', 'description', 'screenshot_data_url', 'screenshot_name',
+        'status', 'priority', 'created_by', 'created_by_name', 'created_by_role',
+        'assigned_to', 'admin_notes', 'resolved_at', 'created_at', 'updated_at',
+        'is_deleted', 'deleted_at', 'deleted_by'
+      ],
     };
 
     // Columns that are auto-generated and should be excluded on INSERT
@@ -792,7 +799,8 @@ export class SupabaseDataService implements IDataService {
       sponsors: ['id', 'created_at', 'updated_at'],
       invoice_lines: ['id', 'created_at', 'updated_at'],
       journal_entries: ['id', 'created_at', 'updated_at'],
-      journal_lines: ['id', 'created_at', 'updated_at']
+      journal_lines: ['id', 'created_at', 'updated_at'],
+      feedback_tickets: ['created_at', 'updated_at']
     };
 
     const allowedColumns = validColumns[table] || [];
@@ -4574,6 +4582,43 @@ export class SupabaseDataService implements IDataService {
       console.error('[Supabase] Error fetching audit logs:', error);
       return [];
     }
+  }
+
+  // ============================================================================
+  // FEEDBACK TICKET CRUD
+  // ============================================================================
+
+  async createFeedbackTicket(ticket: FeedbackTicket): Promise<FeedbackTicket> {
+    return this.callFeedbackTicketsFunction<FeedbackTicket>('create', { ticket });
+  }
+
+  async updateFeedbackTicket(id: string, updates: Partial<FeedbackTicket>): Promise<FeedbackTicket> {
+    return this.callFeedbackTicketsFunction<FeedbackTicket>('update', { id, updates });
+  }
+
+  async getFeedbackTickets(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]> {
+    return this.callFeedbackTicketsFunction<FeedbackTicket[]>('list', context || {});
+  }
+
+  private async callFeedbackTicketsFunction<T>(action: string, payload: any): Promise<T> {
+    const token = await this.getAuthToken();
+    const url = `${this.supabaseUrl}/functions/v1/feedback-tickets`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, ...payload })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Feedback tickets function failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.result as T;
   }
 
   // ============================================================================

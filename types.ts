@@ -150,6 +150,29 @@ export interface PaymentHistory extends BaseEntity {
   invoiceNumber?: string;
   paymentMethod?: string;
 }
+
+export type FeedbackTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+export type FeedbackTicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface FeedbackTicket extends BaseEntity {
+  id: string;
+  orgId: string;
+  title: string;
+  description: string;
+  screenshotDataUrl?: string;
+  screenshotName?: string;
+  status: FeedbackTicketStatus;
+  priority: FeedbackTicketPriority;
+  createdBy: string;
+  createdByName: string;
+  createdByRole: User['role'];
+  assignedTo?: string;
+  adminNotes?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface User extends BaseEntity {
   id: string;
   name: string;
