@@ -4613,17 +4613,21 @@ export default function App() {
         filteredAccounts.find(a => (a.name || '').toLowerCase().includes('revenue'))?.id ||
         filteredAccounts.find(a => (a.name || '').toLowerCase().includes('income'))?.id;
 
+      const lineType = String((line as any).lineType || (line.courseFeeId ? 'COURSE_FEE' : 'MANUAL')).toUpperCase();
       const numericNetAmount = Number(line.netAmount);
       const numericGrossAmount = Number(line.grossAmount);
       const numericVatAmount = Number(line.vatAmount || 0);
       const numericLineAmount = Number(line.amount || 0);
-      const netRevenue = Number.isFinite(numericNetAmount) && numericNetAmount > 0
+      const signedNetAmount = Number.isFinite(numericNetAmount)
         ? numericNetAmount
-        : Number.isFinite(numericGrossAmount) && numericGrossAmount > 0
-          ? Math.max(numericGrossAmount - numericVatAmount, 0)
+        : Number.isFinite(numericGrossAmount)
+          ? numericGrossAmount - numericVatAmount
           : invoice.vatPricing === 'INCLUSIVE'
-            ? Math.max(numericLineAmount - numericVatAmount, 0)
+            ? numericLineAmount - numericVatAmount
             : numericLineAmount;
+      const netRevenue = lineType === 'DISCOUNT'
+        ? -Math.abs(signedNetAmount || numericLineAmount)
+        : signedNetAmount;
 
       // Group VAT by Account
       if (Math.abs(line.vatAmount || 0) > 0.01) {

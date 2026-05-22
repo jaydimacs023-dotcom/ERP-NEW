@@ -457,6 +457,32 @@ const brandColor = organization?.primaryColor || '#059669';
     return getClassificationCode(line.glAccountId);
   };
 
+  const getInvoiceQualificationId = () => {
+    if (formData.batchId) {
+      return batches.find(batch => batch.id === formData.batchId)?.qualificationId || '';
+    }
+    if (formData.assessmentRegistrationId) {
+      return assessmentRegistrations.find(registration => registration.id === formData.assessmentRegistrationId)?.qualificationId || '';
+    }
+    return '';
+  };
+
+  const getSelectableCourseFeesForLine = (line: InvoiceLine) => {
+    const qualificationId = getInvoiceQualificationId();
+    const matchingFees = courseFees.filter(fee =>
+      fee.isActive &&
+      !fee.isDeleted &&
+      (!qualificationId || fee.qualificationId === qualificationId)
+    );
+
+    if (line.courseFeeId && !matchingFees.some(fee => fee.id === line.courseFeeId)) {
+      const existingFee = courseFees.find(fee => fee.id === line.courseFeeId);
+      return existingFee ? [...matchingFees, existingFee] : matchingFees;
+    }
+
+    return matchingFees;
+  };
+
   // whenever the list of tax categories changes, recompute net/vat/gross for existing lines
   // but do NOT touch the visible amount â€“ leave whatever the user entered intact
   useEffect(() => {
@@ -622,6 +648,14 @@ const brandColor = organization?.primaryColor || '#059669';
         grossAmount
       };
     });
+  };
+
+  const getCourseFeeLineQuantity = (fallbackQty = 1) => {
+    const selectedBatch = batches.find(batch => batch.id === formData.batchId);
+    if (!selectedBatch) return fallbackQty;
+    return getSponsoredBatchEnrolledQuantity(selectedBatch, formData.sponsorId) ||
+      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), selectedBatch.id) ||
+      fallbackQty;
   };
 
   const applySponsoredBatchQuantityToLines = (batch: Batch, lines: InvoiceLine[], fallbackSponsorId = '') => {
@@ -1006,9 +1040,14 @@ const brandColor = organization?.primaryColor || '#059669';
         if (nextType === 'COURSE_FEE' && !lines[index].courseFeeId) {
           lines[index].lineType = 'MANUAL' as any;
         }
-        if (nextType === 'DISCOUNT' && Number(lines[index].amount || 0) > 0) {
-          lines[index].amount = -Math.abs(Number(lines[index].amount || 0));
-          lines[index].unitPrice = -Math.abs(Number(lines[index].unitPrice || lines[index].amount || 0));
+        if (nextType === 'DISCOUNT') {
+          const currentUnitPrice = Number(lines[index].unitPrice || lines[index].amount || 0);
+          const currentAmount = Number(lines[index].amount || 0);
+          lines[index].unitPrice = -Math.abs(currentUnitPrice || currentAmount || 1);
+          lines[index].amount = -Math.abs(currentAmount || (Number(lines[index].quantity || 1) * Math.abs(lines[index].unitPrice)));
+        } else if (nextType === 'COURSE_FEE' && lines[index].courseFeeId) {
+          lines[index].unitPrice = Math.abs(Number(lines[index].unitPrice || 0));
+          lines[index].amount = Math.abs(Number(lines[index].amount || 0));
         }
       }
 
@@ -1016,7 +1055,14 @@ const brandColor = organization?.primaryColor || '#059669';
       if ((field === 'quantity' || field === 'unitPrice')) {
         const qty = lines[index].quantity || 0;
         const upr = lines[index].unitPrice || 0;
-        lines[index].amount = Math.round(qty * upr * 100) / 100;
+        const rawAmount = Math.round(qty * upr * 100) / 100;
+        lines[index].amount = getLineType(lines[index]) === 'DISCOUNT'
+          ? -Math.abs(rawAmount)
+          : rawAmount;
+      }
+
+      if (field === 'amount' && getLineType(lines[index]) === 'DISCOUNT') {
+        lines[index].amount = -Math.abs(Number(lines[index].amount || 0));
       }
 
       // Recompute net/vat/gross when any of the relevant fields change
@@ -1044,13 +1090,13 @@ const brandColor = organization?.primaryColor || '#059669';
   const handleApplyCourseFee = (index: number, courseFeeId: string) => {
     const fee = courseFees.find(f => f.id === courseFeeId);
     if (fee) {
-      const selectedBatch = batches.find(batch => batch.id === formData.batchId);
-      const batchQty = selectedBatch
-        ? (getSponsoredBatchEnrolledQuantity(selectedBatch, formData.sponsorId) ||
-          BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), selectedBatch.id))
-        : 0;
-      const qty = batchQty || formData.lines[index].quantity || 1;
-      const unitPrice = fee.amount || 0;
+      const currentLineType = getLineType(formData.lines[index]);
+      const nextLineType = currentLineType === 'DISCOUNT' || currentLineType === 'ADJUSTMENT'
+        ? currentLineType
+        : 'COURSE_FEE';
+      const qty = getCourseFeeLineQuantity(formData.lines[index].quantity || 1);
+      const baseUnitPrice = Number(fee.amount || 0);
+      const unitPrice = nextLineType === 'DISCOUNT' ? -Math.abs(baseUnitPrice) : baseUnitPrice;
       const amount = Math.round(qty * unitPrice * 100) / 100;
       const tempLine: InvoiceLine = {
         ...formData.lines[index],
@@ -1065,8 +1111,8 @@ const brandColor = organization?.primaryColor || '#059669';
       updatedLines[index] = {
         ...updatedLines[index],
         courseFeeId,
-        lineType: 'COURSE_FEE' as any,
-        description: fee.feeName,
+        lineType: nextLineType as any,
+        description: nextLineType === 'DISCOUNT' ? `Discount - ${fee.feeName}` : fee.feeName,
         quantity: qty,
         unitPrice,
         netAmount,
@@ -3663,7 +3709,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                       <select
                                         value={getLineType(line)}
                                         onChange={e => handleUpdateLine(idx, 'lineType', e.target.value as any)}
-                                        disabled={isReadOnly || getLineType(line) === 'COURSE_FEE'}
+                                        disabled={isReadOnly}
                                         className="w-full px-2 py-1 rounded text-[12px] font-semibold text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       >
                                         <option value="COURSE_FEE">COURSE FEE</option>
@@ -3695,7 +3741,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                         className="w-full px-3 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       >
                                         <option value="">-- Select --</option>
-                                        {courseFees.map(cf => (
+                                        {getSelectableCourseFeesForLine(line).map(cf => (
                                           <option key={cf.id} value={cf.id} style={{ fontFamily: 'var(--font-sans)' }}>{cf.feeCode} - {cf.feeName}</option>
                                         ))}
                                       </select>
