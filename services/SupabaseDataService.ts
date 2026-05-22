@@ -215,7 +215,7 @@ export class SupabaseDataService implements IDataService {
         'payments', 'payment_applications',
         'warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions',
         'stock_adjustments', 'reorder_points', 'course_fees', 'alumni_employment_reports',
-        'enrollments', 'invoices', 'invoice_lines', 'tax_categories'
+        'enrollments', 'assessment_registrations', 'invoices', 'invoice_lines', 'tax_categories'
       ];
 
       const fetchers = tablesToFetch.map(table => () => this.fetchFromSupabase(table));
@@ -233,7 +233,7 @@ export class SupabaseDataService implements IDataService {
         payments, paymentApplications,
         warehouseLocations, stockItems, inventoryLevels, inventoryTransactions,
         stockAdjustments, reorderPoints, courseFees, alumniReports,
-        enrollments, invoices, invoice_lines, taxCategories
+        enrollments, assessmentRegistrations, invoices, invoice_lines, taxCategories
       ] = results as any[];
 
       // Log data status
@@ -307,6 +307,7 @@ export class SupabaseDataService implements IDataService {
         reorderPoints: this.snakeToCamel(reorderPoints as any) || [],
         courseFees: this.snakeToCamel(courseFees as any) || [],
         enrollments: this.snakeToCamel(enrollments as any) || [],
+        assessmentRegistrations: this.snakeToCamel(assessmentRegistrations as any) || [],
         alumniReports: this.snakeToCamel(alumniReports as any) || [],
         invoices: invoicesWithLines,
         invoiceLines: this.snakeToCamel(invoice_lines as any) || [],
@@ -546,6 +547,10 @@ export class SupabaseDataService implements IDataService {
       while (true) {
         console.debug(`[Supabase] 📝 Inserting into ${table}:`, payload);
 
+        if (table === 'payments') {
+          payload = this.normalizePaymentStatusForStorage(payload);
+        }
+
         const response = await fetch(url, {
           method: 'POST',
           headers: { ...(await this.getHeaders(preferUserToken)), 'Prefer': 'return=representation' },
@@ -605,6 +610,10 @@ export class SupabaseDataService implements IDataService {
       while (true) {
         console.debug(`[Supabase] Updating ${table} (${id}):`, payload);
 
+        if (table === 'payments') {
+          payload = this.normalizePaymentStatusForStorage(payload);
+        }
+
         const response = await fetch(url, {
           method: 'PATCH',
           headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
@@ -613,7 +622,13 @@ export class SupabaseDataService implements IDataService {
 
         if (response.ok) {
           const result = await response.json();
-          const camelResult = this.snakeToCamel(Array.isArray(result) ? result[0] : result);
+          const returnedRow = Array.isArray(result) ? result[0] : result;
+          const camelResult = returnedRow
+            ? this.snakeToCamel(returnedRow)
+            : { id, ...this.snakeToCamel(payload) };
+          if (!returnedRow) {
+            console.warn(`[Supabase] Update ${table} (${id}) returned no row representation; using submitted payload as local result.`);
+          }
           console.info(`[Supabase] Updated ${table}:`, camelResult);
           return camelResult as T;
         }
@@ -695,7 +710,7 @@ export class SupabaseDataService implements IDataService {
         'tin', 'tax_type', 'ewt_rate', 'ar_account_id', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
-      batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'max_students', 'current_students', 'created_at', 'updated_at'],
+      batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'training_schedule_slots', 'max_students', 'current_students', 'created_at', 'updated_at'],
       vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'created_at', 'updated_at'],
       atc_categories: ['id', 'code', 'name', 'created_at', 'updated_at'],
       atc_items: ['id', 'category_id', 'atc_code', 'description', 'taxpayer_type', 'created_at', 'updated_at'],
@@ -732,12 +747,18 @@ export class SupabaseDataService implements IDataService {
       ],
       enrollments: [
         'id', 'org_id', 'enrollment_code', 'student_id', 'batch_id', 'sponsor_id',
-        'billing_status', 'enrollment_status', 'enrollment_date', 'completion_date',
+        'billing_type', 'billing_status', 'enrollment_status', 'enrollment_date', 'completion_date',
         'total_fees', 'billed_amount', 'notes', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
+      assessment_registrations: [
+        'id', 'org_id', 'registration_code', 'student_id', 'qualification_id', 'sponsor_id',
+        'billing_party', 'assessment_type', 'assessment_date', 'status', 'billing_status',
+        'total_fees', 'billed_amount', 'invoice_id', 'notes',
+        'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
       invoices: [
-        'id', 'org_id', 'invoice_no', 'sponsor_id', 'student_id', 'enrollment_id', 'batch_id',
+        'id', 'org_id', 'invoice_no', 'sponsor_id', 'student_id', 'enrollment_id', 'assessment_registration_id', 'batch_id',
         'invoice_date', 'due_date', 'status', 'subtotal', 'vat_amount', 'grand_total',
         'total_ewt_amount', 'net_amount_due', 'amount_paid', 'balance_due',
         'ewt_rate', 'is_subject_to_ewt', 'reference', 'terms', 'notes', 'journal_entry_id',
@@ -745,8 +766,8 @@ export class SupabaseDataService implements IDataService {
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'created_by', 'updated_at', 'updated_by'
       ],
       invoice_lines: [
-        'id', 'org_id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id',
-        'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount',
+        'id', 'org_id', 'invoice_id', 'line_number', 'description', 'course_fee_id', 'enrollment_id', 'assessment_registration_id',
+        'line_type', 'quantity', 'unit_price', 'net_amount', 'vat_amount', 'gross_amount', 'amount',
         'tax_category_id', 'gl_account_id', 'classification_code',
         'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'
       ],
@@ -795,6 +816,7 @@ export class SupabaseDataService implements IDataService {
       payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
       check_vouchers: ['id', 'created_at', 'updated_at'],
       course_fees: ['id', 'created_at', 'updated_at'],
+      assessment_registrations: ['id', 'created_at', 'updated_at'],
       alumni_employment_reports: ['id', 'created_at', 'updated_at'],
       sponsors: ['id', 'created_at', 'updated_at'],
       invoice_lines: ['id', 'created_at', 'updated_at'],
@@ -1361,6 +1383,7 @@ export class SupabaseDataService implements IDataService {
   async createBatch(batch: any): Promise<any> {
     // Preserve student_ids array
     const studentIdsBackup = batch.studentIds;
+    const trainingScheduleSlotsBackup = batch.trainingScheduleSlots;
 
     const snakeCaseBatch = this.camelToSnake(batch);
     let filteredBatch = this.filterToTableSchema('batches', snakeCaseBatch);
@@ -1368,6 +1391,9 @@ export class SupabaseDataService implements IDataService {
     // Restore student_ids as PostgreSQL array format
     if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
       filteredBatch.student_ids = studentIdsBackup;
+    }
+    if (trainingScheduleSlotsBackup && Array.isArray(trainingScheduleSlotsBackup)) {
+      filteredBatch.training_schedule_slots = trainingScheduleSlotsBackup;
     }
 
     // Handle empty optional foreign keys - convert empty string to null
@@ -1397,6 +1423,7 @@ export class SupabaseDataService implements IDataService {
   async updateBatch(id: string, updates: Partial<any>): Promise<any> {
     // Preserve student_ids array
     const studentIdsBackup = updates.studentIds;
+    const trainingScheduleSlotsBackup = updates.trainingScheduleSlots;
 
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('batches', snakeCaseUpdates);
@@ -1404,6 +1431,9 @@ export class SupabaseDataService implements IDataService {
     // Restore student_ids as PostgreSQL array format
     if (studentIdsBackup && Array.isArray(studentIdsBackup)) {
       filteredUpdates.student_ids = studentIdsBackup;
+    }
+    if (trainingScheduleSlotsBackup && Array.isArray(trainingScheduleSlotsBackup)) {
+      filteredUpdates.training_schedule_slots = trainingScheduleSlotsBackup;
     }
 
     // Handle empty optional foreign keys - convert empty string to null
@@ -1846,6 +1876,103 @@ export class SupabaseDataService implements IDataService {
     }
 
     return this.insertToSupabaseRaw(table, filteredEntity);
+  }
+
+  async fetchBillingBillableQty(batchId: string): Promise<number> {
+    const response = await fetch(`${this.baseUrl}/rpc/billing_billable_qty`, {
+      method: 'POST',
+      headers: await this.getHeaders(),
+      body: JSON.stringify({ p_batch_id: batchId })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`billing_billable_qty failed: ${response.status} ${errorText}`);
+    }
+
+    return Number(await response.json() || 0);
+  }
+
+  async fetchBillingCourseFeeInvoice(batchId: string): Promise<any[]> {
+    const response = await fetch(`${this.baseUrl}/rpc/billing_course_fee_invoice`, {
+      method: 'POST',
+      headers: await this.getHeaders(),
+      body: JSON.stringify({ p_batch_id: batchId })
+    });
+
+    if (response.ok) {
+      const rows = await response.json();
+      return Array.isArray(rows) ? this.snakeToCamel(rows) : [];
+    }
+
+    const errorText = await response.text();
+    console.warn(`[Supabase] billing_course_fee_invoice unavailable, using REST fallback: ${response.status} ${errorText}`);
+    return this.fetchBillingCourseFeeInvoiceViaRest(batchId);
+  }
+
+  private async fetchBillingCourseFeeInvoiceViaRest(batchId: string): Promise<any[]> {
+    const headers = await this.getHeaders();
+    const [batchResponse, enrollmentsResponse] = await Promise.all([
+      fetch(`${this.baseUrl}/batches?id=eq.${batchId}&select=id,org_id,qualification_id,sponsor_id,student_ids`, { headers }),
+      fetch(`${this.baseUrl}/enrollments?batch_id=eq.${batchId}&select=id,batch_id,billing_type,enrollment_status,enrollment_date,created_at,is_deleted,deleted_at`, { headers })
+    ]);
+
+    if (!batchResponse.ok) {
+      throw new Error(`Failed to load batch billing fallback data: ${batchResponse.status} ${await batchResponse.text()}`);
+    }
+    if (!enrollmentsResponse.ok) {
+      throw new Error(`Failed to load enrollment billing fallback data: ${enrollmentsResponse.status} ${await enrollmentsResponse.text()}`);
+    }
+
+    const batchRows = await batchResponse.json();
+    const batch = Array.isArray(batchRows) ? batchRows[0] : null;
+    if (!batch) {
+      console.warn('[Supabase] Billing fallback found no batch row for batch id:', batchId);
+      return [];
+    }
+
+    const enrollmentRows = await enrollmentsResponse.json();
+    const validEnrollments = (Array.isArray(enrollmentRows) ? enrollmentRows : [])
+      .filter(row => !row.is_deleted && !row.deleted_at)
+      .filter(row => !['DROPPED', 'CANCELLED', 'CANCELED', 'INACTIVE', 'ARCHIVED'].includes(String(row.enrollment_status || '').toUpperCase()))
+      .sort((a, b) => {
+        const left = String(a.enrollment_date || a.created_at || '');
+        const right = String(b.enrollment_date || b.created_at || '');
+        const dateCompare = left.localeCompare(right);
+        if (dateCompare !== 0) return dateCompare;
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      });
+    const batchStudentIds = Array.isArray(batch.student_ids) ? batch.student_ids.filter(Boolean) : [];
+    const enrolledQty = validEnrollments.length > 0 ? validEnrollments.length : new Set(batchStudentIds).size;
+    console.info('[Supabase] Billing fallback computed batch quantity:', {
+      batchId,
+      enrollmentRows: Array.isArray(enrollmentRows) ? enrollmentRows.length : 0,
+      validEnrollments: validEnrollments.length,
+      batchStudentIds: batchStudentIds.length,
+      enrolledQty
+    });
+
+    const feesResponse = await fetch(
+      `${this.baseUrl}/course_fees?qualification_id=eq.${batch.qualification_id}&is_active=eq.true&select=id,fee_name,amount,gl_account_id,tax_category_id,is_deleted`,
+      { headers }
+    );
+    if (!feesResponse.ok) {
+      throw new Error(`Failed to load course fee billing fallback data: ${feesResponse.status} ${await feesResponse.text()}`);
+    }
+
+    const fees = await feesResponse.json();
+    return (Array.isArray(fees) ? fees : [])
+      .filter(fee => !fee.is_deleted)
+      .map(fee => this.snakeToCamel({
+        course_fee_id: fee.id,
+        description: fee.fee_name,
+        quantity: enrolledQty,
+        unit_price: Number(fee.amount || 0),
+        amount: Math.round(enrolledQty * Number(fee.amount || 0) * 100) / 100,
+        line_type: 'COURSE_FEE',
+        gl_account_id: fee.gl_account_id,
+        tax_category_id: fee.tax_category_id
+      }));
   }
 
   /**
@@ -4597,28 +4724,70 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getFeedbackTickets(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]> {
-    return this.callFeedbackTicketsFunction<FeedbackTicket[]>('list', context || {});
+    try {
+      return await this.callFeedbackTicketsFunction<FeedbackTicket[]>('list', context || {});
+    } catch (error) {
+      if (this.isRecoverableFeedbackTicketsFunctionError(error)) {
+        console.warn(
+          '[SupabaseDataService] feedback-tickets edge function is unavailable; showing no feedback tickets until it is deployed/reachable.',
+          error
+        );
+        return [];
+      }
+      throw error;
+    }
   }
 
   private async callFeedbackTicketsFunction<T>(action: string, payload: any): Promise<T> {
-    const token = await this.getAuthToken();
-    const url = `${this.supabaseUrl}/functions/v1/feedback-tickets`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ action, ...payload })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Feedback tickets function failed: ${response.status} - ${errorText}`);
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      throw new Error('Supabase credentials not configured');
     }
 
-    const data = await response.json();
-    return data.result as T;
+    try {
+      const token = await this.getAuthToken();
+      const url = `${this.supabaseUrl}/functions/v1/feedback-tickets`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'apikey': this.supabaseKey,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action, ...payload })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Feedback tickets function failed: ${response.status} - ${this.parseEdgeFunctionError(errorBody)}`);
+      }
+
+      const data = await response.json();
+      if (data?.error) {
+        throw new Error(`Feedback tickets function failed: ${data.error}`);
+      }
+      return data.result as T;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error(
+          `Feedback tickets function is unreachable. Deploy supabase/functions/feedback-tickets and confirm VITE_SUPABASE_URL points to the active Supabase project. Original error: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  private parseEdgeFunctionError(errorBody: string): string {
+    try {
+      const jsonError = JSON.parse(errorBody);
+      return jsonError.error || jsonError.message || errorBody;
+    } catch {
+      return errorBody || 'Unknown edge function error';
+    }
+  }
+
+  private isRecoverableFeedbackTicketsFunctionError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /feedback tickets function is unreachable|requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
   }
 
   // ============================================================================
@@ -4963,7 +5132,7 @@ export class SupabaseDataService implements IDataService {
 
     // 4. Sanitize UUID fields: convert empty strings to null
     // PostgREST/Supabase will throw a 400 error if it receives "" for a UUID column
-    const uuidFields = ['sponsor_id', 'student_id', 'enrollment_id', 'batch_id', 'journal_entry_id'];
+    const uuidFields = ['sponsor_id', 'student_id', 'enrollment_id', 'assessment_registration_id', 'batch_id', 'journal_entry_id'];
     uuidFields.forEach(field => {
       if (filteredUpdates[field] === '') {
         filteredUpdates[field] = null;
@@ -5149,5 +5318,38 @@ export class SupabaseDataService implements IDataService {
   async getAlumniReportsByOrg(orgId: string): Promise<any[]> {
     const reports = await this.fetchFromSupabase<any>('alumni_employment_reports');
     return this.snakeToCamel(reports.filter((r: any) => r.org_id === orgId));
+  }
+
+  async createAssessmentRegistration(registration: any): Promise<any> {
+    const snakeCaseRegistration = this.camelToSnake(registration);
+    const filteredRegistration = this.filterToTableSchema('assessment_registrations', snakeCaseRegistration, true);
+    if (filteredRegistration.sponsor_id === '' || filteredRegistration.sponsor_id === undefined) {
+      filteredRegistration.sponsor_id = null;
+    }
+    if (filteredRegistration.assessment_date === '' || filteredRegistration.assessment_date === undefined) {
+      filteredRegistration.assessment_date = null;
+    }
+    if (filteredRegistration.invoice_id === '' || filteredRegistration.invoice_id === undefined) {
+      filteredRegistration.invoice_id = null;
+    }
+    return this.insertToSupabaseRaw('assessment_registrations', filteredRegistration);
+  }
+
+  async updateAssessmentRegistration(id: string, updates: Partial<any>): Promise<any> {
+    const snakeCaseUpdates = this.camelToSnake(updates);
+    const filteredUpdates = this.filterToTableSchema('assessment_registrations', snakeCaseUpdates);
+    if (filteredUpdates.sponsor_id === '') filteredUpdates.sponsor_id = null;
+    if (filteredUpdates.assessment_date === '' || filteredUpdates.assessment_date === undefined) filteredUpdates.assessment_date = null;
+    if (filteredUpdates.invoice_id === '') filteredUpdates.invoice_id = null;
+    return this.updateInSupabaseRaw('assessment_registrations', id, filteredUpdates);
+  }
+
+  async deleteAssessmentRegistration(id: string): Promise<void> {
+    return this.deleteFromSupabase('assessment_registrations', id);
+  }
+
+  async getAssessmentRegistrationsByOrg(orgId: string): Promise<any[]> {
+    const registrations = await this.fetchFromSupabase<any>('assessment_registrations');
+    return this.snakeToCamel(registrations.filter((r: any) => r.org_id === orgId));
   }
 }

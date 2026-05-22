@@ -1,6 +1,6 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Batch, Trainer, TrainerSchedule, DaySlot, Location, Organization } from '../types';
+import { Batch, Trainer, TrainerSchedule, DaySlot, Location, Organization, Qualification } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
@@ -21,6 +21,7 @@ interface SchedulesViewProps {
   schedules: TrainerSchedule[];
   trainers: Trainer[];
   locations: Location[];
+  qualifications: Qualification[];
   organization?: Organization;
   onAddSchedule: (sch: TrainerSchedule) => void | Promise<void>;
   onUpdateSchedule: (sch: TrainerSchedule) => void | Promise<void>;
@@ -28,6 +29,8 @@ interface SchedulesViewProps {
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const LUNCH_START_MINUTES = 12 * 60;
+const LUNCH_END_MINUTES = 13 * 60;
 
 const getSlotHours = (start: string, end: string) => {
   if (!start || !end) return 0;
@@ -35,11 +38,16 @@ const getSlotHours = (start: string, end: string) => {
   const [eH, eM] = end.split(':').map(Number);
   const startTotal = sH * 60 + sM;
   const endTotal = eH * 60 + eM;
-  return Math.max(0, (endTotal - startTotal) / 60);
+  const grossMinutes = Math.max(0, endTotal - startTotal);
+  const lunchOverlap = Math.max(
+    0,
+    Math.min(endTotal, LUNCH_END_MINUTES) - Math.max(startTotal, LUNCH_START_MINUTES)
+  );
+  return Math.max(0, (grossMinutes - lunchOverlap) / 60);
 };
 
 const SchedulesView: React.FC<SchedulesViewProps> = ({ 
-  batches, schedules, trainers, locations, organization, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
+  batches, schedules, trainers, locations, qualifications, organization, onAddSchedule, onUpdateSchedule, onDeleteSchedule 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState<'ALL' | string>('ALL');
@@ -67,12 +75,25 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [activeSlot, setActiveSlot] = useState<DaySlot>({
     dayIndex: 1,
     startTime: '08:00',
-    endTime: '12:00'
+    endTime: '12:00',
+    qualificationId: ''
   });
 
   const totalWeeklyHours = useMemo(() => 
     (formData.slots || []).reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0),
   [formData.slots]);
+
+  const selectedTrainerQualifications = useMemo(() => {
+    const trainer = trainers.find(t => t.id === formData.trainerId);
+    if (!trainer?.qualificationIds?.length) return qualifications;
+    return qualifications.filter(q => trainer.qualificationIds.includes(q.id));
+  }, [formData.trainerId, trainers, qualifications]);
+
+  const getQualificationLabel = (qualificationId?: string) => {
+    if (!qualificationId) return 'General availability';
+    const qualification = qualifications.find(q => q.id === qualificationId);
+    return qualification ? `${qualification.name}${qualification.code ? ` (${qualification.code})` : ''}` : 'Unknown qualification';
+  };
 
   const filteredSchedules = useMemo(() => schedules.filter(s => {
     if (s.isDeleted) return false;
@@ -88,7 +109,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   const resetForm = () => {
     setFormData({ trainerId: '', locationId: '', slots: [] });
     setEditingSchedule(null);
-    setActiveSlot({ dayIndex: 1, startTime: '08:00', endTime: '12:00' });
+    setActiveSlot({ dayIndex: 1, startTime: '08:00', endTime: '12:00', qualificationId: '' });
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -181,12 +202,29 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
   };
   const addSlot = () => {
     const current = formData.slots || [];
-    const next = [...current.filter(s => s.dayIndex !== activeSlot.dayIndex), { ...activeSlot }].sort((a,b) => a.dayIndex - b.dayIndex);
+    const normalizedSlot = {
+      ...activeSlot,
+      qualificationId: activeSlot.qualificationId || undefined
+    };
+    const next = [
+      ...current.filter(s => !(s.dayIndex === normalizedSlot.dayIndex && (s.qualificationId || '') === (normalizedSlot.qualificationId || ''))),
+      normalizedSlot
+    ].sort((a,b) => a.dayIndex - b.dayIndex || (a.qualificationId || '').localeCompare(b.qualificationId || ''));
     setFormData({ ...formData, slots: next });
   };
 
-  const removeSlot = (dayIndex: number) => {
-    setFormData({ ...formData, slots: (formData.slots || []).filter(s => s.dayIndex !== dayIndex) });
+  const removeSlot = (slotToRemove: DaySlot) => {
+    setFormData({
+      ...formData,
+      slots: (formData.slots || []).filter(s =>
+        !(
+          s.dayIndex === slotToRemove.dayIndex &&
+          s.startTime === slotToRemove.startTime &&
+          s.endTime === slotToRemove.endTime &&
+          (s.qualificationId || '') === (slotToRemove.qualificationId || '')
+        )
+      )
+    });
   };
 
   return (
@@ -293,19 +331,21 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                     <td className="px-6 py-5">
                       <div className="flex flex-wrap gap-1">
                         {DAYS.map((day, idx) => {
-                          const slot = sch.slots.find(s => s.dayIndex === idx);
+                          const daySlots = sch.slots.filter(s => s.dayIndex === idx);
                           return (
-                            <div key={day} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${slot ? 'bg-brand text-white' : 'bg-gray-100 text-gray-400'}`}>
+                            <div key={day} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${daySlots.length ? 'bg-brand text-white' : 'bg-gray-100 text-gray-400'}`}>
                               <span>{day.slice(0, 3)}</span>
-                              {slot && <Clock size={10} />}
+                              {daySlots.length > 0 && <Clock size={10} />}
+                              {daySlots.length > 1 && <span className="font-mono">{daySlots.length}</span>}
                             </div>
                           );
                         })}
                       </div>
                       <div className="mt-2 space-y-1">
                         {sch.slots.map((slot, idx) => (
-                          <div key={idx} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block mr-1">
+                          <div key={`${slot.dayIndex}-${slot.qualificationId || 'all'}-${idx}`} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block mr-1">
                             {DAYS[slot.dayIndex]}: {slot.startTime} - {slot.endTime}
+                            <span className="ml-1 font-semibold text-brand">{getQualificationLabel(slot.qualificationId)}</span>
                           </div>
                         ))}
                       </div>
@@ -413,8 +453,23 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
                      <div className="p-8 bg-gray-800 rounded-md border border-gray-700 shadow-md relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-5 opacity-5"><Sparkles size={120} /></div>
-                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
                            <div className="md:col-span-2 space-y-2">
+                              <label className="text-xs font-semibold text-brand uppercase tracking-wide px-1">Qualification Allocation</label>
+                              <select
+                                 className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-semibold text-white focus:border-brand"
+                                 value={activeSlot.qualificationId || ''}
+                                 onChange={e => setActiveSlot({...activeSlot, qualificationId: e.target.value || undefined})}
+                              >
+                                 <option value="" className="bg-gray-800">General / Any Qualification</option>
+                                 {selectedTrainerQualifications.map(q => (
+                                   <option key={q.id} value={q.id} className="bg-gray-800">
+                                     {q.name} {q.code ? `(${q.code})` : ''}
+                                   </option>
+                                 ))}
+                              </select>
+                           </div>
+                           <div className="space-y-2">
                               <label className="text-xs font-semibold text-brand uppercase tracking-wide px-1">Target Work Day</label>
                               <select 
                                  className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-semibold text-white focus:border-brand"
@@ -436,6 +491,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                            </div>
                         </div>
                         <div className="mt-8 pt-8 border-t border-white/5">
+                           <p className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                              Lunch break from 12:00 PM to 1:00 PM is excluded from training hours.
+                           </p>
                            <button 
                               type="button" 
                               onClick={addSlot}
@@ -461,13 +519,16 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                </div>
 
                <div className="flex-1 space-y-3 overflow-y-auto scrollbar-hide">
-                  {(formData.slots || []).length > 0 ? (formData.slots || []).map(s => {
+                  {(formData.slots || []).length > 0 ? (formData.slots || []).map((s, index) => {
                      const hrs = getSlotHours(s.startTime, s.endTime);
                      return (
-                        <div key={s.dayIndex} className="group p-6 bg-white rounded border border-gray-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-brand transition-all">
+                        <div key={`${s.dayIndex}-${s.qualificationId || 'all'}-${index}`} className="group p-6 bg-white rounded border border-gray-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-brand transition-all">
                            <div className="flex justify-between items-start mb-4">
-                              <span className="text-xs font-semibold text-brand uppercase tracking-wide">{DAYS[s.dayIndex]}</span>
-                              <button onClick={() => removeSlot(s.dayIndex)} className="text-gray-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                              <div>
+                                <span className="text-xs font-semibold text-brand uppercase tracking-wide">{DAYS[s.dayIndex]}</span>
+                                <p className="mt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{getQualificationLabel(s.qualificationId)}</p>
+                              </div>
+                              <button type="button" onClick={() => removeSlot(s)} className="text-gray-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                            </div>
                            <div className="flex justify-between items-end">
                               <div className="space-y-1">
@@ -506,9 +567,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
                      </div>
 
                      <div className="bg-brand/10 p-6 rounded border border-brand-light flex gap-4">
-                        <Info size={24} className="text-brand shrink-0" />
+                       <Info size={24} className="text-brand shrink-0" />
                         <p className="text-xs text-brand leading-relaxed font-bold">
-                           Instructional hour metrics feed the <strong>Projected Completion Engine</strong>. Modifying this schedule re-forecasts terminal dates for all linked training batches.
+                           Instructional hour metrics feed the <strong>Projected Completion Engine</strong> for future planned batches. Once training commences, the batch keeps its own locked schedule snapshot.
                         </p>
                      </div>
 

@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { Enrollment, BillingStatus, EnrollmentStatus, Student, Batch, Sponsor, Qualification } from '../types';
+import { Enrollment, BillingStatus, EnrollmentStatus, EnrollmentBillingType, Student, Batch, Sponsor, Qualification } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import { 
@@ -40,6 +40,12 @@ const ENROLLMENT_STATUS_OPTIONS: { value: EnrollmentStatus; label: string; color
   { value: 'DROPPED', label: 'Dropped', color: 'bg-rose-100 text-rose-700' },
 ];
 
+const BILLING_TYPE_OPTIONS: { value: EnrollmentBillingType; label: string }[] = [
+  { value: 'BILLABLE', label: 'Billable' },
+  { value: 'FREE_SPONSORED', label: 'Free Sponsored' },
+  { value: 'MANUAL_FREE', label: 'Manual Free' },
+];
+
 const formatEnrollmentDate = (value?: string) => {
   if (!value) return '-';
 
@@ -72,6 +78,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
     studentId: '',
     batchId: '',
     sponsorId: '',
+    billingType: 'BILLABLE',
     billingStatus: 'UNBILLED',
     enrollmentStatus: 'ACTIVE',
     enrollmentDate: new Date().toISOString().split('T')[0],
@@ -136,6 +143,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
       studentId: '',
       batchId: '',
       sponsorId: '',
+      billingType: 'BILLABLE',
       billingStatus: 'UNBILLED',
       enrollmentStatus: 'ACTIVE',
       enrollmentDate: new Date().toISOString().split('T')[0],
@@ -177,6 +185,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           studentId: formData.studentId!,
           batchId: formData.batchId!,
           sponsorId: formData.sponsorId || undefined,
+          billingType: formData.billingType || 'BILLABLE',
           billingStatus: formData.billingStatus || 'UNBILLED',
           enrollmentStatus: formData.enrollmentStatus || 'ACTIVE',
           enrollmentDate: formData.enrollmentDate || editingEnrollment.enrollmentDate,
@@ -198,6 +207,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           studentId: formData.studentId!,
           batchId: formData.batchId!,
           sponsorId: formData.sponsorId || undefined,
+          billingType: formData.billingType || 'BILLABLE',
           billingStatus: formData.billingStatus || 'UNBILLED',
           enrollmentStatus: formData.enrollmentStatus || 'ACTIVE',
           enrollmentDate: formData.enrollmentDate || new Date().toISOString(),
@@ -239,12 +249,16 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
   };
 
   const openEditModal = (enrollment: Enrollment) => {
+    const billingType = String(enrollment.billingType || 'BILLABLE') === 'FREE_EXCESS'
+      ? 'BILLABLE'
+      : enrollment.billingType || 'BILLABLE';
     setEditingEnrollment(enrollment);
     setFormData({
       enrollmentCode: enrollment.enrollmentCode || '',
       studentId: enrollment.studentId,
       batchId: enrollment.batchId,
       sponsorId: enrollment.sponsorId || '',
+      billingType,
       billingStatus: enrollment.billingStatus,
       enrollmentStatus: enrollment.enrollmentStatus,
       enrollmentDate: enrollment.enrollmentDate?.split('T')[0] || '',
@@ -511,7 +525,14 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {getBillingBadge(enrollment.billingStatus)}
+                    <div className="space-y-1">
+                      {getBillingBadge(enrollment.billingStatus)}
+                      {enrollment.billingType && enrollment.billingType !== 'BILLABLE' && (
+                        <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-2 py-0.5 inline-block">
+                          {enrollment.billingType.replace(/_/g, ' ')}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {getEnrollmentBadge(enrollment.enrollmentStatus)}
@@ -697,6 +718,19 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-500">Billing Type</label>
+                      <select
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm font-medium"
+                        value={formData.billingType || 'BILLABLE'}
+                        onChange={e => setFormData({...formData, billingType: e.target.value as EnrollmentBillingType})}
+                      >
+                        {BILLING_TYPE_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500">Use discount invoice lines for sponsored reductions; free types are manual enrollment overrides.</p>
                     </div>
                   </div>
                 </div>

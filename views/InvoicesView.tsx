@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser, Payment } from '../types';
+import { Invoice, InvoiceLine, InvoiceStatus, Sponsor, Student, Enrollment, AssessmentRegistration, Batch, Qualification, CourseFee, ChartOfAccount, AccountClass, StudentLedger, JournalEntry, TaxCategoryEntry, Organization, User as AppUser, Payment } from '../types';
 import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import { calculateInvoiceDueDate, todayISO } from '../utils/invoiceTerms';
+import { BillingComputationService } from '../services/BillingComputationService';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
@@ -24,6 +25,7 @@ interface InvoicesViewProps {
   students: Student[];
   users: AppUser[];
   enrollments: Enrollment[];
+  assessmentRegistrations: AssessmentRegistration[];
   batches: Batch[];
   qualifications: Qualification[];
   courseFees: CourseFee[];
@@ -36,6 +38,7 @@ interface InvoicesViewProps {
   onPostInvoice?: (invoice: Invoice) => void;
   onVoidInvoice?: (id: string, reason: string) => void;
   onUpdateEnrollment?: (enrollment: Enrollment) => void; // For updating billing status after invoice generation
+  onUpdateAssessmentRegistration?: (registration: AssessmentRegistration) => void;
   journalEntries?: JournalEntry[];
   onAddStudentLedgerEntry?: (entry: StudentLedger) => void; // For AR subsidiary ledger
   onViewJournal?: (journalEntryId: string, sourceLines?: InvoiceLine[]) => void;
@@ -46,8 +49,8 @@ interface InvoicesViewProps {
 }
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
-  invoices, payments = [], sponsors, students, users, enrollments, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
-  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onAddStudentLedgerEntry,
+  invoices, payments = [], sponsors, students, users, enrollments, assessmentRegistrations, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
+  onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onUpdateAssessmentRegistration, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
   organization,
@@ -94,15 +97,16 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const lineResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
   // Column order and drag state for line items table
-  // Default: #, Course Fee, Description, Tax Category, Class, Qty, Unit Price, Amount, Actions
+  // Default: #, Type, Course Fee, Description, Tax Category, Class, Qty, Unit Price, Amount, Actions
   const defaultLineColOrder = [
-    'lineNumber', 'courseFeeId', 'description', 'taxCategoryId', 'classificationCode', 'quantity', 'unitPrice', 'amount', 'actions'
+    'lineNumber', 'lineType', 'courseFeeId', 'description', 'taxCategoryId', 'classificationCode', 'quantity', 'unitPrice', 'amount', 'actions'
   ];
   const [lineColOrder, setLineColOrder] = useState<string[]>(defaultLineColOrder);
   const [draggedLineColIdx, setDraggedLineColIdx] = useState<number | null>(null);
 
   // local copy of tax categories; we fetch from backend when form is active
   const [localTaxCats, setLocalTaxCats] = useState<TaxCategoryEntry[]>(taxCategories);
+  const [backendBatchEnrolledQty, setBackendBatchEnrolledQty] = useState<Record<string, number>>({});
 
   // Sponsor/Student (Payer) Custom Filter State
   const [showPayerDropdown, setShowPayerDropdown] = useState(false);
@@ -138,6 +142,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     sponsorId: string;
     studentId: string;
     enrollmentId: string;
+    assessmentRegistrationId: string;
     batchId: string;
     invoiceDate: string;
     dueDate: string;
@@ -154,6 +159,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     sponsorId: '',
     studentId: '',
     enrollmentId: '',
+    assessmentRegistrationId: '',
     batchId: '',
     invoiceDate: todayISO(),
     dueDate: calculateInvoiceDueDate(todayISO(), 'Net 30'),
@@ -211,6 +217,25 @@ const brandColor = organization?.primaryColor || '#059669';
       missingFields.push('Tax Category');
     }
     return missingFields;
+  };
+
+  const getLineType = (line: InvoiceLine) =>
+    String((line as any).lineType || (line.courseFeeId ? 'COURSE_FEE' : 'MANUAL')).toUpperCase();
+
+  const validateInvoiceLineRules = (invoiceDraft: Pick<Invoice, 'lines' | 'grandTotal'> | { lines?: InvoiceLine[] } | null | undefined) => {
+    const lines = invoiceDraft?.lines || [];
+    const issues: string[] = [];
+    lines.forEach((line, index) => {
+      const lineType = getLineType(line);
+      if (lineType === 'DISCOUNT' && Number(line.amount || 0) > 0) {
+        issues.push(`Line ${index + 1}: Discount lines must be zero or negative.`);
+      }
+    });
+    const totals = calculateTotals(lines);
+    if (totals.grandTotal < -0.01) {
+      issues.push('Final invoice total cannot be negative.');
+    }
+    return issues;
   };
 
   const invoiceRequiredFieldIssues = validateInvoiceRequiredFields(formData);
@@ -296,6 +321,7 @@ const brandColor = organization?.primaryColor || '#059669';
       sponsorId: '',
       studentId: '',
       enrollmentId: '',
+      assessmentRegistrationId: '',
       batchId: '',
       invoiceDate,
       dueDate: calculateInvoiceDueDate(invoiceDate, terms),
@@ -343,6 +369,7 @@ const brandColor = organization?.primaryColor || '#059669';
       sponsorId: invoice.sponsorId || '',
       studentId: invoice.studentId || '',
       enrollmentId: invoice.enrollmentId || '',
+      assessmentRegistrationId: invoice.assessmentRegistrationId || '',
       batchId: invoice.batchId || '',
       invoiceDate: invoice.invoiceDate,
       dueDate: invoice.dueDate,
@@ -503,13 +530,133 @@ const brandColor = organization?.primaryColor || '#059669';
     );
   };
 
+  const getBillingComputationContext = (overrideEnrollments?: Enrollment[]) => ({
+    batches,
+    enrollments: overrideEnrollments || enrollments,
+    courseFees,
+    invoices,
+    payments,
+    journalEntries
+  });
+
+  const sortEnrollmentsForBillingCap = (rows: Enrollment[]) => {
+    if (!rows[0]?.batchId) return rows;
+    return BillingComputationService.getValidEnrollments(getBillingComputationContext(rows), rows[0].batchId);
+  };
+
+  const getBatchSponsorId = (batch?: Batch | null) => {
+    return BillingComputationService.getBatchSponsorId(batch);
+  };
+
+  const isSponsoredBatchContext = (batch?: Batch | null, fallbackSponsorId = '') => {
+    return !!getBatchSponsorId(batch) || !!String(fallbackSponsorId || '').trim();
+  };
+
+  const getEnrollmentSponsorId = (enrollment: Enrollment) => {
+    return enrollment.sponsorId || getBatchSponsorId(batches.find(batch => batch.id === enrollment.batchId)) || '';
+  };
+
+  const getBillableSponsoredEnrollments = (rows: Enrollment[]) => {
+    const byBatch = new Map<string, Enrollment[]>();
+
+    rows
+      .filter(e =>
+        !!getEnrollmentSponsorId(e)
+      )
+      .forEach(e => {
+        const batchId = e.batchId || (e as any).batch_id || '';
+        if (!batchId) return;
+        if (!byBatch.has(batchId)) byBatch.set(batchId, []);
+        byBatch.get(batchId)!.push(e);
+      });
+
+    return Array.from(byBatch.entries()).flatMap(([batchId, batchRows]) => {
+      const batch = batches.find(b => b.id === batchId);
+      if (!isSponsoredBatchContext(batch)) return sortEnrollmentsForBillingCap(batchRows);
+      return BillingComputationService.classifyEnrollmentsByBatchCap(
+        getBillingComputationContext(batchRows),
+        batchId
+      ).billableEnrollments;
+    });
+  };
+
+  const getSponsoredBatchEnrolledQuantity = (batch: Batch, fallbackSponsorId = '') => {
+    if (!isSponsoredBatchContext(batch, fallbackSponsorId)) return 0;
+    const backendQty = Number(backendBatchEnrolledQty[batch.id] || 0);
+    if (backendQty > 0) return backendQty;
+    return BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id);
+  };
+
+  const fetchBackendCourseFeeInvoice = async (batchId: string) => {
+    try {
+      const { DataServiceFactory } = await import('../services/DataServiceFactory');
+      const service = DataServiceFactory.getService() as any;
+      if (typeof service.fetchBillingCourseFeeInvoice !== 'function') return null;
+      const rows = await service.fetchBillingCourseFeeInvoice(batchId);
+      const qty = Number(rows?.[0]?.quantity ?? 0);
+      if (qty > 0) {
+        setBackendBatchEnrolledQty(prev => ({ ...prev, [batchId]: qty }));
+      }
+      return Array.isArray(rows) ? rows : null;
+    } catch (error) {
+      console.warn('[InvoicesView] Backend billing computation unavailable; using local preview.', error);
+      return null;
+    }
+  };
+
+  const applyQuantityToLines = (lines: InvoiceLine[], qty: number) => {
+    return lines.map(line => {
+      if (getLineType(line) !== 'COURSE_FEE') return line;
+      const unitPrice = Number(line.unitPrice || 0);
+      const amount = Math.round(qty * unitPrice * 100) / 100;
+      const recalculatedLine = {
+        ...line,
+        quantity: qty,
+        amount
+      };
+      const { netAmount, vatAmount, grossAmount } = computeAmounts(recalculatedLine);
+      return {
+        ...recalculatedLine,
+        netAmount,
+        vatAmount,
+        grossAmount
+      };
+    });
+  };
+
+  const applySponsoredBatchQuantityToLines = (batch: Batch, lines: InvoiceLine[], fallbackSponsorId = '') => {
+    const qty = getSponsoredBatchEnrolledQuantity(batch, fallbackSponsorId) ||
+      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id);
+    if (qty <= 0) return lines;
+
+    return applyQuantityToLines(lines, qty);
+  };
+
+  const getBatchContractAdjustedLines = (lines: InvoiceLine[], batchId?: string, fallbackSponsorId = '') => {
+    const batch = batchId ? batches.find(b => b.id === batchId) : null;
+    if (!batch) return lines;
+    return applySponsoredBatchQuantityToLines(batch, lines, fallbackSponsorId || getBatchSponsorId(batch));
+  };
+
+  const invoiceLinesChanged = (left: InvoiceLine[], right: InvoiceLine[]) => {
+    if (left.length !== right.length) return true;
+    return left.some((line, index) => {
+      const next = right[index];
+      return line.quantity !== next.quantity ||
+        line.amount !== next.amount ||
+        line.netAmount !== next.netAmount ||
+        line.vatAmount !== next.vatAmount ||
+        line.grossAmount !== next.grossAmount;
+    });
+  };
+
   const getBillableStudentsForBatch = (batchId: string, includeStudentId?: string) => {
     const batch = batches.find(b => b.id === batchId);
     const batchStudents = getBatchStudentIds(batchId)
       .map(id => students.find(s => s.id === id))
       .filter((s): s is Student => !!s && !s.isDeleted);
 
-    if (batch?.sponsorId) return batchStudents;
+    if (isSponsoredBatchContext(batch)) return batchStudents;
 
     const billedStudentIds = getBilledStudentIdsForPrivateBatch(batchId);
     return batchStudents.filter(student =>
@@ -517,8 +664,14 @@ const brandColor = organization?.primaryColor || '#059669';
     );
   };
 
+  const getBillableSponsoredEnrollmentsForBatch = (batchId: string) => {
+    return getBillableSponsoredEnrollments(
+      enrollments.filter(e => e.batchId === batchId && e.billingStatus === 'UNBILLED')
+    );
+  };
+
   const isPrivateBatchFullyBilled = (batch: Batch) => {
-    if (batch.sponsorId) return false;
+    if (isSponsoredBatchContext(batch)) return false;
 
     const studentIds = getBatchStudentIds(batch.id);
     if (studentIds.length === 0) return false;
@@ -526,6 +679,16 @@ const brandColor = organization?.primaryColor || '#059669';
     const billedStudentIds = getBilledStudentIdsForPrivateBatch(batch.id);
     return studentIds.every(studentId => billedStudentIds.has(studentId));
   };
+
+  useEffect(() => {
+    if (viewMode !== 'FORM' || !formData.batchId || formData.lines.length === 0) return;
+
+    setFormData(prev => {
+      const adjustedLines = getBatchContractAdjustedLines(prev.lines, prev.batchId, prev.sponsorId);
+      if (!invoiceLinesChanged(prev.lines, adjustedLines)) return prev;
+      return { ...prev, lines: adjustedLines };
+    });
+  }, [viewMode, formData.batchId, formData.sponsorId, formData.lines, batches, enrollments, backendBatchEnrolledQty]);
 
   // Recalculate VAT for all lines when VAT settings change or during initial edit load
   useEffect(() => {
@@ -560,39 +723,32 @@ const brandColor = organization?.primaryColor || '#059669';
   }, [viewMode, formData.vatPricing, formData.vatRate, formData.sponsorId, sponsors]);
 
   // Handle batch change - auto-fill sponsor, quantity, and line items
-  const handleBatchChange = (batchId: string) => {
+  const handleBatchChange = async (batchId: string) => {
     const batch = batches.find(b => b.id === batchId);
     if (!batch) {
-      setFormData(prev => ({ ...prev, batchId: '', sponsorId: '', studentId: '', lines: [] }));
+      setFormData(prev => ({ ...prev, batchId: '', assessmentRegistrationId: '', sponsorId: '', studentId: '', lines: [] }));
       return;
     }
 
-    const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
-    const sponsorId = batch.sponsorId || '';
+    const sponsorId = getBatchSponsorId(batch) || formData.sponsorId || '';
+    const backendFeeRows = sponsorId ? await fetchBackendCourseFeeInvoice(batchId) : null;
+    const backendQty = Number(backendFeeRows?.[0]?.quantity ?? 0);
     const studentsInBatch = getBillableStudentsForBatch(batchId, formData.studentId);
     const nextPrivateStudentId = studentsInBatch[0]?.id || '';
 
-    // if there are already lines, do not override description/course fee/unit price/amount
-    if (formData.lines.length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        batchId,
-        sponsorId,
-        studentId: sponsorId ? '' : (nextPrivateStudentId || prev.studentId || '')
-      }));
-      return;
-    }
-
+    const computedInvoice = BillingComputationService.computeCourseFeeInvoice(getBillingComputationContext(), batchId);
     const qualificationFees = courseFees.filter(f => f.qualificationId === batch.qualificationId && f.isActive && !f.isDeleted);
 
-    // Count students from enrollments
-    const studentCount = batchEnrollments.length || batch.studentIds?.length || 0;
+    const manualLines = formData.lines.filter(line => getLineType(line) !== 'COURSE_FEE');
+    const shouldPreserveManualLines = manualLines.length > 0
+      ? window.confirm('Preserve manually added discount/adjustment lines after loading this batch?')
+      : false;
 
     const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => {
-      const qty = sponsorId ? studentCount : 1;
-      const netAmount = Math.round(qty * (fee.amount || 0) * 100) / 100;
-      const vatAmount = 0;
-      const grossAmount = netAmount; // initially no tax
+      const computedLine = computedInvoice.lines.find(line => line.courseFeeId === fee.id);
+      const backendLine = backendFeeRows?.find(row => row.courseFeeId === fee.id || row.course_fee_id === fee.id);
+      const qty = Number(backendLine?.quantity ?? backendQty) || computedInvoice.enrolledQty || 0;
+      const unitPrice = fee.amount || 0;
 
       // To evaluate classification correctly we temporarily patch the batchId into formData before evaluation although handleBatchChange does not wait
       const code = (() => {
@@ -605,49 +761,124 @@ const brandColor = organization?.primaryColor || '#059669';
          return '0000-0000';
       })();
 
-      return {
+      const draftLine = {
         id: generateUUID(),
         invoiceId: editingInvoice?.id || '',
         lineNumber: idx + 1,
         description: fee.feeName,
         courseFeeId: fee.id,
+        lineType: 'COURSE_FEE' as any,
         quantity: qty,
-        unitPrice: fee.amount || 0,
-        netAmount,
-        vatAmount,
-        grossAmount,
-        amount: netAmount,
+        unitPrice,
+        netAmount: computedLine?.netAmount || 0,
+        vatAmount: computedLine?.vatAmount || 0,
+        grossAmount: computedLine?.grossAmount || 0,
+        amount: computedLine?.amount || Math.round(qty * unitPrice * 100) / 100,
         glAccountId: fee.glAccountId,
+        taxCategoryId: fee.taxCategoryId || '',
         classificationCode: code
-      };
+      } as InvoiceLine;
+      const computed = computeAmounts(draftLine);
+      return { ...draftLine, ...computed };
     });
+    const preservedLines = shouldPreserveManualLines
+      ? manualLines.map((line, index) => ({ ...line, lineNumber: newLines.length + index + 1 }))
+      : [];
+    const nextLines = [...newLines, ...preservedLines].map((line, index) => ({ ...line, lineNumber: index + 1 }));
 
     setFormData(prev => ({
       ...prev,
       batchId,
+      assessmentRegistrationId: '',
       sponsorId,
       studentId: sponsorId ? '' : nextPrivateStudentId,
-      lines: newLines
+      lines: nextLines
+    }));
+  };
+
+  const handleAssessmentRegistrationChange = (registrationId: string) => {
+    const registration = assessmentRegistrations.find(r => r.id === registrationId);
+    if (!registration) {
+      setFormData(prev => ({ ...prev, assessmentRegistrationId: '', lines: [] }));
+      return;
+    }
+
+    const student = students.find(s => s.id === registration.studentId);
+    const qualification = qualifications.find(q => q.id === registration.qualificationId);
+    const assessmentFees = courseFees.filter(f =>
+      f.qualificationId === registration.qualificationId &&
+      f.isActive &&
+      !f.isDeleted &&
+      f.category === 'ASSESSMENT'
+    );
+
+    const feeSources = assessmentFees.length > 0
+      ? assessmentFees
+      : [{
+          id: '',
+          feeName: `Assessment Fee - ${qualification?.name || 'Qualification'}`,
+          amount: Number(registration.totalFees || 0),
+          glAccountId: undefined,
+          taxCategoryId: undefined
+        } as Partial<CourseFee>];
+
+    const lines: InvoiceLine[] = feeSources.map((fee, idx) => {
+      const amount = Number(fee.amount || 0);
+      const draftLine = {
+        id: generateUUID(),
+        invoiceId: editingInvoice?.id || '',
+        orgId,
+        lineNumber: idx + 1,
+        description: fee.feeName || `Assessment Fee - ${qualification?.name || 'Qualification'}`,
+        courseFeeId: fee.id || undefined,
+        assessmentRegistrationId: registration.id,
+        quantity: 1,
+        unitPrice: amount,
+        amount,
+        netAmount: amount,
+        vatAmount: 0,
+        grossAmount: amount,
+        glAccountId: fee.glAccountId,
+        taxCategoryId: fee.taxCategoryId || '',
+        classificationCode: qualification?.code || getClassificationCode(fee.glAccountId)
+      } as InvoiceLine;
+      const computed = computeAmounts(draftLine);
+      return { ...draftLine, ...computed };
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      assessmentRegistrationId: registration.id,
+      batchId: '',
+      enrollmentId: '',
+      sponsorId: '',
+      studentId: registration.studentId,
+      notes: prev.notes || `Assessment-only billing: ${student ? `${student.firstName} ${student.lastName}` : 'Candidate'} - ${qualification?.name || 'Qualification'}`,
+      lines
     }));
   };
 
   // Add line
-  const handleAddLine = () => {
+  const handleAddLine = (lineType: 'DISCOUNT' | 'ADJUSTMENT' | 'MANUAL' = 'MANUAL') => {
+    const defaultUnitPrice = lineType === 'DISCOUNT' ? -1 : 0;
     const newLine: InvoiceLine = {
       id: generateUUID(),
       invoiceId: editingInvoice?.id || '',
       orgId,
       lineNumber: formData.lines.length + 1,
       description: '',
+      lineType: lineType as any,
       quantity: 1,
-      unitPrice: 0,
+      unitPrice: defaultUnitPrice,
       netAmount: 0,
       vatAmount: 0,
       grossAmount: 0,
-      amount: 0,
+      amount: lineType === 'DISCOUNT' ? -1 : 0,
       taxCategoryId: '',
       classificationCode: ''
     };
+    const computed = computeAmounts(newLine);
+    Object.assign(newLine, computed);
     setFormData(prev => ({ ...prev, lines: [...prev.lines, newLine] }));
   };
 
@@ -655,6 +886,7 @@ const brandColor = organization?.primaryColor || '#059669';
     const columns = lineColOrder.map(colKey => {
       switch (colKey) {
         case 'lineNumber': return { label: '#', getter: (line: InvoiceLine) => line.lineNumber };
+        case 'lineType': return { label: 'Type', getter: (line: InvoiceLine) => getLineType(line) };
         case 'classificationCode': return { label: 'Class', getter: (line: InvoiceLine) => line.classificationCode || '-' };
         case 'courseFeeId': return { label: 'Course Fee', getter: (line: InvoiceLine) => courseFees.find(cf => cf.id === line.courseFeeId)?.feeName || (line.courseFeeId || '-') };
         case 'description': return { label: 'Description', getter: (line: InvoiceLine) => line.description || '-' };
@@ -739,7 +971,7 @@ const brandColor = organization?.primaryColor || '#059669';
     const price = line.unitPrice || 0;
     // start with qty*price but allow explicit override
     let base = Math.round(qty * price * 100) / 100;
-    if (line.amount && line.amount > 0) {
+    if (line.amount !== undefined && line.amount !== null && Number(line.amount) !== 0) {
       base = line.amount;
     }
 
@@ -769,18 +1001,26 @@ const brandColor = organization?.primaryColor || '#059669';
           lines[index].classificationCode = getClassificationCode(value as string);
       }
 
-      // when qty or unit price change, we may want to autoâ€‘populate the amount
-      if ((field === 'quantity' || field === 'unitPrice')) {
-        // only update the amount if the user hasn't already overridden it (i.e. it's zero)
-        if (!lines[index].amount) {
-          const qty = lines[index].quantity || 0;
-          const upr = lines[index].unitPrice || 0;
-          lines[index].amount = Math.round(qty * upr * 100) / 100;
+      if (field === 'lineType') {
+        const nextType = String(value || 'MANUAL').toUpperCase();
+        if (nextType === 'COURSE_FEE' && !lines[index].courseFeeId) {
+          lines[index].lineType = 'MANUAL' as any;
+        }
+        if (nextType === 'DISCOUNT' && Number(lines[index].amount || 0) > 0) {
+          lines[index].amount = -Math.abs(Number(lines[index].amount || 0));
+          lines[index].unitPrice = -Math.abs(Number(lines[index].unitPrice || lines[index].amount || 0));
         }
       }
 
+      // when qty or unit price change, we may want to autoâ€‘populate the amount
+      if ((field === 'quantity' || field === 'unitPrice')) {
+        const qty = lines[index].quantity || 0;
+        const upr = lines[index].unitPrice || 0;
+        lines[index].amount = Math.round(qty * upr * 100) / 100;
+      }
+
       // Recompute net/vat/gross when any of the relevant fields change
-      if (field === 'quantity' || field === 'unitPrice' || field === 'taxCategoryId' || field === 'amount') {
+      if (field === 'quantity' || field === 'unitPrice' || field === 'taxCategoryId' || field === 'amount' || field === 'lineType') {
         const { netAmount, vatAmount, grossAmount } = computeAmounts(lines[index]);
         lines[index].netAmount = netAmount;
         lines[index].vatAmount = vatAmount;
@@ -804,13 +1044,19 @@ const brandColor = organization?.primaryColor || '#059669';
   const handleApplyCourseFee = (index: number, courseFeeId: string) => {
     const fee = courseFees.find(f => f.id === courseFeeId);
     if (fee) {
-      const sponsor = sponsors.find(s => s.id === formData.sponsorId);
-      const qty = formData.lines[index].quantity || 1;
+      const selectedBatch = batches.find(batch => batch.id === formData.batchId);
+      const batchQty = selectedBatch
+        ? (getSponsoredBatchEnrolledQuantity(selectedBatch, formData.sponsorId) ||
+          BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), selectedBatch.id))
+        : 0;
+      const qty = batchQty || formData.lines[index].quantity || 1;
       const unitPrice = fee.amount || 0;
+      const amount = Math.round(qty * unitPrice * 100) / 100;
       const tempLine: InvoiceLine = {
         ...formData.lines[index],
         quantity: qty,
         unitPrice,
+        amount,
         taxCategoryId: fee.taxCategoryId || formData.lines[index].taxCategoryId || ''
       };
       const { netAmount, vatAmount, grossAmount } = computeAmounts(tempLine);
@@ -819,12 +1065,14 @@ const brandColor = organization?.primaryColor || '#059669';
       updatedLines[index] = {
         ...updatedLines[index],
         courseFeeId,
+        lineType: 'COURSE_FEE' as any,
         description: fee.feeName,
+        quantity: qty,
         unitPrice,
         netAmount,
         vatAmount,
         grossAmount,
-        amount: netAmount,
+        amount,
         glAccountId: fee.glAccountId || updatedLines[index].glAccountId,
         taxCategoryId: fee.taxCategoryId || updatedLines[index].taxCategoryId,
         classificationCode: getClassificationCode(fee.glAccountId || updatedLines[index].glAccountId)
@@ -832,6 +1080,20 @@ const brandColor = organization?.primaryColor || '#059669';
 
       setFormData(prev => ({ ...prev, lines: updatedLines }));
     }
+  };
+
+  const markAssessmentRegistrationBilled = (invoice: Invoice) => {
+    if (!invoice.assessmentRegistrationId || !onUpdateAssessmentRegistration) return;
+    const registration = assessmentRegistrations.find(r => r.id === invoice.assessmentRegistrationId);
+    if (!registration) return;
+    onUpdateAssessmentRegistration({
+      ...registration,
+      status: 'BILLED',
+      billingStatus: 'BILLED',
+      billedAmount: invoice.grandTotal,
+      invoiceId: invoice.id,
+      updatedAt: new Date().toISOString()
+    });
   };
 
   // Save invoice
@@ -857,8 +1119,14 @@ const brandColor = organization?.primaryColor || '#059669';
       alert('Transaction description is required before saving the invoice.');
       return;
     }
+    const invoiceLineRuleIssues = validateInvoiceLineRules(formData);
+    if (invoiceLineRuleIssues.length > 0) {
+      alert(invoiceLineRuleIssues.join('\n'));
+      return;
+    }
 
-    const totals = calculateTotals(formData.lines);
+    const invoiceLines = getBatchContractAdjustedLines(formData.lines, formData.batchId, formData.sponsorId);
+    const totals = calculateTotals(invoiceLines);
 
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
@@ -867,6 +1135,7 @@ const brandColor = organization?.primaryColor || '#059669';
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       enrollmentId: formData.enrollmentId || undefined,
+      assessmentRegistrationId: formData.assessmentRegistrationId || undefined,
       batchId: formData.batchId || undefined,
       invoiceDate: formData.invoiceDate,
       dueDate: formData.dueDate,
@@ -883,7 +1152,7 @@ const brandColor = organization?.primaryColor || '#059669';
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: String(formData.notes || '').trim() || undefined,
-      lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
+      lines: invoiceLines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '', assessmentRegistrationId: l.assessmentRegistrationId || formData.assessmentRegistrationId || undefined })),
       createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -894,6 +1163,7 @@ const brandColor = organization?.primaryColor || '#059669';
     } else {
       onAddInvoice(invoice);
     }
+    markAssessmentRegistrationBilled(invoice);
 
     resetForm();
     setViewMode('LIST');
@@ -922,8 +1192,14 @@ const brandColor = organization?.primaryColor || '#059669';
       alert('Transaction description is required before approving the invoice.');
       return;
     }
+    const invoiceLineRuleIssues = validateInvoiceLineRules(formData);
+    if (invoiceLineRuleIssues.length > 0) {
+      alert(invoiceLineRuleIssues.join('\n'));
+      return;
+    }
 
-    const totals = calculateTotals(formData.lines);
+    const invoiceLines = getBatchContractAdjustedLines(formData.lines, formData.batchId, formData.sponsorId);
+    const totals = calculateTotals(invoiceLines);
 
     const invoice: Invoice = {
       id: editingInvoice?.id || generateUUID(),
@@ -932,6 +1208,7 @@ const brandColor = organization?.primaryColor || '#059669';
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       enrollmentId: formData.enrollmentId || undefined,
+      assessmentRegistrationId: formData.assessmentRegistrationId || undefined,
       batchId: formData.batchId || undefined,
       invoiceDate: formData.invoiceDate,
       dueDate: formData.dueDate,
@@ -948,7 +1225,7 @@ const brandColor = organization?.primaryColor || '#059669';
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: String(formData.notes || '').trim() || undefined,
-      lines: formData.lines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '' })),
+      lines: invoiceLines.map(l => ({ ...l, invoiceId: editingInvoice?.id || '', assessmentRegistrationId: l.assessmentRegistrationId || formData.assessmentRegistrationId || undefined })),
       createdBy: editingInvoice?.createdBy,
       createdAt: editingInvoice?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -960,6 +1237,7 @@ const brandColor = organization?.primaryColor || '#059669';
     } else {
       onAddInvoice(invoice);
     }
+    markAssessmentRegistrationBilled(invoice);
 
     resetForm();
     setViewMode('LIST');
@@ -970,7 +1248,9 @@ const brandColor = organization?.primaryColor || '#059669';
     // Subsidiary Ledger: For sponsor-billed invoices, create StudentLedger entries for each student in the batch
     if (invoice.sponsorId && onAddStudentLedgerEntry) {
       // Find all enrollments for this sponsor and batch
-      const coveredEnrollments = enrollments.filter(e => e.sponsorId === invoice.sponsorId && (!invoice.batchId || e.batchId === invoice.batchId));
+      const coveredEnrollments = getBillableSponsoredEnrollments(
+        enrollments.filter(e => e.sponsorId === invoice.sponsorId && (!invoice.batchId || e.batchId === invoice.batchId))
+      );
       // Distribute netAmountDue equally if possible, else use enrollment.feeAmount or fallback
       const perStudentAmount = coveredEnrollments.length > 0 ? invoice.netAmountDue / coveredEnrollments.length : 0;
       coveredEnrollments.forEach(e => {
@@ -1912,13 +2192,22 @@ const brandColor = organization?.primaryColor || '#059669';
           credit: netRevenue,
           missing: !account,
         });
+      } else if (netRevenue < 0) {
+        lines.push({
+          key: `disc-${line.id || idx}`,
+          accountLabel: getAccountLabel(account, 'Discount/Adjustment Account Not Set'),
+          description: line.description || `Invoice line ${idx + 1}`,
+          debit: Math.abs(netRevenue),
+          credit: 0,
+          missing: !account,
+        });
       }
     });
 
     const vatGrouped = new Map<string, { account?: ChartOfAccount; amount: number }>();
     formData.lines.forEach(line => {
       const amount = Number(line.vatAmount || 0);
-      if (amount <= 0) return;
+      if (Math.abs(amount) <= 0.01) return;
       const taxCat = localTaxCats.find(tc => tc.id === line.taxCategoryId);
       const account = accounts.find(a => a.id === taxCat?.outputAccountId) || fallbackVatAccount;
       const key = account?.id || 'missing-vat';
@@ -1928,12 +2217,13 @@ const brandColor = organization?.primaryColor || '#059669';
     });
 
     vatGrouped.forEach((entry, key) => {
+      const amount = Math.round(entry.amount * 100) / 100;
       lines.push({
         key: `vat-${key}`,
         accountLabel: getAccountLabel(entry.account, 'Output VAT Account Not Set'),
         description: `Output VAT: ${formData.invoiceNo}`,
-        debit: 0,
-        credit: Math.round(entry.amount * 100) / 100,
+        debit: amount < 0 ? Math.abs(amount) : 0,
+        credit: amount > 0 ? amount : 0,
         missing: !entry.account,
       });
     });
@@ -1953,10 +2243,10 @@ const brandColor = organization?.primaryColor || '#059669';
   const unbilledEnrollmentsBySponsor = useMemo(() => {
     const grouped = new Map<string, Enrollment[]>();
 
-    enrollments
-      .filter(e => !e.isDeleted && e.billingStatus === 'UNBILLED' && e.sponsorId)
+    getBillableSponsoredEnrollments(enrollments.filter(e => e.billingStatus === 'UNBILLED'))
       .forEach(e => {
-        const sponsorId = e.sponsorId!;
+        const sponsorId = getEnrollmentSponsorId(e);
+        if (!sponsorId) return;
         if (!grouped.has(sponsorId)) {
           grouped.set(sponsorId, []);
         }
@@ -1964,7 +2254,7 @@ const brandColor = organization?.primaryColor || '#059669';
       });
 
     return grouped;
-  }, [enrollments]);
+  }, [enrollments, batches]);
 
   // Get sponsors with unbilled enrollments
   const sponsorsWithUnbilledEnrollments = useMemo(() => {
@@ -1992,6 +2282,18 @@ const brandColor = organization?.primaryColor || '#059669';
     return getBillableStudentsForBatch(formData.batchId, editingInvoice?.studentId || formData.studentId);
   }, [formData.batchId, formData.studentId, editingInvoice?.studentId, enrollments, students, batches, invoices, editingInvoice?.id]);
 
+  const selectableAssessmentRegistrations = useMemo(() => {
+    return assessmentRegistrations.filter(registration =>
+      !registration.isDeleted &&
+      registration.status !== 'CANCELLED' &&
+      (
+        registration.billingStatus !== 'BILLED' ||
+        registration.id === formData.assessmentRegistrationId ||
+        registration.id === editingInvoice?.assessmentRegistrationId
+      )
+    );
+  }, [assessmentRegistrations, formData.assessmentRegistrationId, editingInvoice?.assessmentRegistrationId]);
+
   // Get unbilled enrollments for selected sponsor
   const unbilledEnrollmentsForSponsor = useMemo(() => {
     if (!selectedSponsorId) return [];
@@ -2001,7 +2303,7 @@ const brandColor = organization?.primaryColor || '#059669';
   // Calculate preview totals for selected enrollments
   const generatePreviewTotals = useMemo(() => {
     if (selectedEnrollmentIds.size === 0) {
-      return { subtotal: 0, vatAmount: 0, grandTotal: 0, netAmountDue: 0, lineItems: [], vatPricing: 'EXEMPT', vatRate: 0 };
+      return { subtotal: 0, vatAmount: 0, grandTotal: 0, netAmountDue: 0, lineItems: [], vatPricing: 'EXEMPT' as const, vatRate: 0 };
     }
 
     const sponsor = sponsors.find(s => s.id === selectedSponsorId);
@@ -2021,46 +2323,83 @@ const brandColor = organization?.primaryColor || '#059669';
     });
 
     let subtotal = 0;
-    const lineItems: { description: string; quantity: number; unitPrice: number; netAmount: number; vatAmount: number; grossAmount: number }[] = [];
+    const lineItems: {
+      batchId?: string;
+      courseFeeId?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      netAmount: number;
+      vatAmount: number;
+      grossAmount: number;
+      amount: number;
+      glAccountId?: string;
+      taxCategoryId?: string;
+      classificationCode?: string;
+    }[] = [];
 
     enrollmentsByBatch.forEach((batchEnrollments, batchId) => {
       const batch = batches.find(b => b.id === batchId);
       const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
-      const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive && !cf.isDeleted);
+      const quantity = batch
+        ? BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id)
+        : batchEnrollments.length;
+      const activeCourseFees = courseFees.filter(cf =>
+        cf.qualificationId === batch?.qualificationId &&
+        cf.isActive &&
+        !cf.isDeleted
+      );
+      const feeSources: Array<Partial<CourseFee>> = activeCourseFees.length > 0
+        ? activeCourseFees
+        : [{
+            feeName: qualification
+              ? `${qualification.name} - ${batch?.batchCode || 'Batch'}`
+              : `Training Fee - ${batch?.batchCode || 'Unknown Batch'}`,
+            amount: batchEnrollments[0]?.totalFees || 0
+          }];
 
-      const unitPrice = courseFee?.amount || (batchEnrollments[0]?.totalFees || 0);
-      const quantity = batchEnrollments.length;
+      feeSources.forEach(fee => {
+        const unitPrice = Number(fee.amount || 0);
+        const amount = Math.round(quantity * unitPrice * 100) / 100;
+        const tempLine: InvoiceLine = {
+          id: '',
+          orgId,
+          lineNumber: 0,
+          description: fee.feeName || '',
+          courseFeeId: fee.id,
+          lineType: 'COURSE_FEE' as any,
+          quantity,
+          unitPrice,
+          netAmount: amount,
+          vatAmount: 0,
+          grossAmount: amount,
+          amount,
+          glAccountId: fee.glAccountId,
+          taxCategoryId: fee.taxCategoryId || ''
+        } as any;
+        const { netAmount, vatAmount, grossAmount } = computeAmounts(tempLine);
 
-      // determine a tax category for this fee if provided
-      const tempLine: InvoiceLine = {
-        id: '',
-        orgId,
-        lineNumber: 0,
-        description: '',
-        quantity,
-        unitPrice,
-        netAmount: 0,
-        vatAmount: 0,
-        grossAmount: 0,
-        amount: 0,
-        taxCategoryId: courseFee?.taxCategoryId || ''
-      } as any;
-      const { netAmount, vatAmount, grossAmount } = computeAmounts(tempLine);
+        const description = qualification
+          ? `${fee.feeName || qualification.name} - ${batch?.batchCode || 'Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`
+          : `${fee.feeName || 'Training Fee'} - ${batch?.batchCode || 'Unknown Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`;
 
-      const description = qualification
-        ? `${qualification.name} - ${batch?.batchCode || 'Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`
-        : `Training Fee - ${batch?.batchCode || 'Unknown Batch'} (${quantity} student${quantity > 1 ? 's' : ''})`;
+        lineItems.push({
+          batchId,
+          courseFeeId: fee.id,
+          description,
+          quantity,
+          unitPrice,
+          netAmount,
+          vatAmount,
+          grossAmount,
+          amount: grossAmount,
+          glAccountId: fee.glAccountId,
+          taxCategoryId: fee.taxCategoryId,
+          classificationCode: qualification?.code || getClassificationCode(fee.glAccountId)
+        });
 
-      lineItems.push({
-        description,
-        quantity,
-        unitPrice,
-        netAmount,
-        vatAmount,
-        grossAmount
+        subtotal += netAmount;
       });
-
-      subtotal += netAmount;
     });
 
     const vatAmount = lineItems.reduce((sum, l) => sum + l.vatAmount, 0);
@@ -2124,23 +2463,31 @@ const brandColor = organization?.primaryColor || '#059669';
     const invoiceLines: InvoiceLine[] = lineItems.map((item, idx) => ({
       id: generateUUID(),
       invoiceId: '', // Will be set below
+      orgId,
       lineNumber: idx + 1,
       description: item.description,
+      courseFeeId: item.courseFeeId,
+      lineType: 'COURSE_FEE' as any,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       netAmount: item.netAmount,
       vatAmount: item.vatAmount,
       grossAmount: item.grossAmount,
-      amount: item.grossAmount // Use grossAmount for line item amount
+      amount: item.grossAmount, // Use grossAmount for line item amount
+      glAccountId: item.glAccountId,
+      taxCategoryId: item.taxCategoryId,
+      classificationCode: item.classificationCode
     }));
 
     // Create the invoice
     const invoiceId = generateUUID();
+    const selectedBatchIds = Array.from(new Set(lineItems.map(item => item.batchId).filter(Boolean))) as string[];
     const invoice: Invoice = {
       id: invoiceId,
-      orgId: '',
+      orgId,
       invoiceNo: generateInvoiceNo(),
       sponsorId: selectedSponsorId,
+      batchId: selectedBatchIds.length === 1 ? selectedBatchIds[0] : undefined,
       invoiceDate: generateInvoiceDate,
       dueDate: generateDueDate,
       status: 'ON_HOLD',
@@ -2882,11 +3229,33 @@ const brandColor = organization?.primaryColor || '#059669';
                 <div className="space-y-8 min-w-0">
               {/* Batch / Sponsor / Dates row */}
               <div className="bg-brand/5 rounded-lg p-4 border border-brand/20">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
+
+                  <div className="min-w-0 lg:col-span-4">
+                    <label className="text-xs font-medium text-gray-500">Walk-in Assessment Candidate</label>
+                    <select
+                      value={formData.assessmentRegistrationId}
+                      onChange={e => handleAssessmentRegistrationChange(e.target.value)}
+                      disabled={isReadOnly}
+                      className="mt-1 px-3 py-2 border border-brand/20 rounded-lg focus:ring-2 focus:ring-brand/30 focus:border-brand w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="">-- Select walk-in candidate --</option>
+                      {selectableAssessmentRegistrations.map(registration => {
+                        const student = students.find(s => s.id === registration.studentId);
+                        const qualification = qualifications.find(q => q.id === registration.qualificationId);
+                        return (
+                          <option key={registration.id} value={registration.id}>
+                            {student ? `${student.lastName}, ${student.firstName}` : 'Candidate'} - {qualification?.name || 'Qualification'} ({registration.registrationCode || registration.id})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-brand mt-1">Select the registered walk-in candidate to bill assessment fees without a training batch.</p>
+                  </div>
 
                   {/* batch in center */}
-                  <div>
-                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Sponsored batches hide after billing; private batches stay until every student is billed.</p>
+                  <div className="min-w-0 lg:col-span-4">
+                    <label className="text-xs font-medium text-gray-500">Select Batch</label>
                     <select
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
@@ -2898,18 +3267,19 @@ const brandColor = organization?.primaryColor || '#059669';
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
+                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Sponsored batches hide after billing; private batches stay until every student is billed.</p>
                   </div>
                   {/* sponsor and student side by side */}
-                  <div className="flex gap-4 items-end">
-                    <div className="flex-1">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-4">
+                    <div className="min-w-0">
                       <label className="text-xs font-medium text-gray-500">Sponsor</label>
                       <select
                         value={formData.sponsorId}
                         onChange={e => {
                           handleSponsorChange(e.target.value);
-                          if (e.target.value) setFormData(prev => ({ ...prev, studentId: '' }));
+                          if (e.target.value) setFormData(prev => ({ ...prev, studentId: '', assessmentRegistrationId: prev.assessmentRegistrationId || '' }));
                         }}
-                        disabled={!!formData.studentId || isReadOnly}
+                        disabled={(!!formData.studentId && !formData.assessmentRegistrationId) || isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <option value="">-- Auto-filled if Batch is selected --</option>
@@ -2918,14 +3288,14 @@ const brandColor = organization?.primaryColor || '#059669';
                         ))}
                       </select>
                     </div>
-                    <div className="flex-1">
+                    <div className="min-w-0">
                       <label className="text-xs font-medium text-gray-500">Student</label>
                       <select
                         value={formData.studentId}
                         onChange={e => {
-                          setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '' }));
+                          setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '', assessmentRegistrationId: prev.assessmentRegistrationId && e.target.value ? prev.assessmentRegistrationId : '' }));
                         }}
-                        disabled={!!formData.sponsorId || isReadOnly}
+                        disabled={(!!formData.sponsorId && !formData.assessmentRegistrationId) || isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <option value="">-- Select Student --</option>
@@ -2939,7 +3309,7 @@ const brandColor = organization?.primaryColor || '#059669';
                     </div>
                   </div>
                   {/* dates on right */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-4">
                     <div>
                       <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
                       <input
@@ -3113,11 +3483,18 @@ const brandColor = organization?.primaryColor || '#059669';
                       <FileSpreadsheet size={16} /> Export Line Items
                     </button>
                     <button
-                      onClick={handleAddLine}
+                      onClick={() => handleAddLine('MANUAL')}
                       disabled={isReadOnly}
                       className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-dashed hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus size={16} /> Add Line
+                    </button>
+                    <button
+                      onClick={() => handleAddLine('DISCOUNT')}
+                      disabled={isReadOnly}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Scissors size={16} /> Discount
                     </button>
                   </div>
                 </div>
@@ -3136,6 +3513,7 @@ const brandColor = organization?.primaryColor || '#059669';
                         {(() => {
                           const lineColDefs = {
                             lineNumber: { key: 'lineNumber', label: '#', align: 'text-left', width: 40 },
+                            lineType: { key: 'lineType', label: 'Type', align: 'text-left', width: 110 },
                             classificationCode: { key: 'classificationCode', label: 'Class', align: 'text-left', width: 120 },
                             courseFeeId: { key: 'courseFeeId', label: 'Course Fee', align: 'text-left', width: 120 },
                             description: { key: 'description', label: 'Description', align: 'text-left', width: 180 },
@@ -3233,6 +3611,7 @@ const brandColor = organization?.primaryColor || '#059669';
                           // Render cells in the current column order
                           const lineColDefs = {
                             lineNumber: { key: 'lineNumber' },
+                            lineType: { key: 'lineType' },
                             classificationCode: { key: 'classificationCode' },
                             courseFeeId: { key: 'courseFeeId' },
                             description: { key: 'description' },
@@ -3279,6 +3658,20 @@ const brandColor = organization?.primaryColor || '#059669';
                                 switch (colKey) {
                                   case 'lineNumber':
                                     return <td key={colKey} className="px-3 py-2 text-gray-400" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>{line.lineNumber}</td>;
+                                  case 'lineType':
+                                    return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
+                                      <select
+                                        value={getLineType(line)}
+                                        onChange={e => handleUpdateLine(idx, 'lineType', e.target.value as any)}
+                                        disabled={isReadOnly || getLineType(line) === 'COURSE_FEE'}
+                                        className="w-full px-2 py-1 rounded text-[12px] font-semibold text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                      >
+                                        <option value="COURSE_FEE">COURSE FEE</option>
+                                        <option value="DISCOUNT">DISCOUNT</option>
+                                        <option value="ADJUSTMENT">ADJUSTMENT</option>
+                                        <option value="MANUAL">MANUAL</option>
+                                      </select>
+                                    </td>;
                                   case 'classificationCode': {
                                     // Find qualification code via courseFeeId
                                     let qualCode = '';
@@ -3338,9 +3731,9 @@ const brandColor = organization?.primaryColor || '#059669';
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <input
                                         type="number"
-                                        min="1"
+                                        min="0"
                                         value={line.quantity}
-                                        onChange={e => handleUpdateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
+                                        onChange={e => handleUpdateLine(idx, 'quantity', Math.max(parseInt(e.target.value) || 0, 0))}
                                         disabled={isReadOnly}
                                         className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       />

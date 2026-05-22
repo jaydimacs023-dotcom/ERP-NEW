@@ -210,13 +210,23 @@ Deno.serve(async (req) => {
     if (invoice.org_id !== actorOrgId) return json(403, { error: "Cross-org invoice access denied" });
 
     const now = new Date().toISOString();
+    const availableDepositBalance = Math.max(Number(payment.customer_deposit_balance || 0), 0);
+    const appliedAmount = Number(amountApplied || 0);
+    if (availableDepositBalance + 0.01 < appliedAmount) {
+      return json(400, {
+        error: "Payment application exceeds available unapplied customer deposit balance",
+        availableDepositBalance,
+        amountApplied: appliedAmount,
+      });
+    }
+    const projectedDepositBalance = Math.max(availableDepositBalance - appliedAmount, 0);
 
     const { data: application, error: appErr } = await admin
       .from("payment_applications")
       .insert({
         payment_id: paymentId,
         invoice_id: invoiceId,
-        amount_applied: amountApplied,
+        amount_applied: appliedAmount,
         is_reversed: false,
         created_at: now,
         updated_at: now,
@@ -230,8 +240,8 @@ Deno.serve(async (req) => {
     await admin
       .from("payments")
       .update({
-        total_applied: Number(payment.total_applied || 0) + Number(amountApplied),
-        customer_deposit_balance: Number(payment.customer_deposit_balance || 0) - Number(amountApplied),
+        total_applied: Number(payment.total_applied || 0) + appliedAmount,
+        customer_deposit_balance: projectedDepositBalance,
         updated_at: now,
         updated_by: actorUserId,
       })
@@ -241,8 +251,8 @@ Deno.serve(async (req) => {
     await admin
       .from("invoices")
       .update({
-        amount_paid: Number(invoice.amount_paid || 0) + Number(amountApplied),
-        balance_due: Math.max(Number(invoice.balance_due || 0) - Number(amountApplied), 0),
+        amount_paid: Number(invoice.amount_paid || 0) + appliedAmount,
+        balance_due: Math.max(Number(invoice.balance_due || 0) - appliedAmount, 0),
         updated_at: now,
       })
       .eq("id", invoiceId)

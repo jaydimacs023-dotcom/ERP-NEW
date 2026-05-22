@@ -1,6 +1,6 @@
 
 import { IDataService, InitialData, TrainerUsageCheck, QualificationUsageCheck, LocationUsageCheck, ScheduleUsageCheck, SponsorUsageCheck } from './IDataService';
-import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport, Invoice, InvoiceLine, Enrollment, TaxCategoryEntry, FixedAsset, Vendor, Bill, Payable, BankAccount, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate, StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint, RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, CourseFee, PayrollRun, PayrollLine, Employee, AuditLog, PurchaseOrder, CheckVoucher } from '../types';
+import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport, Invoice, InvoiceLine, Enrollment, AssessmentRegistration, TaxCategoryEntry, FixedAsset, Vendor, Bill, Payable, BankAccount, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate, StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint, RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, CourseFee, PayrollRun, PayrollLine, Employee, AuditLog, PurchaseOrder, CheckVoucher } from '../types';
 
 /**
  * MockDataService - Empty Data Service
@@ -54,6 +54,7 @@ export class MockDataService implements IDataService {
       invoices: [],
       invoiceLines: [],
       enrollments: [],
+      assessmentRegistrations: [],
       taxCategories: []
     };
   }
@@ -230,6 +231,25 @@ export class MockDataService implements IDataService {
   async checkSponsorUsage(sponsorId: string): Promise<SponsorUsageCheck> {
     console.warn('[MockDataService] Checking sponsor usage in mock mode');
     return { isUsed: false, usedIn: [] };
+  }
+
+  async createAssessmentRegistration(registration: AssessmentRegistration): Promise<AssessmentRegistration> {
+    console.warn('[MockDataService] Assessment registrations persist to memory only; changes lost on refresh');
+    return registration;
+  }
+
+  async updateAssessmentRegistration(id: string, updates: Partial<AssessmentRegistration>): Promise<AssessmentRegistration> {
+    console.warn('[MockDataService] Assessment registrations persist to memory only; changes lost on refresh');
+    return { id, ...updates } as AssessmentRegistration;
+  }
+
+  async deleteAssessmentRegistration(id: string): Promise<void> {
+    console.warn('[MockDataService] Assessment registrations persist to memory only; changes lost on refresh');
+  }
+
+  async getAssessmentRegistrationsByOrg(orgId: string): Promise<AssessmentRegistration[]> {
+    console.warn('[MockDataService] Assessment registrations persist to memory only; changes lost on refresh');
+    return [];
   }
 
   // Vendor CRUD

@@ -175,6 +175,9 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
             const courseText = `${course?.name || ''} ${course?.code || ''} ${course?.batchCode || ''}`.toLowerCase();
             const matchesSearch = studentName.includes(searchTerm.toLowerCase()) ||
                 (report.employerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (report.employerAddress || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (report.position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (report.salaryRange || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                 courseText.includes(searchTerm.toLowerCase());
 
             const matchesStatus = statusFilter === 'ALL' || report.employmentStatus === statusFilter;
@@ -201,7 +204,9 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
     }, [filteredReports, currentPage]);
 
     const handleExport = () => {
-        const headers = ['Student', 'Email', 'Employment Status', 'Employer', 'Position', 'Type', 'Hired Date', 'Related to Course'];
+        const escapeCsv = (value: string | number | boolean | undefined | null) =>
+            `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const headers = ['Student', 'Email', 'Employment Status', 'Employer', 'Employer Address', 'Position', 'Type', 'Salary', 'Hired Date', 'Related to Course'];
         const rows = filteredReports.map(r => {
             const s = students.find(stud => stud.id === r.studentId);
             return [
@@ -209,14 +214,16 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                 s?.email || '',
                 r.employmentStatus,
                 r.employerName || 'N/A',
+                r.employerAddress || 'N/A',
                 r.position || 'N/A',
                 r.employmentType || 'N/A',
+                r.salaryRange || 'N/A',
                 r.dateHired || 'N/A',
                 r.isRelatedToCourse ? 'Yes' : 'No'
-            ].join(',');
+            ].map(escapeCsv).join(',');
         });
 
-        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.map(escapeCsv).join(','), ...rows].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -228,6 +235,20 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const isEmployed =
+            formData.employmentStatus === AlumniEmploymentStatus.EMPLOYED ||
+            formData.employmentStatus === AlumniEmploymentStatus.SELF_EMPLOYED;
+
+        if (isEmployed && (
+            !formData.employerName?.trim() ||
+            !formData.employerAddress?.trim() ||
+            !formData.position?.trim() ||
+            !formData.salaryRange?.trim() ||
+            !formData.dateHired
+        )) {
+            return;
+        }
+
         if (editingReport) {
             onUpdateReport({ ...editingReport, ...formData } as AlumniEmploymentReport);
         } else {
@@ -410,7 +431,22 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                     report.employmentStatus === AlumniEmploymentStatus.SELF_EMPLOYED;
 
                                 return (
-                                    <tr key={report.id} className="hover:bg-gray-50/50 transition-colors group">
+                                    <tr
+                                        key={report.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => { setEditingReport(report); setFormData(report); setShowModal(true); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setEditingReport(report);
+                                                setFormData(report);
+                                                setShowModal(true);
+                                            }
+                                        }}
+                                        className="hover:bg-gray-50/50 transition-colors group cursor-pointer focus:outline-none focus:bg-gray-50"
+                                        title="Open alumni employment details"
+                                    >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 bg-brand/10 text-brand rounded-full flex items-center justify-center font-bold text-xs border border-brand-light shadow-sm">
@@ -442,10 +478,16 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                             {isEmployed ? (
                                                 <div>
                                                     <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
-                                                        <Building2 size={14} className="text-gray-400" /> {report.employerName}
+                                                        <Building2 size={14} className="text-gray-400" /> {report.employerName || 'Employer not recorded'}
                                                     </p>
                                                     <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-                                                        <Briefcase size={12} /> {report.position} ({report.employmentType})
+                                                        <Briefcase size={12} /> {report.position || 'Position not recorded'} ({report.employmentType || 'Type not recorded'})
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                                                        <DollarSign size={12} /> {report.salaryRange || 'Salary not recorded'}
+                                                    </p>
+                                                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5 max-w-[240px] truncate">
+                                                        <MapPin size={12} /> {report.employerAddress || 'Address not recorded'}
                                                     </p>
                                                 </div>
                                             ) : (
@@ -460,9 +502,9 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                     }`}>
                                                     {report.employmentStatus}
                                                 </span>
-                                                {report.dateHired && (
+                                                {(report.dateHired || isEmployed) && (
                                                     <p className="text-[10px] text-gray-400 font-semibold flex items-center gap-1">
-                                                        <Calendar size={10} /> Hired: {new Date(report.dateHired).toLocaleDateString()}
+                                                        <Calendar size={10} /> Hired: {report.dateHired ? new Date(report.dateHired).toLocaleDateString() : 'Not recorded'}
                                                     </p>
                                                 )}
                                                 {report.isRelatedToCourse && (
@@ -475,8 +517,14 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end items-center gap-2">
                                                 <button
-                                                    onClick={() => { setEditingReport(report); setFormData(report); setShowModal(true); }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingReport(report);
+                                                        setFormData(report);
+                                                        setShowModal(true);
+                                                    }}
                                                     className="p-1.5 hover:bg-brand-light text-gray-400 hover:text-brand rounded transition-all"
+                                                    title="Open details"
                                                 >
                                                     <ExternalLink size={16} />
                                                 </button>
@@ -617,36 +665,40 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="md:col-span-2">
-                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Employer Name / Company</label>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Employer Name / Company *</label>
                                                 <input
                                                     type="text"
+                                                    required
                                                     value={formData.employerName || ''}
                                                     onChange={(e) => setFormData({ ...formData, employerName: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Position / Job Title</label>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Position / Job Title *</label>
                                                 <input
                                                     type="text"
+                                                    required
                                                     value={formData.position || ''}
                                                     onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Hiring Date</label>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Hiring Date *</label>
                                                 <input
                                                     type="date"
+                                                    required
                                                     value={formData.dateHired || ''}
                                                     onChange={(e) => setFormData({ ...formData, dateHired: e.target.value })}
                                                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:border-brand outline-none transition-all font-semibold"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Salary Range (Monthly)</label>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Salary Range (Monthly) *</label>
                                                 <input
                                                     type="text"
+                                                    required
                                                     placeholder="e.g. 20k - 30k"
                                                     value={formData.salaryRange || ''}
                                                     onChange={(e) => setFormData({ ...formData, salaryRange: e.target.value })}
@@ -666,8 +718,9 @@ const AlumniEmploymentView: React.FC<AlumniEmploymentViewProps> = ({
                                                 </label>
                                             </div>
                                             <div className="md:col-span-2">
-                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Employer Address</label>
+                                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Employer Address *</label>
                                                 <textarea
+                                                    required
                                                     rows={2}
                                                     value={formData.employerAddress || ''}
                                                     onChange={(e) => setFormData({ ...formData, employerAddress: e.target.value })}

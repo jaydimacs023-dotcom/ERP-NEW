@@ -246,6 +246,7 @@ export interface DaySlot {
   dayIndex: number;
   startTime: string;
   endTime: string;
+  qualificationId?: string;
 }
 
 export interface TrainerSchedule extends BaseEntity {
@@ -660,6 +661,7 @@ export interface Batch extends BaseEntity {
   status: BatchStatus;
   startDate: string;
   endDate: string;
+  trainingScheduleSlots?: DaySlot[];
   maxStudents?: number;
   currentStudents?: number;
   createdAt?: string;
@@ -669,6 +671,9 @@ export interface Batch extends BaseEntity {
 // Enrollment - links students to batches with billing tracking
 export type BillingStatus = 'UNBILLED' | 'BILLED' | 'PARTIALLY_BILLED';
 export type EnrollmentStatus = 'ACTIVE' | 'DROPPED' | 'COMPLETED' | 'ON_HOLD';
+export type EnrollmentBillingType = 'BILLABLE' | 'FREE_SPONSORED' | 'MANUAL_FREE';
+export type AssessmentRegistrationStatus = 'PENDING' | 'BILLED' | 'PAID' | 'ASSESSED' | 'COMPLETED' | 'COMPETENT' | 'NOT_YET_COMPETENT' | 'CANCELLED';
+export type AssessmentType = 'FULL_ASSESSMENT' | 'REASSESSMENT' | 'COC' | 'RPL';
 
 export interface Enrollment extends BaseEntity {
   id: string;
@@ -677,6 +682,7 @@ export interface Enrollment extends BaseEntity {
   studentId: string;            // FK to Student
   batchId: string;              // FK to Batch
   sponsorId?: string;           // FK to Sponsor (can override batch/student sponsor)
+  billingType?: EnrollmentBillingType;
   billingStatus: BillingStatus; // Unbilled, Billed, Partially Billed
   enrollmentStatus: EnrollmentStatus; // ACTIVE, DROPPED, COMPLETED, ON_HOLD
   enrollmentDate: string;       // When student enrolled
@@ -688,8 +694,29 @@ export interface Enrollment extends BaseEntity {
   updatedAt?: string;
 }
 
+export interface AssessmentRegistration extends BaseEntity {
+  id: string;
+  orgId: string;
+  registrationCode?: string;
+  studentId: string;
+  qualificationId: string;
+  sponsorId?: string;
+  billingParty: 'SELF' | 'SPONSOR';
+  assessmentType: AssessmentType;
+  assessmentDate?: string | null;
+  status: AssessmentRegistrationStatus;
+  billingStatus: BillingStatus;
+  totalFees?: number;
+  billedAmount?: number;
+  invoiceId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Invoice - AR Invoice for sponsors/students with EWT tracking
 export type InvoiceStatus = 'DRAFT' | 'ON_HOLD' | 'OPEN' | 'CLOSED' | 'VOIDED';
+export type InvoiceLineType = 'COURSE_FEE' | 'DISCOUNT' | 'ADJUSTMENT' | 'MANUAL';
 
 
 export interface InvoiceLine extends BaseEntity {
@@ -700,6 +727,8 @@ export interface InvoiceLine extends BaseEntity {
   description: string;
   courseFeeId?: string;        // FK to CourseFee (optional)
   enrollmentId?: string;       // FK to Enrollment (optional)
+  assessmentRegistrationId?: string; // FK to AssessmentRegistration (optional)
+  lineType?: InvoiceLineType;
   quantity: number;
   unitPrice: number;
   netAmount: number;           // Exclusive of VAT: qty * unitPrice (if exclusive) or gross / 1.12 (if inclusive)
@@ -718,6 +747,7 @@ export interface Invoice extends BaseEntity {
   sponsorId?: string;          // FK to Sponsor (primary billing party)
   studentId?: string;          // FK to Student (if individual billing)
   enrollmentId?: string;       // FK to Enrollment (optional link)
+  assessmentRegistrationId?: string; // FK to AssessmentRegistration (assessment-only billing)
   batchId?: string;            // FK to Batch (optional link)
   invoiceDate: string;         // Invoice date
   dueDate: string;             // Payment due date

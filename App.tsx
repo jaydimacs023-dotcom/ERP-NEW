@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
 import { authService } from './services/AuthService';
 import { AuditService } from './services/AuditService';
+import { BillingComputationService } from './services/BillingComputationService';
 import { config } from './config/app';
 import { generateUUID } from './utils/uuid';
 import { canAccess, canAccessGroup, MODULE_GROUPS, isSystemAdmin as checkSysAdmin, isTenantAdmin as checkTenantAdmin, getDefaultTab, hasFinanceAccess, hasARAccess, hasAPAccess, hasOperationsAccess } from './config/permissions';
@@ -72,6 +73,7 @@ import BackupRestoreView from './views/BackupRestoreView';
 import RevenueRecognitionView from './views/RevenueRecognitionView';
 import CourseFeesView from './views/CourseFeesView';
 import EnrollmentsView from './views/EnrollmentsView';
+import AssessmentRegistrationsView from './views/AssessmentRegistrationsView';
 import InvoicesView from './views/InvoicesView';
 import PaymentsView from './views/PaymentsView';
 import BankDepositsView from './views/BankDepositsView';
@@ -91,7 +93,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -124,6 +126,28 @@ function darkenHex(hex: string, amount: number): string {
 function rgbString(hex: string): string {
   const [r, g, b] = hexToRgb(hex);
   return `${r}, ${g}, ${b}`;
+}
+
+const ASSESSMENT_RESULT_OR_LOCKED_STATUSES = new Set<AssessmentRegistration['status']>([
+  'COMPLETED',
+  'COMPETENT',
+  'NOT_YET_COMPETENT',
+  'CANCELLED'
+]);
+
+function isAssessmentDateDue(assessmentDate?: string | null): boolean {
+  if (!assessmentDate) return false;
+  return assessmentDate.slice(0, 10) <= new Date().toISOString().slice(0, 10);
+}
+
+function withAutoCompletedAssessmentRegistration<T extends AssessmentRegistration>(registration: T): T {
+  if (
+    isAssessmentDateDue(registration.assessmentDate) &&
+    !ASSESSMENT_RESULT_OR_LOCKED_STATUSES.has(registration.status)
+  ) {
+    return { ...registration, status: 'COMPLETED', updatedAt: registration.updatedAt || new Date().toISOString() };
+  }
+  return registration;
 }
 
 export default function App() {
@@ -424,6 +448,7 @@ export default function App() {
   const [items, setItems] = useState<NonStockItem[]>([]);
   const [courseFees, setCourseFees] = useState<CourseFee[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [assessmentRegistrations, setAssessmentRegistrations] = useState<AssessmentRegistration[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [studentLedger, setStudentLedger] = useState<StudentLedger[]>([]); // Subsidiary ledger for students
@@ -476,9 +501,9 @@ export default function App() {
   }
 
   function getPersistablePaymentStatus(status?: Payment['status'] | null): Payment['status'] {
-    // Some deployed databases still reject CLOSED on payments, so we keep CLOSED as a
-    // derived UI status and persist POSTED for finalized records.
-    if (status === 'CLOSED') {
+    // Some deployed databases only allow DRAFT/POSTED/VOIDED on payments, so OPEN/CLOSED
+    // stay as derived UI states and finalized records persist as POSTED.
+    if (status === 'OPEN' || status === 'CLOSED') {
       return 'POSTED';
     }
 
@@ -1278,6 +1303,16 @@ export default function App() {
         setStockAdjustments(data.stockAdjustments || []);
         setReorderPoints(data.reorderPoints || []);
         setEnrollments(data.enrollments || []);
+        const normalizedAssessmentRegistrations = (data.assessmentRegistrations || []).map(withAutoCompletedAssessmentRegistration);
+        setAssessmentRegistrations(normalizedAssessmentRegistrations);
+        normalizedAssessmentRegistrations
+          .filter((registration, index) => registration.status !== (data.assessmentRegistrations || [])[index]?.status)
+          .forEach(registration => {
+            service.updateAssessmentRegistration(registration.id, {
+              status: registration.status,
+              updatedAt: registration.updatedAt || new Date().toISOString()
+            }).catch(error => console.warn('[App] Failed to auto-complete assessment registration:', registration.id, error));
+          });
         setAlumniReports(data.alumniReports || []);
         setFeedbackTickets(data.feedbackTickets || []);
 
@@ -3039,6 +3074,59 @@ export default function App() {
   // BATCH CRUD Handlers
   // ============================================================================
 
+  const getBatchFundingSponsorId = (batch?: Batch | null) => String((batch as any)?.sponsorId || (batch as any)?.sponsor_id || '').trim();
+
+  const mapBatchBillingRulesToEnrollments = (batch: Batch, sourceEnrollments: Enrollment[]) => {
+    const sponsorId = getBatchFundingSponsorId(batch);
+    if (!sponsorId) return sourceEnrollments;
+
+    const classification = BillingComputationService.classifyEnrollmentsByBatchCap({
+      batches: [batch],
+      enrollments: sourceEnrollments,
+      courseFees
+    }, batch.id);
+
+    return classification.classifiedEnrollments.map(enrollment => ({
+      ...enrollment,
+      sponsorId: enrollment.sponsorId || sponsorId,
+      updatedAt: new Date().toISOString()
+    }));
+  };
+
+  const persistEnrollmentBillingUpdates = async (updates: Enrollment[]) => {
+    await Promise.all(updates.map(enrollment =>
+      dataService.updateEntity('enrollments', enrollment.id, {
+        sponsorId: enrollment.sponsorId,
+        billingType: enrollment.billingType,
+        updatedAt: enrollment.updatedAt
+      } as Partial<Enrollment>).catch(error => {
+        console.warn('[App] Failed to persist enrollment billing mapping:', enrollment.id, error);
+        return null;
+      })
+    ));
+  };
+
+  const applyBatchBillingContractToEnrollments = async (batch: Batch, extraEnrollment?: Enrollment) => {
+    const sponsorId = getBatchFundingSponsorId(batch);
+    if (!sponsorId) return;
+
+    const batchEnrollmentRows = enrollments
+      .filter(enrollment => enrollment.batchId === batch.id && !enrollment.isDeleted)
+      .filter(enrollment => !extraEnrollment || enrollment.id !== extraEnrollment.id);
+    const sourceRows = extraEnrollment ? [...batchEnrollmentRows, extraEnrollment] : batchEnrollmentRows;
+
+    if (sourceRows.length === 0) return;
+
+    const updates = mapBatchBillingRulesToEnrollments(batch, sourceRows);
+    const updateMap = new Map(updates.map(enrollment => [enrollment.id, enrollment]));
+
+    setEnrollments(prev => prev.map(enrollment => {
+      return updateMap.get(enrollment.id) || enrollment;
+    }));
+
+    await persistEnrollmentBillingUpdates(updates);
+  };
+
   const handleAddBatch = async (batch: Batch) => {
     try {
       const batchWithOrg = { ...batch, orgId: currentOrgId };
@@ -3046,6 +3134,7 @@ export default function App() {
       const created = await dataService.createBatch(batchWithOrg);
       console.info('[App] Batch created successfully:', created);
       setBatches(prev => [...prev, created]);
+      await applyBatchBillingContractToEnrollments(created);
 
       // Audit: Batch created
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', created.id, batch.name || batch.batchCode);
@@ -3065,7 +3154,8 @@ export default function App() {
       const existing = batches.find(b => b.id === batch.id);
       const updated = await dataService.updateBatch(batch.id, batch);
       console.info('[App] Batch updated successfully:', updated);
-      setBatches(prev => prev.map(b => b.id === batch.id ? batch : b));
+      setBatches(prev => prev.map(b => b.id === batch.id ? updated : b));
+      await applyBatchBillingContractToEnrollments(updated);
 
       // Audit: Batch updated
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'BATCH', batch.id, batch.name || batch.batchCode, existing, batch);
@@ -4157,8 +4247,30 @@ export default function App() {
   const handleAddEnrollment = async (enrollment: Enrollment) => {
     try {
       console.info('[App] Creating enrollment for student:', enrollment.studentId);
-      const enrollmentWithOrg = { ...enrollment, orgId: currentOrgId };
+      const batch = batches.find(b => b.id === enrollment.batchId);
+      const draftEnrollment = {
+        ...enrollment,
+        orgId: currentOrgId,
+        sponsorId: getBatchFundingSponsorId(batch) || enrollment.sponsorId,
+        billingType: enrollment.billingType || 'BILLABLE'
+      } as Enrollment;
+      let enrollmentWithOrg = batch
+        ? mapBatchBillingRulesToEnrollments(batch, [
+          ...enrollments.filter(e => e.batchId === enrollment.batchId && !e.isDeleted),
+          draftEnrollment
+        ]).find(e => e.id === draftEnrollment.id) || draftEnrollment
+        : draftEnrollment;
+
+      try {
+        enrollmentWithOrg = await dataService.createEntity('enrollments', enrollmentWithOrg);
+      } catch (persistError) {
+        console.warn('[App] Failed to persist enrollment; keeping it in app state:', persistError);
+      }
+
       setEnrollments(prev => [...prev, enrollmentWithOrg]);
+      if (batch) {
+        await applyBatchBillingContractToEnrollments(batch, enrollmentWithOrg);
+      }
 
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollmentWithOrg.id, enrollment.enrollmentCode || enrollment.id);
       handleNotify('success', 'Student enrolled successfully');
@@ -4172,7 +4284,22 @@ export default function App() {
     try {
       console.info('[App] Updating enrollment:', enrollment.id);
       const existing = enrollments.find(e => e.id === enrollment.id);
-      setEnrollments(prev => prev.map(e => e.id === enrollment.id ? { ...e, ...enrollment, updatedAt: new Date().toISOString() } : e));
+      const batch = batches.find(b => b.id === enrollment.batchId);
+      const updatedEnrollment = {
+        ...enrollment,
+        sponsorId: getBatchFundingSponsorId(batch) || enrollment.sponsorId,
+        updatedAt: new Date().toISOString()
+      } as Enrollment;
+
+      setEnrollments(prev => prev.map(e => e.id === enrollment.id ? { ...e, ...updatedEnrollment } : e));
+      try {
+        await dataService.updateEntity('enrollments', updatedEnrollment.id, updatedEnrollment);
+      } catch (persistError) {
+        console.warn('[App] Failed to persist enrollment update; keeping it in app state:', persistError);
+      }
+      if (batch) {
+        await applyBatchBillingContractToEnrollments(batch, updatedEnrollment);
+      }
 
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', enrollment.id, enrollment.enrollmentCode, existing, enrollment);
       handleNotify('success', 'Enrollment updated successfully');
@@ -4186,7 +4313,21 @@ export default function App() {
     try {
       console.info('[App] Deleting enrollment:', id);
       const existing = enrollments.find(e => e.id === id);
-      setEnrollments(prev => prev.map(e => e.id === id ? { ...e, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : e));
+      const deletedEnrollment = { ...existing, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } as Enrollment;
+      setEnrollments(prev => prev.map(e => e.id === id ? { ...e, ...deletedEnrollment } : e));
+      try {
+        await dataService.updateEntity('enrollments', id, {
+          isDeleted: true,
+          deletedAt: deletedEnrollment.deletedAt,
+          deletedBy: deletedEnrollment.deletedBy
+        } as Partial<Enrollment>);
+      } catch (persistError) {
+        console.warn('[App] Failed to persist enrollment delete; keeping it in app state:', persistError);
+      }
+      const batch = existing ? batches.find(b => b.id === existing.batchId) : undefined;
+      if (batch) {
+        await applyBatchBillingContractToEnrollments(batch);
+      }
 
       AuditService.softDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ENROLLMENT', id, existing?.enrollmentCode);
       handleNotify('success', 'Enrollment removed successfully');
@@ -4194,6 +4335,58 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error deleting enrollment:', error);
       handleNotify('error', 'Failed to delete enrollment.');
+      return false;
+    }
+  };
+
+  // ===== Assessment Registration CRUD Handlers =====
+  const handleAddAssessmentRegistration = async (registration: AssessmentRegistration) => {
+    try {
+      console.info('[App] Creating assessment registration:', registration.registrationCode);
+      const registrationWithOrg = withAutoCompletedAssessmentRegistration({ ...registration, orgId: currentOrgId });
+      const savedRegistration = await dataService.createAssessmentRegistration(registrationWithOrg);
+      setAssessmentRegistrations(prev => [...prev, withAutoCompletedAssessmentRegistration(savedRegistration)]);
+
+      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ASSESSMENT_REGISTRATION', savedRegistration.id, savedRegistration.registrationCode || savedRegistration.id);
+      handleNotify('success', 'Assessment registration created successfully');
+    } catch (error) {
+      console.error('[App] Error creating assessment registration:', error);
+      handleNotify('error', `Failed to create assessment registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleUpdateAssessmentRegistration = async (registration: AssessmentRegistration) => {
+    try {
+      console.info('[App] Updating assessment registration:', registration.id);
+      const existing = assessmentRegistrations.find(r => r.id === registration.id);
+      const normalizedRegistration = withAutoCompletedAssessmentRegistration(registration);
+      const updatedRegistration = await dataService.updateAssessmentRegistration(registration.id, {
+        ...normalizedRegistration,
+        updatedAt: new Date().toISOString()
+      });
+      setAssessmentRegistrations(prev => prev.map(r => r.id === registration.id ? { ...r, ...withAutoCompletedAssessmentRegistration(updatedRegistration) } : r));
+
+      AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ASSESSMENT_REGISTRATION', registration.id, registration.registrationCode, existing, normalizedRegistration);
+      handleNotify('success', 'Assessment registration updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating assessment registration:', error);
+      handleNotify('error', `Failed to update assessment registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteAssessmentRegistration = async (id: string): Promise<boolean> => {
+    try {
+      console.info('[App] Deleting assessment registration:', id);
+      const existing = assessmentRegistrations.find(r => r.id === id);
+      await dataService.deleteAssessmentRegistration(id);
+      setAssessmentRegistrations(prev => prev.filter(r => r.id !== id));
+
+      AuditService.hardDelete(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'ASSESSMENT_REGISTRATION', id, existing?.registrationCode);
+      handleNotify('success', 'Assessment registration deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] Error deleting assessment registration:', error);
+      handleNotify('error', `Failed to delete assessment registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return false;
     }
   };
@@ -4433,7 +4626,7 @@ export default function App() {
             : numericLineAmount;
 
       // Group VAT by Account
-      if (line.vatAmount > 0) {
+      if (Math.abs(line.vatAmount || 0) > 0.01) {
         const taxCat = taxCategories.find(tc => tc.id === line.taxCategoryId);
         const vatAccountId = taxCat?.outputAccountId || vatPayableId;
         if (vatAccountId) {
@@ -4455,19 +4648,33 @@ export default function App() {
           contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
           classificationCode: line.classificationCode,
         } as JournalLine);
+      } else if (revenueAccountId && netRevenue < 0) {
+        jLines.push({
+          id: `${jeId}-adj-${idx}`,
+          orgId: currentOrgId,
+          journalEntryId: jeId,
+          accountId: revenueAccountId,
+          debit: Math.abs(netRevenue),
+          credit: 0,
+          description: line.description || `Discount/Adjustment: ${glRef} Line ${idx + 1}`,
+          memo: line.description || `Discount/Adjustment: ${glRef} Line ${idx + 1}`,
+          contactId: invoice.sponsorId || invoice.studentId || undefined,
+          contactType: invoice.sponsorId ? 'SPONSOR' : invoice.studentId ? 'STUDENT' : undefined,
+          classificationCode: line.classificationCode,
+        } as JournalLine);
       }
     });
 
     // Add grouped VAT lines
     Object.entries(vatGrouped).forEach(([accountId, amount], idx) => {
-      if (amount > 0) {
+      if (Math.abs(amount) > 0.01) {
         jLines.push({
           id: `${jeId}-vat-${idx}`,
           orgId: currentOrgId,
           journalEntryId: jeId,
           accountId: accountId,
-          debit: 0,
-          credit: amount,
+          debit: amount < 0 ? Math.abs(amount) : 0,
+          credit: amount > 0 ? amount : 0,
           description: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
           memo: `Output VAT: ${glRef} (Invoice: ${invoice.invoiceNo})`,
         } as JournalLine);
@@ -4619,11 +4826,18 @@ export default function App() {
 
           // Sponsor invoice → distribute across enrolled students in the batch
           if (invoice.sponsorId) {
-            const covered = enrollments.filter(e =>
-              e.sponsorId === invoice.sponsorId &&
+            const invoiceBatch = invoice.batchId ? batches.find(batch => batch.id === invoice.batchId) : undefined;
+            const coveredSource = enrollments.filter(e =>
+              !e.isDeleted &&
               (!invoice.batchId || e.batchId === invoice.batchId) &&
-              !e.isDeleted
+              (
+                e.sponsorId === invoice.sponsorId ||
+                (!!invoiceBatch && getBatchFundingSponsorId(invoiceBatch) === invoice.sponsorId)
+              )
             );
+            const covered = invoiceBatch
+              ? mapBatchBillingRulesToEnrollments(invoiceBatch, coveredSource).filter(e => e.billingType === 'BILLABLE')
+              : coveredSource.filter(e => String(e.billingType || 'BILLABLE') === 'BILLABLE');
             const perStudent = covered.length > 0 ? invoice.netAmountDue / covered.length : 0;
             const sponsorName = sponsors.find(s => s.id === invoice.sponsorId)?.name || 'Sponsor';
             const newEntries: StudentLedger[] = covered.map((e, idx) => ({
@@ -5325,8 +5539,9 @@ export default function App() {
       handleNotify('error', 'Only posted or finalized payments can be applied to invoices.');
       return;
     }
-    const availablePaymentBalance = getPaymentAvailableBalance(payment);
-    if (availablePaymentBalance + 0.01 < amount) {
+    const applicationValidation = BillingComputationService.validatePaymentApplication(payment, amount);
+    const availablePaymentBalance = applicationValidation.availableBalance;
+    if (!applicationValidation.isValid) {
       handleNotify('error', 'Apply amount exceeds the remaining unapplied balance of this payment.');
       return;
     }
@@ -5446,7 +5661,6 @@ export default function App() {
       const applicationUpdatedAt = new Date().toISOString();
       try {
         await dataService.updateEntity('payment_applications', savedApplication.id, {
-          applicationNo,
           glReference: savedApplicationEntry.glEntryNumber || savedApplicationEntry.reference,
           journalEntryId: savedApplicationEntry.id,
           updatedAt: applicationUpdatedAt
@@ -5469,11 +5683,11 @@ export default function App() {
         ...payment,
         applications: [...(payment.applications || []), persistedApplication],
         totalApplied: (payment.totalApplied || 0) + amount,
-        customerDepositBalance: Math.max(availablePaymentBalance - amount, 0),
+        customerDepositBalance: applicationValidation.projectedBalance,
         status: resolveAppliedPaymentStatus(
           payment,
           (payment.totalApplied || 0) + amount,
-          Math.max(availablePaymentBalance - amount, 0)
+          applicationValidation.projectedBalance
         ),
         updatedAt: new Date().toISOString()
       };
@@ -6192,6 +6406,7 @@ export default function App() {
               <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => navigateTo('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => navigateTo('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Layers size={20} />} label="Training Batches" active={activeTab === 'batches'} onClick={() => navigateTo('batches')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<ClipboardCheck size={20} />} label="Assessment Registrations" active={activeTab === 'assessment-registrations'} onClick={() => navigateTo('assessment-registrations')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => navigateTo('locations')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => navigateTo('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<UserCheck size={20} />} label="Alumni Reports" active={activeTab === 'alumni-reports'} onClick={() => navigateTo('alumni-reports')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6481,6 +6696,16 @@ export default function App() {
             />
           )}
           {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
+          {activeTab === 'assessment-registrations' && (
+            <AssessmentRegistrationsView
+              registrations={assessmentRegistrations.filter(r => r.orgId === currentOrgId && !r.isDeleted)}
+              students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+              qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+              onAddRegistration={handleAddAssessmentRegistration}
+              onUpdateRegistration={handleUpdateAssessmentRegistration}
+              onDeleteRegistration={handleDeleteAssessmentRegistration}
+            />
+          )}
           {activeTab === 'invoices' && <InvoicesView
             invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
@@ -6488,6 +6713,7 @@ export default function App() {
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
             enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+            assessmentRegistrations={assessmentRegistrations.filter(r => r.orgId === currentOrgId && !r.isDeleted)}
             batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
             qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
             courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)}
@@ -6499,6 +6725,7 @@ export default function App() {
             onDeleteInvoice={handleDeleteInvoice}
             onVoidInvoice={handleVoidInvoice}
             onUpdateEnrollment={handleUpdateEnrollment}
+            onUpdateAssessmentRegistration={handleUpdateAssessmentRegistration}
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
             journalEntries={activeJournalEntries}
             onViewJournal={handleViewJournal}
@@ -6607,7 +6834,7 @@ export default function App() {
             }}
           />}
           {activeTab === 'locations' && <LocationsView organization={currentOrg} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddLocation={handleAddLocation} onUpdateLocation={handleUpdateLocation} onDeleteLocation={handleDeleteLocation} />}
-          {activeTab === 'schedules' && <SchedulesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
+          {activeTab === 'schedules' && <SchedulesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />}
 
           {activeTab === 'employees' && <EmployeesView
             employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)}

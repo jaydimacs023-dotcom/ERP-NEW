@@ -7,7 +7,7 @@ import {
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
-  CourseFee, AlumniEmploymentReport, Enrollment, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
+  CourseFee, AlumniEmploymentReport, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
   FeedbackTicket
 } from '../types';
 
@@ -78,6 +78,7 @@ export interface InitialData {
   reorderPoints: ReorderPoint[];
   courseFees: CourseFee[];
   enrollments: Enrollment[];
+  assessmentRegistrations: AssessmentRegistration[];
   alumniReports: AlumniEmploymentReport[];
   invoices: Invoice[];
   invoiceLines: InvoiceLine[];
@@ -374,6 +375,12 @@ export interface IDataService {
   updateAlumniReport(id: string, updates: Partial<AlumniEmploymentReport>): Promise<AlumniEmploymentReport>;
   deleteAlumniReport(id: string): Promise<void>;
   getAlumniReportsByOrg(orgId: string): Promise<AlumniEmploymentReport[]>;
+
+  // Assessment Registration CRUD
+  createAssessmentRegistration(registration: AssessmentRegistration): Promise<AssessmentRegistration>;
+  updateAssessmentRegistration(id: string, updates: Partial<AssessmentRegistration>): Promise<AssessmentRegistration>;
+  deleteAssessmentRegistration(id: string): Promise<void>;
+  getAssessmentRegistrationsByOrg(orgId: string): Promise<AssessmentRegistration[]>;
 
   // Generic create for other entities
   createEntity<T extends { id?: string; orgId?: string }>(table: string, entity: T): Promise<T>;

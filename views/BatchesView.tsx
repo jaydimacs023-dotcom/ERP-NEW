@@ -30,7 +30,12 @@ const getSlotHours = (start: string, end: string) => {
   const [eH, eM] = end.split(':').map(Number);
   const startTotal = sH * 60 + sM;
   const endTotal = eH * 60 + eM;
-  return Math.max(0, (endTotal - startTotal) / 60);
+  const grossMinutes = Math.max(0, endTotal - startTotal);
+  const lunchOverlap = Math.max(
+    0,
+    Math.min(endTotal, 13 * 60) - Math.max(startTotal, 12 * 60)
+  );
+  return Math.max(0, (grossMinutes - lunchOverlap) / 60);
 };
 
 const calculateProjectedEndDate = (
@@ -81,6 +86,25 @@ const calculateProjectedEndDate = (
   };
 };
 
+const getQualificationSlots = (schedule: TrainerSchedule | undefined, qualificationId?: string): DaySlot[] => {
+  if (!schedule?.slots?.length) return [];
+  const qualificationSlots = schedule.slots.filter(slot => slot.qualificationId === qualificationId);
+  return qualificationSlots.length > 0
+    ? qualificationSlots
+    : schedule.slots.filter(slot => !slot.qualificationId);
+};
+
+const getBatchCalculationSlots = (
+  batch: Batch,
+  schedules: TrainerSchedule[]
+): DaySlot[] => {
+  if (batch.status !== BatchStatus.PLANNED) {
+    return batch.trainingScheduleSlots || [];
+  }
+  const schedule = schedules.find(s => s.trainerId === batch.trainerId);
+  return getQualificationSlots(schedule, batch.qualificationId);
+};
+
 const BatchesView: React.FC<BatchesViewProps> = ({
   batches, qualifications, trainers, students, sponsors, schedules, locations, organization,
   onAddBatch, onUpdateBatch, onDeleteBatch, onNotify
@@ -129,12 +153,13 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     if (formData.startDate && formData.qualificationId && formData.trainerId) {
       const qual = qualifications.find(q => q.id === formData.qualificationId);
       const sch = schedules.find(s => s.trainerId === formData.trainerId);
+      const qualificationSlots = getQualificationSlots(sch, formData.qualificationId);
 
-      if (qual && sch && sch.slots.length > 0) {
+      if (qual && qualificationSlots.length > 0) {
         const result = calculateProjectedEndDate(
           formData.startDate,
           qual.durationDays,
-          sch.slots
+          qualificationSlots
         );
 
         if (result.endDate !== formData.endDate) {
@@ -145,6 +170,9 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             trainingDays: result.trainingDays
           });
         }
+      } else if (qual) {
+        setFormData(prev => ({ ...prev, endDate: '' }));
+        setProjection(null);
       }
     }
   }, [formData.startDate, formData.qualificationId, formData.trainerId, qualifications, schedules]);
@@ -179,17 +207,25 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.qualificationId || !formData.trainerId || isSaving) return;
+    if (!formData.endDate) {
+      onNotify?.('error', 'Cannot save batch. Define trainer schedule slots for this qualification to calculate the projected completion date.');
+      return;
+    }
 
     setIsSaving(true);
     try {
       const studentCount = formData.studentIds?.length || 0;
-
       if (editingBatch) {
-        // Keep existing status if it's ongoing, completed or cancelled
-        const finalStatus = (editingBatch.status === BatchStatus.ONGOING || editingBatch.status === BatchStatus.COMPLETED || editingBatch.status === BatchStatus.CANCELLED)
-          ? editingBatch.status
-          : BatchStatus.PLANNED;
-        await onUpdateBatch({ ...editingBatch, ...formData, status: finalStatus, currentStudents: studentCount } as Batch);
+        if (!isBatchEditable(editingBatch)) {
+          onNotify?.('error', 'Only planned batches can be edited. Commenced and completed batches are view-only.');
+          return;
+        }
+        await onUpdateBatch({
+          ...editingBatch,
+          ...formData,
+          status: BatchStatus.PLANNED,
+          currentStudents: studentCount
+        } as Batch);
         onNotify?.('success', 'Batch updated successfully');
       } else {
         const newBatch: Batch = {
@@ -256,7 +292,24 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
     setIsCommencing(batch.id);
     try {
-      await onUpdateBatch({ ...batch, status: BatchStatus.ONGOING });
+      const schedule = schedules.find(s => s.trainerId === batch.trainerId);
+      const trainingScheduleSlots = getQualificationSlots(schedule, batch.qualificationId);
+      if (!trainingScheduleSlots.length) {
+        onNotify?.('error', 'Cannot commence training. Define schedule slots for this trainer and qualification first.');
+        return;
+      }
+
+      const qualification = qualifications.find(q => q.id === batch.qualificationId);
+      const projected = qualification
+        ? calculateProjectedEndDate(batch.startDate, qualification.durationDays, trainingScheduleSlots)
+        : null;
+
+      await onUpdateBatch({
+        ...batch,
+        status: BatchStatus.ONGOING,
+        trainingScheduleSlots,
+        endDate: projected?.endDate || batch.endDate
+      });
       onNotify?.('success', 'Training commenced successfully!');
     } catch (error) {
       console.error('[BatchesView] Error commencing training:', error);
@@ -303,6 +356,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     );
   };
 
+  const isBatchEditable = (batch: Batch) => batch.status === BatchStatus.PLANNED;
+
+  const openEditBatch = (batch: Batch) => {
+    if (!isBatchEditable(batch)) {
+      onNotify?.('info', 'Training batches that have commenced are locked for viewing only.');
+      return;
+    }
+    setEditingBatch(batch);
+    setFormData({
+      ...batch
+    });
+    setShowModal(true);
+  };
+
   const toggleStudent = (studentId: string) => {
     const current = formData.studentIds || [];
     if (current.includes(studentId)) {
@@ -313,10 +380,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   };
 
   const getStudentConflict = (studentId: string) => {
-    // If this student is already enrolled in any planned or ongoing batch (except current editing batch), conflict.
+    // Only block duplicate planned/ongoing enrollment for the same qualification.
+    // Completed batches and other qualifications remain eligible for enrollment.
     return batches.find(b => {
       if (editingBatch && b.id === editingBatch.id) return false;
       if (b.status !== BatchStatus.PLANNED && b.status !== BatchStatus.ONGOING) return false;
+      if (formData.qualificationId && b.qualificationId !== formData.qualificationId) return false;
       if (!b.studentIds || !b.studentIds.includes(studentId)) return false;
       return true;
     });
@@ -481,7 +550,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 const location = locations.find(l => l.id === batch.locationId);
 
                 return (
-                  <tr key={batch.id} className="hover:bg-gray-50 transition-colors group">
+                  <tr
+                    key={batch.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setViewingBatch(batch)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setViewingBatch(batch);
+                      }
+                    }}
+                    className="hover:bg-gray-50 transition-colors group cursor-pointer focus:outline-none focus:bg-gray-50"
+                    title="View batch details"
+                  >
                     <td className="px-6 py-5">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -530,7 +612,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       {getStatusBadge(batch.status)}
                       {batch.status === 'PLANNED' && batch.currentStudents >= 5 && (
                         <button
-                          onClick={() => handleCommenceTraining(batch)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCommenceTraining(batch);
+                          }}
                           disabled={isCommencing === batch.id}
                           className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-all disabled:opacity-50"
                           title="Start Training"
@@ -556,27 +641,36 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {batch.status !== BatchStatus.COMPLETED && (
+                        {isBatchEditable(batch) && (
                           <>
                             <button
-                              onClick={() => { setEditingBatch(batch); setFormData(batch); setShowModal(true); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditBatch(batch);
+                              }}
                               className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
                               title="Edit Batch"
                             >
                               <Edit2 size={16} />
                             </button>
                             <button
-                              onClick={() => handleDelete(batch.id)}
-                              disabled={batch.status === BatchStatus.ONGOING || isDeleting === batch.id}
-                              className={`p-2 rounded transition-colors ${batch.status === BatchStatus.ONGOING ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} disabled:opacity-50`}
-                              title={batch.status === BatchStatus.ONGOING ? 'Cannot delete ongoing batch' : 'Delete Batch'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(batch.id);
+                              }}
+                              disabled={isDeleting === batch.id}
+                              className="p-2 rounded transition-colors hover:bg-rose-50 text-gray-400 hover:text-rose-600 disabled:opacity-50"
+                              title="Delete Batch"
                             >
                               {isDeleting === batch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             </button>
                           </>
                         )}
                         <button
-                          onClick={() => setViewingBatch(batch)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingBatch(batch);
+                          }}
                           className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
                           title="View Details"
                         >
@@ -637,7 +731,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1.5">
                       <Award size={12} className="text-amber-500" /> Program Qualification
@@ -673,7 +767,8 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       ) : null}
                       {eligibleTrainers.map(t => {
                         const sch = schedules.find(s => s.trainerId === t.id);
-                        const weeklyHrs = sch?.slots.reduce((acc, s) => acc + getSlotHours(s.startTime, s.endTime), 0) || 0;
+                        const qualificationSlots = getQualificationSlots(sch, formData.qualificationId);
+                        const weeklyHrs = qualificationSlots.reduce((acc, s) => acc + getSlotHours(s.startTime, s.endTime), 0);
                         return <option key={t.id} value={t.id}>{t.lastName}, {t.firstName} {weeklyHrs > 0 ? `(${weeklyHrs.toFixed(1)} hrs/wk)` : '(No Schedule)'}</option>;
                       })}
                     </select>
@@ -751,11 +846,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 )}
 
-                {!schedules.find(s => s.trainerId === formData.trainerId) && formData.trainerId && (
+                {formData.trainerId && formData.qualificationId && getQualificationSlots(schedules.find(s => s.trainerId === formData.trainerId), formData.qualificationId).length === 0 && (
                   <div className="bg-rose-50 p-6 rounded border border-rose-100 flex gap-4">
                     <AlertCircle className="text-rose-600 shrink-0" size={24} />
                     <p className="text-xs text-rose-800 leading-relaxed font-bold">
-                      Critical Notice: The selected instructor has no declared work shifts. The system cannot forecast an end-date or calculate half-day increments until a weekly schedule is defined.
+                      Critical Notice: The selected instructor has no declared work shifts for this qualification. The system cannot forecast an end-date until qualification-specific schedule slots are defined.
                     </p>
                   </div>
                 )}
@@ -999,10 +1094,10 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </h3>
                   <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-md border border-gray-600 shadow-sm text-white">
                     {(() => {
-                      const schedule = schedules.find(s => s.trainerId === viewingBatch.trainerId);
                       const qual = qualifications.find(q => q.id === viewingBatch.qualificationId);
-                      if (schedule && qual && viewingBatch.startDate) {
-                        const projected = calculateProjectedEndDate(viewingBatch.startDate, qual.durationDays, schedule.slots);
+                      const calculationSlots = getBatchCalculationSlots(viewingBatch, schedules);
+                      if (qual && viewingBatch.startDate && calculationSlots.length > 0) {
+                        const projected = calculateProjectedEndDate(viewingBatch.startDate, qual.durationDays, calculationSlots);
                         return (
                           <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -1065,13 +1160,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </div>
 
               <div className="mt-8 flex gap-3">
-                {viewingBatch.status !== BatchStatus.COMPLETED && (
+                {isBatchEditable(viewingBatch) && (
                   <button
                     onClick={() => {
                       setViewingBatch(null);
-                      setEditingBatch(viewingBatch);
-                      setFormData(viewingBatch);
-                      setShowModal(true);
+                      openEditBatch(viewingBatch);
                     }}
                     className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand/20"
                   >
@@ -1080,7 +1173,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 )}
                 <button
                   onClick={() => setViewingBatch(null)}
-                  className={`${viewingBatch.status === BatchStatus.COMPLETED ? 'flex-1' : 'px-8'} py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all`}
+                  className={`${isBatchEditable(viewingBatch) ? 'px-8' : 'flex-1'} py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all`}
                 >
                   Close
                 </button>
