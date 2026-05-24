@@ -81,6 +81,7 @@ import AlumniEmploymentView from './views/AlumniEmploymentView';
 import CustomerMasterListView from './views/CustomerMasterListView';
 import ARCalendarTasksView from './views/ARCalendarTasksView';
 import FeedbackManagementView from './views/FeedbackManagementView';
+import UserProfileView from './views/UserProfileView';
 
 // Lucide Icons
 import {
@@ -93,7 +94,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -222,7 +223,8 @@ export default function App() {
           }
 
           // Lookup app user record by email
-          const appUserRes = await fetch(`${config.supabase.url}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=*`, {
+          const appUserColumns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active';
+          const appUserRes = await fetch(`${config.supabase.url}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=${appUserColumns}`, {
             headers: {
               apikey: config.supabase.anonKey,
               Authorization: `Bearer ${config.supabase.anonKey}`,
@@ -248,6 +250,10 @@ export default function App() {
             id: su.id,
             name: su.name || email.split('@')[0],
             email: su.email,
+            lastName: su.last_name || undefined,
+            profilePhoto: su.profile_photo || undefined,
+            contactNumber: su.contact_number || undefined,
+            address: su.address || undefined,
             role: su.role || 'ADMIN',
             orgId: su.org_id || '',
             studentId: su.student_id || undefined,
@@ -1121,17 +1127,51 @@ export default function App() {
         // backfill payment records with glEntryNumber from their journal entries
         const paymentGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
         const paymentStatusBackfills: Array<{ id: string; status: Payment['status'] }> = [];
+        const paymentAmountBackfills: Array<{ id: string; amountReceived: number; totalApplied: number; customerDepositBalance: number; status: Payment['status'] }> = [];
         const paymentJournalDescriptionBackfills = new Map<string, string>();
         const paymentLineBackfills = new Map<string, Partial<JournalLine>>();
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
-          const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
-          const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
+          const activeApps = apps.filter(app => !app.isReversed);
+          const appliedTotal = activeApps.reduce((sum, app) => sum + (app.amountApplied || 0), 0);
+          const totalApplied = payment.totalApplied ?? appliedTotal;
+          const sourceInvoiceId = String((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId || '').trim();
+          const appliedInvoiceIds = Array.from(new Set(activeApps.map(app => String(app.invoiceId || '').trim()).filter(Boolean)));
+          const reconciledInvoiceId = sourceInvoiceId || (appliedInvoiceIds.length === 1 ? appliedInvoiceIds[0] : '');
+          const sourceInvoice = reconciledInvoiceId ? normalizedInvoices.find(invoice => invoice.id === reconciledInvoiceId) : undefined;
+          const allApplicationsBelongToSourceInvoice =
+            !!reconciledInvoiceId &&
+            activeApps.length > 0 &&
+            activeApps.every(app => app.invoiceId === reconciledInvoiceId);
+          const sourceInvoiceIsSettled =
+            !!sourceInvoice &&
+            (String(sourceInvoice.status || '').toUpperCase() === 'CLOSED' || Number(sourceInvoice.balanceDue ?? 0) <= 0.01);
+          const originalAmountReceived = Number(payment.amountReceived || 0);
+          const ewtAmount = Number(payment.ewtAmountCertified || 0);
+          let resolvedAmountReceived = originalAmountReceived;
+          let grossReceived = resolvedAmountReceived + ewtAmount;
           const paymentTransactionDescription = resolvePaymentTransactionDescription(payment);
-          const resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0);
+          let resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - totalApplied, 0);
+
+          // Invoice-linked payments are meant to represent actual receipts for that invoice.
+          // If the invoice is now settled and this payment only applied to that invoice, trim
+          // an overstated default receipt amount down to the amount actually applied.
+          const shouldReconcileSourceInvoiceReceipt =
+            allApplicationsBelongToSourceInvoice &&
+            resolvedBalance > 0.01 &&
+            grossReceived > totalApplied + 0.01 &&
+            Math.abs(resolvedBalance - (grossReceived - totalApplied)) <= 0.01;
+
+          if (shouldReconcileSourceInvoiceReceipt) {
+            resolvedAmountReceived = Math.max(totalApplied - ewtAmount, 0);
+            grossReceived = resolvedAmountReceived + ewtAmount;
+            resolvedBalance = 0;
+          }
+
+          const resolvedPaymentForStatus = { ...payment, amountReceived: resolvedAmountReceived };
           const resolvedStatus = resolveAppliedPaymentStatus(
-            payment,
-            payment.totalApplied ?? appliedTotal,
+            resolvedPaymentForStatus,
+            totalApplied,
             resolvedBalance
           );
           const persistableResolvedStatus = getPersistablePaymentStatus(resolvedStatus);
@@ -1162,11 +1202,11 @@ export default function App() {
 
           if (payment.journalEntryId) {
             const entryLines = normalizedJournalLines.filter((line: any) => line.journalEntryId === payment.journalEntryId);
-            const amountReceived = Number(payment.amountReceived || 0);
-            const ewtAmount = Number(payment.ewtAmountCertified || 0);
-            const totalCredit = amountReceived + ewtAmount;
+            const amountReceived = originalAmountReceived;
+            const originalTotalCredit = amountReceived + ewtAmount;
+            const resolvedTotalCredit = resolvedAmountReceived + ewtAmount;
             const cashLine = entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - amountReceived) < 0.001 && Number(line.credit || 0) === 0);
-            const depositsLine = entryLines.find((line: any) => Math.abs(Number(line.credit || 0) - totalCredit) < 0.001);
+            const depositsLine = entryLines.find((line: any) => Math.abs(Number(line.credit || 0) - originalTotalCredit) < 0.001);
             const ewtLine = ewtAmount > 0
               ? entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - ewtAmount) < 0.001 && Number(line.credit || 0) === 0)
               : null;
@@ -1183,10 +1223,32 @@ export default function App() {
 
             queuePaymentLineBackfill(cashLine, paymentTransactionDescription);
             queuePaymentLineBackfill(depositsLine, paymentTransactionDescription);
+            if (shouldReconcileSourceInvoiceReceipt) {
+              if (cashLine && Math.abs(Number(cashLine.debit || 0) - resolvedAmountReceived) > 0.001) {
+                cashLine.debit = resolvedAmountReceived;
+                const current = paymentLineBackfills.get(cashLine.id) || {};
+                paymentLineBackfills.set(cashLine.id, { ...current, debit: resolvedAmountReceived });
+              }
+              if (depositsLine && Math.abs(Number(depositsLine.credit || 0) - resolvedTotalCredit) > 0.001) {
+                depositsLine.credit = resolvedTotalCredit;
+                const current = paymentLineBackfills.get(depositsLine.id) || {};
+                paymentLineBackfills.set(depositsLine.id, { ...current, credit: resolvedTotalCredit });
+              }
+            }
             if (ewtLine) {
               const ewtDescription = `Creditable Withholding Tax (CWT 2307) for ${payment.paymentNo}`;
               queuePaymentLineBackfill(ewtLine, ewtDescription);
             }
+          }
+
+          if (shouldReconcileSourceInvoiceReceipt) {
+            paymentAmountBackfills.push({
+              id: payment.id,
+              amountReceived: resolvedAmountReceived,
+              totalApplied,
+              customerDepositBalance: resolvedBalance,
+              status: persistableResolvedStatus
+            });
           }
 
           return {
@@ -1194,7 +1256,8 @@ export default function App() {
             status: resolvedStatus,
             glEntryNumber,
             applications: apps,
-            totalApplied: payment.totalApplied ?? appliedTotal,
+            amountReceived: resolvedAmountReceived,
+            totalApplied,
             customerDepositBalance: resolvedBalance
           } as Payment;
         });
@@ -1226,6 +1289,28 @@ export default function App() {
               }
             })
             .catch(err => console.warn('[App] failed to backfill payment lifecycle statuses', err));
+        }
+        if (paymentAmountBackfills.length > 0) {
+          Promise.allSettled(
+            paymentAmountBackfills.map((paymentBackfill) => {
+              return dataService.updateEntity('payments', paymentBackfill.id, {
+                amountReceived: paymentBackfill.amountReceived,
+                totalApplied: paymentBackfill.totalApplied,
+                customerDepositBalance: paymentBackfill.customerDepositBalance,
+                status: paymentBackfill.status,
+                updatedAt: new Date().toISOString()
+              });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some invoice-linked payment amount reconciliations failed', failures);
+              } else {
+                console.info('[App] reconciled overstated invoice-linked payment receipts');
+              }
+            })
+            .catch(err => console.warn('[App] failed to reconcile invoice-linked payment receipts', err));
         }
         if (paymentLineBackfills.size > 0) {
           Promise.allSettled(
@@ -2623,6 +2708,48 @@ export default function App() {
       console.error('[App] Error deleting user:', error);
       handleNotify('error', 'Failed to delete user. Falling back to memory storage.');
       setUsers(prev => prev.filter(u => u.id !== id));
+    }
+  };
+
+  const handleUpdateCurrentUserProfile = async (updates: Partial<User>) => {
+    if (!currentUser) return;
+
+    const cleanUpdates: Partial<User> = {
+      name: updates.name ?? '',
+      lastName: updates.lastName || undefined,
+      email: updates.email ?? '',
+      contactNumber: updates.contactNumber || undefined,
+      address: updates.address || undefined,
+      profilePhoto: updates.profilePhoto || undefined
+    };
+
+    try {
+      const updated = await dataService.updateUser(currentUser.id, {
+        ...cleanUpdates,
+        updatedAt: new Date().toISOString()
+      } as Partial<User>);
+      const mergedUser = { ...currentUser, ...cleanUpdates, ...updated };
+
+      setCurrentUser(mergedUser);
+      setUsers(prev => prev.map(user => user.id === currentUser.id ? { ...user, ...mergedUser } : user));
+      authService.updateStoredUser(mergedUser);
+      localStorage.setItem('at_erp_session', JSON.stringify({
+        user: mergedUser,
+        token: btoa(JSON.stringify({ userId: mergedUser.id, email: mergedUser.email, iat: Date.now() }))
+      }));
+      handleNotify('success', 'Profile updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating profile:', error);
+      const mergedUser = { ...currentUser, ...cleanUpdates };
+
+      setCurrentUser(mergedUser);
+      setUsers(prev => prev.map(user => user.id === currentUser.id ? { ...user, ...mergedUser } : user));
+      authService.updateStoredUser(mergedUser);
+      localStorage.setItem('at_erp_session', JSON.stringify({
+        user: mergedUser,
+        token: btoa(JSON.stringify({ userId: mergedUser.id, email: mergedUser.email, iat: Date.now() }))
+      }));
+      handleNotify('error', 'Profile saved locally, but Supabase update failed.');
     }
   };
 
@@ -5683,25 +5810,74 @@ export default function App() {
       };
 
       // 2. Persist Payment application totals.
+      const existingPaymentApplications = payment.applications || [];
+      const nextPaymentApplications = [...existingPaymentApplications, persistedApplication];
+      const nextTotalApplied = (payment.totalApplied || 0) + amount;
+      const isSingleInvoiceReceipt =
+        String((payment as PaymentWithSource).sourceInvoiceId || '').trim() === invoiceId &&
+        nextPaymentApplications
+          .filter(app => !app.isReversed)
+          .every(app => app.invoiceId === invoiceId);
+      const shouldReconcileReceiptAmountToApplication =
+        isSingleInvoiceReceipt &&
+        getPaymentTotalCredit(payment) > nextTotalApplied + 0.01;
+      const reconciledAmountReceived = shouldReconcileReceiptAmountToApplication
+        ? Math.max(nextTotalApplied - Number(payment.ewtAmountCertified || 0), 0)
+        : Number(payment.amountReceived || 0);
+      const reconciledDepositBalance = shouldReconcileReceiptAmountToApplication
+        ? 0
+        : applicationValidation.projectedBalance;
       const updatedPayment = {
         ...payment,
-        applications: [...(payment.applications || []), persistedApplication],
-        totalApplied: (payment.totalApplied || 0) + amount,
-        customerDepositBalance: applicationValidation.projectedBalance,
+        amountReceived: reconciledAmountReceived,
+        applications: nextPaymentApplications,
+        totalApplied: nextTotalApplied,
+        customerDepositBalance: reconciledDepositBalance,
         status: resolveAppliedPaymentStatus(
-          payment,
-          (payment.totalApplied || 0) + amount,
-          applicationValidation.projectedBalance
+          { ...payment, amountReceived: reconciledAmountReceived },
+          nextTotalApplied,
+          reconciledDepositBalance
         ),
         updatedAt: new Date().toISOString()
       };
       const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
       await dataService.updateEntity('payments', paymentId, {
+        amountReceived: updatedPayment.amountReceived,
         totalApplied: updatedPayment.totalApplied,
         customerDepositBalance: updatedPayment.customerDepositBalance,
         status: persistedPaymentStatus,
         updatedAt: updatedPayment.updatedAt
       });
+
+      if (shouldReconcileReceiptAmountToApplication && payment.journalEntryId) {
+        const paymentEntryLines = journalLines.filter(line => line.journalEntryId === payment.journalEntryId);
+        const previousAmountReceived = Number(payment.amountReceived || 0);
+        const previousTotalCredit = previousAmountReceived + Number(payment.ewtAmountCertified || 0);
+        const reconciledTotalCredit = reconciledAmountReceived + Number(payment.ewtAmountCertified || 0);
+        const cashLine = paymentEntryLines.find(line =>
+          Math.abs(Number(line.debit || 0) - previousAmountReceived) < 0.001 &&
+          Number(line.credit || 0) === 0
+        );
+        const depositsLine = paymentEntryLines.find(line =>
+          Math.abs(Number(line.credit || 0) - previousTotalCredit) < 0.001
+        );
+        const lineUpdates: Promise<JournalLine>[] = [];
+
+        if (cashLine && Math.abs(Number(cashLine.debit || 0) - reconciledAmountReceived) > 0.001) {
+          lineUpdates.push(dataService.updateJournalLine(cashLine.id, { debit: reconciledAmountReceived }));
+        }
+        if (depositsLine && Math.abs(Number(depositsLine.credit || 0) - reconciledTotalCredit) > 0.001) {
+          lineUpdates.push(dataService.updateJournalLine(depositsLine.id, { credit: reconciledTotalCredit }));
+        }
+        if (lineUpdates.length > 0) {
+          const updatedLines = await Promise.all(lineUpdates);
+          setJournalLines(prev => prev.map(line => {
+            const updatedLine = updatedLines.find(item => item.id === line.id);
+            return updatedLine ? { ...line, ...updatedLine } : line;
+          }));
+        }
+      }
+
       setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
       // 3. Persist Invoice balance/status update.
@@ -6310,6 +6486,10 @@ export default function App() {
 
         <nav className="flex-1 overflow-y-auto py-8 px-4 scrollbar-hide">
           {/* Navigation Items (unchanged logic) */}
+          <div className="mb-8">
+            {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Account</p>}
+            <NavItem icon={<UserCircle size={20} />} label="Profile" active={activeTab === 'profile'} onClick={() => navigateTo('profile')} compact={!sidebarOpen} brandColor={brandColor} />
+          </div>
           {!isSysAdmin && (
             <>
               {currentUser.role === 'STUDENT' && (
@@ -6406,6 +6586,7 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
               compact={!sidebarOpen}
             >
+              <NavItem icon={<LayoutDashboard size={20} />} label="Registrar Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Users size={20} />} label="Learners" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => navigateTo('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => navigateTo('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6528,8 +6709,12 @@ export default function App() {
                 <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
-                {currentUser.name.substring(0, 2)}
+              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase overflow-hidden">
+                {currentUser.profilePhoto ? (
+                  <img src={currentUser.profilePhoto} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  `${currentUser.name.substring(0, 1)}${(currentUser.lastName || currentUser.name.substring(1, 2)).substring(0, 1)}`.toUpperCase()
+                )}
               </div>
             </div>
           </div>
@@ -6570,6 +6755,14 @@ export default function App() {
           ) : (
             <>
           {/* View Router (unchanged) */}
+          {activeTab === 'profile' && currentUser && (
+            <UserProfileView
+              currentUser={currentUser}
+              brandColor={brandColor}
+              onUpdateProfile={handleUpdateCurrentUserProfile}
+            />
+          )}
+
           {activeTab === 'student-portal' && currentUser.studentId && (
             <StudentPortalView
               student={students.find(s => s.id === currentUser.studentId)!}
@@ -6886,6 +7079,7 @@ export default function App() {
               currentOrgId={currentOrgId}
               organizations={organizations}
               users={users}
+              brandColor={brandColor}
               onCreateTicket={handleCreateFeedbackTicket}
               onUpdateTicket={handleUpdateFeedbackTicket}
               onNotify={handleNotify}
@@ -6976,6 +7170,7 @@ export default function App() {
             <ARCollectionReceiptView
               entries={activeJournalEntries}
               lines={filteredLines}
+              payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
               bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}

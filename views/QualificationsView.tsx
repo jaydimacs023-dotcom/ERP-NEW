@@ -4,6 +4,7 @@ import { Batch, Qualification, Trainer, Organization } from '../types';
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle,
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
@@ -46,6 +47,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showModal, setShowModal] = useState(false);
   const [editingQual, setEditingQual] = useState<Qualification | null>(null);
+  const [viewingQual, setViewingQual] = useState<Qualification | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -75,6 +77,15 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     const matchesSector = sectorFilter === 'ALL' || q.sector === sectorFilter;
     return matchesSearch && matchesSector;
   });
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedQuals,
+    setCurrentPage
+  } = usePaginatedRows(filteredQuals, [searchTerm, sectorFilter], 7);
 
   const resetForm = () => {
     setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
@@ -121,6 +132,9 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           updatedAt: new Date().toISOString()
         };
         await onUpdateQualification(updatedQual);
+        if (viewingQual?.id === updatedQual.id) {
+          setViewingQual(updatedQual);
+        }
         showToast(`Qualification "${formData.name}" updated successfully!`, 'success');
       } else {
         // Create new qualification with proper UUID
@@ -189,8 +203,117 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
 
   return (
     <div className="space-y-6 relative">
-      
+      {viewingQual && !showModal && (() => {
+        const activeBatches = batches.filter(b => b.qualificationId === viewingQual.id && !b.isDeleted);
+        const assignedTrainers = trainers.filter(t => t.qualificationIds.includes(viewingQual.id) && !t.isDeleted);
 
+        return (
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div
+              className="rounded-md border bg-white p-5 shadow-sm"
+              style={{ borderColor: `${brandColor}30`, background: `linear-gradient(90deg, ${brandColor}10, #ffffff 45%)` }}
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setViewingQual(null)}
+                    className="mb-4 inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-brand hover:text-brand"
+                  >
+                    <ChevronRight size={15} className="rotate-180" />
+                    Back to Qualifications
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded border border-brand-light bg-brand/10 text-brand">
+                      <Award size={22} />
+                    </div>
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="rounded border border-brand-light bg-brand/10 px-2.5 py-1 text-xs font-mono font-semibold text-brand">{viewingQual.code}</span>
+                        <span className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-500">{viewingQual.sector || 'Uncategorized'}</span>
+                      </div>
+                      <h2 className="text-xl font-semibold text-gray-900 tracking-tight">{viewingQual.name}</h2>
+                      <p className="text-sm text-gray-500">Qualification profile and usage summary.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openEditModal(viewingQual)}
+                  className="inline-flex items-center justify-center gap-2 rounded bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition-colors hover:bg-brand-hover"
+                >
+                  <Edit2 size={17} />
+                  Edit Qualification
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Duration</p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800">
+                  <Clock size={15} className="text-brand" />
+                  {viewingQual.durationDays} days
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Training Batches</p>
+                <p className="mt-3 text-2xl font-semibold text-gray-900">{activeBatches.length}</p>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Assigned Trainers</p>
+                <p className="mt-3 text-2xl font-semibold text-gray-900">{assignedTrainers.length}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Layers size={17} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Related Batches</h3>
+                </div>
+                {activeBatches.length > 0 ? (
+                  <div className="space-y-2">
+                    {activeBatches.slice(0, 5).map(batch => (
+                      <div key={batch.id} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="text-sm font-semibold text-gray-800">{batch.name}</p>
+                        <p className="text-xs text-gray-400">{batch.status}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No batches use this qualification yet.</p>
+                )}
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <ShieldCheck size={17} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Assigned Trainers</h3>
+                </div>
+                {assignedTrainers.length > 0 ? (
+                  <div className="space-y-2">
+                    {assignedTrainers.slice(0, 5).map(trainer => (
+                      <div key={trainer.id} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="text-sm font-semibold text-gray-800">{trainer.lastName}, {trainer.firstName}</p>
+                        <p className="text-xs text-gray-400">{trainer.email}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No trainers are assigned to this qualification.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {!viewingQual && (
+        <>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight flex items-center gap-3">
@@ -258,12 +381,23 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                 <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Code & Sector</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Qualification Name</th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Duration</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredQuals.length > 0 ? filteredQuals.map(qual => (
-                <tr key={qual.id} className="hover:bg-gray-50/50 transition-colors group">
+              {filteredQuals.length > 0 ? paginatedQuals.map(qual => (
+                <tr
+                  key={qual.id}
+                  onClick={() => setViewingQual(qual)}
+                  className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setViewingQual(qual);
+                    }
+                  }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <div className="text-xs font-mono font-semibold text-brand bg-brand/10 px-2 py-0.5 rounded inline-block border border-brand-light w-fit">
@@ -295,39 +429,10 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEditModal(qual)}
-                        className="p-2 hover:bg-brand-light text-gray-300 hover:text-brand rounded transition-all"
-                        title="Edit"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(qual.id)}
-                        disabled={
-                          deletingId === qual.id ||
-                          batches.some(b => b.qualificationId === qual.id && (b.status === 'PLANNED' || b.status === 'ONGOING')) ||
-                          trainers.some(t => t.qualificationIds.includes(qual.id))
-                        }
-                        className="p-2 hover:bg-rose-50 text-gray-300 hover:text-rose-600 rounded transition-all disabled:opacity-50"
-                        title={
-                          batches.some(b => b.qualificationId === qual.id && (b.status === 'PLANNED' || b.status === 'ONGOING'))
-                            ? 'Cannot delete qualification while assigned to active batches.'
-                            : trainers.some(t => t.qualificationIds.includes(qual.id))
-                              ? 'Cannot delete qualification while trainers are assigned.'
-                              : 'Delete'
-                        }
-                      >
-                        {deletingId === qual.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12">
+                  <td colSpan={3} className="px-6 py-12">
                     <EmptyState
                       title="No qualifications registered"
                       description="Add your first professional qualification to your TESDA-registered program catalog."
@@ -340,10 +445,19 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               )}
             </tbody>
           </table>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredQuals.length}
+            pageStartIndex={pageStartIndex}
+            pageEndIndex={pageEndIndex}
+            onPageChange={setCurrentPage}
+            itemLabel="qualifications"
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {filteredQuals.map(qual => {
+          {paginatedQuals.map(qual => {
             const color = getSectorColor(qual.sector || '');
             return (
               <div key={qual.id} className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow-md hover:border-brand-light transition-all group overflow-hidden flex flex-col">
@@ -403,7 +517,20 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           {filteredQuals.length === 0 && (
             <div className="col-span-full py-16 text-center text-gray-400">No matching qualifications found.</div>
           )}
+          <div className="col-span-full">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredQuals.length}
+              pageStartIndex={pageStartIndex}
+              pageEndIndex={pageEndIndex}
+              onPageChange={setCurrentPage}
+              itemLabel="qualifications"
+            />
+          </div>
         </div>
+      )}
+        </>
       )}
 
       {/* Toast Notifications */}

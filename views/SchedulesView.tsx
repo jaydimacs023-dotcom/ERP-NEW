@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Batch, Trainer, TrainerSchedule, DaySlot, Location, Organization, Qualification } from '../types';
 import { generateUUID } from '../utils/uuid';
-import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { 
   CalendarClock, Search, Plus, Trash2, X, ChevronRight, 
   Clock, Timer, AlertCircle, CalendarDays, Check, MapPin,
@@ -62,6 +62,7 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
     }
   }, [brandColor]);
   const [editingSchedule, setEditingSchedule] = useState<TrainerSchedule | null>(null);
+  const [viewingSchedule, setViewingSchedule] = useState<TrainerSchedule | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -106,6 +107,15 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
     return matchesSearch && matchesLocation;
   }), [schedules, trainers, locations, searchTerm, locationFilter]);
 
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedSchedules,
+    setCurrentPage
+  } = usePaginatedRows(filteredSchedules, [searchTerm, locationFilter], 5);
+
   const resetForm = () => {
     setFormData({ trainerId: '', locationId: '', slots: [] });
     setEditingSchedule(null);
@@ -142,6 +152,9 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
           updatedAt: new Date().toISOString()
         };
         await onUpdateSchedule(updatedSchedule);
+        if (viewingSchedule?.id === updatedSchedule.id) {
+          setViewingSchedule(updatedSchedule);
+        }
         showToast(`Schedule for "${trainerName}" updated successfully!`, 'success');
       } else {
         // Create new schedule with proper UUID
@@ -229,6 +242,124 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {viewingSchedule && !showModal && (() => {
+        const trainer = trainers.find(t => t.id === viewingSchedule.trainerId);
+        const location = locations.find(l => l.id === viewingSchedule.locationId);
+        const weeklyHours = viewingSchedule.slots.reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0);
+
+        return (
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div
+              className="rounded-md border bg-white p-5 shadow-sm"
+              style={{ borderColor: `${brandColor}30`, background: `linear-gradient(90deg, ${brandColor}10, #ffffff 45%)` }}
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setViewingSchedule(null)}
+                    className="mb-4 inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-brand hover:text-brand"
+                  >
+                    <ChevronRight size={15} className="rotate-180" />
+                    Back to Schedules
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded border border-brand-light bg-brand/10 text-brand">
+                      <CalendarClock size={22} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 tracking-tight">
+                        {trainer ? `${trainer.lastName}, ${trainer.firstName}` : 'Schedule Details'}
+                      </h2>
+                      <p className="text-sm text-gray-500">{location?.name || 'Mobile/Remote'} schedule profile</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSchedule(viewingSchedule);
+                    setFormData(viewingSchedule);
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition-colors hover:bg-brand-hover"
+                >
+                  <Edit2Icon size={17} />
+                  Edit Schedule
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-brand-light bg-brand/10 p-4 text-sm text-brand shadow-sm">
+              <div className="flex gap-3">
+                <Info size={18} className="mt-0.5 shrink-0" />
+                <p className="font-medium">
+                  Schedule updates will be reflected for incoming new assignments. Existing assigned or ongoing batches keep their current schedule snapshot.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Trainer</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded border border-brand-light bg-brand/10 text-xs font-semibold text-brand">
+                    {trainer?.lastName?.[0]}{trainer?.firstName?.[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{trainer ? `${trainer.lastName}, ${trainer.firstName}` : 'Unassigned'}</p>
+                    <p className="text-xs text-gray-400">{trainer?.email || 'No email recorded'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Location</p>
+                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <MapPin size={16} className="text-brand" />
+                  {location?.name || 'Mobile/Remote'}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Weekly Load</p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-sm font-semibold text-gray-800">
+                  <Timer size={15} className="text-brand" />
+                  {weeklyHours.toFixed(1)} hrs
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <Clock size={17} className="text-brand" />
+                <h3 className="text-sm font-semibold text-gray-900">Schedule Slots</h3>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {viewingSchedule.slots.map((slot, index) => (
+                  <div key={`${slot.dayIndex}-${slot.qualificationId || 'all'}-${index}`} className="rounded border border-gray-100 bg-gray-50 p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{DAYS[slot.dayIndex]}</p>
+                        <p className="mt-1 text-xs font-medium text-gray-500">{getQualificationLabel(slot.qualificationId)}</p>
+                      </div>
+                      <span className="rounded bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">
+                        {getSlotHours(slot.startTime, slot.endTime).toFixed(1)}h
+                      </span>
+                    </div>
+                    <p className="font-mono text-sm font-semibold text-gray-800">{slot.startTime} - {slot.endTime}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {!showModal && !viewingSchedule && (
+        <>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Institutional Capacity Engine</h2>
@@ -287,315 +418,351 @@ const SchedulesView: React.FC<SchedulesViewProps> = ({
 
       <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-brand border-b">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-brand border-b border-brand">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Location</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wide">Weekly Hours</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Schedule</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-white uppercase tracking-wide">Location</th>
+                <th className="px-5 py-3 text-center text-xs font-semibold text-white uppercase tracking-wide">Hours</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-white uppercase tracking-wide">Active Days</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-white uppercase tracking-wide">Time Blocks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredSchedules.length > 0 ? filteredSchedules.map(sch => {
+              {filteredSchedules.length > 0 ? paginatedSchedules.map(sch => {
                 const trainer = trainers.find(t => t.id === sch.trainerId);
                 const location = locations.find(l => l.id === sch.locationId);
                 const weeklyHours = sch.slots.reduce((sum, s) => sum + getSlotHours(s.startTime, s.endTime), 0);
+                const activeDays = DAYS.map((day, idx) => ({
+                  day,
+                  count: sch.slots.filter(s => s.dayIndex === idx).length
+                })).filter(item => item.count > 0);
+                const sortedSlots = [...sch.slots].sort((a, b) =>
+                  a.dayIndex - b.dayIndex ||
+                  a.startTime.localeCompare(b.startTime) ||
+                  (a.qualificationId || '').localeCompare(b.qualificationId || '')
+                );
+                const previewSlots = sortedSlots.slice(0, 3);
 
                 return (
-                  <tr key={sch.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-5">
+                  <tr
+                    key={sch.id}
+                    onClick={() => setViewingSchedule(sch)}
+                    className="hover:bg-gray-50/80 transition-colors group cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setViewingSchedule(sch);
+                      }
+                    }}
+                  >
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded bg-gray-800 text-white flex items-center justify-center font-semibold text-sm shadow-sm">
+                        <div className="w-9 h-9 rounded border border-brand-light bg-brand/10 text-brand flex items-center justify-center font-semibold text-xs">
                           {trainer?.lastName[0]}{trainer?.firstName[0]}
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-800">{trainer?.lastName}, {trainer?.firstName}</p>
-                          <p className="text-xs text-gray-500 uppercase tracking-wide">Trainer</p>
+                          <p className="text-xs text-gray-400">Trainer</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-brand" />
+                        <MapPin size={15} className="text-brand" />
                         <span className="text-sm text-gray-700">{location?.name || 'Mobile/Remote'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-center">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-800 text-white rounded text-sm font-mono font-semibold">
-                        <Timer size={14} />
+                    <td className="px-5 py-4 text-center">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-gray-200 bg-white text-sm font-mono font-semibold text-gray-700">
+                        <Timer size={13} className="text-brand" />
                         {weeklyHours.toFixed(1)} hrs
                       </div>
                     </td>
-                    <td className="px-6 py-5">
-                      <div className="flex flex-wrap gap-1">
-                        {DAYS.map((day, idx) => {
-                          const daySlots = sch.slots.filter(s => s.dayIndex === idx);
-                          return (
-                            <div key={day} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${daySlots.length ? 'bg-brand text-white' : 'bg-gray-100 text-gray-400'}`}>
-                              <span>{day.slice(0, 3)}</span>
-                              {daySlots.length > 0 && <Clock size={10} />}
-                              {daySlots.length > 1 && <span className="font-mono">{daySlots.length}</span>}
-                            </div>
-                          );
-                        })}
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeDays.length > 0 ? activeDays.map(item => (
+                          <span key={item.day} className="inline-flex items-center gap-1 rounded border border-brand-light bg-brand/10 px-2 py-1 text-xs font-semibold text-brand">
+                            {item.day.slice(0, 3)}
+                            {item.count > 1 && <span className="font-mono text-[10px]">{item.count}</span>}
+                          </span>
+                        )) : (
+                          <span className="text-xs font-medium text-gray-400">No active days</span>
+                        )}
                       </div>
-                      <div className="mt-2 space-y-1">
-                        {sch.slots.map((slot, idx) => (
-                          <div key={`${slot.dayIndex}-${slot.qualificationId || 'all'}-${idx}`} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block mr-1">
-                            {DAYS[slot.dayIndex]}: {slot.startTime} - {slot.endTime}
-                            <span className="ml-1 font-semibold text-brand">{getQualificationLabel(slot.qualificationId)}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <p className="mt-1 text-xs text-gray-400">{sch.slots.length} slot{sch.slots.length === 1 ? '' : 's'}</p>
                     </td>
-                    <td className="px-6 py-5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => { setEditingSchedule(sch); setFormData(sch); setShowModal(true); }}
-                          className="p-2 hover:bg-brand-light rounded text-gray-400 hover:text-brand transition-colors"
-                          title="Edit Schedule"
-                          disabled={deletingId === sch.id}
-                        >
-                          <Edit2Icon size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(sch.id)}
-                          disabled={
-                            deletingId === sch.id ||
-                            !!batches.find(b => b.trainerId === sch.trainerId && (b.status === 'PLANNED' || b.status === 'ONGOING'))
-                          }
-                          className="p-2 hover:bg-rose-50 rounded text-gray-400 hover:text-rose-600 transition-colors disabled:opacity-50"
-                          title={
-                            batches.find(b => b.trainerId === sch.trainerId && (b.status === 'PLANNED' || b.status === 'ONGOING'))
-                              ? 'Cannot delete schedule while trainer has planned or ongoing batch.'
-                              : 'Delete Schedule'
-                          }
-                        >
-                          {deletingId === sch.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                        </button>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {previewSlots.map((slot, idx) => (
+                          <span key={`${slot.dayIndex}-${slot.qualificationId || 'all'}-${idx}`} className="inline-flex items-center gap-1.5 rounded border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-600">
+                            <Clock size={10} className="text-brand" />
+                            {DAYS[slot.dayIndex].slice(0, 3)} {slot.startTime}-{slot.endTime}
+                          </span>
+                        ))}
+                        {sortedSlots.length > previewSlots.length && (
+                          <span className="inline-flex rounded border border-brand-light bg-brand/10 px-2 py-1 text-xs font-semibold text-brand">
+                            +{sortedSlots.length - previewSlots.length} more
+                          </span>
+                        )}
                       </div>
+                      <p className="mt-1 text-xs text-gray-400">Click row to view or update</p>
                     </td>
                   </tr>
                 );
               }) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-16 text-center">
-                    <CalendarDays size={64} strokeWidth={1} className="mx-auto mb-6 text-gray-200" />
-                    <h3 className="text-xl font-semibold text-gray-400 uppercase tracking-tight">No trainer profiles established</h3>
-                    <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">Schedules are mandatory for computing program terminal dates and institutional instructional hours.</p>
+                    <CalendarDays size={48} strokeWidth={1.5} className="mx-auto mb-4 text-gray-200" />
+                    <h3 className="text-base font-semibold text-gray-500">No trainer schedules yet</h3>
+                    <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto">Create a schedule session to start building trainer availability.</p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredSchedules.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="schedules"
+        />
       </div>
+        </>
+      )}
 
       {showModal && (
-        <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 flex flex-col md:flex-row h-full max-h-[90vh]">
-            
-            <div className="flex-1 overflow-y-auto p-5 border-r border-gray-100 bg-white">
-               <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                     <div className="p-4 bg-brand text-white rounded shadow-sm shadow-brand/20"><CalendarClock size={28} /></div>
-                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Configuration Console</h3>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Institutional Labor Matrix v4.1</p>
-                     </div>
-                  </div>
-                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X size={32} /></button>
-               </div>
-
-               <form onSubmit={handleSubmit} className="space-y-12">
-                  <section className="space-y-8">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-brand/10 text-brand rounded border border-brand-light"><GraduationCap size={18} /></div>
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">I. Personnel Allocation</h4>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-8">
-                        <div className="space-y-2">
-                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Lead Instructor</label>
-                           <select 
-                              required 
-                              disabled={!!editingSchedule}
-                              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-semibold text-gray-800 appearance-none disabled:opacity-50"
-                              value={formData.trainerId}
-                              onChange={e => setFormData({...formData, trainerId: e.target.value})}
-                           >
-                              <option value="">Choose Personnel...</option>
-                              {trainers.map(t => <option key={t.id} value={t.id}>{t.lastName.toUpperCase()}, {t.firstName}</option>)}
-                           </select>
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Primary Deployment Station</label>
-                           <select 
-                              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-semibold text-gray-800 appearance-none"
-                              value={formData.locationId}
-                              onChange={e => setFormData({...formData, locationId: e.target.value})}
-                           >
-                              <option value="">Remote / Decentralized</option>
-                              {locations.map(l => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
-                           </select>
-                        </div>
-                     </div>
-                  </section>
-
-                  <section className="space-y-8">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-brand/10 text-brand rounded border border-brand-light"><Timer size={18} /></div>
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">II. Shift Definition Matrix</h4>
-                     </div>
-
-                     <div className="p-8 bg-gray-800 rounded-md border border-gray-700 shadow-md relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-5 opacity-5"><Sparkles size={120} /></div>
-                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
-                           <div className="md:col-span-2 space-y-2">
-                              <label className="text-xs font-semibold text-brand uppercase tracking-wide px-1">Qualification Allocation</label>
-                              <select
-                                 className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-semibold text-white focus:border-brand"
-                                 value={activeSlot.qualificationId || ''}
-                                 onChange={e => setActiveSlot({...activeSlot, qualificationId: e.target.value || undefined})}
-                              >
-                                 <option value="" className="bg-gray-800">General / Any Qualification</option>
-                                 {selectedTrainerQualifications.map(q => (
-                                   <option key={q.id} value={q.id} className="bg-gray-800">
-                                     {q.name} {q.code ? `(${q.code})` : ''}
-                                   </option>
-                                 ))}
-                              </select>
-                           </div>
-                           <div className="space-y-2">
-                              <label className="text-xs font-semibold text-brand uppercase tracking-wide px-1">Target Work Day</label>
-                              <select 
-                                 className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-semibold text-white focus:border-brand"
-                                 value={activeSlot.dayIndex}
-                                 onChange={e => setActiveSlot({...activeSlot, dayIndex: Number(e.target.value)})}
-                              >
-                                 {DAYS.map((d, i) => <option key={i} value={i} className="bg-gray-800">{d}</option>)}
-                              </select>
-                           </div>
-                           <div className="space-y-2">
-                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Commencement</label>
-                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-mono font-semibold text-white focus:border-brand"
-                                 value={activeSlot.startTime} onChange={e => setActiveSlot({...activeSlot, startTime: e.target.value})} />
-                           </div>
-                           <div className="space-y-2">
-                              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">Termination</label>
-                              <input type="time" className="w-full px-5 py-3.5 bg-white/5 border-2 border-white/10 rounded outline-none text-sm font-mono font-semibold text-white focus:border-brand"
-                                 value={activeSlot.endTime} onChange={e => setActiveSlot({...activeSlot, endTime: e.target.value})} />
-                           </div>
-                        </div>
-                        <div className="mt-8 pt-8 border-t border-white/5">
-                           <p className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                              Lunch break from 12:00 PM to 1:00 PM is excluded from training hours.
-                           </p>
-                           <button 
-                              type="button" 
-                              onClick={addSlot}
-                              className="w-full py-4 bg-brand text-white rounded text-xs font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-3 shadow-sm shadow-brand/20 active:scale-95"
-                           >
-                              <Check size={18} strokeWidth={4} /> Update Capacity Matrix
-                           </button>
-                        </div>
-                     </div>
-                  </section>
-               </form>
-            </div>
-
-            <div className="w-full md:w-[400px] bg-gray-50 p-5 flex flex-col shrink-0">
-               <div className="flex items-center justify-between mb-8">
-                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
-                     <ShieldCheck size={20} className="text-brand" />
-                     Live Profile Load
-                  </h4>
-                  <div className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    SYNC_ID: {Date.now().toString().slice(-6)}
-                  </div>
-               </div>
-
-               <div className="flex-1 space-y-3 overflow-y-auto scrollbar-hide">
-                  {(formData.slots || []).length > 0 ? (formData.slots || []).map((s, index) => {
-                     const hrs = getSlotHours(s.startTime, s.endTime);
-                     return (
-                        <div key={`${s.dayIndex}-${s.qualificationId || 'all'}-${index}`} className="group p-6 bg-white rounded border border-gray-100 shadow-sm animate-in slide-in-from-right-4 duration-500 hover:border-brand transition-all">
-                           <div className="flex justify-between items-start mb-4">
-                              <div>
-                                <span className="text-xs font-semibold text-brand uppercase tracking-wide">{DAYS[s.dayIndex]}</span>
-                                <p className="mt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{getQualificationLabel(s.qualificationId)}</p>
-                              </div>
-                              <button type="button" onClick={() => removeSlot(s)} className="text-gray-200 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
-                           </div>
-                           <div className="flex justify-between items-end">
-                              <div className="space-y-1">
-                                 <p className="text-lg font-mono font-semibold text-gray-800 tracking-tighter">{s.startTime} — {s.endTime}</p>
-                                 <p className="text-xs font-semibold text-gray-400 uppercase">Operational Shift</p>
-                              </div>
-                              <div className="p-3 bg-brand/10 text-brand rounded font-semibold text-xs group-hover:bg-brand-light group-hover:text-brand transition-all">
-                                 {hrs.toFixed(1)}h
-                              </div>
-                           </div>
-                        </div>
-                     )
-                  }) : (
-                     <div className="py-20 text-center bg-white/50 rounded-md border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-4">
-                        <Activity size={40} className="text-gray-200" />
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide italic">Matrix is Unassigned</p>
-                     </div>
-                  )}
-               </div>
-
-               <div className="mt-8 pt-8 border-t-2 border-gray-200">
-                  <div className="space-y-6">
-                     <div className="flex justify-between items-end">
-                        <div>
-                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cumulative Load</p>
-                           <div className="flex items-baseline gap-2">
-                              <h5 className="text-xl font-mono font-semibold text-gray-900 tracking-tighter">{totalWeeklyHours.toFixed(1)}</h5>
-                              <span className="text-xs font-semibold text-brand uppercase">Hours / Week</span>
-                           </div>
-                        </div>
-                        {totalWeeklyHours > 40 && (
-                          <div className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-semibold uppercase flex items-center gap-1.5 animate-pulse">
-                             <AlertCircle size={10} /> Over-Capacity
-                          </div>
-                        )}
-                     </div>
-
-                     <div className="bg-brand/10 p-6 rounded border border-brand-light flex gap-4">
-                       <Info size={24} className="text-brand shrink-0" />
-                        <p className="text-xs text-brand leading-relaxed font-bold">
-                           Instructional hour metrics feed the <strong>Projected Completion Engine</strong> for future planned batches. Once training commences, the batch keeps its own locked schedule snapshot.
-                        </p>
-                     </div>
-
-                     <button 
-                       onClick={handleSubmit}
-                       disabled={!formData.trainerId || !formData.slots?.length || isSubmitting}
-                       className="w-full py-5 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-sm shadow-brand/20 hover:bg-brand-hover active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-3"
-                     >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            {editingSchedule ? 'Updating...' : 'Committing...'}
-                          </>
-                        ) : (
-                          <>
-                            <Save size={18} />
-                            {editingSchedule ? 'Update Professional Profile' : 'Commit Professional Profile'}
-                          </>
-                        )}
-                     </button>
-                  </div>
-               </div>
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div
+            className="rounded-md border bg-white p-5 shadow-sm"
+            style={{ borderColor: `${brandColor}30`, background: `linear-gradient(90deg, ${brandColor}10, #ffffff 45%)` }}
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded bg-brand text-white shadow-sm shadow-brand/20">
+                  <CalendarClock size={22} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 tracking-tight">
+                    {editingSchedule ? 'Modify Schedule Session' : 'Schedule Session'}
+                  </h2>
+                  <p className="text-sm text-gray-500">Trainer availability, deployment station, and weekly load.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowModal(false); resetForm(); }}
+                className="inline-flex items-center justify-center gap-2 rounded border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:border-brand hover:text-brand"
+              >
+                <X size={16} />
+                {viewingSchedule ? 'Back to Schedule' : 'Back to Schedules'}
+              </button>
             </div>
           </div>
+
+          <div className="rounded-md border border-brand-light bg-brand/10 p-4 text-sm text-brand shadow-sm">
+            <div className="flex gap-3">
+              <Info size={18} className="mt-0.5 shrink-0" />
+              <p className="font-medium">
+                New or updated schedules will be reflected for incoming new assignments. Existing assigned or ongoing batches keep their current schedule snapshot.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <form
+              id="schedule-session-form"
+              onSubmit={handleSubmit}
+              className="space-y-5 rounded-md border border-gray-200 bg-white p-5 shadow-sm [&_input]:rounded [&_input]:border [&_input]:border-gray-200 [&_input]:bg-gray-50 [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-sm [&_input]:outline-none [&_input]:transition-colors [&_input:focus]:border-brand [&_select]:rounded [&_select]:border [&_select]:border-gray-200 [&_select]:bg-gray-50 [&_select]:px-3 [&_select]:py-2.5 [&_select]:text-sm [&_select]:font-semibold [&_select]:text-gray-800 [&_select]:outline-none [&_select]:transition-colors [&_select:focus]:border-brand"
+            >
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                  <GraduationCap size={18} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Trainer Details</h3>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Lead Instructor</label>
+                    <select
+                      required
+                      disabled={!!editingSchedule}
+                      className="w-full appearance-none disabled:opacity-50"
+                      value={formData.trainerId}
+                      onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
+                    >
+                      <option value="">Choose personnel</option>
+                      {trainers.map(t => <option key={t.id} value={t.id}>{t.lastName.toUpperCase()}, {t.firstName}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployment Station</label>
+                    <select
+                      className="w-full appearance-none"
+                      value={formData.locationId}
+                      onChange={e => setFormData({ ...formData, locationId: e.target.value })}
+                    >
+                      <option value="">Remote / decentralized</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.code} - {l.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                  <Timer size={18} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Session Slot</h3>
+                </div>
+
+                <div className="rounded-md border border-gray-200 bg-gray-50/70 p-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="space-y-1.5 xl:col-span-2">
+                      <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Qualification</label>
+                      <select
+                        className="w-full"
+                        value={activeSlot.qualificationId || ''}
+                        onChange={e => setActiveSlot({ ...activeSlot, qualificationId: e.target.value || undefined })}
+                      >
+                        <option value="">General / any qualification</option>
+                        {selectedTrainerQualifications.map(q => (
+                          <option key={q.id} value={q.id}>
+                            {q.name} {q.code ? `(${q.code})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Day</label>
+                      <select
+                        className="w-full"
+                        value={activeSlot.dayIndex}
+                        onChange={e => setActiveSlot({ ...activeSlot, dayIndex: Number(e.target.value) })}
+                      >
+                        {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Start</label>
+                      <input
+                        type="time"
+                        className="w-full font-mono font-semibold"
+                        value={activeSlot.startTime}
+                        onChange={e => setActiveSlot({ ...activeSlot, startTime: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">End</label>
+                      <input
+                        type="time"
+                        className="w-full font-mono font-semibold"
+                        value={activeSlot.endTime}
+                        onChange={e => setActiveSlot({ ...activeSlot, endTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs font-medium text-gray-500">Lunch break from 12:00 PM to 1:00 PM is excluded from training hours.</p>
+                    <button
+                      type="button"
+                      onClick={addSlot}
+                      className="inline-flex items-center justify-center gap-2 rounded bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition-all hover:bg-brand-hover active:scale-95"
+                    >
+                      <Check size={16} />
+                      Add Slot
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </form>
+
+            <aside className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <ShieldCheck size={18} className="text-brand" />
+                  Weekly Load
+                </h3>
+                {totalWeeklyHours > 40 && (
+                  <span className="inline-flex items-center gap-1 rounded border border-rose-100 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600">
+                    <AlertCircle size={12} />
+                    Over capacity
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {(formData.slots || []).length > 0 ? (formData.slots || []).map((s, index) => {
+                  const hrs = getSlotHours(s.startTime, s.endTime);
+                  return (
+                    <div key={`${s.dayIndex}-${s.qualificationId || 'all'}-${index}`} className="group rounded border border-gray-100 bg-gray-50 p-4 transition-all hover:border-brand">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{DAYS[s.dayIndex]}</p>
+                          <p className="mt-1 text-xs font-medium text-gray-500">{getQualificationLabel(s.qualificationId)}</p>
+                        </div>
+                        <button type="button" onClick={() => removeSlot(s)} className="rounded p-1 text-gray-300 transition-colors hover:bg-rose-50 hover:text-rose-600">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div className="flex items-end justify-between gap-3">
+                        <p className="font-mono text-sm font-semibold text-gray-800">{s.startTime} - {s.endTime}</p>
+                        <span className="rounded bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{hrs.toFixed(1)}h</span>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-gray-200 bg-gray-50 py-14 text-center">
+                    <Activity size={34} className="text-gray-300" />
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">No slots added</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-gray-100 pt-5">
+                <div className="mb-4 flex items-end justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Total</p>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="font-mono text-2xl font-semibold text-gray-900">{totalWeeklyHours.toFixed(1)}</span>
+                      <span className="text-xs font-semibold uppercase text-brand">hours/week</span>
+                    </div>
+                  </div>
+                  <Info size={18} className="text-brand" />
+                </div>
+
+                <button
+                  type="submit"
+                  form="schedule-session-form"
+                  disabled={!formData.trainerId || !formData.slots?.length || isSubmitting}
+                  className="flex w-full items-center justify-center gap-2 rounded bg-brand px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition-all hover:bg-brand-hover active:scale-95 disabled:opacity-40 disabled:grayscale"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={17} className="animate-spin" />
+                      {editingSchedule ? 'Updating...' : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <Save size={17} />
+                      {editingSchedule ? 'Update Schedule' : 'Save Schedule'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </aside>
+          </div>
         </div>
-</ModalPortal>
       )}
     </div>
   );

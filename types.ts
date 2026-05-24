@@ -177,6 +177,10 @@ export interface User extends BaseEntity {
   id: string;
   name: string;
   email: string;
+  lastName?: string;
+  profilePhoto?: string;
+  contactNumber?: string;
+  address?: string;
   password?: string;
   role: 'SYSTEM_ADMIN' | 'ADMIN' | 'ACCOUNTANT' | 'REGISTRAR' | 'STUDENT' | 'TRAINER' | 'AP_SPECIALIST' | 'AR_SPECIALIST' | 'FINANCE_MANAGER' | 'PRESIDENT' | 'TREASURY' | 'AUDITOR' | 'AP_CLERK' | 'AP_SUPERVISOR';
   orgId: string;
@@ -220,6 +224,16 @@ export interface Student extends BaseEntity {
   district?: string;
   province?: string;
   guardian?: string;
+  mailingRegion?: string;
+  tesdaEmploymentStatus?: string;
+  tesdaEmploymentType?: string;
+  tesdaLearnerClassifications?: string[];
+  tesdaOtherClassification?: string;
+  tesdaDisabilityTypes?: string[];
+  tesdaDisabilityCauses?: string[];
+  tesdaCourseQualification?: string;
+  tesdaScholarshipPackage?: string;
+  tesdaPrivacyConsent?: string;
   locationId?: string;
   sponsorId?: string;
   profilePhoto?: string;

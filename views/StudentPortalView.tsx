@@ -482,8 +482,8 @@ const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
       {activeTab === 'DOCS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {complianceDocuments.map(doc => (
-              <div key={doc.id} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md transition-all">
+           {complianceDocuments.map((doc, docIndex) => (
+              <div key={`${doc.id}-${doc.name}-${docIndex}`} className="bg-white rounded-md border border-gray-200 p-8 space-y-6 flex flex-col group hover:shadow-md transition-all">
                  <div className="flex justify-between items-start">
                     <div className="p-4 rounded transition-all" style={{ backgroundColor: withAlpha(brandColor, 0.08), color: brandColor }}>
                        <FileText size={28}/>

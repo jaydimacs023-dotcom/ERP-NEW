@@ -1,12 +1,12 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
-import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
-  Search, Plus, Layers, Award, GraduationCap, Users, Calendar,
-  Trash2, X, CheckCircle, Clock, MoreVertical, Edit2, AlertCircle,
-  ChevronRight, Filter, LayoutGrid, List, Handshake, CalendarRange,
-  ShieldCheck, Timer, MapPin, Calculator, CalendarDays, Loader2, Play, Download
+  Search, Plus, Layers, Award, GraduationCap, Users,
+  Trash2, CheckCircle, Edit2, AlertCircle,
+  ChevronRight, Filter, Handshake, CalendarRange,
+  ShieldCheck, MapPin, Calculator, CalendarDays, Loader2, Play, Download
 } from 'lucide-react';
 
 interface BatchesViewProps {
@@ -125,6 +125,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [viewingBatch, setViewingBatch] = useState<Batch | null>(null);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
 
   const [formData, setFormData] = useState<Partial<Batch>>({
     name: '',
@@ -177,13 +178,32 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     }
   }, [formData.startDate, formData.qualificationId, formData.trainerId, qualifications, schedules]);
 
-  const filteredBatches = batches.filter(b => {
-    const matchesSearch =
-      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredBatches = useMemo(() => {
+    const getLatestTime = (batch: Batch) => {
+      const dateValue = batch.createdAt || batch.startDate || batch.endDate || '';
+      const time = new Date(dateValue).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    return batches
+      .filter(b => {
+        const matchesSearch =
+          b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => getLatestTime(b) - getLatestTime(a));
+  }, [batches, searchTerm, statusFilter]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedBatches,
+    setCurrentPage
+  } = usePaginatedRows(filteredBatches, [searchTerm, statusFilter], 7);
 
   const resetForm = () => {
     setFormData({
@@ -202,6 +222,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     });
     setEditingBatch(null);
     setProjection(null);
+    setStudentSearchTerm('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -367,6 +388,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     setFormData({
       ...batch
     });
+    setStudentSearchTerm('');
     setShowModal(true);
   };
 
@@ -390,6 +412,27 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       return true;
     });
   };
+
+  const selectedStudents = useMemo(
+    () => students.filter(student => formData.studentIds?.includes(student.id)),
+    [students, formData.studentIds]
+  );
+
+  const availableStudents = useMemo(() => {
+    const term = studentSearchTerm.trim().toLowerCase();
+    return students
+      .filter(student => !formData.studentIds?.includes(student.id))
+      .filter(student => !getStudentConflict(student.id))
+      .filter(student => {
+        if (!term) return true;
+        return [
+          student.firstName,
+          student.lastName,
+          student.email || '',
+          student.uli || ''
+        ].join(' ').toLowerCase().includes(term);
+      });
+  }, [students, formData.studentIds, studentSearchTerm, formData.qualificationId, batches, editingBatch]);
 
   const downloadCsv = () => {
     const headersSummary = ['Batch ID', 'Batch Code', 'Name', 'Year', 'Qualification', 'Trainer', 'Sponsor', 'Location', 'Status', 'Start Date', 'End Date', 'Students', 'Max Students'];
@@ -457,8 +500,252 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     onNotify?.('success', 'Batch CSV exported successfully.');
   };
 
+  if (viewingBatch) {
+    return (
+      <div className="space-y-5 animate-in fade-in duration-300">
+        <div
+          className="rounded-md border bg-white overflow-hidden shadow-sm relative"
+          style={{ borderColor: `${brandColor}30`, background: `linear-gradient(90deg, ${brandColor}10, #ffffff 48%)` }}
+        >
+          <div className="absolute left-0 top-0 h-full w-1.5 bg-brand" />
+          <div className="absolute top-4 right-4 text-brand opacity-10">
+            <Layers size={120} strokeWidth={1} />
+          </div>
+          <div className="relative z-10 p-5 md:p-6">
+            <button
+              type="button"
+              onClick={() => setViewingBatch(null)}
+              className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded border border-gray-200 bg-white text-xs font-semibold text-gray-600 transition-colors hover:border-brand hover:text-brand"
+            >
+              <ChevronRight size={16} className="rotate-180" /> Back to Batches
+            </button>
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <span className="text-xs font-semibold bg-brand/10 text-brand px-3 py-1 rounded border border-brand-light uppercase tracking-wide">FY {viewingBatch.year}</span>
+                  <span className="text-xs font-semibold bg-gray-50 text-gray-600 px-3 py-1 rounded border border-gray-200 uppercase tracking-wide">{viewingBatch.batchCode || 'No Batch Code'}</span>
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mb-2">{viewingBatch.name}</h2>
+                <p className="text-gray-500 text-sm font-medium">Batch overview and enrolled learner profile.</p>
+              </div>
+              {isBatchEditable(viewingBatch) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingBatch(null);
+                    openEditBatch(viewingBatch);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-brand text-white text-sm font-semibold hover:bg-brand-hover transition-colors shadow-sm shadow-brand/20"
+                >
+                  <Edit2 size={18} /> Edit Batch
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-5 rounded-md border bg-white shadow-sm" style={{ borderColor: `${brandColor}30` }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-brand/10 text-brand rounded border border-brand-light">
+                {getStatusBadge(viewingBatch.status)}
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Current Status</p>
+            <p className="text-lg font-semibold text-gray-800 capitalize">{viewingBatch.status.toLowerCase()}</p>
+          </div>
+
+          <div className="p-5 rounded-md border bg-white shadow-sm" style={{ borderColor: `${brandColor}30` }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-brand/10 text-brand rounded border border-brand-light">
+                <Users size={24} />
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Enrollment</p>
+            <p className="text-lg font-semibold text-gray-800">{viewingBatch.currentStudents} / {viewingBatch.maxStudents}</p>
+            <div className="mt-3 w-full bg-brand/10 rounded-full h-2">
+              <div
+                className="bg-brand h-2 rounded-full transition-all"
+                style={{ width: `${Math.min(((viewingBatch.currentStudents || 0) / (viewingBatch.maxStudents || 1)) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-md border bg-white shadow-sm" style={{ borderColor: `${brandColor}30` }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 bg-brand/10 text-brand rounded border border-brand-light">
+                <CalendarDays size={24} />
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Timeline</p>
+            <p className="text-sm font-bold text-gray-600">{viewingBatch.startDate}</p>
+            <p className="text-xs text-gray-400 font-semibold uppercase">to</p>
+            <p className="text-sm font-bold text-gray-800">{viewingBatch.endDate}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
+              <Award size={16} className="text-brand" />
+              Qualification Details
+            </h3>
+            <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm">
+              <p className="text-base font-semibold text-gray-800 mb-2">
+                {qualifications.find(q => q.id === viewingBatch.qualificationId)?.name || 'Unknown'}
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Code</p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    {qualifications.find(q => q.id === viewingBatch.qualificationId)?.code || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Duration</p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    {qualifications.find(q => q.id === viewingBatch.qualificationId)?.durationDays || 0} Days
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
+              <GraduationCap size={16} className="text-brand" />
+              Lead Instructor
+            </h3>
+            <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm">
+              {(() => {
+                const trainer = trainers.find(t => t.id === viewingBatch.trainerId);
+                return trainer ? (
+                  <>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded border border-brand-light bg-brand/10 text-brand flex items-center justify-center font-semibold text-sm">
+                        {trainer.lastName[0]}{trainer.firstName[0]}
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-800">{trainer.lastName}, {trainer.firstName}</p>
+                        <p className="text-xs text-gray-500 font-semibold">{trainer.email}</p>
+                      </div>
+                    </div>
+                    {trainer.phone && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact</p>
+                        <p className="text-sm font-semibold text-gray-700">{trainer.phone}</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-400 italic">No trainer assigned</p>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
+              <MapPin size={16} className="text-brand" />
+              Location & Sponsor
+            </h3>
+            <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Training Location</p>
+                <p className="text-sm font-semibold text-gray-700">
+                  {locations.find(l => l.id === viewingBatch.locationId)?.name || 'Not Specified'}
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sponsor</p>
+                <p className="text-sm font-semibold text-gray-700">
+                  {sponsors.find(s => s.id === viewingBatch.sponsorId)?.name || 'Private / Self-Funded'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
+              <Calculator size={16} className="text-brand" />
+              Projected Metrics
+            </h3>
+            <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm">
+              {(() => {
+                const qual = qualifications.find(q => q.id === viewingBatch.qualificationId);
+                const calculationSlots = getBatchCalculationSlots(viewingBatch, schedules);
+                if (qual && viewingBatch.startDate && calculationSlots.length > 0) {
+                  const projected = calculateProjectedEndDate(viewingBatch.startDate, qual.durationDays, calculationSlots);
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Hours</p>
+                          <p className="text-lg font-mono font-semibold text-gray-800">{projected.totalHours}h</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Calendar Days</p>
+                          <p className="text-lg font-mono font-semibold text-gray-800">{projected.calendarDays}</p>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Training Days</p>
+                        <p className="text-lg font-mono font-semibold text-brand">{projected.trainingDays}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return <p className="text-gray-400 italic text-sm">Metrics unavailable</p>;
+              })()}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
+            <Users size={16} className="text-brand" />
+            Enrolled Students ({viewingBatch.studentIds?.length || 0})
+          </h3>
+          <div className="bg-white p-5 rounded-md border border-gray-200 shadow-sm">
+            {viewingBatch.studentIds && viewingBatch.studentIds.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {viewingBatch.studentIds.map(studentId => {
+                  const student = students.find(s => s.id === studentId);
+                  return student ? (
+                    <div key={student.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
+                      <div className="w-9 h-9 rounded border border-brand-light bg-brand/10 text-brand flex items-center justify-center text-xs font-semibold shrink-0">
+                        {student.lastName[0]}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-xs font-semibold text-gray-800 truncate">
+                          {student.lastName}, {student.firstName}
+                        </p>
+                        <p className="text-xs font-mono text-gray-400 mt-0.5">
+                          {student.uli.slice(-6)}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            ) : (
+              <div className="py-12 text-center">
+                <Users size={48} className="mx-auto text-gray-200 mb-4" />
+                <p className="text-sm text-gray-400 font-semibold">No students enrolled yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {!showModal && (
+        <>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">
@@ -543,7 +830,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredBatches.map(batch => {
+              {paginatedBatches.map(batch => {
                 const qual = qualifications.find(q => q.id === batch.qualificationId);
                 const trainer = trainers.find(t => t.id === batch.trainerId);
                 const sponsor = sponsors.find(s => s.id === batch.sponsorId);
@@ -684,31 +971,64 @@ const BatchesView: React.FC<BatchesViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredBatches.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="batches"
+        />
       </div>
+        </>
+      )}
 
       {showModal && (
-        <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8 flex flex-col md:flex-row h-full max-h-[85vh]">
-            <div className="flex-1 overflow-y-auto border-r p-8">
-              <div className="flex items-center justify-between mb-8">
+        <div className="space-y-5 animate-in fade-in duration-300">
+          <div className="rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4" style={{ background: `linear-gradient(90deg, ${brandColor}12, ${brandColor}20)` }}>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 text-white rounded shadow-sm" style={{ backgroundColor: brandColor }}>
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold uppercase tracking-tight text-gray-800">
+                    {editingBatch ? 'Modify Batch Record' : 'Initialize Batch'}
+                  </h2>
+                  <p className="text-xs text-gray-500 font-semibold mt-1">Program setup, schedule forecast, and learner assignment.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded bg-white border border-gray-200 hover:bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600 transition-colors disabled:opacity-50"
+              >
+                <ChevronRight size={16} className="rotate-180" /> Back to Batches
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-md shadow-sm w-full overflow-hidden border border-gray-200">
+            <div className="p-5 md:p-6">
+              <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-brand text-white rounded shadow-sm shadow-brand/20">
-                    <Layers size={24} />
+                  <div className="p-2 bg-brand text-white rounded shadow-sm shadow-brand/20">
+                    <Layers size={18} />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
+                  <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-tight">
                     {editingBatch ? 'Modify Batch Record' : 'Initialize Batch'}
                   </h3>
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="space-y-1.5">
+              <form onSubmit={handleSubmit} className="space-y-5 [&_input]:px-3 [&_input]:py-2.5 [&_select]:px-3 [&_select]:py-2.5 [&_input]:text-sm [&_select]:text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">                  <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Batch Code</label>
                     <input
                       placeholder="e.g. BATCH-001"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
+                      className="w-full bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold text-gray-800"
                       value={formData.batchCode} onChange={e => setFormData({ ...formData, batchCode: e.target.value })}
                     />
                   </div>
@@ -717,7 +1037,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <input
                       required
                       placeholder="e.g. CSS-2024-B1"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
+                      className="w-full bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold text-gray-800"
                       value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
@@ -725,20 +1045,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Fiscal Year</label>
                     <input
                       required type="number"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold text-gray-800"
+                      className="w-full bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold text-gray-800"
                       value={formData.year} onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1.5">
                       <Award size={12} className="text-amber-500" /> Program Qualification
                     </label>
                     <select
                       required
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded font-semibold text-gray-800 appearance-none"
                       value={formData.qualificationId} onChange={e => {
                         const qualId = e.target.value;
                         setFormData(prev => ({
@@ -758,7 +1078,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </label>
                     <select
                       required
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded font-semibold text-gray-800 appearance-none"
                       value={formData.trainerId} onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
                     >
                       <option value="">Assign trainer...</option>
@@ -775,11 +1095,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Training Location</label>
                     <select
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded font-semibold text-gray-800 appearance-none"
                       value={formData.locationId} onChange={e => setFormData({ ...formData, locationId: e.target.value })}
                     >
                       <option value="">Remote / External</option>
@@ -789,7 +1109,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Funding Sponsor</label>
                     <select
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-800 appearance-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded font-semibold text-gray-800 appearance-none"
                       value={formData.sponsorId} onChange={e => setFormData({ ...formData, sponsorId: e.target.value })}
                     >
                       <option value="">Private / Individual</option>
@@ -798,12 +1118,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Commencement Date</label>
                     <input
                       required type="date"
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none text-sm font-bold"
+                      className="w-full bg-gray-50 border border-gray-200 rounded focus:border-brand outline-none font-semibold"
                       value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })}
                     />
                   </div>
@@ -815,7 +1135,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       <input
                         readOnly
                         placeholder="Pending schedule input..."
-                        className="w-full px-5 py-3.5 bg-brand/10 border border-brand-light rounded text-brand font-semibold outline-none text-sm"
+                        className="w-full bg-brand/10 border border-brand-light rounded text-brand font-semibold outline-none"
                         value={formData.endDate}
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -826,20 +1146,20 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 </div>
 
                 {projection && (
-                  <div className="p-6 bg-gray-800 rounded space-y-4 shadow-md border border-gray-700 animate-in fade-in slide-in-from-top-2 duration-500">
+                  <div className="p-4 bg-gray-50 rounded space-y-3 border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-500">
                     <div className="flex items-center gap-2 mb-2 text-brand">
                       <Calculator size={18} />
                       <h4 className="text-xs font-semibold uppercase tracking-wide">Compliance Forecast Breakdown</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Required Units</p>
-                        <p className="text-xl font-mono font-semibold text-white">{projection.trainingDays.toFixed(1)} <span className="text-xs text-brand">Full Days</span></p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Required Units</p>
+                        <p className="text-base font-mono font-semibold text-gray-800">{projection.trainingDays.toFixed(1)} <span className="text-xs text-brand">Full Days</span></p>
                         <p className="text-xs text-gray-500 italic mt-1">(Totaling {projection.totalHours} Instructional Hours)</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wait Duration</p>
-                        <p className="text-xl font-mono font-semibold text-white">{projection.calendarDays} <span className="text-xs text-brand">Calendar Days</span></p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Wait Duration</p>
+                        <p className="text-base font-mono font-semibold text-gray-800">{projection.calendarDays} <span className="text-xs text-brand">Calendar Days</span></p>
                         <p className="text-xs text-gray-500 italic mt-1">Reflecting Half-Day and Off-Day shifts.</p>
                       </div>
                     </div>
@@ -855,7 +1175,114 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 )}
 
-                <div className="pt-4 flex gap-4">
+                <section className="rounded-md border border-gray-200 bg-gray-50/80 overflow-hidden">
+                  <div className="p-5 border-b bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                        <Users size={18} className="text-brand" />
+                        Enrollment Registry
+                      </h4>
+                      <p className="mt-1 text-xs text-gray-500">Search and add learners from the left, then review selected learners on the right.</p>
+                    </div>
+                    <div className="px-3 py-1 bg-brand/10 text-brand border border-brand-light rounded text-xs font-semibold uppercase tracking-wide">
+                      {selectedStudents.length} enrolled
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-0">
+                    <div className="p-5 space-y-3 xl:border-r border-gray-200">
+                      <div className="flex items-center justify-between gap-3">
+                        <h5 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Available Learners</h5>
+                        <span className="text-xs font-semibold text-gray-500">{availableStudents.length}</span>
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          value={studentSearchTerm}
+                          onChange={e => setStudentSearchTerm(e.target.value)}
+                          placeholder="Search name, ULI, or email..."
+                          className="w-full pl-9 pr-3 py-3 bg-white border border-gray-200 rounded text-xs font-semibold text-gray-700 outline-none focus:border-brand"
+                        />
+                      </div>
+                      <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
+                        {availableStudents.map(student => (
+                          <button
+                            key={student.id}
+                            type="button"
+                            onClick={() => toggleStudent(student.id)}
+                            className="w-full flex items-center gap-3 p-4 rounded transition-all border bg-white border-gray-100 hover:border-brand-light group"
+                            title="Add learner to batch"
+                          >
+                            <div className="w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 bg-gray-100 text-gray-400 group-hover:bg-brand-light group-hover:text-brand">
+                              {student.lastName[0]}
+                            </div>
+                            <div className="flex-1 text-left overflow-hidden">
+                              <div className="text-xs font-semibold truncate uppercase text-gray-800">
+                                {student.lastName}, {student.firstName}
+                              </div>
+                              <div className="text-xs font-mono mt-0.5 text-gray-400">
+                                ULI: {student.uli.slice(-6)}
+                              </div>
+                            </div>
+                            <Plus size={16} className="shrink-0 text-gray-300 group-hover:text-brand" />
+                          </button>
+                        ))}
+                        {students.length === 0 && (
+                          <div className="py-16 text-center px-4">
+                            <Users size={32} className="mx-auto text-gray-200 mb-4" />
+                            <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">No learners found in the registry.</p>
+                          </div>
+                        )}
+                        {students.length > 0 && availableStudents.length === 0 && (
+                          <div className="rounded border border-dashed border-gray-200 bg-white/70 p-5 text-center">
+                            <Search size={28} className="mx-auto text-gray-200 mb-3" />
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">No available learners match the search.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-3 bg-white">
+                      <div className="flex items-center justify-between gap-3">
+                        <h5 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Selected Learners</h5>
+                        <span className="text-xs font-semibold text-brand">{selectedStudents.length}</span>
+                      </div>
+                      <div className="max-h-[488px] overflow-y-auto space-y-2 pr-1">
+                        {selectedStudents.length > 0 ? (
+                          selectedStudents.map(student => (
+                            <button
+                              key={student.id}
+                              type="button"
+                              onClick={() => toggleStudent(student.id)}
+                              className="w-full flex items-center gap-3 p-4 rounded transition-all border bg-brand border-brand text-white shadow-sm shadow-brand/20 group"
+                              title="Remove learner from batch"
+                            >
+                              <div className="w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 bg-white/20 text-white">
+                                {student.lastName[0]}
+                              </div>
+                              <div className="flex-1 text-left overflow-hidden">
+                                <div className="text-xs font-semibold truncate uppercase text-white">
+                                  {student.lastName}, {student.firstName}
+                                </div>
+                                <div className="text-xs font-mono mt-0.5 text-white/80">
+                                  ULI: {student.uli.slice(-6)}
+                                </div>
+                              </div>
+                              <CheckCircle size={18} className="shrink-0 text-white" />
+                            </button>
+                          ))
+                        ) : (
+                          <div className="rounded border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                            <Users size={32} className="mx-auto text-gray-200 mb-3" />
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">No learners selected</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="pt-4 flex flex-col sm:flex-row gap-4">
                   <button type="button" onClick={() => setShowModal(false)} disabled={isSaving} className="flex-1 py-4 text-sm font-semibold text-gray-500 hover:bg-gray-50 rounded transition-all disabled:opacity-50">Cancel</button>
                   <button type="submit" disabled={isSaving} className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold shadow-md shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center gap-2">
                     {isSaving && <Loader2 size={16} className="animate-spin" />}
@@ -865,327 +1292,15 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </form>
             </div>
 
-            <div className="w-full md:w-80 bg-gray-50 overflow-y-auto flex flex-col">
-              <div className="p-8 border-b bg-white shrink-0">
-                <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                  <Users size={20} className="text-brand" />
-                  Enrollment Registry
-                </h4>
-              </div>
-              <div className="p-6 space-y-3 flex-1 overflow-y-auto">
-                {students
-                  .filter(student => {
-                    const isSelected = formData.studentIds?.includes(student.id);
-                    if (isSelected) return true; // Always show if already selected
-                    return !getStudentConflict(student.id); // Otherwise only show if no conflict
-                  })
-                  .map(student => {
-                    const isSelected = formData.studentIds?.includes(student.id);
-
-                    return (
-                      <button
-                        key={student.id}
-                        type="button"
-                        onClick={() => toggleStudent(student.id)}
-                        className={`w-full flex items-center gap-3 p-4 rounded transition-all border group ${isSelected ? 'bg-brand border-brand text-white shadow-sm shadow-brand/20' :
-                            'bg-white border-gray-100 hover:border-brand-light'
-                          }`}
-                      >
-                        <div className={`w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 ${isSelected ? 'bg-white/20 text-white' :
-                            'bg-gray-100 text-gray-400 group-hover:bg-brand-light group-hover:text-brand'
-                          }`}>
-                          {student.lastName[0]}
-                        </div>
-                        <div className="flex-1 text-left overflow-hidden">
-                          <div className={`text-xs font-semibold truncate uppercase ${isSelected ? 'text-white' : 'text-gray-800'}`}>
-                            {student.lastName}, {student.firstName}
-                          </div>
-                          <div className={`text-xs font-mono mt-0.5 ${isSelected ? 'text-white/80' : 'text-gray-400'}`}>
-                            ULI: {student.uli.slice(-6)}
-                          </div>
-                        </div>
-                        {isSelected && <CheckCircle size={18} className="shrink-0 text-white" />}
-                      </button>
-                    );
-                  })}
-                {students.length === 0 && (
-                  <div className="py-20 text-center px-4">
-                    <Users size={32} className="mx-auto text-gray-200 mb-4" />
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">No learners found in the registry.</p>
-                  </div>
-                )}
-              </div>
-              <div className="p-8 bg-white border-t mt-auto">
-                <div className="flex justify-between items-center text-xs font-semibold text-gray-800 uppercase tracking-wide">
-                  <span>Enrolled Learners</span>
-                  <span className="text-brand">{formData.studentIds?.length || 0}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
-</ModalPortal>
       )}
 
-      {/* Batch Detail View Modal */}
-      {viewingBatch && (
-        <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/70 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
-            <div
-              className="px-5 py-8 text-white relative overflow-hidden"
-              style={{ backgroundImage: 'linear-gradient(90deg, var(--acm-primary), var(--acm-primary-hover))' }}
-            >
-              <div className="absolute top-0 right-0 opacity-10">
-                <Layers size={200} strokeWidth={1} />
-              </div>
-              <div className="relative z-10 flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-lg border border-white/30 uppercase tracking-wide">FY {viewingBatch.year}</span>
-                    <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-lg border border-white/30 uppercase tracking-wide">{viewingBatch.batchCode}</span>
-                  </div>
-                  <h2 className="text-xl font-semibold uppercase tracking-tight mb-2">{viewingBatch.name}</h2>
-                  <p className="text-white/80 text-sm font-bold">Comprehensive Batch Intelligence Report</p>
-                </div>
-                <button
-                  onClick={() => setViewingBatch(null)}
-                  className="p-3 hover:bg-white/20 rounded-full transition-colors text-white"
-                >
-                  <X size={28} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="p-6 rounded-md border" style={{ backgroundImage: 'linear-gradient(135deg, rgba(var(--acm-primary-rgb), 0.08), rgba(var(--acm-primary-rgb), 0.16))', borderColor: 'rgba(var(--acm-primary-rgb), 0.18)' }}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-brand text-white rounded shadow-lg shadow-brand/20">
-                      {getStatusBadge(viewingBatch.status)}
-                    </div>
-                  </div>
-                  <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Current Status</p>
-                  <p className="text-lg font-semibold text-gray-800 capitalize">{viewingBatch.status.toLowerCase()}</p>
-                </div>
-
-                <div
-                  className="p-6 rounded-md border border-emerald-100"
-                  style={{ backgroundImage: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(var(--acm-primary-rgb), 0.08))' }}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-emerald-600 text-white rounded shadow-lg">
-                      <Users size={24} />
-                    </div>
-                  </div>
-                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-1">Enrollment</p>
-                  <p className="text-lg font-semibold text-gray-800">{viewingBatch.currentStudents} / {viewingBatch.maxStudents}</p>
-                  <div className="mt-3 w-full bg-emerald-100 rounded-full h-2">
-                    <div
-                      className="bg-emerald-600 h-2 rounded-full transition-all"
-                      style={{ width: `${Math.min((viewingBatch.currentStudents / viewingBatch.maxStudents) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div
-                  className="p-6 rounded-md border border-amber-100"
-                  style={{ backgroundImage: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(var(--acm-primary-rgb), 0.08))' }}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-amber-600 text-white rounded shadow-lg">
-                      <CalendarDays size={24} />
-                    </div>
-                  </div>
-                  <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-1">Timeline</p>
-                  <p className="text-sm font-bold text-gray-600">{viewingBatch.startDate}</p>
-                  <p className="text-xs text-gray-400 font-semibold uppercase">to</p>
-                  <p className="text-sm font-bold text-gray-800">{viewingBatch.endDate}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <Award size={16} className="text-brand" />
-                    Qualification Details
-                  </h3>
-                  <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-                    <p className="text-lg font-semibold text-gray-800 mb-2">
-                      {qualifications.find(q => q.id === viewingBatch.qualificationId)?.name || 'Unknown'}
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                      <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Code</p>
-                        <p className="text-sm font-bold text-gray-700">
-                          {qualifications.find(q => q.id === viewingBatch.qualificationId)?.code || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Duration</p>
-                        <p className="text-sm font-bold text-gray-700">
-                          {qualifications.find(q => q.id === viewingBatch.qualificationId)?.durationDays || 0} Days
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <GraduationCap size={16} className="text-brand" />
-                    Lead Instructor
-                  </h3>
-                  <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-                    {(() => {
-                      const trainer = trainers.find(t => t.id === viewingBatch.trainerId);
-                      return trainer ? (
-                        <>
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-14 h-14 rounded bg-brand text-white flex items-center justify-center font-semibold text-lg shadow-sm shadow-brand/20">
-                              {trainer.lastName[0]}{trainer.firstName[0]}
-                            </div>
-                            <div>
-                              <p className="text-lg font-semibold text-gray-800">{trainer.lastName}, {trainer.firstName}</p>
-                              <p className="text-xs text-gray-500 font-bold">{trainer.email}</p>
-                            </div>
-                          </div>
-                          {trainer.phone && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact</p>
-                              <p className="text-sm font-bold text-gray-700">{trainer.phone}</p>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-gray-400 italic">No trainer assigned</p>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <MapPin size={16} className="text-brand" />
-                    Location & Sponsor
-                  </h3>
-                  <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-4">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Training Location</p>
-                      <p className="text-sm font-bold text-gray-700">
-                        {locations.find(l => l.id === viewingBatch.locationId)?.name || 'Not Specified'}
-                      </p>
-                    </div>
-                    <div className="pt-4 border-t border-gray-100">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sponsor</p>
-                      <p className="text-sm font-bold text-gray-700">
-                        {sponsors.find(s => s.id === viewingBatch.sponsorId)?.name || 'Private / Self-Funded'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                    <Calculator size={16} className="text-brand" />
-                    Projected Metrics
-                  </h3>
-                  <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-md border border-gray-600 shadow-sm text-white">
-                    {(() => {
-                      const qual = qualifications.find(q => q.id === viewingBatch.qualificationId);
-                      const calculationSlots = getBatchCalculationSlots(viewingBatch, schedules);
-                      if (qual && viewingBatch.startDate && calculationSlots.length > 0) {
-                        const projected = calculateProjectedEndDate(viewingBatch.startDate, qual.durationDays, calculationSlots);
-                        return (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Hours</p>
-                                <p className="text-lg font-mono font-semibold">{projected.totalHours}h</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Calendar Days</p>
-                                <p className="text-lg font-mono font-semibold">{projected.calendarDays}</p>
-                              </div>
-                            </div>
-                            <div className="pt-4 border-t border-white/10">
-                              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Training Days</p>
-                              <p className="text-lg font-mono font-semibold text-brand">{projected.trainingDays}</p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return <p className="text-gray-400 italic text-sm">Metrics unavailable</p>;
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                  <Users size={16} className="text-brand" />
-                  Enrolled Students ({viewingBatch.studentIds?.length || 0})
-                </h3>
-                <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm">
-                  {viewingBatch.studentIds && viewingBatch.studentIds.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {viewingBatch.studentIds.map(studentId => {
-                        const student = students.find(s => s.id === studentId);
-                        return student ? (
-                          <div key={student.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded border border-gray-100">
-                            <div className="w-10 h-10 rounded bg-brand text-white flex items-center justify-center text-xs font-semibold shrink-0">
-                              {student.lastName[0]}
-                            </div>
-                            <div className="flex-1 overflow-hidden">
-                              <p className="text-xs font-semibold text-gray-800 truncate uppercase">
-                                {student.lastName}, {student.firstName}
-                              </p>
-                              <p className="text-xs font-mono text-gray-400 mt-0.5">
-                                {student.uli.slice(-6)}
-                              </p>
-                            </div>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                  ) : (
-                    <div className="py-12 text-center">
-                      <Users size={48} className="mx-auto text-gray-200 mb-4" />
-                      <p className="text-sm text-gray-400 font-bold">No students enrolled yet</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                {isBatchEditable(viewingBatch) && (
-                  <button
-                    onClick={() => {
-                      setViewingBatch(null);
-                      openEditBatch(viewingBatch);
-                    }}
-                    className="flex-1 py-4 bg-brand text-white rounded text-sm font-semibold uppercase tracking-wide hover:bg-brand-hover transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand/20"
-                  >
-                    <Edit2 size={18} /> Edit Batch
-                  </button>
-                )}
-                <button
-                  onClick={() => setViewingBatch(null)}
-                  className={`${isBatchEditable(viewingBatch) ? 'px-8' : 'flex-1'} py-4 bg-gray-100 text-gray-700 rounded text-sm font-semibold uppercase tracking-wide hover:bg-gray-200 transition-all`}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-</ModalPortal>
-      )}
     </div>
   );
 };
 
 export default BatchesView;
+
+
 

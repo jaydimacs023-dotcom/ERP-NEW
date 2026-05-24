@@ -1,5 +1,5 @@
 
-import { IDataService, InitialData, TrainerUsageCheck, QualificationUsageCheck, LocationUsageCheck, ScheduleUsageCheck, SponsorUsageCheck } from './IDataService';
+import { FetchPageOptions, IDataService, InitialData, PaginatedResult, TrainerUsageCheck, QualificationUsageCheck, LocationUsageCheck, ScheduleUsageCheck, SponsorUsageCheck } from './IDataService';
 import { Organization, User, Student, Batch, Trainer, Qualification, Location, TrainerSchedule, Sponsor, NonStockItem, AlumniEmploymentReport, Invoice, InvoiceLine, Enrollment, AssessmentRegistration, TaxCategoryEntry, FixedAsset, Vendor, Bill, Payable, BankAccount, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate, StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint, RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill, CourseFee, PayrollRun, PayrollLine, Employee, AuditLog, PurchaseOrder, CheckVoucher } from '../types';
 
 /**
@@ -55,7 +55,20 @@ export class MockDataService implements IDataService {
       invoiceLines: [],
       enrollments: [],
       assessmentRegistrations: [],
-      taxCategories: []
+      taxCategories: [],
+      feedbackTickets: [],
+    };
+  }
+
+  async fetchPage<T>(_table: string, options: FetchPageOptions = {}): Promise<PaginatedResult<T>> {
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.min(Math.max(1, options.pageSize || 25), 200);
+    return {
+      rows: [],
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 1,
     };
   }
 

@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { BankAccount, JournalEntry, JournalLine, Sponsor, Student } from '../types';
+import { BankAccount, JournalEntry, JournalLine, Payment, Sponsor, Student } from '../types';
 import { format } from 'date-fns';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
@@ -19,6 +19,7 @@ import PaginationControls, { usePaginatedRows } from '../components/PaginationCo
 interface ARCollectionReceiptViewProps {
   entries: JournalEntry[];
   lines: JournalLine[];
+  payments?: Payment[];
   bankAccounts: BankAccount[];
   students: Student[];
   sponsors: Sponsor[];
@@ -42,6 +43,7 @@ const todayKey = () => new Date().toISOString().split('T')[0];
 const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
   entries,
   lines,
+  payments = [],
   bankAccounts,
   students,
   sponsors,
@@ -61,7 +63,7 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
     `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const collectionRows = useMemo<CollectionRow[]>(() => {
-    return entries
+    const journalRows = entries
       .filter(entry => entry.sourceType === 'COLLECTION' && entry.status === 'POSTED')
       .map(entry => {
         const entryLines = lines.filter(line => line.journalEntryId === entry.id);
@@ -89,9 +91,64 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
           bankName: bank?.bankName || 'Treasury',
           amount: cashLine?.debit || 0,
         };
-      })
+      });
+
+    const collectionEntryIds = new Set(journalRows.map(row => row.entry.id));
+    const finalizedPaymentStatuses = new Set(['OPEN', 'POSTED', 'CLOSED']);
+    const paymentRows = payments
+      .filter(payment =>
+        !payment.isDeleted &&
+        finalizedPaymentStatuses.has(payment.status) &&
+        (!payment.journalEntryId || !collectionEntryIds.has(payment.journalEntryId))
+      )
+      .map(payment => {
+        let payerName = 'Unassigned Payor';
+        let payerType: PayerTypeFilter = 'OTHER';
+
+        if (payment.sponsorId) {
+          payerType = 'SPONSOR';
+          payerName = sponsors.find(sponsor => sponsor.id === payment.sponsorId)?.name || 'Unknown Sponsor';
+        } else if (payment.studentId) {
+          payerType = 'STUDENT';
+          const student = students.find(item => item.id === payment.studentId);
+          payerName = student ? `${student.lastName}, ${student.firstName}` : 'Unknown Student';
+        }
+
+        const journalLine = payment.journalEntryId
+          ? lines.find(line => line.journalEntryId === payment.journalEntryId && line.debit > 0)
+          : undefined;
+        const bank = bankAccounts.find(account =>
+          account.id === payment.bankAccountId ||
+          account.glAccountId === journalLine?.accountId
+        );
+        const receiptNo = String(payment.crNo || payment.paymentNo || payment.glEntryNumber || '').trim() || payment.id;
+        const description = String(payment.notes || '').trim() || `Payment ${payment.paymentNo}`;
+
+        return {
+          entry: {
+            id: `payment-${payment.id}`,
+            orgId: payment.orgId,
+            periodId: '',
+            date: payment.paymentDate,
+            description,
+            reference: receiptNo,
+            glEntryNumber: payment.glEntryNumber,
+            status: 'POSTED',
+            createdBy: payment.createdBy || payment.postedBy || 'system',
+            createdAt: payment.createdAt || payment.postedAt || payment.paymentDate,
+            sourceType: 'PAYMENT',
+            sourceRef: payment.id
+          } as JournalEntry,
+          payerName,
+          payerType,
+          bankName: bank?.bankName || 'Treasury',
+          amount: Number(payment.amountReceived || 0) + Number(payment.ewtAmountCertified || 0),
+        };
+      });
+
+    return [...journalRows, ...paymentRows]
       .sort((a, b) => new Date(b.entry.date).getTime() - new Date(a.entry.date).getTime());
-  }, [bankAccounts, entries, lines, sponsors, students]);
+  }, [bankAccounts, entries, lines, payments, sponsors, students]);
 
   const filteredCollections = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -360,26 +417,25 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
+          <table className="min-w-full table-fixed divide-y divide-gray-100">
             <thead style={{ backgroundColor: brandColor }}>
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Receipt #</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Payer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Bank</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-white">Amount</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-white">Action</th>
+                <th className="w-[15%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Receipt #</th>
+                <th className="w-[30%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Payer</th>
+                <th className="w-[13%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Date</th>
+                <th className="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Bank</th>
+                <th className="w-[16%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-white">Amount</th>
+                <th className="w-[8%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-white">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredCollections.length > 0 ? paginatedCollections.map(row => (
-                <tr key={row.entry.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-5 text-xs font-mono font-bold text-gray-700">{row.entry.reference}</td>
-                  <td className="px-6 py-5">
-                    <div className="text-sm font-semibold text-gray-800">{row.payerName}</div>
-                    <div className="mt-1">
+                <tr key={row.entry.id} className="h-14 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 align-middle text-xs font-mono font-bold text-gray-700 truncate">{row.entry.reference}</td>
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span
-                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
+                        className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold uppercase tracking-wide ${
                           row.payerType === 'STUDENT' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : ''
                         }`}
                         style={row.payerType !== 'STUDENT'
@@ -389,20 +445,21 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
                         {row.payerType === 'SPONSOR' ? <Building2 size={12} /> : row.payerType === 'STUDENT' ? <GraduationCap size={12} /> : <FileText size={12} />}
                         {row.payerType === 'SPONSOR' ? 'Sponsor' : row.payerType === 'STUDENT' ? 'Student' : 'Other'}
                       </span>
+                      <span className="min-w-0 truncate text-sm font-semibold text-gray-800">{row.payerName}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-xs text-gray-600">{format(new Date(row.entry.date), 'yyyy-MM-dd')}</td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                  <td className="px-4 py-3 align-middle text-xs font-medium text-gray-600">{format(new Date(row.entry.date), 'yyyy-MM-dd')}</td>
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-gray-600">
                       <Calendar size={12} className="text-gray-400" />
-                      {row.bankName}
+                      <span className="truncate">{row.bankName}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-right text-xs font-mono font-semibold text-gray-900">{formatCurrency(row.amount)}</td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-4 py-3 align-middle text-right text-xs font-mono font-semibold text-gray-900">{formatCurrency(row.amount)}</td>
+                  <td className="px-4 py-3 align-middle text-right">
                     <button
                       onClick={() => setSelected(row)}
-                      className="px-3 py-2 text-xs font-semibold text-white rounded transition-colors"
+                      className="inline-flex h-8 items-center justify-center rounded px-3 text-xs font-semibold text-white transition-colors"
                       style={{ backgroundColor: brandColor }}
                     >
                       View

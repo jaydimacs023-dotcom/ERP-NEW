@@ -404,6 +404,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const isAppliedPayment = (payment: Payment) =>
     getActiveApplications(payment).length > 0 || Number(payment.totalApplied ?? 0) > 0;
 
+  const activeAppliedInvoiceIds = useMemo(() => new Set(
+    editingPayment ? getActiveApplications(editingPayment).map(app => app.invoiceId) : []
+  ), [editingPayment?.applications]);
+
   const getPaymentApplicationRecords = (payment: Payment) =>
     getActiveApplications(payment)
       .slice()
@@ -1008,10 +1012,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       if (!isMounted) return;
       const fetchedPayorInvoices = invoices
         .filter(inv => {
-        if (inv.orgId !== currentOrgId || inv.status === 'VOIDED') return false;
-        if (payorType === 'SPONSOR') return inv.sponsorId === formData.sponsorId;
-        return inv.studentId === formData.studentId;
-      })
+          if (inv.orgId !== currentOrgId || inv.status === 'VOIDED') return false;
+          if (activeAppliedInvoiceIds.has(inv.id)) return false;
+          if (Number(inv.balanceDue ?? 0) <= 0.01 || inv.status === 'CLOSED') return false;
+          if (payorType === 'SPONSOR') return inv.sponsorId === formData.sponsorId;
+          return inv.studentId === formData.studentId;
+        })
         .sort((a, b) => new Date(b.invoiceDate || 0).getTime() - new Date(a.invoiceDate || 0).getTime());
       setOpenInvoicesForPayor(fetchedPayorInvoices);
       setIsFetchingOpenInvoices(false);
@@ -1020,7 +1026,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [selectedPayorId, payorType, formData.sponsorId, formData.studentId, invoices, currentOrgId]);
+  }, [selectedPayorId, payorType, formData.sponsorId, formData.studentId, invoices, currentOrgId, activeAppliedInvoiceIds]);
 
   useEffect(() => {
     if (!editingPayment && defaultCashAccountId && !formData.bankAccountId) {
@@ -1350,6 +1356,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   };
 
   const handleInvoiceTick = (invoice: Invoice, checked: boolean) => {
+    if (checked && activeAppliedInvoiceIds.has(invoice.id)) {
+      alert(`Invoice ${invoice.invoiceNo} is already applied to this payment.`);
+      return;
+    }
+
     setInvoiceSelectionMap(prev => ({ ...prev, [invoice.id]: checked }));
     if (!checked) {
       setInvoiceApplyMap(prev => ({ ...prev, [invoice.id]: 0 }));
@@ -1614,7 +1625,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     },
     {
       key: 'status',
-      label: 'Status',
+      label: 'Payment Status',
       align: 'text-left',
       minWidth: 96,
       sortKey: 'status',
@@ -1694,7 +1705,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     },
     {
       key: 'balance',
-      label: 'Balance',
+      label: 'Unapplied Balance',
       align: 'text-right',
       minWidth: 128,
       sortKey: 'balance',
@@ -2119,7 +2130,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     },
     {
       key: 'applications',
-      label: 'Applications',
+      label: 'Application Count',
       align: 'text-center',
       minWidth: 112,
       value: (payment) => getActiveApplications(payment).length,
@@ -2851,9 +2862,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="rounded-xl border bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Payment Application Lists</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">Payment Application Summary</h3>
                   <p className="text-sm text-gray-500">
-                    Track payments waiting for invoice application and payments that already have invoice applications.
+                    Track payment records waiting for invoice application and payment records that already have invoice applications.
                   </p>
                 </div>
 

@@ -142,8 +142,9 @@ export class AuthService {
       }
 
       // Step 1: Fetch user by email
+      const userColumns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active,locked_until,password_hash,password,failed_login_attempts,last_login_at';
       const usersResponse = await fetch(
-        `${this.supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=*`,
+        `${this.supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=${userColumns}`,
         { headers: this.getHeaders() }
       );
 
@@ -208,6 +209,10 @@ export class AuthService {
         id: dbUser.id,
         name: dbUser.name,
         email: dbUser.email,
+        lastName: dbUser.last_name,
+        profilePhoto: dbUser.profile_photo,
+        contactNumber: dbUser.contact_number,
+        address: dbUser.address,
         role: dbUser.role,
         orgId: dbUser.org_id,
         studentId: dbUser.student_id,
@@ -311,6 +316,10 @@ export class AuthService {
       user,
       token: 'jwt-managed' // Token is managed by TokenManager
     };
+  }
+
+  updateStoredUser(updates: Partial<User>): User | null {
+    return TokenManager.updateCurrentUser(updates);
   }
 
   /**

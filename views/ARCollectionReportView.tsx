@@ -50,6 +50,8 @@ interface CollectionReportRow {
   method: PaymentMethod;
   referenceNo: string;
   amountReceived: number;
+  amountApplied: number;
+  unappliedBalance: number;
   statusLabel: string;
   glReferenceNo: string;
   createdBy: string;
@@ -233,7 +235,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
   const [dateTo, setDateTo] = useState(initialDateRange.to);
   const [payorTypeFilter, setPayorTypeFilter] = useState<PayorTypeFilter>('ALL');
   const [methodFilter, setMethodFilter] = useState<MethodFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('CLOSED');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [showPayorDropdown, setShowPayorDropdown] = useState(false);
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
@@ -286,6 +288,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
         method: payment.paymentMethod,
         referenceNo: payment.refNo || payment.checkNumber || '-',
         amountReceived: Number(payment.amountReceived || 0) + Number(payment.ewtAmountCertified || 0),
+        amountApplied: Number(payment.totalApplied || 0),
+        unappliedBalance: Math.max(Number(payment.customerDepositBalance || 0), 0),
         statusLabel: getStatusLabel(payment.status),
         glReferenceNo: getGlReference(payment),
         createdBy: getCreatedByName(payment.createdBy || payment.postedBy)
@@ -312,8 +316,9 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
         const matchesPayor = payorTypeFilter === 'ALL' || row.payorType === payorTypeFilter;
         const matchesMethod = methodFilter === 'ALL' || row.method === methodFilter;
         const matchesStatus =
-          statusFilter === 'ALL' ||
-          (statusFilter === 'OPEN' ? row.payment.status === 'OPEN' || row.payment.status === 'POSTED' : row.payment.status === statusFilter);
+          statusFilter === 'ALL'
+            ? row.payment.status !== 'DRAFT' && row.payment.status !== 'VOIDED'
+            : (statusFilter === 'OPEN' ? row.payment.status === 'OPEN' || row.payment.status === 'POSTED' : row.payment.status === statusFilter);
 
         return matchesSearch && matchesDates && matchesPayor && matchesMethod && matchesStatus;
       })
@@ -338,6 +343,10 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               return row.referenceNo;
             case 'amountReceived':
               return row.amountReceived;
+            case 'amountApplied':
+              return row.amountApplied;
+            case 'unappliedBalance':
+              return row.unappliedBalance;
             case 'status':
               return row.statusLabel;
             case 'glReferenceNo':
@@ -376,6 +385,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
 
   const summary = useMemo(() => ({
     totalCollections: filteredRows.reduce((sum, row) => sum + row.amountReceived, 0),
+    totalApplied: filteredRows.reduce((sum, row) => sum + row.amountApplied, 0),
+    totalUnapplied: filteredRows.reduce((sum, row) => sum + row.unappliedBalance, 0),
     paymentCount: filteredRows.length
   }), [filteredRows]);
 
@@ -386,7 +397,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
     !!dateTo ||
     payorTypeFilter !== 'ALL' ||
     methodFilter !== 'ALL' ||
-    statusFilter !== 'CLOSED';
+    statusFilter !== 'ALL';
 
   const clearFilters = () => {
     const range = getPeriodDateRange('MONTHLY');
@@ -483,6 +494,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
       'Method',
       'Reference No.',
       'Amount Received',
+      'Amount Applied',
+      'Unapplied Balance',
       'Status',
       'GL Reference No.',
       'Created By'
@@ -498,6 +511,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
       getMethodLabel(row.method),
       row.referenceNo,
       row.amountReceived.toFixed(2),
+      row.amountApplied.toFixed(2),
+      row.unappliedBalance.toFixed(2),
       row.statusLabel,
       row.glReferenceNo,
       row.createdBy
@@ -782,6 +797,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
     { key: 'method', label: 'Method', align: 'text-left' },
     { key: 'referenceNo', label: 'Reference No.', align: 'text-left' },
     { key: 'amountReceived', label: 'Amount Received', align: 'text-right' },
+    { key: 'amountApplied', label: 'Amount Applied', align: 'text-right' },
+    { key: 'unappliedBalance', label: 'Unapplied Balance', align: 'text-right' },
     { key: 'status', label: 'Status', align: 'text-left' },
     { key: 'glReferenceNo', label: 'GL Reference No.', align: 'text-left' },
     { key: 'createdBy', label: 'Created By', align: 'text-left' }
@@ -789,7 +806,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
 
   const activePeriodLabel = periodOptions.find(option => option.value === periodFilter)?.label || 'Monthly';
   const activeMethodLabel = methodOptions.find(option => option.value === methodFilter)?.label || 'All';
-  const activeStatusLabel = statusOptions.find(option => option.value === statusFilter)?.label || 'Closed';
+  const activeStatusLabel = statusOptions.find(option => option.value === statusFilter)?.label || 'All';
   const activePayorLabel = payorTypeFilter === 'ALL' ? 'All' : payorTypeFilter === 'SPONSOR' ? 'Sponsor' : 'Student';
 
   if (viewMode === 'PREVIEW' && previewContext) {
@@ -1072,10 +1089,18 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
         <p className="text-sm text-gray-500 font-normal italic">Monitor actual collections received and their application to accounts receivable.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Total Collections</p>
           <p className="mt-6 text-2xl font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalCollections)}</p>
+        </section>
+        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Amount Applied</p>
+          <p className="mt-6 text-2xl font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalApplied)}</p>
+        </section>
+        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Unapplied Balance</p>
+          <p className="mt-6 text-2xl font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalUnapplied)}</p>
         </section>
         <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">No. of Payments</p>
@@ -1292,6 +1317,8 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                   </td>
                   <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.referenceNo}</td>
                   <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.amountReceived)}</td>
+                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.amountApplied)}</td>
+                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.unappliedBalance)}</td>
                   <td className="px-4 py-4">{statusBadge(row.payment.status, row.statusLabel)}</td>
                   <td className="px-4 py-4 text-xs font-semibold text-slate-700">
                     {row.payment.journalEntryId && onViewJournal ? (
@@ -1315,15 +1342,17 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               ))}
               {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="py-20 text-center text-sm italic text-gray-400">No collections found for the current search and filters.</td>
+                  <td colSpan={14} className="py-20 text-center text-sm italic text-gray-400">No collections found for the current search and filters.</td>
                 </tr>
               )}
             </tbody>
             {filteredRows.length > 0 && (
               <tfoot className="border-t border-gray-200 bg-gray-50">
                 <tr>
-                  <td colSpan={8} className="px-4 py-4 text-left text-sm font-bold text-slate-700">Grand Total Amount Received:</td>
+                  <td colSpan={8} className="px-4 py-4 text-left text-sm font-bold text-slate-700">Grand Totals:</td>
                   <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalCollections)}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalApplied)}</td>
+                  <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalUnapplied)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tfoot>
