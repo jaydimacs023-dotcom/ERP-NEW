@@ -1,7 +1,10 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Enrollment, BillingStatus, EnrollmentStatus, EnrollmentBillingType, Student, Batch, Sponsor, Qualification } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import { 
   Search, Plus, UserCheck, Trash2, X, GraduationCap,
   Edit2, Loader2, CheckCircle, AlertCircle,
@@ -16,6 +19,7 @@ interface Toast {
 }
 
 interface EnrollmentsViewProps {
+  orgId: string;
   enrollments: Enrollment[];
   students: Student[];
   batches: Batch[];
@@ -26,6 +30,9 @@ interface EnrollmentsViewProps {
   onUpdateEnrollment: (enrollment: Enrollment) => void | Promise<void>;
   onDeleteEnrollment: (id: string) => void | Promise<boolean>;
 }
+
+const PAGE_SIZE = 10;
+const ENROLLMENT_COLUMNS = 'id,org_id,enrollment_code,student_id,batch_id,sponsor_id,billing_status,enrollment_status,enrollment_date,total_fees,billed_amount,notes,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,billing_type';
 
 const BILLING_STATUS_OPTIONS: { value: BillingStatus; label: string; color: string }[] = [
   { value: 'UNBILLED', label: 'Unbilled', color: 'bg-amber-100 text-amber-700' },
@@ -60,13 +67,21 @@ const formatEnrollmentDate = (value?: string) => {
 };
 
 const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({ 
-  enrollments, students, batches, sponsors, qualifications, currency = 'PHP',
+  orgId, enrollments, students, batches, sponsors, qualifications, currency = 'PHP',
   onAddEnrollment, onUpdateEnrollment, onDeleteEnrollment 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterBatch, setFilterBatch] = useState<string>('');
   const [filterBillingStatus, setFilterBillingStatus] = useState<BillingStatus | ''>('');
   const [filterEnrollmentStatus, setFilterEnrollmentStatus] = useState<EnrollmentStatus | ''>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverEnrollments, setServerEnrollments] = useState<Enrollment[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editingEnrollment, setEditingEnrollment] = useState<Enrollment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,6 +102,72 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
     notes: ''
   });
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  const serverFetchEnabled = Boolean(orgId) && debouncedSearchTerm.trim() === '';
+
+  const enrollmentFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (filterBatch) {
+      filters.push({ column: 'batch_id', operator: 'eq', value: filterBatch });
+    }
+    if (filterBillingStatus) {
+      filters.push({ column: 'billing_status', operator: 'eq', value: filterBillingStatus });
+    }
+    if (filterEnrollmentStatus) {
+      filters.push({ column: 'enrollment_status', operator: 'eq', value: filterEnrollmentStatus });
+    }
+    return filters;
+  }, [filterBatch, filterBillingStatus, filterEnrollmentStatus, orgId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus, orgId]);
+
+  useEffect(() => {
+    if (!serverFetchEnabled) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Enrollment>('enrollments', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: ENROLLMENT_COLUMNS,
+      filters: enrollmentFilters,
+      orderBy: [{ column: 'enrollment_date', ascending: false }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerEnrollments(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[EnrollmentsView] Failed to load enrollment page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load enrollments.');
+        setServerEnrollments([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPage(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, enrollmentFilters, refreshKey, serverFetchEnabled]);
+
   // Get students that are not already enrolled in the selected batch
   const availableStudents = useMemo(() => {
     if (!formData.batchId) return students.filter(s => !s.isDeleted);
@@ -99,7 +180,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
   }, [students, enrollments, formData.batchId, editingEnrollment]);
 
   const filteredEnrollments = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return enrollments
       .filter(e => {
@@ -129,7 +210,25 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
         return matchesSearch && matchesBatch && matchesBillingStatus && matchesEnrollmentStatus;
       })
       .sort((a, b) => (b.enrollmentDate || '').localeCompare(a.enrollmentDate || ''));
-  }, [enrollments, students, batches, sponsors, qualifications, searchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus]);
+  }, [enrollments, students, batches, sponsors, qualifications, debouncedSearchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedEnrollments,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredEnrollments, [debouncedSearchTerm, filterBatch, filterBillingStatus, filterEnrollmentStatus], PAGE_SIZE);
+
+  const useFallbackRows = !serverFetchEnabled || !!pageLoadError;
+  const paginatedEnrollments = useFallbackRows ? fallbackPaginatedEnrollments : serverEnrollments;
+  const totalItems = useFallbackRows ? filteredEnrollments.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverEnrollments.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
@@ -198,6 +297,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           updatedAt: new Date().toISOString()
         };
         await onUpdateEnrollment(updatedEnrollment);
+        setRefreshKey(key => key + 1);
         showToast(`Enrollment updated successfully!`, 'success');
       } else {
         const newEnrollment: Enrollment = {
@@ -217,6 +317,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
           createdAt: new Date().toISOString()
         };
         await onAddEnrollment(newEnrollment);
+        setRefreshKey(key => key + 1);
         showToast(`Student enrolled successfully!`, 'success');
       }
       
@@ -239,6 +340,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
       if (result === false) {
         showToast('Cannot delete enrollment: It may have associated billing records.', 'error');
       } else {
+        setRefreshKey(key => key + 1);
         showToast('Enrollment removed successfully!', 'success');
       }
     } catch (error) {
@@ -463,7 +565,7 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredEnrollments.length > 0 ? filteredEnrollments.map(enrollment => {
+            {totalItems > 0 ? paginatedEnrollments.map(enrollment => {
               const qual = getQualificationForBatch(enrollment.batchId);
               const sponsorName = getSponsorName(enrollment.sponsorId);
               const unbilledAmt = (enrollment.totalFees || 0) - (enrollment.billedAmount || 0);
@@ -561,7 +663,9 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <FileText size={40} className="mx-auto mb-2 text-gray-300" />
-                  {hasActiveFilters
+                  {isLoadingPage && !useFallbackRows
+                    ? 'Loading enrollments...'
+                    : hasActiveFilters
                     ? 'Try adjusting your search or filters.'
                     : 'No enrollments found. Enroll a student in a batch to get started.'}
                 </td>
@@ -569,6 +673,15 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="enrollments"
+        />
       </div>
 
       {/* Modal */}
@@ -828,4 +941,5 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
 };
 
 export default EnrollmentsView;
+
 

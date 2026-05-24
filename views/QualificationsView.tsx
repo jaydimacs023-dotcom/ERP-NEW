@@ -5,6 +5,8 @@ import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import {
   Search, Plus, Filter, Award, Code, Clock, Trash2, X, PlusCircle,
   Database, Info, ShieldCheck, FileText, ChevronRight, Layers,
@@ -41,9 +43,14 @@ const SECTORS = [
   'Others'
 ];
 
+const PAGE_SIZE = 7;
+const QUALIFICATION_COLUMNS = 'id,org_id,code,name,duration_days,sector,created_at,updated_at';
+
 const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications, batches, trainers, organization, onAddQualification, onUpdateQualification, onDeleteQualification }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sectorFilter, setSectorFilter] = useState<'ALL' | string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showModal, setShowModal] = useState(false);
   const [editingQual, setEditingQual] = useState<Qualification | null>(null);
@@ -51,6 +58,12 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverQuals, setServerQuals] = useState<Qualification[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
   const [formData, setFormData] = useState<Partial<Qualification>>({
     name: '',
     code: '',
@@ -59,7 +72,10 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
   });
 
   const brandColor = organization?.primaryColor || '#059669';
-  const sectors = useMemo(() => Array.from(new Set(qualifications.map(q => q.sector).filter(Boolean))).sort(), [qualifications]);
+  const sectors = useMemo(
+    () => Array.from(new Set([...qualifications.map(q => q.sector), ...serverQuals.map(q => q.sector)].filter(Boolean))).sort(),
+    [qualifications, serverQuals]
+  );
   const hasActiveFilters = searchTerm.trim().length > 0 || sectorFilter !== 'ALL';
 
   useEffect(() => {
@@ -68,24 +84,99 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
     }
   }, [brandColor]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, organization?.id, sectorFilter]);
+
+  const qualificationFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (organization?.id) {
+      filters.push({ column: 'org_id', operator: 'eq', value: organization.id });
+    }
+    if (sectorFilter !== 'ALL') {
+      filters.push({ column: 'sector', operator: 'eq', value: sectorFilter });
+    }
+    return filters;
+  }, [organization?.id, sectorFilter]);
+
+  useEffect(() => {
+    if (!organization?.id) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Qualification>('qualifications', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: QUALIFICATION_COLUMNS,
+      filters: qualificationFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['name', 'code', 'sector'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'name', ascending: true }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerQuals(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[QualificationsView] Failed to load qualification page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load qualifications.');
+        setServerQuals([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, organization?.id, qualificationFilters, refreshKey]);
+
   const filteredQuals = qualifications.filter(q => {
     if (q.isDeleted) return false;
+    const term = debouncedSearchTerm.toLowerCase();
     const matchesSearch =
-      q.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.sector?.toLowerCase().includes(searchTerm.toLowerCase());
+      q.name.toLowerCase().includes(term) ||
+      q.code.toLowerCase().includes(term) ||
+      q.sector?.toLowerCase().includes(term);
     const matchesSector = sectorFilter === 'ALL' || q.sector === sectorFilter;
     return matchesSearch && matchesSector;
   });
 
   const {
-    currentPage,
-    totalPages,
-    pageStartIndex,
-    pageEndIndex,
-    paginatedRows: paginatedQuals,
-    setCurrentPage
-  } = usePaginatedRows(filteredQuals, [searchTerm, sectorFilter], 7);
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedQuals,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredQuals, [debouncedSearchTerm, sectorFilter], PAGE_SIZE);
+
+  const useFallbackRows = !organization?.id || !!pageLoadError;
+  const paginatedQuals = useFallbackRows ? fallbackPaginatedQuals : serverQuals;
+  const totalItems = useFallbackRows ? filteredQuals.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverQuals.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const resetForm = () => {
     setFormData({ name: '', code: '', durationDays: 0, sector: 'ICT' });
@@ -135,6 +226,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
         if (viewingQual?.id === updatedQual.id) {
           setViewingQual(updatedQual);
         }
+        setRefreshKey(key => key + 1);
         showToast(`Qualification "${formData.name}" updated successfully!`, 'success');
       } else {
         // Create new qualification with proper UUID
@@ -148,6 +240,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
           createdAt: new Date().toISOString()
         };
         await onAddQualification(newQual);
+        setRefreshKey(key => key + 1);
         showToast(`Qualification "${formData.name}" registered successfully!`, 'success');
       }
 
@@ -180,6 +273,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
       if (result === false) {
         showToast('Cannot delete qualification: It is currently in use by batches or trainers.', 'error');
       } else {
+        setRefreshKey(key => key + 1);
         showToast(`Qualification "${qualToDelete?.name || 'Unknown'}" deleted successfully!`, 'success');
       }
     } catch (error) {
@@ -367,7 +461,7 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               Clear filters
             </button>
             <p className="text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-900">{filteredQuals.length}</span> of <span className="font-semibold text-gray-900">{qualifications.length}</span>
+              Showing <span className="font-semibold text-gray-900">{totalItems}</span> matching qualification{totalItems !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -384,7 +478,13 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredQuals.length > 0 ? paginatedQuals.map(qual => (
+              {isLoadingPage && !useFallbackRows ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-12 text-center text-sm font-semibold text-gray-400">
+                    Loading qualifications...
+                  </td>
+                </tr>
+              ) : totalItems > 0 ? paginatedQuals.map(qual => (
                 <tr
                   key={qual.id}
                   onClick={() => setViewingQual(qual)}
@@ -446,17 +546,20 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
             </tbody>
           </table>
           <PaginationControls
-            currentPage={currentPage}
+            currentPage={activePage}
             totalPages={totalPages}
-            totalItems={filteredQuals.length}
+            totalItems={totalItems}
             pageStartIndex={pageStartIndex}
             pageEndIndex={pageEndIndex}
-            onPageChange={setCurrentPage}
+            onPageChange={handlePageChange}
             itemLabel="qualifications"
           />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          {isLoadingPage && !useFallbackRows && (
+            <div className="col-span-full py-16 text-center text-sm font-semibold text-gray-400">Loading qualifications...</div>
+          )}
           {paginatedQuals.map(qual => {
             const color = getSectorColor(qual.sector || '');
             return (
@@ -514,17 +617,19 @@ const QualificationsView: React.FC<QualificationsViewProps> = ({ qualifications,
               </div>
             );
           })}
-          {filteredQuals.length === 0 && (
-            <div className="col-span-full py-16 text-center text-gray-400">No matching qualifications found.</div>
+          {totalItems === 0 && !isLoadingPage && (
+            <div className="col-span-full py-16 text-center text-gray-400">
+              {pageLoadError ? 'Unable to load qualifications from Supabase.' : 'No matching qualifications found.'}
+            </div>
           )}
           <div className="col-span-full">
             <PaginationControls
-              currentPage={currentPage}
+              currentPage={activePage}
               totalPages={totalPages}
-              totalItems={filteredQuals.length}
+              totalItems={totalItems}
               pageStartIndex={pageStartIndex}
               pageEndIndex={pageEndIndex}
-              onPageChange={setCurrentPage}
+              onPageChange={handlePageChange}
               itemLabel="qualifications"
             />
           </div>

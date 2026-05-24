@@ -12,10 +12,15 @@ interface AuditTrailProps {
 }
 
 type DateFilterMode = 'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM';
+type AuditTrailTab = 'BUSINESS' | 'SYSTEM';
 
 const todayKey = () => new Date().toISOString().split('T')[0];
 const PAGE_SIZE = 7;
 const AUDIT_COLUMNS = 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at';
+const SYSTEM_MOVEMENT_ACTIONS = ['LOGIN', 'LOGOUT'];
+
+const isSystemMovementLog = (log: Pick<AuditLog, 'action'>) =>
+  SYSTEM_MOVEMENT_ACTIONS.includes(String(log.action || '').toUpperCase());
 
 const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
 const dateEndIso = (date: string) => `${date}T23:59:59.999Z`;
@@ -36,6 +41,7 @@ const monthRange = () => {
 const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = '#4f46e5' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [activeAuditTab, setActiveAuditTab] = useState<AuditTrailTab>('BUSINESS');
   const [actionFilter, setActionFilter] = useState('ALL');
   const [entityFilter, setEntityFilter] = useState('ALL');
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('ALL');
@@ -56,18 +62,29 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
     [logs, orgId]
   );
 
+  const categoryOrgLogs = useMemo(
+    () => orgLogs.filter(log => activeAuditTab === 'SYSTEM' ? isSystemMovementLog(log) : !isSystemMovementLog(log)),
+    [activeAuditTab, orgLogs]
+  );
+
   const actionOptions = useMemo(
-    () => ['ALL', ...Array.from(new Set([...orgLogs.map(log => log.action), ...serverLogs.map(log => log.action)].filter(Boolean))).sort()],
-    [orgLogs, serverLogs]
+    () => ['ALL', ...Array.from(new Set([...categoryOrgLogs.map(log => log.action), ...serverLogs.map(log => log.action)].filter(Boolean))).sort()],
+    [categoryOrgLogs, serverLogs]
   );
 
   const entityOptions = useMemo(
-    () => ['ALL', ...Array.from(new Set([...orgLogs.map(log => log.entityType), ...serverLogs.map(log => log.entityType)].filter(Boolean))).sort()],
-    [orgLogs, serverLogs]
+    () => ['ALL', ...Array.from(new Set([...categoryOrgLogs.map(log => log.entityType), ...serverLogs.map(log => log.entityType)].filter(Boolean))).sort()],
+    [categoryOrgLogs, serverLogs]
   );
 
   const auditFilters = useMemo(() => {
     const filters: PageFilter[] = [{ column: 'org_id', operator: 'eq', value: orgId }];
+
+    filters.push({
+      column: 'action',
+      operator: activeAuditTab === 'SYSTEM' ? 'in' : 'not.in',
+      value: `(${SYSTEM_MOVEMENT_ACTIONS.join(',')})`
+    });
 
     if (actionFilter !== 'ALL') {
       filters.push({ column: 'action', operator: 'eq', value: actionFilter });
@@ -94,7 +111,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
     }
 
     return filters;
-  }, [actionFilter, dateFilterMode, dateFrom, dateTo, entityFilter, orgId]);
+  }, [actionFilter, activeAuditTab, dateFilterMode, dateFrom, dateTo, entityFilter, orgId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
@@ -103,7 +120,14 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [actionFilter, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter, orgId]);
+  }, [actionFilter, activeAuditTab, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter, orgId]);
+
+  useEffect(() => {
+    setActionFilter('ALL');
+    setEntityFilter('ALL');
+    setShowActionDropdown(false);
+    setShowEntityDropdown(false);
+  }, [activeAuditTab]);
 
   useEffect(() => {
     let isActive = true;
@@ -160,7 +184,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
     const month = now.getMonth();
     const year = now.getFullYear();
 
-    return orgLogs.filter(log => {
+    return categoryOrgLogs.filter(log => {
       const matchesSearch =
         !term ||
         String(log.userId || '').toLowerCase().includes(term) ||
@@ -188,7 +212,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
 
       return matchesSearch && matchesAction && matchesEntity && matchesDate;
     });
-  }, [actionFilter, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter, orgLogs]);
+  }, [actionFilter, categoryOrgLogs, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter]);
 
   const {
     currentPage: fallbackCurrentPage,
@@ -197,7 +221,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
     pageEndIndex: fallbackPageEndIndex,
     paginatedRows: fallbackPaginatedLogs,
     setCurrentPage: setFallbackCurrentPage
-  } = usePaginatedRows(localFilteredLogs, [debouncedSearchTerm, actionFilter, entityFilter, dateFilterMode, dateFrom, dateTo]);
+  } = usePaginatedRows(localFilteredLogs, [debouncedSearchTerm, actionFilter, activeAuditTab, entityFilter, dateFilterMode, dateFrom, dateTo]);
 
   const useFallbackRows = !!loadError;
   const paginatedLogs = useFallbackRows ? fallbackPaginatedLogs : serverLogs;
@@ -266,6 +290,31 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
         >
           <ShieldCheck size={18} />
           {summary.total} Events
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[
+            { key: 'BUSINESS' as const, label: 'Business Transactions', description: 'Posting, approvals, updates, receipts, invoices, and operational records' },
+            { key: 'SYSTEM' as const, label: 'System Movement', description: 'Login and logout activity' }
+          ].map(tab => {
+            const active = activeAuditTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveAuditTab(tab.key)}
+                className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+                  active ? 'border-transparent text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                style={active ? { backgroundColor: brandColor } : undefined}
+              >
+                <span className="block text-sm font-bold">{tab.label}</span>
+                <span className={`mt-1 block text-xs ${active ? 'text-white/80' : 'text-gray-400'}`}>{tab.description}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

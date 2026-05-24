@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Building2,
   Calendar,
@@ -58,9 +58,22 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [columnOrder, setColumnOrder] = useState(['receiptNo', 'payer', 'date', 'bank', 'amount']);
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizeRef = useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
+  const currencySymbol = currency === 'PHP' ? '₱' : currency;
+  const formatCurrencyNumber = (val: number) =>
+    val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatCurrency = (val: number) =>
-    `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${currencySymbol} ${formatCurrencyNumber(val)}`;
+  const renderAccountingAmount = (val: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 font-medium text-gray-800 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatCurrencyNumber(val)}</span>
+    </span>
+  );
 
   const collectionRows = useMemo<CollectionRow[]>(() => {
     const journalRows = entries
@@ -236,6 +249,79 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
 
   const dateFilterLabel =
     dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...';
+
+  const registryColumns = useMemo(() => {
+    const baseColumns = [
+      {
+        key: 'receiptNo',
+        label: 'Receipt No.',
+        width: 'w-40',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.entry.reference || '-',
+      },
+      {
+        key: 'payer',
+        label: 'Sponsor/Student',
+        width: 'w-64',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.payerName,
+      },
+      {
+        key: 'date',
+        label: 'Transaction Date',
+        width: 'w-32',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.entry.date ? format(new Date(row.entry.date), 'MM-dd-yyyy') : '-',
+      },
+      {
+        key: 'bank',
+        label: 'Bank',
+        width: 'w-44',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.bankName,
+      },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 'w-36',
+        align: 'text-right' as const,
+        render: (row: CollectionRow) => renderAccountingAmount(row.amount),
+      },
+    ];
+
+    return columnOrder.map(key => baseColumns.find(column => column.key === key)).filter(Boolean) as typeof baseColumns;
+  }, [columnOrder, currency]);
+
+  const handleColumnDragStart = (event: React.DragEvent, index: number) => {
+    setDraggedColumnIdx(index);
+    event.dataTransfer.effectAllowed = 'move';
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleColumnDragEnd = (event: React.DragEvent) => {
+    setDraggedColumnIdx(null);
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleColumnDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleColumnDrop = (event: React.DragEvent, dropIndex: number) => {
+    event.preventDefault();
+    if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+
+    const nextOrder = [...columnOrder];
+    const [draggedKey] = nextOrder.splice(draggedColumnIdx, 1);
+    nextOrder.splice(dropIndex, 0, draggedKey);
+    setColumnOrder(nextOrder);
+    setDraggedColumnIdx(null);
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -415,80 +501,126 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-fixed divide-y divide-gray-100">
-            <thead style={{ backgroundColor: brandColor }}>
-              <tr>
-                <th className="w-[15%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Receipt #</th>
-                <th className="w-[30%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Payer</th>
-                <th className="w-[13%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Date</th>
-                <th className="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">Bank</th>
-                <th className="w-[16%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-white">Amount</th>
-                <th className="w-[8%] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-white">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredCollections.length > 0 ? paginatedCollections.map(row => (
-                <tr key={row.entry.id} className="h-14 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 align-middle text-xs font-mono font-bold text-gray-700 truncate">{row.entry.reference}</td>
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold uppercase tracking-wide ${
-                          row.payerType === 'STUDENT' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : ''
-                        }`}
-                        style={row.payerType !== 'STUDENT'
-                          ? { backgroundColor: 'var(--acm-primary-light)', color: brandColor, borderColor: 'var(--acm-primary-light)' }
-                          : undefined}
-                      >
-                        {row.payerType === 'SPONSOR' ? <Building2 size={12} /> : row.payerType === 'STUDENT' ? <GraduationCap size={12} /> : <FileText size={12} />}
-                        {row.payerType === 'SPONSOR' ? 'Sponsor' : row.payerType === 'STUDENT' ? 'Student' : 'Other'}
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-emerald-600 border-b">
+            <tr>
+              {registryColumns.map((column, index) => (
+                <th
+                  key={column.key}
+                  draggable
+                  onDragStart={(event) => handleColumnDragStart(event, index)}
+                  onDragEnd={handleColumnDragEnd}
+                  onDragOver={handleColumnDragOver}
+                  onDrop={(event) => handleColumnDrop(event, index)}
+                  className={`px-4 py-3 ${column.align} cursor-move font-semibold text-white ${draggedColumnIdx === index ? 'bg-emerald-700 border-dashed border-2 border-emerald-300 opacity-50' : ''} group select-none transition-colors border-x border-transparent hover:bg-emerald-700 hover:border-emerald-200 relative`}
+                  style={columnWidths[column.key] ? { width: columnWidths[column.key], minWidth: columnWidths[column.key] } : undefined}
+                  title="Drag to reorder column"
+                >
+                  <div className={`flex items-center ${column.align === 'text-right' ? 'justify-end' : ''} text-[13px] font-bold text-white`}>
+                    {column.label}
+                  </div>
+                  <div
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      const th = event.currentTarget.parentElement;
+                      if (!th) return;
+                      resizeRef.current = {
+                        colKey: column.key,
+                        startX: event.clientX,
+                        startWidth: th.getBoundingClientRect().width,
+                      };
+                      const onMouseMove = (moveEvent: MouseEvent) => {
+                        if (!resizeRef.current) return;
+                        const diff = moveEvent.clientX - resizeRef.current.startX;
+                        const newWidth = Math.max(60, resizeRef.current.startWidth + diff);
+                        setColumnWidths(prev => ({ ...prev, [resizeRef.current!.colKey]: newWidth }));
+                      };
+                      const onMouseUp = () => {
+                        resizeRef.current = null;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                      };
+                      document.addEventListener('mousemove', onMouseMove);
+                      document.addEventListener('mouseup', onMouseUp);
+                      document.body.style.cursor = 'col-resize';
+                      document.body.style.userSelect = 'none';
+                    }}
+                    className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-emerald-400 transition-colors z-10"
+                    title="Drag to resize column"
+                    draggable={false}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filteredCollections.length > 0 ? paginatedCollections.map(row => (
+              <tr
+                key={row.entry.id}
+                role="button"
+                tabIndex={0}
+                className="cursor-pointer transition-colors hover:bg-gray-50 focus:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                onClick={() => setSelected(row)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelected(row);
+                  }
+                }}
+                title="Click to view collection receipt"
+              >
+                {registryColumns.map(column => (
+                  <td
+                    key={column.key}
+                    className={`px-4 py-3 ${column.align} cursor-pointer`}
+                    style={columnWidths[column.key] ? { width: columnWidths[column.key], minWidth: columnWidths[column.key] } : undefined}
+                  >
+                    {column.key === 'payer' ? (
+                      <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+                        {row.payerType === 'SPONSOR' ? (
+                          <Building2 size={14} className="text-gray-400" />
+                        ) : row.payerType === 'STUDENT' ? (
+                          <GraduationCap size={14} className="text-gray-400" />
+                        ) : (
+                          <FileText size={14} className="text-gray-400" />
+                        )}
+                        {column.render(row)}
                       </span>
-                      <span className="min-w-0 truncate text-sm font-semibold text-gray-800">{row.payerName}</span>
-                    </div>
+                    ) : column.key === 'bank' ? (
+                      <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+                        <Calendar size={14} className="text-gray-400" />
+                        {column.render(row)}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-gray-800">{column.render(row)}</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 align-middle text-xs font-medium text-gray-600">{format(new Date(row.entry.date), 'yyyy-MM-dd')}</td>
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-gray-600">
-                      <Calendar size={12} className="text-gray-400" />
-                      <span className="truncate">{row.bankName}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 align-middle text-right text-xs font-mono font-semibold text-gray-900">{formatCurrency(row.amount)}</td>
-                  <td className="px-4 py-3 align-middle text-right">
+                ))}
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={registryColumns.length} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  <div>No collection receipts found</div>
+                  {hasActiveFilters && (
                     <button
-                      onClick={() => setSelected(row)}
-                      className="inline-flex h-8 items-center justify-center rounded px-3 text-xs font-semibold text-white transition-colors"
+                      type="button"
+                      onClick={clearFilters}
+                      className="mt-3 px-5 py-2 text-white rounded text-sm font-semibold transition-all"
                       style={{ backgroundColor: brandColor }}
                     >
-                      View
+                      Clear Filters
                     </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3 text-gray-400">
-                      <FileText size={28} className="opacity-40" />
-                      <p className="text-sm font-medium">No collection receipts found for the current search and filter.</p>
-                      {hasActiveFilters && (
-                        <button
-                          type="button"
-                          onClick={clearFilters}
-                          className="mt-2 px-5 py-2 text-white rounded text-sm font-semibold transition-all"
-                          style={{ backgroundColor: brandColor }}
-                        >
-                          Clear Filters
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  )}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}

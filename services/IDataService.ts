@@ -97,6 +97,7 @@ export type PageFilterOperator =
   | 'ilike'
   | 'is'
   | 'in'
+  | 'not.in'
   | 'cs'
   | 'cd'
   | 'ov';

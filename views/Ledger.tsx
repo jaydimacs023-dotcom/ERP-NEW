@@ -6,12 +6,17 @@ import {
   Payment,
   Trainer, Sponsor, Batch, NonStockItem, User, Qualification
 } from '../types';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter, PageOrder } from '../services/IDataService';
 import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import JournalForm from '../components/JournalForm';
 
 const JOURNAL_ENTRIES_PER_PAGE = 7;
+const JOURNAL_ENTRY_COLUMNS = 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id';
+const JOURNAL_LINE_COLUMNS = 'id,journal_entry_id,account_id,debit,credit,memo,contact_id,contact_type,batch_id,item_id,asset_id,is_cleared,created_at,description,classification_code,tax_category_id';
 
 interface LedgerProps {
+  orgId: string;
   accounts: ChartOfAccount[];
   entries: JournalEntry[];
   lines: JournalLine[];
@@ -48,12 +53,24 @@ const getJournalEntryReferenceNo = (entry: JournalEntry): string => {
   return glReference || sourceReference;
 };
 
+const formatPesoNumber = (amount: number) =>
+  Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const renderAccountingAmount = (amount: number, className = '') => (
+  <span className={`grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 tabular-nums ${className}`}>
+    <span className="text-left">₱</span>
+    <span className="truncate text-right">{formatPesoNumber(amount)}</span>
+  </span>
+);
+
 const Ledger: React.FC<LedgerProps> = ({
+  orgId,
   accounts, entries, lines, invoices = [], payments = [], students, sponsors, trainers, batches, items, qualifications = [], users = [],
   currentUser, onPostEntry, onApproveJournal, onReverseJournal,
   initialSearchTerm = ''
 }) => {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearchTerm);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ON_HOLD' | 'POSTED' | 'REVERSED'>('ALL');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('ALL');
   const [postPeriodFilter, setPostPeriodFilter] = useState('ALL');
@@ -69,6 +86,13 @@ const Ledger: React.FC<LedgerProps> = ({
   const [entryFormMode, setEntryFormMode] = useState<'new' | 'edit' | 'view'>('new');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | 'none' }>({ key: 'date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverEntries, setServerEntries] = useState<JournalEntry[]>([]);
+  const [serverEntryLines, setServerEntryLines] = useState<JournalLine[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Column ordering and resize state
   const [columnOrder, setColumnOrder] = useState<string[]>([
@@ -77,6 +101,11 @@ const Ledger: React.FC<LedgerProps> = ({
   const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const entryTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -118,6 +147,143 @@ const Ledger: React.FC<LedgerProps> = ({
     })
   ), [entries]);
 
+
+  const parsePostPeriodRange = (period: string): { from: string; to: string } | null => {
+    const [monthRaw, yearRaw] = period.split('-');
+    const month = Number(monthRaw);
+    const year = Number(yearRaw);
+    if (!month || !year) return null;
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const toDate = new Date(year, month, 0);
+    const to = `${year}-${String(month).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')}`;
+    return { from, to };
+  };
+
+  const serverSortKeyMap: Record<string, string> = {
+    source: 'source_type',
+    date: 'date',
+    glReference: 'gl_entry_number',
+    postPeriod: 'date',
+    description: 'description',
+    status: 'status',
+    createdOn: 'created_at'
+  };
+  const serverSortColumn = serverSortKeyMap[sortConfig.key] || 'date';
+  const serverFetchEnabled =
+    Boolean(orgId) &&
+    statusFilter !== 'ON_HOLD' &&
+    sortConfig.key !== 'total' &&
+    sortConfig.key !== 'createdBy' &&
+    !/\d/.test(debouncedSearchTerm.trim());
+
+  const serverFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    if (statusFilter !== 'ALL') {
+      filters.push({ column: 'status', operator: 'eq', value: statusFilter });
+    }
+    if (transactionTypeFilter !== 'ALL') {
+      filters.push({ column: 'source_type', operator: 'eq', value: transactionTypeFilter });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    if (dateFilterMode === 'TODAY') {
+      filters.push({ column: 'date', operator: 'eq', value: today });
+    } else if (dateFilterMode === 'THIS_MONTH') {
+      filters.push({ column: 'date', operator: 'gte', value: firstDayOfMonth });
+      filters.push({ column: 'date', operator: 'lte', value: today });
+    } else if (dateFilterMode === 'CUSTOM') {
+      if (dateFrom) filters.push({ column: 'date', operator: 'gte', value: dateFrom });
+      if (dateTo) filters.push({ column: 'date', operator: 'lte', value: dateTo });
+    }
+
+    if (postPeriodFilter !== 'ALL') {
+      const range = parsePostPeriodRange(postPeriodFilter);
+      if (range) {
+        filters.push({ column: 'date', operator: 'gte', value: range.from });
+        filters.push({ column: 'date', operator: 'lte', value: range.to });
+      }
+    }
+
+    return filters;
+  }, [dateFilterMode, dateFrom, dateTo, orgId, postPeriodFilter, statusFilter, transactionTypeFilter]);
+
+  const serverOrderBy = useMemo<PageOrder[]>(() => {
+    if (sortConfig.direction === 'none') {
+      return [{ column: 'date', ascending: false }];
+    }
+    return [{ column: serverSortColumn, ascending: sortConfig.direction === 'asc' }];
+  }, [serverSortColumn, sortConfig.direction]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, dateFilterMode, dateFrom, dateTo, orgId, postPeriodFilter, sortConfig, statusFilter, transactionTypeFilter]);
+
+  useEffect(() => {
+    if (!serverFetchEnabled) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<JournalEntry>('journal_entries', {
+      page: currentPage,
+      pageSize: JOURNAL_ENTRIES_PER_PAGE,
+      columns: JOURNAL_ENTRY_COLUMNS,
+      filters: serverFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['gl_entry_number', 'reference', 'description', 'source_ref'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: serverOrderBy
+    })
+      .then(async result => {
+        if (!isActive) return;
+        setServerEntries(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+
+        const entryIds = result.rows.map(entry => entry.id).filter(Boolean);
+        if (entryIds.length === 0) {
+          setServerEntryLines([]);
+          return;
+        }
+
+        const lineResult = await DataServiceFactory.getService().fetchPage<JournalLine>('journal_lines', {
+          page: 1,
+          pageSize: 200,
+          columns: JOURNAL_LINE_COLUMNS,
+          filters: [{ column: 'journal_entry_id', operator: 'in', value: `(${entryIds.join(',')})` }],
+          orderBy: [{ column: 'journal_entry_id', ascending: true }]
+        });
+        if (isActive) {
+          setServerEntryLines(lineResult.rows);
+        }
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[Ledger] Failed to load journal entry page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load journal entries.');
+        setServerEntries([]);
+        setServerEntryLines([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, refreshKey, serverFetchEnabled, serverFilters, serverOrderBy]);
   const handleReverseOpenedEntry = async (): Promise<void> => {
     if (!editingEntry?.id || !onReverseJournal) return;
 
@@ -128,6 +294,7 @@ const Ledger: React.FC<LedgerProps> = ({
     const reversed = await onReverseJournal(liveEntry.id);
     if (!reversed) return;
 
+    setRefreshKey(key => key + 1);
     setShowEntryForm(false);
     setEditingEntry(null);
     setEditingLines([]);
@@ -135,7 +302,7 @@ const Ledger: React.FC<LedgerProps> = ({
   };
 
   const filteredEntries = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = debouncedSearchTerm.trim().toLowerCase();
     const hasLetters = /[a-z]/i.test(term);
     const hasNumbers = /\d/.test(term);
     const numericTerm = term.replace(/[, ]/g, '');
@@ -182,7 +349,7 @@ const Ledger: React.FC<LedgerProps> = ({
 
       return matchesSearch && matchesStatus && matchesTransactionType && matchesPostPeriod && matchesDate;
     });
-  }, [entries, entryTotals, searchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [entries, entryTotals, debouncedSearchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
 
   const sortedEntries = useMemo(() => {
     if (sortConfig.direction === 'none') return filteredEntries;
@@ -210,18 +377,33 @@ const Ledger: React.FC<LedgerProps> = ({
     });
   }, [filteredEntries, sortConfig, entryTotals]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedEntries.length / JOURNAL_ENTRIES_PER_PAGE));
+  const useFallbackRows = !serverFetchEnabled || !!pageLoadError;
+  const totalItems = useFallbackRows ? sortedEntries.length : serverTotal;
+  const totalPages = useFallbackRows ? Math.max(1, Math.ceil(sortedEntries.length / JOURNAL_ENTRIES_PER_PAGE)) : serverTotalPages;
   const pageStartIndex = (currentPage - 1) * JOURNAL_ENTRIES_PER_PAGE;
-  const pageEndIndex = Math.min(pageStartIndex + JOURNAL_ENTRIES_PER_PAGE, sortedEntries.length);
+  const pageEndIndex = useFallbackRows
+    ? Math.min(pageStartIndex + JOURNAL_ENTRIES_PER_PAGE, sortedEntries.length)
+    : Math.min(pageStartIndex + serverEntries.length, serverTotal);
 
-  const paginatedEntries = useMemo(
+  const fallbackPaginatedEntries = useMemo(
     () => sortedEntries.slice(pageStartIndex, pageStartIndex + JOURNAL_ENTRIES_PER_PAGE),
     [sortedEntries, pageStartIndex]
   );
+  const paginatedEntries = useFallbackRows ? fallbackPaginatedEntries : serverEntries;
+
+  const serverEntryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    serverEntryLines.forEach(line => {
+      const id = line.journalEntryId;
+      totals.set(id, (totals.get(id) || 0) + (line.debit || 0));
+    });
+    return totals;
+  }, [serverEntryLines]);
+  const displayEntryTotals = useFallbackRows ? entryTotals : serverEntryTotals;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [debouncedSearchTerm, statusFilter, transactionTypeFilter, postPeriodFilter, dateFilterMode, dateFrom, dateTo]);
 
   useEffect(() => {
     setCurrentPage(page => Math.min(Math.max(page, 1), totalPages));
@@ -296,7 +478,10 @@ const Ledger: React.FC<LedgerProps> = ({
   };
 
   const resolveJournalDisplayLines = (entry: JournalEntry): Array<JournalLine & { classificationCode?: string }> => {
-    const baseLines = lines.filter(line => line.journalEntryId === entry.id);
+    const serverLinesForEntry = serverEntryLines.filter(line => line.journalEntryId === entry.id);
+    const baseLines = serverLinesForEntry.length > 0
+      ? serverLinesForEntry
+      : lines.filter(line => line.journalEntryId === entry.id);
     if (String(entry.sourceType || '').toUpperCase() !== 'INVOICE') {
       return baseLines.map(line => ({ ...line }));
     }
@@ -776,7 +961,7 @@ const Ledger: React.FC<LedgerProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {sortedEntries.length === 0 ? (
+            {totalItems === 0 ? (
               <tr>
                 <td colSpan={columnOrder.length} className="px-4 py-12 text-center text-gray-500">
                   <div className="p-6 bg-white rounded shadow-sm inline-block mb-4 border border-gray-100">
@@ -784,7 +969,7 @@ const Ledger: React.FC<LedgerProps> = ({
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">No Journal Records</h3>
-                    <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto italic font-medium">The ledger is currently empty. Manual entries or system-generated records will appear here once posted.</p>
+                    <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto italic font-medium">{isLoadingPage && !useFallbackRows ? 'Loading journal records...' : 'The ledger is currently empty. Manual entries or system-generated records will appear here once posted.'}</p>
                     <button
                       onClick={() => setShowEntryForm(true)}
                       className="mt-6 px-8 py-3 bg-gray-800 text-white rounded text-xs font-semibold uppercase tracking-wide shadow-md active:scale-95 transition-all"
@@ -796,7 +981,7 @@ const Ledger: React.FC<LedgerProps> = ({
               </tr>
             ) : (
               paginatedEntries.map(entry => {
-                const controlTotal = entryTotals.get(entry.id) || 0;
+                const controlTotal = displayEntryTotals.get(entry.id) || 0;
                 const statusLabel = entry.status || 'ON_HOLD';
 
                 const cells: Record<string, React.ReactNode> = {
@@ -849,7 +1034,7 @@ const Ledger: React.FC<LedgerProps> = ({
                         }`}
                         style={columnWidths[colKey] ? { width: columnWidths[colKey], minWidth: columnWidths[colKey] } : undefined}
                       >
-                        {cells[colKey]}
+                        {colKey === 'total' ? renderAccountingAmount(controlTotal, 'font-medium text-gray-800') : cells[colKey]}
                       </td>
                     ))}
                   </tr>
@@ -858,10 +1043,10 @@ const Ledger: React.FC<LedgerProps> = ({
             )}
           </tbody>
         </table>
-        {sortedEntries.length > 0 && (
+        {totalItems > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t bg-gray-50 px-4 py-3 text-[13px] text-gray-600">
             <div className="font-medium">
-              Showing {pageStartIndex + 1}-{pageEndIndex} of {sortedEntries.length} journal entries
+              Showing {pageStartIndex + 1}-{pageEndIndex} of {totalItems} journal entries
             </div>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
@@ -915,6 +1100,7 @@ const Ledger: React.FC<LedgerProps> = ({
           }}
           onSubmit={(entry, lines) => {
             onPostEntry?.(entry, lines);
+            setRefreshKey(key => key + 1);
             setShowEntryForm(false);
             setEditingEntry(null);
             setEditingLines([]);
@@ -1016,7 +1202,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
             <DetailItem label="Transaction Date" value={entry.date} />
             <DetailItem label="GL Reference" value={(entry.glEntryNumber || entry.reference || '—')} highlight />
             <DetailItem label="Source Type" value={entry.sourceType} />
-            <DetailItem label="Transaction Total" value={controlTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mono />
+            <DetailItem label="Transaction Total" value={renderAccountingAmount(controlTotal, 'font-mono')} />
             <DetailItem label="Status" value={
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
                 entry.status === 'POSTED' ? 'bg-emerald-100 text-emerald-700' :
@@ -1058,12 +1244,12 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                       </td>
                       <td className="px-5 py-4 text-right">
                         <span className="text-sm font-mono font-bold text-slate-700">
-                          {line.debit > 0 ? line.debit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
+                          {line.debit > 0 ? renderAccountingAmount(line.debit) : '-'}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
                         <span className="text-sm font-mono font-bold text-slate-700">
-                          {line.credit > 0 ? line.credit.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
+                          {line.credit > 0 ? renderAccountingAmount(line.credit) : '-'}
                         </span>
                       </td>
                     </tr>
@@ -1074,10 +1260,10 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                 <tr className="border-t-2 border-slate-200">
                   <td colSpan={3} className="px-5 py-4 text-xs uppercase tracking-widest text-slate-400">Total Voucher Value</td>
                   <td className="px-5 py-4 text-right font-mono text-sm text-slate-900 underline decoration-slate-300 decoration-2 underline-offset-4">
-                    {controlTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {renderAccountingAmount(controlTotal)}
                   </td>
                   <td className="px-5 py-4 text-right font-mono text-sm text-slate-900 underline decoration-slate-300 decoration-2 underline-offset-4">
-                    {lines.reduce((sum, l) => sum + (l.credit || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {renderAccountingAmount(lines.reduce((sum, l) => sum + (l.credit || 0), 0))}
                   </td>
                 </tr>
               </tfoot>
@@ -1129,3 +1315,4 @@ const DetailItem: React.FC<{ label: string; value: React.ReactNode; icon?: React
 );
 
 export default Ledger;
+

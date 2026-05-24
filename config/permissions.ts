@@ -143,7 +143,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'ar', 'payables',
     'payroll', 'budgets',
     'students', 'trainers', 'qualifications', 'batches',
-    'employees', 'audit', 'feedback'
+    'employees', 'feedback'
   ],
 
   // FINANCE_MANAGER: All finance modules
@@ -154,7 +154,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
-    'employees', 'coa', 'periods', 'audit', 'feedback'
+    'employees', 'coa', 'periods', 'feedback'
   ],
 
   // ACCOUNTANT: General Ledger, Reporting, Journal Entries
@@ -164,7 +164,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
     'sponsors', 'vendors', 'items', 'assets',
-    'coa', 'periods', 'audit', 'feedback'
+    'coa', 'periods', 'feedback'
   ],
 
   // AR_SPECIALIST: Accounts Receivable focused
@@ -180,7 +180,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'soa',
     'customer-ledger',
     'collection-receipt',
-    'audit', 'feedback'
+    'feedback'
   ],
 
   // AP_SPECIALIST: Accounts Payable focused
@@ -189,7 +189,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
-    'audit', 'feedback'
+    'feedback'
   ],
 
   // AP_CLERK: Limited AP data entry
@@ -204,7 +204,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
-    'audit', 'feedback'
+    'feedback'
   ],
 
   // TREASURY: Banking and cash management
@@ -212,7 +212,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'dashboard', 'reports', 'banking', 'checks',
     'ar', // View receivables for cash forecasting
     'payables', // View payables for cash forecasting
-    'audit', 'feedback'
+    'feedback'
   ],
 
   // AUDITOR: Read-only access to all financial data
@@ -223,7 +223,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'payroll',
     'sponsors', 'vendors', 'items', 'assets',
     'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'inventory-transactions', 'inventory-reports',
-    'coa', 'periods', 'audit', 'feedback'
+    'coa', 'periods', 'feedback'
   ],
 
   // REGISTRAR: Training/Student management

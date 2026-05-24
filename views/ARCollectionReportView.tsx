@@ -3,21 +3,15 @@ import {
   ArrowLeft,
   ArrowUpDown,
   BarChart3,
-  Building2,
   Calendar,
-  CheckSquare,
   ChevronDown,
   ChevronUp,
-  CreditCard,
   Download,
   FileSpreadsheet,
   FileText,
-  Landmark,
   Printer,
   RotateCcw,
-  Search,
-  User as UserIcon,
-  Wallet
+  Search
 } from 'lucide-react';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { Payment, PaymentMethod, PaymentStatus, Sponsor, Student, User } from '../types';
@@ -244,8 +238,17 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
   const [generatedAt, setGeneratedAt] = useState(() => new Date().toISOString());
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: SortDirection }>({ key: 'collectionDate', direction: 'desc' });
 
+  const currencySymbol = currency === 'PHP' ? '₱' : currency;
+  const formatCurrencyNumber = (amount: number) =>
+    Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatCurrency = (amount: number) =>
-    `${currency} ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${currencySymbol} ${formatCurrencyNumber(amount)}`;
+  const renderAccountingAmount = (amount: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatCurrencyNumber(amount)}</span>
+    </span>
+  );
 
   const getPayorName = (payment: Payment) => {
     if (payment.sponsorId) {
@@ -577,19 +580,6 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
     printPreviewReport();
   };
 
-  const methodIcon = (method: PaymentMethod) => {
-    switch (method) {
-      case 'CHECK':
-        return <CheckSquare size={14} className="text-slate-500" />;
-      case 'BANK_TRANSFER':
-        return <Landmark size={14} className="text-slate-500" />;
-      case 'CREDIT_CARD':
-        return <CreditCard size={14} className="text-slate-500" />;
-      default:
-        return <Wallet size={14} className="text-slate-500" />;
-    }
-  };
-
   const getMethodSummary = (rows: CollectionReportRow[]) => {
     const check = rows
       .filter(row => row.method === 'CHECK')
@@ -788,20 +778,20 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
   };
 
   const columns = [
-    { key: 'collectionDate', label: 'Collection Date', align: 'text-left' },
-    { key: 'postPeriod', label: 'Post Period', align: 'text-left' },
-    { key: 'paymentNo', label: 'Payment No.', align: 'text-left' },
-    { key: 'crNo', label: 'C.R. No.', align: 'text-left' },
-    { key: 'payorType', label: 'Payor Type', align: 'text-left' },
-    { key: 'payorName', label: 'Payor Name', align: 'text-left' },
-    { key: 'method', label: 'Method', align: 'text-left' },
-    { key: 'referenceNo', label: 'Reference No.', align: 'text-left' },
-    { key: 'amountReceived', label: 'Amount Received', align: 'text-right' },
-    { key: 'amountApplied', label: 'Amount Applied', align: 'text-right' },
-    { key: 'unappliedBalance', label: 'Unapplied Balance', align: 'text-right' },
-    { key: 'status', label: 'Status', align: 'text-left' },
-    { key: 'glReferenceNo', label: 'GL Reference No.', align: 'text-left' },
-    { key: 'createdBy', label: 'Created By', align: 'text-left' }
+    { key: 'collectionDate', label: 'Collection Date', align: 'text-left', width: '7%' },
+    { key: 'postPeriod', label: 'Post Period', align: 'text-left', width: '6%' },
+    { key: 'paymentNo', label: 'Payment No.', align: 'text-left', width: '7%' },
+    { key: 'crNo', label: 'C.R. No.', align: 'text-left', width: '6%' },
+    { key: 'payorType', label: 'Payor Type', align: 'text-left', width: '6%' },
+    { key: 'payorName', label: 'Payor Name', align: 'text-left', width: '12%' },
+    { key: 'method', label: 'Method', align: 'text-left', width: '6%' },
+    { key: 'referenceNo', label: 'Reference No.', align: 'text-left', width: '8%' },
+    { key: 'amountReceived', label: 'Amount Received', align: 'text-right', width: '8%' },
+    { key: 'amountApplied', label: 'Amount Applied', align: 'text-right', width: '8%' },
+    { key: 'unappliedBalance', label: 'Unapplied Balance', align: 'text-right', width: '8%' },
+    { key: 'status', label: 'Status', align: 'text-left', width: '5%' },
+    { key: 'glReferenceNo', label: 'GL Ref. No.', align: 'text-left', width: '7%' },
+    { key: 'createdBy', label: 'Created By', align: 'text-left', width: '6%' }
   ];
 
   const activePeriodLabel = periodOptions.find(option => option.value === periodFilter)?.label || 'Monthly';
@@ -1274,20 +1264,25 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1480px] font-sans">
-            <thead style={{ backgroundColor: brandColor }}>
+      <section className="overflow-hidden rounded-xl border bg-white">
+        <div className="overflow-hidden">
+          <table className="w-full table-fixed font-sans">
+            <colgroup>
+              {columns.map(column => (
+                <col key={column.key} style={{ width: column.width }} />
+              ))}
+            </colgroup>
+            <thead className="bg-emerald-600 border-b">
               <tr>
                 {columns.map(column => (
                   <th
                     key={column.key}
-                    className={`group select-none border-x border-transparent px-4 py-3 font-semibold text-white transition-colors ${column.align}`}
+                    className={`group select-none border-x border-transparent px-2 py-3 font-semibold text-white transition-colors hover:bg-emerald-700 hover:border-emerald-200 ${column.align}`}
                   >
                     <button
                       type="button"
                       onClick={() => handleSort(column.key)}
-                      className={`flex w-full cursor-pointer items-center text-[13px] font-bold text-white ${column.align === 'text-right' ? 'justify-end' : ''}`}
+                      className={`flex w-full cursor-pointer items-center text-[11px] font-bold leading-tight text-white ${column.align === 'text-right' ? 'justify-end' : ''}`}
                     >
                       {column.label} <SortIndicator columnKey={column.key} />
                     </button>
@@ -1295,32 +1290,25 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y">
               {paginatedRows.map(row => (
                 <tr
                   key={row.payment.id}
                   className="transition-colors hover:bg-gray-50"
                 >
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{formatDate(row.collectionDate)}</td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.postPeriod}</td>
-                  <td className="px-4 py-4 text-xs font-bold" style={{ color: brandColor }}>{row.payment.paymentNo || '-'}</td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.payment.crNo || '-'}</td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.payorType === 'ALL' ? '-' : row.payorType === 'SPONSOR' ? 'Sponsor' : 'Student'}</td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-800">
-                    <span className="inline-flex items-center gap-2">
-                      {row.payorType === 'SPONSOR' ? <Building2 size={14} className="text-slate-400" /> : <UserIcon size={14} className="text-slate-400" />}
-                      {row.payorName}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">
-                    <span className="inline-flex items-center gap-2">{methodIcon(row.method)} {getMethodLabel(row.method)}</span>
-                  </td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.referenceNo}</td>
-                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.amountReceived)}</td>
-                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.amountApplied)}</td>
-                  <td className="px-4 py-4 text-right text-xs font-bold text-slate-800">{formatCurrency(row.unappliedBalance)}</td>
-                  <td className="px-4 py-4">{statusBadge(row.payment.status, row.statusLabel)}</td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={formatDate(row.collectionDate)}>{formatDate(row.collectionDate)}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.postPeriod}>{row.postPeriod}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.payment.paymentNo || '-'}>{row.payment.paymentNo || '-'}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.payment.crNo || '-'}>{row.payment.crNo || '-'}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800">{row.payorType === 'ALL' ? '-' : row.payorType === 'SPONSOR' ? 'Sponsor' : 'Student'}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.payorName}>{row.payorName}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={getMethodLabel(row.method)}>{getMethodLabel(row.method)}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.referenceNo}>{row.referenceNo}</td>
+                  <td className="px-2 py-3 text-[11px] font-medium text-gray-800" title={formatCurrency(row.amountReceived)}>{renderAccountingAmount(row.amountReceived)}</td>
+                  <td className="px-2 py-3 text-[11px] font-medium text-gray-800" title={formatCurrency(row.amountApplied)}>{renderAccountingAmount(row.amountApplied)}</td>
+                  <td className="px-2 py-3 text-[11px] font-medium text-gray-800" title={formatCurrency(row.unappliedBalance)}>{renderAccountingAmount(row.unappliedBalance)}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.statusLabel}>{row.statusLabel}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.glReferenceNo}>
                     {row.payment.journalEntryId && onViewJournal ? (
                       <button
                         type="button"
@@ -1328,8 +1316,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                           event.stopPropagation();
                           onViewJournal(row.payment.journalEntryId!);
                         }}
-                        className="font-bold hover:underline"
-                        style={{ color: brandColor }}
+                        className="block w-full truncate text-left font-medium text-gray-800 hover:underline"
                       >
                         {row.glReferenceNo}
                       </button>
@@ -1337,7 +1324,7 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
                       row.glReferenceNo
                     )}
                   </td>
-                  <td className="px-4 py-4 text-xs font-semibold text-slate-700">{row.createdBy}</td>
+                  <td className="truncate px-2 py-3 text-[11px] font-medium text-gray-800" title={row.createdBy}>{row.createdBy}</td>
                 </tr>
               ))}
               {filteredRows.length === 0 && (
@@ -1350,9 +1337,9 @@ const ARCollectionReportView: React.FC<ARCollectionReportViewProps> = ({
               <tfoot className="border-t border-gray-200 bg-gray-50">
                 <tr>
                   <td colSpan={8} className="px-4 py-4 text-left text-sm font-bold text-slate-700">Grand Totals:</td>
-                  <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalCollections)}</td>
-                  <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalApplied)}</td>
-                  <td className="px-4 py-4 text-right text-sm font-bold" style={{ color: brandColor }}>{formatCurrency(summary.totalUnapplied)}</td>
+                  <td className="px-2 py-4 text-sm font-bold" style={{ color: brandColor }}>{renderAccountingAmount(summary.totalCollections)}</td>
+                  <td className="px-2 py-4 text-sm font-bold" style={{ color: brandColor }}>{renderAccountingAmount(summary.totalApplied)}</td>
+                  <td className="px-2 py-4 text-sm font-bold" style={{ color: brandColor }}>{renderAccountingAmount(summary.totalUnapplied)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tfoot>

@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { generateUUID } from '../utils/uuid';
 import { calculateInvoiceDueDate, todayISO } from '../utils/invoiceTerms';
 import { BillingComputationService } from '../services/BillingComputationService';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter, PageOrder } from '../services/IDataService';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
@@ -48,6 +50,9 @@ interface InvoicesViewProps {
   onNavigate?: (tab: string, context?: any) => void;
 }
 
+const INVOICE_PAGE_SIZE = 7;
+const INVOICE_COLUMNS = 'id,org_id,invoice_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id';
+
 const InvoicesView: React.FC<InvoicesViewProps> = ({
   invoices, payments = [], sponsors, students, users, enrollments, assessmentRegistrations, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onUpdateAssessmentRegistration, onAddStudentLedgerEntry,
@@ -69,6 +74,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -113,6 +119,13 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [payerFilterMode, setPayerFilterMode] = useState<'ALL' | 'CUSTOM'>('ALL');
   const [payerSearchTerm, setPayerSearchTerm] = useState('');
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [serverInvoices, setServerInvoices] = useState<Invoice[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverCurrentPage, setServerCurrentPage] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
 
   // Derived: Students in the batch for annex
@@ -174,6 +187,11 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   });
 
 const brandColor = organization?.primaryColor || '#059669';
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (brandColor && brandColor !== '#059669') {
@@ -360,27 +378,39 @@ const brandColor = organization?.primaryColor || '#059669';
     }));
   };
 
+  const hydrateInvoiceForForm = async (invoice: Invoice): Promise<Invoice> => {
+    if ((invoice.lines || []).length > 0) return invoice;
+
+    try {
+      return await DataServiceFactory.getService().getInvoiceById(invoice.id) || invoice;
+    } catch (error) {
+      console.error('[InvoicesView] Failed to load invoice lines:', error);
+      return invoice;
+    }
+  };
+
   // Open modal for editing
-  const handleEdit = (invoice: Invoice) => {
-    setEditingInvoice(invoice);
-    const normalizedStatus = invoice.status === 'DRAFT' ? 'ON_HOLD' : invoice.status;
+  const handleEdit = async (invoice: Invoice) => {
+    const hydratedInvoice = await hydrateInvoiceForForm(invoice);
+    setEditingInvoice(hydratedInvoice);
+    const normalizedStatus = hydratedInvoice.status === 'DRAFT' ? 'ON_HOLD' : hydratedInvoice.status;
     setFormData({
-      invoiceNo: invoice.invoiceNo,
-      sponsorId: invoice.sponsorId || '',
-      studentId: invoice.studentId || '',
-      enrollmentId: invoice.enrollmentId || '',
-      assessmentRegistrationId: invoice.assessmentRegistrationId || '',
-      batchId: invoice.batchId || '',
-      invoiceDate: invoice.invoiceDate,
-      dueDate: invoice.dueDate,
+      invoiceNo: hydratedInvoice.invoiceNo,
+      sponsorId: hydratedInvoice.sponsorId || '',
+      studentId: hydratedInvoice.studentId || '',
+      enrollmentId: hydratedInvoice.enrollmentId || '',
+      assessmentRegistrationId: hydratedInvoice.assessmentRegistrationId || '',
+      batchId: hydratedInvoice.batchId || '',
+      invoiceDate: hydratedInvoice.invoiceDate,
+      dueDate: hydratedInvoice.dueDate,
       status: normalizedStatus,
-      reference: invoice.reference || '',
-      terms: invoice.terms || '',
-      notes: invoice.notes || '',
-      vatPricing: invoice.vatPricing || 'INCLUSIVE',
-      vatRate: invoice.vatRate || 0.12,
-      glEntryNumber: invoice.glEntryNumber || '',
-      lines: invoice.lines || []
+      reference: hydratedInvoice.reference || '',
+      terms: hydratedInvoice.terms || '',
+      notes: hydratedInvoice.notes || '',
+      vatPricing: hydratedInvoice.vatPricing || 'INCLUSIVE',
+      vatRate: hydratedInvoice.vatRate || 0.12,
+      glEntryNumber: hydratedInvoice.glEntryNumber || '',
+      lines: hydratedInvoice.lines || []
     });
     setViewMode('FORM');
   };
@@ -1209,6 +1239,7 @@ const brandColor = organization?.primaryColor || '#059669';
     } else {
       onAddInvoice(invoice);
     }
+    setRefreshKey(key => key + 1);
     markAssessmentRegistrationBilled(invoice);
 
     resetForm();
@@ -1283,6 +1314,7 @@ const brandColor = organization?.primaryColor || '#059669';
     } else {
       onAddInvoice(invoice);
     }
+    setRefreshKey(key => key + 1);
     markAssessmentRegistrationBilled(invoice);
 
     resetForm();
@@ -1320,6 +1352,7 @@ const brandColor = organization?.primaryColor || '#059669';
     } else {
       onUpdateInvoice({ ...invoice, status: 'OPEN', postedAt: new Date().toISOString() });
     }
+    setRefreshKey(key => key + 1);
   };
 
   // Void invoice
@@ -1335,6 +1368,7 @@ const brandColor = organization?.primaryColor || '#059669';
           voidReason
         });
       }
+      setRefreshKey(key => key + 1);
       setShowVoidModal(false);
       setVoidingInvoice(null);
       setVoidReason('');
@@ -1351,15 +1385,124 @@ const brandColor = organization?.primaryColor || '#059669';
     });
   };
 
+  const serverSortKeyMap: Record<string, string> = {
+    invoiceDate: 'invoice_date',
+    postPeriod: 'invoice_date',
+    invoiceNo: 'invoice_no',
+    status: 'status',
+    glReference: 'gl_entry_number',
+    totalAmount: 'grand_total',
+    balance: 'balance_due',
+    createdOn: 'created_at'
+  };
+  const serverSortColumn = serverSortKeyMap[sortConfig.key] || 'invoice_date';
+  const serverFetchEnabled =
+    Boolean(orgId) &&
+    payerFilterMode !== 'CUSTOM' &&
+    sortConfig.key !== 'payer' &&
+    sortConfig.key !== 'createdBy';
+
+  const invoiceFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+
+    if (statusFilter !== 'ALL') {
+      filters.push({
+        column: 'status',
+        operator: 'eq',
+        value: statusFilter === 'ON_HOLD' ? 'ON_HOLD' : statusFilter
+      });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    if (dateFilterMode === 'TODAY') {
+      filters.push({ column: 'invoice_date', operator: 'eq', value: today });
+    } else if (dateFilterMode === 'THIS_MONTH') {
+      filters.push({ column: 'invoice_date', operator: 'gte', value: firstDayOfMonth });
+      filters.push({ column: 'invoice_date', operator: 'lte', value: today });
+    } else if (dateFilterMode === 'CUSTOM') {
+      if (dateFrom) filters.push({ column: 'invoice_date', operator: 'gte', value: dateFrom });
+      if (dateTo) filters.push({ column: 'invoice_date', operator: 'lte', value: dateTo });
+    }
+
+    if (filterSponsorId !== 'ALL') {
+      filters.push({ column: 'sponsor_id', operator: 'eq', value: filterSponsorId });
+    }
+    if (filterStudentId !== 'ALL') {
+      filters.push({ column: 'student_id', operator: 'eq', value: filterStudentId });
+    }
+
+    return filters;
+  }, [dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, orgId, statusFilter]);
+
+  const invoiceOrderBy = useMemo<PageOrder[]>(() => {
+    if (sortConfig.direction === 'none') {
+      return [{ column: 'invoice_date', ascending: false }];
+    }
+    return [{ column: serverSortColumn, ascending: sortConfig.direction === 'asc' }];
+  }, [serverSortColumn, sortConfig.direction]);
+
+  useEffect(() => {
+    setServerCurrentPage(1);
+  }, [debouncedSearchTerm, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, orgId, payerFilterMode, payerSearchTerm, sortConfig, statusFilter]);
+
+  useEffect(() => {
+    if (!serverFetchEnabled) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Invoice>('invoices', {
+      page: serverCurrentPage,
+      pageSize: INVOICE_PAGE_SIZE,
+      columns: INVOICE_COLUMNS,
+      filters: invoiceFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['invoice_no', 'reference', 'gl_entry_number', 'notes'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: invoiceOrderBy
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerInvoices(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[InvoicesView] Failed to load invoice page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load invoices.');
+        setServerInvoices([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedSearchTerm, invoiceFilters, invoiceOrderBy, refreshKey, serverCurrentPage, serverFetchEnabled]);
+
   // Filter invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
       const matchesSearch =
-        inv.invoiceNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        getInvoiceGlRef(inv).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(searchTerm.toLowerCase());
+        inv.invoiceNo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        inv.reference?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        getInvoiceGlRef(inv).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       
       const normalizedStatus = inv.status === 'DRAFT' ? 'ON_HOLD' : inv.status;
       const matchesStatus = statusFilter === 'ALL' ||
@@ -1451,16 +1594,25 @@ const brandColor = organization?.primaryColor || '#059669';
       const comparison = (valA || 0) - (valB || 0);
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [invoices, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, users, sortConfig, payerFilterMode, payerSearchTerm]);
+  }, [invoices, debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, sponsors, students, users, sortConfig, payerFilterMode, payerSearchTerm]);
 
   const {
-    currentPage,
-    totalPages,
-    pageStartIndex,
-    pageEndIndex,
-    paginatedRows: paginatedInvoices,
-    setCurrentPage
-  } = usePaginatedRows(filteredInvoices, [searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, payerFilterMode, payerSearchTerm, sortConfig]);
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedInvoices,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredInvoices, [debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, payerFilterMode, payerSearchTerm, sortConfig], INVOICE_PAGE_SIZE);
+
+  const useFallbackRows = !serverFetchEnabled || !!pageLoadError;
+  const paginatedInvoices = useFallbackRows ? fallbackPaginatedInvoices : serverInvoices;
+  const totalInvoices = useFallbackRows ? filteredInvoices.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const currentPage = useFallbackRows ? fallbackCurrentPage : serverCurrentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (serverCurrentPage - 1) * INVOICE_PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverInvoices.length, serverTotal);
+  const setCurrentPage = useFallbackRows ? setFallbackCurrentPage : setServerCurrentPage;
 
   // Summary stats
   const stats = useMemo(() => {
@@ -1492,6 +1644,15 @@ const brandColor = organization?.primaryColor || '#059669';
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: currency || 'PHP' }).format(amount);
   };
+  const currencySymbol = (currency || 'PHP') === 'PHP' ? '₱' : (currency || 'PHP');
+  const formatCurrencyNumber = (amount: number) =>
+    new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const renderAccountingAmount = (amount: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 font-medium text-gray-800 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatCurrencyNumber(amount)}</span>
+    </span>
+  );
 
   const getStatusBadge = (status: InvoiceStatus, className = '') => {
     const badges: Record<InvoiceStatus, { bg: string; text: string; label: string; title?: string }> = {
@@ -2556,6 +2717,7 @@ const brandColor = organization?.primaryColor || '#059669';
 
     // Add the invoice
     onAddInvoice(invoice);
+    setRefreshKey(key => key + 1);
 
     // Update enrollment billing status to BILLED
     if (onUpdateEnrollment) {
@@ -2982,7 +3144,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 sortKey: 'totalAmount',
                 width: 'w-32',
                 align: 'text-right' as const,
-                render: (inv: any) => formatCurrency(inv.grandTotal),
+                render: (inv: any) => renderAccountingAmount(inv.grandTotal),
               },
               // ── 7. Balance ────────────────────────────────
               {
@@ -2991,7 +3153,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 sortKey: 'balance',
                 width: 'w-32',
                 align: 'text-right' as const,
-                render: (inv: any) => formatCurrency(Number(inv.balanceDue ?? 0)),
+                render: (inv: any) => renderAccountingAmount(Number(inv.balanceDue ?? 0)),
               },
               {
                 key: 'createdBy',
@@ -3104,7 +3266,7 @@ const brandColor = organization?.primaryColor || '#059669';
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {filteredInvoices.length === 0 ? (
+                    {totalInvoices === 0 ? (
                       <tr>
                         <td colSpan={registryColumns.length} className="px-4 py-12 text-center text-gray-500">
                           <FileText size={40} className="mx-auto mb-2 text-gray-300" />
@@ -3136,7 +3298,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 <PaginationControls
                   currentPage={currentPage}
                   totalPages={totalPages}
-                  totalItems={filteredInvoices.length}
+                  totalItems={totalInvoices}
                   pageStartIndex={pageStartIndex}
                   pageEndIndex={pageEndIndex}
                   onPageChange={setCurrentPage}
@@ -3355,7 +3517,7 @@ const brandColor = organization?.primaryColor || '#059669';
                     </div>
                   </div>
                   {/* dates on right */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(9rem,1fr)] lg:col-span-6">
                     <div>
                       <label className="text-xs font-medium text-gray-500">Invoice Date *</label>
                       <input
@@ -3363,7 +3525,7 @@ const brandColor = organization?.primaryColor || '#059669';
                         value={formData.invoiceDate}
                         onChange={e => handleInvoiceDateChange(e.target.value)}
                         disabled={isReadOnly}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full min-w-[10rem] mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                     <div>
@@ -3373,7 +3535,7 @@ const brandColor = organization?.primaryColor || '#059669';
                         value={formData.dueDate}
                         onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
                         disabled={isReadOnly}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full min-w-[10rem] mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       />
                     </div>
                     <div>
@@ -4451,5 +4613,6 @@ const brandColor = organization?.primaryColor || '#059669';
 };
 
 export default InvoicesView;
+
 
 

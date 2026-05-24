@@ -142,14 +142,15 @@ export class AuthService {
       }
 
       // Step 1: Fetch user by email
-      const userColumns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active,locked_until,password_hash,password,failed_login_attempts,last_login_at';
+      const userColumns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active,locked_until,password_hash,failed_login_attempts,last_login_at';
       const usersResponse = await fetch(
         `${this.supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=${userColumns}`,
         { headers: this.getHeaders() }
       );
 
       if (!usersResponse.ok) {
-        console.error('[Auth] Failed to fetch user:', usersResponse.status);
+        const errorText = await usersResponse.text().catch(() => '');
+        console.error('[Auth] Failed to fetch user:', usersResponse.status, errorText);
         return null;
       }
 
@@ -172,7 +173,7 @@ export class AuthService {
         return null;
       }
 
-      const storedPassword = dbUser.password_hash || dbUser.password || '';
+      const storedPassword = dbUser.password_hash || '';
       if (!storedPassword) {
         console.error('[Auth] ❌ No password hash found for user:', email);
         return null;

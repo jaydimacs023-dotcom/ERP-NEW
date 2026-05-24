@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location, Organization } from '../types';
 import { generateUUID } from '../utils/uuid';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import {
   Search, Plus, Layers, Award, GraduationCap, Users,
   Trash2, CheckCircle, Edit2, AlertCircle,
@@ -37,6 +39,9 @@ const getSlotHours = (start: string, end: string) => {
   );
   return Math.max(0, (grossMinutes - lunchOverlap) / 60);
 };
+
+const PAGE_SIZE = 7;
+const BATCH_COLUMNS = 'id,org_id,batch_code,name,year,qualification_id,trainer_id,sponsor_id,location_id,student_ids,status,start_date,end_date,training_schedule_slots,max_students,current_students,created_at,updated_at';
 
 const calculateProjectedEndDate = (
   startDateStr: string,
@@ -110,10 +115,21 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   onAddBatch, onUpdateBatch, onDeleteBatch, onNotify
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<BatchStatus | 'ALL'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const brandColor = organization?.primaryColor || '#059669';
-  const statuses = useMemo(() => ['ALL', ...Array.from(new Set(batches.map(b => b.status)))] as (BatchStatus | 'ALL')[], [batches]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverBatches, setServerBatches] = useState<Batch[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const statuses = useMemo(
+    () => ['ALL', ...Array.from(new Set([...batches.map(b => b.status), ...serverBatches.map(b => b.status)].filter(Boolean)))] as (BatchStatus | 'ALL')[],
+    [batches, serverBatches]
+  );
   const hasActiveFilters = searchTerm.trim().length > 0 || statusFilter !== 'ALL';
 
   useEffect(() => {
@@ -121,6 +137,16 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       document.documentElement.style.setProperty('--brand', brandColor);
     }
   }, [brandColor]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, organization?.id, statusFilter]);
+
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -143,6 +169,62 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   });
 
   const [projection, setProjection] = useState<{ totalHours: number; calendarDays: number; trainingDays: number } | null>(null);
+
+  const batchFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (organization?.id) {
+      filters.push({ column: 'org_id', operator: 'eq', value: organization.id });
+    }
+    if (statusFilter !== 'ALL') {
+      filters.push({ column: 'status', operator: 'eq', value: statusFilter });
+    }
+    return filters;
+  }, [organization?.id, statusFilter]);
+
+  useEffect(() => {
+    if (!organization?.id) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Batch>('batches', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: BATCH_COLUMNS,
+      filters: batchFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['name', 'batch_code'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'created_at', ascending: false, nullsFirst: false }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerBatches(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[BatchesView] Failed to load batch page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load batches.');
+        setServerBatches([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [batchFilters, currentPage, debouncedSearchTerm, organization?.id, refreshKey]);
 
   const eligibleTrainers = useMemo(() => {
     if (!formData.qualificationId) return trainers;
@@ -184,26 +266,36 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       const time = new Date(dateValue).getTime();
       return Number.isNaN(time) ? 0 : time;
     };
+    const term = debouncedSearchTerm.toLowerCase();
 
     return batches
       .filter(b => {
         const matchesSearch =
-          b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (b.batchCode && b.batchCode.toLowerCase().includes(searchTerm.toLowerCase()));
+          b.name.toLowerCase().includes(term) ||
+          (b.batchCode && b.batchCode.toLowerCase().includes(term));
         const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => getLatestTime(b) - getLatestTime(a));
-  }, [batches, searchTerm, statusFilter]);
+  }, [batches, debouncedSearchTerm, statusFilter]);
 
   const {
-    currentPage,
-    totalPages,
-    pageStartIndex,
-    pageEndIndex,
-    paginatedRows: paginatedBatches,
-    setCurrentPage
-  } = usePaginatedRows(filteredBatches, [searchTerm, statusFilter], 7);
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedBatches,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredBatches, [debouncedSearchTerm, statusFilter], PAGE_SIZE);
+
+  const useFallbackRows = !organization?.id || !!pageLoadError;
+  const paginatedBatches = useFallbackRows ? fallbackPaginatedBatches : serverBatches;
+  const totalItems = useFallbackRows ? filteredBatches.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverBatches.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const resetForm = () => {
     setFormData({
@@ -247,6 +339,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           status: BatchStatus.PLANNED,
           currentStudents: studentCount
         } as Batch);
+        setRefreshKey(key => key + 1);
         onNotify?.('success', 'Batch updated successfully');
       } else {
         const newBatch: Batch = {
@@ -267,6 +360,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           currentStudents: studentCount
         };
         await onAddBatch(newBatch);
+        setRefreshKey(key => key + 1);
         onNotify?.('success', 'Batch created successfully');
       }
       setShowModal(false);
@@ -280,7 +374,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   };
 
   const handleDelete = async (id: string) => {
-    const batch = batches.find(b => b.id === id);
+    const batch = [...serverBatches, ...batches].find(b => b.id === id);
     if (!batch) return;
     if (batch.status === BatchStatus.ONGOING) {
       onNotify?.('error', 'Cannot delete an ongoing batch for security reasons.');
@@ -290,6 +384,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     setIsDeleting(id);
     try {
       await onDeleteBatch(id);
+      setRefreshKey(key => key + 1);
       onNotify?.('success', 'Batch deleted successfully');
     } catch (error) {
       console.error('[BatchesView] Error deleting batch:', error);
@@ -331,6 +426,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         trainingScheduleSlots,
         endDate: projected?.endDate || batch.endDate
       });
+      setRefreshKey(key => key + 1);
       onNotify?.('success', 'Training commenced successfully!');
     } catch (error) {
       console.error('[BatchesView] Error commencing training:', error);
@@ -349,6 +445,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
       if (batch.status === BatchStatus.ONGOING && batch.endDate && batch.endDate < today) {
         try {
           await onUpdateBatch({ ...batch, status: BatchStatus.COMPLETED });
+          setRefreshKey(key => key + 1);
           onNotify?.('info', `Batch "${batch.name}" automatically marked as completed`);
         } catch (error) {
           console.error('[BatchesView] Error auto-completing batch:', error);
@@ -807,7 +904,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               Clear filters
             </button>
             <p className="text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-900">{filteredBatches.length}</span> of <span className="font-semibold text-gray-900">{batches.length}</span>
+              Showing <span className="font-semibold text-gray-900">{totalItems}</span> matching batch{totalItems !== 1 ? 'es' : ''}
             </p>
           </div>
         </div>
@@ -830,7 +927,19 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedBatches.map(batch => {
+              {isLoadingPage && !useFallbackRows ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-16 text-center text-sm font-semibold text-gray-400">
+                    Loading batches...
+                  </td>
+                </tr>
+              ) : totalItems === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-16 text-center text-sm font-semibold text-gray-400">
+                    {pageLoadError ? 'Unable to load batches from Supabase.' : 'No batches found matching your criteria.'}
+                  </td>
+                </tr>
+              ) : paginatedBatches.map(batch => {
                 const qual = qualifications.find(q => q.id === batch.qualificationId);
                 const trainer = trainers.find(t => t.id === batch.trainerId);
                 const sponsor = sponsors.find(s => s.id === batch.sponsorId);
@@ -972,12 +1081,12 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           </table>
         </div>
         <PaginationControls
-          currentPage={currentPage}
+          currentPage={activePage}
           totalPages={totalPages}
-          totalItems={filteredBatches.length}
+          totalItems={totalItems}
           pageStartIndex={pageStartIndex}
           pageEndIndex={pageEndIndex}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
           itemLabel="batches"
         />
       </div>

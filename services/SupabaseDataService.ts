@@ -2192,6 +2192,7 @@ export class SupabaseDataService implements IDataService {
       const response = await fetch(organizationsWriteUrl, {
         method: 'POST',
         headers: {
+          'apikey': this.supabaseKey,
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
@@ -2203,14 +2204,14 @@ export class SupabaseDataService implements IDataService {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        let errorMsg = `Organizations edge function error: ${response.status}`;
+        let errorMsg = '';
         try {
           const jsonError = JSON.parse(errorBody);
-          errorMsg = jsonError.error || jsonError.message || errorMsg;
+          errorMsg = jsonError.error || jsonError.message || '';
         } catch {
-          errorMsg = errorBody || errorMsg;
+          errorMsg = errorBody || '';
         }
-        throw new Error(errorMsg);
+        throw new Error(`Organizations edge function error: ${response.status}${errorMsg ? ` - ${errorMsg}` : ''}`);
       }
 
       const result = await response.json();
@@ -2220,14 +2221,18 @@ export class SupabaseDataService implements IDataService {
 
       return this.snakeToCamel(result.organization);
     } catch (error) {
-      console.error('[SupabaseDataService] Error writing organization via edge function:', error);
+      if (this.isRecoverableOrganizationWriteError(error)) {
+        console.warn('[SupabaseDataService] Organization edge function unavailable or unauthorized; using REST fallback when allowed:', error);
+      } else {
+        console.error('[SupabaseDataService] Error writing organization via edge function:', error);
+      }
       throw error;
     }
   }
 
   private isRecoverableOrganizationWriteError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
-    return /requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
+    return /organizations edge function error:\s*(401|403)|authentication required|requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
   }
 
   /**
@@ -4828,6 +4833,10 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getFeedbackTickets(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]> {
+    if (this.isLocalSupabase()) {
+      return this.getFeedbackTicketsViaLocalRest(context);
+    }
+
     try {
       return await this.callFeedbackTicketsFunction<FeedbackTicket[]>('list', context || {});
     } catch (error) {
@@ -4920,7 +4929,7 @@ export class SupabaseDataService implements IDataService {
   private parseEdgeFunctionError(errorBody: string): string {
     try {
       const jsonError = JSON.parse(errorBody);
-      return jsonError.error || jsonError.message || errorBody;
+      return jsonError.error || jsonError.message || jsonError.msg || errorBody;
     } catch {
       return errorBody || 'Unknown edge function error';
     }

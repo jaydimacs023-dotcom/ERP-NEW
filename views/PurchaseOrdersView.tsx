@@ -1,6 +1,9 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, Vendor, NonStockItem } from '../types';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import {
   FileStack, Plus, Search, X, Save, Trash2,
   ChevronRight, CheckCircle, Clock, Box,
@@ -9,6 +12,7 @@ import {
 } from 'lucide-react';
 
 interface PurchaseOrdersViewProps {
+  orgId: string;
   purchaseOrders: PurchaseOrder[];
   vendors: Vendor[];
   items: NonStockItem[];
@@ -36,18 +40,31 @@ const getTodayDateValue = () => {
   return local.toISOString().slice(0, 10);
 };
 
+const PAGE_SIZE = 10;
+const PURCHASE_ORDER_COLUMNS = 'id,org_id,vendor_id,date,reference,gl_entry_number,status,lines,total_amount,memo,created_at,approved_by,approved_at,is_deleted,deleted_at,deleted_by';
+const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
+const dateEndIso = (date: string) => `${date}T23:59:59.999Z`;
+
 const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({ 
-  purchaseOrders, vendors, items, onCreatePO, onUpdateStatus, onConvertToBill 
+  orgId, purchaseOrders, vendors, items, onCreatePO, onUpdateStatus, onConvertToBill 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | 'ALL'>('ALL');
   const [vendorFilter, setVendorFilter] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [viewPO, setViewPO] = useState<PurchaseOrder | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverPOs, setServerPOs] = useState<PurchaseOrder[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
 
   const [formData, setFormData] = useState<Partial<PurchaseOrder>>({
     vendorId: '',
@@ -57,8 +74,96 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     lines: [{ id: '1', itemId: '', description: '', qty: 1, unitPrice: 0, taxAmount: 0 }]
   });
 
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, orgId, statusFilter, vendorFilter]);
+
+  const poFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (statusFilter !== 'ALL') {
+      filters.push({ column: 'status', operator: 'eq', value: statusFilter });
+    }
+    if (vendorFilter !== 'ALL') {
+      filters.push({ column: 'vendor_id', operator: 'eq', value: vendorFilter });
+    }
+
+    const todayValue = getTodayDateValue();
+    if (dateFilterMode === 'TODAY') {
+      filters.push({ column: 'date', operator: 'gte', value: dateStartIso(todayValue) });
+      filters.push({ column: 'date', operator: 'lte', value: dateEndIso(todayValue) });
+    } else if (dateFilterMode === 'THIS_MONTH') {
+      filters.push({ column: 'date', operator: 'gte', value: `${todayValue.slice(0, 7)}-01` });
+      const end = new Date(`${todayValue.slice(0, 7)}-01T00:00:00.000Z`);
+      end.setUTCMonth(end.getUTCMonth() + 1);
+      filters.push({ column: 'date', operator: 'lt', value: end.toISOString().slice(0, 10) });
+    } else if (dateFilterMode === 'CUSTOM') {
+      if (dateFrom) {
+        filters.push({ column: 'date', operator: 'gte', value: dateFrom });
+      }
+      if (dateTo) {
+        filters.push({ column: 'date', operator: 'lte', value: dateTo });
+      }
+    }
+
+    return filters;
+  }, [dateFilterMode, dateFrom, dateTo, orgId, statusFilter, vendorFilter]);
+
+  React.useEffect(() => {
+    if (!orgId) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<PurchaseOrder>('purchase_orders', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: PURCHASE_ORDER_COLUMNS,
+      filters: poFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['reference', 'gl_entry_number', 'memo'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'date', ascending: false }, { column: 'created_at', ascending: false }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerPOs(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[PurchaseOrdersView] Failed to load purchase order page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load purchase orders.');
+        setServerPOs([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, orgId, poFilters, refreshKey]);
+
   const filteredPOs = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
     const todayValue = getTodayDateValue();
     const currentMonthValue = todayValue.slice(0, 7);
 
@@ -91,7 +196,25 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
         return matchesSearch && matchesStatus && matchesVendor && matchesDate;
       })
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [purchaseOrders, vendors, searchTerm, statusFilter, vendorFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [purchaseOrders, vendors, debouncedSearchTerm, statusFilter, vendorFilter, dateFilterMode, dateFrom, dateTo]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedPOs,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredPOs, [debouncedSearchTerm, statusFilter, vendorFilter, dateFilterMode, dateFrom, dateTo], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError;
+  const paginatedPOs = useFallbackRows ? fallbackPaginatedPOs : serverPOs;
+  const totalItems = useFallbackRows ? filteredPOs.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverPOs.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
@@ -150,6 +273,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     };
 
     onCreatePO(newPO);
+    setRefreshKey(key => key + 1);
     setShowModal(false);
     setFormData({
       vendorId: '',
@@ -352,7 +476,7 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
           </button>
 
           <p className="ml-auto text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-700">{filteredPOs.length}</span> of {purchaseOrders.length}
+            Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching purchase order{totalItems !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -372,7 +496,14 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredPOs.length > 0 ? filteredPOs.map(po => {
+              {isLoadingPage && !useFallbackRows ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                    <FileStack size={40} className="mx-auto mb-2 text-gray-300" />
+                    Loading purchase orders...
+                  </td>
+                </tr>
+              ) : totalItems > 0 ? paginatedPOs.map(po => {
                 const vendor = vendors.find(v => v.id === po.vendorId);
                 return (
                   <tr key={po.id} className="hover:bg-gray-50 transition-colors group">
@@ -419,7 +550,9 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                     <FileStack size={40} className="mx-auto mb-2 text-gray-300" />
-                    {hasActiveFilters
+                    {pageLoadError
+                      ? 'Unable to load purchase orders from Supabase.'
+                      : hasActiveFilters
                       ? 'Try adjusting your search or filters.'
                       : 'No purchase commitments identified in the current index.'}
                   </td>
@@ -428,13 +561,22 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="purchase orders"
+        />
 
         <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
             <div className="flex items-center gap-5">
                <div className="p-4 bg-white rounded border border-gray-100 shadow-sm text-brand"><Database size={24} /></div>
                <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-2">Obligation State</p>
-                  <p className="text-xs font-bold text-gray-600">Total of {purchaseOrders.length} purchase orders recorded in the current lifecycle.</p>
+                  <p className="text-xs font-bold text-gray-600">Total of {totalItems} purchase orders in the current filter.</p>
                </div>
             </div>
             <div className="text-right">

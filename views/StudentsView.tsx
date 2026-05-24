@@ -20,6 +20,8 @@ import {
   CheckSquare, ChevronLeft, ChevronRight, Layers, Award,
   ChevronsLeft, ChevronsRight, Users
 } from 'lucide-react';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 
 interface Toast {
   id: string;
@@ -37,6 +39,7 @@ interface PsgcArea {
 }
 
 interface StudentsViewProps {
+  orgId: string;
   students: Student[];
   batches?: Batch[];
   qualifications?: Qualification[];
@@ -57,6 +60,7 @@ const CSV_HEADERS = [
 ];
 
 const PAGE_SIZE = 7;
+const STUDENT_COLUMNS = 'id,org_id,uli,last_name,first_name,middle_name,extension,sex,date_of_birth,email,contact_number,street,barangay,city,province,guardian,location_id,sponsor_id,documents,created_at,updated_at,profile_photo,mailing_region,tesda_employment_status,tesda_employment_type,tesda_learner_classifications,tesda_other_classification,tesda_disability_types,tesda_disability_causes,tesda_course_qualification,tesda_scholarship_package,tesda_privacy_consent';
 const PSGC_BASE_URL = 'https://classification.psa.gov.ph/psgc';
 const PSGC_VERSION = 'Q2_2024';
 const PSGC_TOKEN = import.meta.env.VITE_PSA_PSGC_TOKEN || '';
@@ -224,8 +228,9 @@ function buildLearnerProfilePrintHtml(student: Student, courseName: string): str
 </body>
 </html>`;
 }
-const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
+const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [complianceFilter, setComplianceFilter] = useState<'ALL' | 'COMPLIANT' | 'PENDING' | 'REJECTED'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'all' | 'batch'>('all');
@@ -250,6 +255,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
   const [selectedPsgcRegion, setSelectedPsgcRegion] = useState('');
   const [selectedPsgcProvince, setSelectedPsgcProvince] = useState('');
   const [selectedPsgcCity, setSelectedPsgcCity] = useState('');
+  const [serverStudents, setServerStudents] = useState<Student[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
 
   const [auditStudent, setAuditStudent] = useState<Student | null>(null);
 
@@ -258,6 +268,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
     'Birth Certificate': 'PENDING',
     'Application Form': 'PENDING'
   });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const [mandatoryDocFiles, setMandatoryDocFiles] = useState<Record<string, string>>({});
 
@@ -419,6 +434,67 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
     };
   }, [selectedPsgcCity, psgcCities]);
 
+  const serverFetchEnabled = Boolean(orgId) && viewMode === 'all' && complianceFilter === 'ALL';
+
+  const studentFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    return filters;
+  }, [orgId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, viewMode, selectedBatchId, complianceFilter]);
+
+  useEffect(() => {
+    if (!serverFetchEnabled) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Student>('students', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: STUDENT_COLUMNS,
+      filters: studentFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['first_name', 'last_name', 'middle_name', 'uli', 'email', 'contact_number', 'city', 'province'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [
+        { column: 'last_name', ascending: true },
+        { column: 'first_name', ascending: true }
+      ]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerStudents(result.rows.map(normalizeStudentRecord));
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[StudentsView] Failed to load student page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load learners.');
+        setServerStudents([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, serverFetchEnabled, studentFilters]);
   // Optimized filtering with useMemo
   const filteredStudents = useMemo(() => {
     let base = students;
@@ -445,8 +521,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       });
     }
 
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
+    if (debouncedSearchTerm) {
+      const lower = debouncedSearchTerm.toLowerCase();
       base = base.filter(s =>
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
         s.uli.toLowerCase().includes(lower)
@@ -460,14 +536,23 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
         { sensitivity: 'base' }
       )
     );
-  }, [students, searchTerm, viewMode, selectedBatchId, complianceFilter, batches]);
+  }, [students, debouncedSearchTerm, viewMode, selectedBatchId, complianceFilter, batches]);
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
-  const paginatedStudents = useMemo(() => {
+  const fallbackTotalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
+  const fallbackPaginatedStudents = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredStudents.slice(start, start + PAGE_SIZE);
   }, [filteredStudents, currentPage]);
+
+  const useFallbackRows = !serverFetchEnabled || !!pageLoadError;
+  const paginatedStudents = useFallbackRows ? fallbackPaginatedStudents : serverStudents;
+  const totalItems = useFallbackRows ? filteredStudents.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = Math.min(currentPage, totalPages);
+  const handlePageChange = (page: number | ((currentPage: number) => number)) => {
+    setCurrentPage(prev => typeof page === 'function' ? page(prev) : page);
+  };
 
   // Reset page when search or filter changes
   const handleSearchChange = (term: string) => {
@@ -977,7 +1062,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
               Clear filters
             </button>
             <p className="text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-900">{filteredStudents.length}</span> of <span className="font-semibold text-gray-900">{students.length}</span>
+              Showing <span className="font-semibold text-gray-900">{totalItems}</span> of <span className="font-semibold text-gray-900">{useFallbackRows ? students.length : serverTotal}</span>
             </p>
           </div>
         </div>
@@ -998,7 +1083,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 <td colSpan={3} className="px-6 py-16 text-center">
                   <Users size={32} className="mx-auto text-gray-200 mb-3" />
                   <p className="text-sm text-gray-400 font-semibold">
-                    {viewMode === 'batch' && !selectedBatchId ? 'Select a batch above to view its enrolled learners.' : 'No learners found matching your criteria.'}
+                    {isLoadingPage && !useFallbackRows ? 'Loading learners...' : viewMode === 'batch' && !selectedBatchId ? 'Select a batch above to view its enrolled learners.' : 'No learners found matching your criteria.'}
                   </p>
                 </td>
               </tr>
@@ -1069,30 +1154,30 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
       </div>
 
       {/* Pagination Controls */}
-      {filteredStudents.length > PAGE_SIZE && (
+      {totalItems > PAGE_SIZE && (
         <div className="bg-white px-6 py-4 rounded-md border border-gray-200 shadow-sm flex items-center justify-between">
           <p className="text-xs text-gray-400 font-semibold">
-            Page {currentPage} of {totalPages}
+            Page {activePage} of {totalPages} {isLoadingPage && !useFallbackRows ? '(loading...)' : ''}
           </p>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
+              onClick={() => handlePageChange(1)}
+              disabled={activePage === 1}
               className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="First page"
             >
               <ChevronsLeft size={16} />
             </button>
             <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+              onClick={() => handlePageChange(p => Math.max(1, p - 1))}
+              disabled={activePage === 1}
               className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Previous page"
             >
               <ChevronLeft size={16} />
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - activePage) <= 2)
               .reduce<(number | 'dots')[]>((acc, p, idx, arr) => {
                 if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('dots');
                 acc.push(p);
@@ -1104,28 +1189,28 @@ const StudentsView: React.FC<StudentsViewProps> = ({ students, batches = [], qua
                 ) : (
                   <button
                     key={item}
-                    onClick={() => setCurrentPage(item as number)}
-                    className={`w-8 h-8 rounded text-xs font-semibold transition-all ${currentPage === item
+                    onClick={() => handlePageChange(item as number)}
+                    className={`w-8 h-8 rounded text-xs font-semibold transition-all ${activePage === item
                       ? 'bg-brand text-white shadow-sm'
                       : 'text-gray-500 hover:bg-gray-100'
                       }`}
-                    style={currentPage === item ? { backgroundColor: brandColor } : undefined}
+                    style={activePage === item ? { backgroundColor: brandColor } : undefined}
                   >
                     {item}
                   </button>
                 )
               )}
             <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(p => Math.min(totalPages, p + 1))}
+              disabled={activePage === totalPages}
               className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Next page"
             >
               <ChevronRight size={16} />
             </button>
             <button
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(totalPages)}
+              disabled={activePage === totalPages}
               className="p-2 rounded hover:bg-gray-100 text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Last page"
             >

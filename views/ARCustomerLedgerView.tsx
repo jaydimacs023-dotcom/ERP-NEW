@@ -75,8 +75,17 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
   const [showCustomerTypeDropdown, setShowCustomerTypeDropdown] = useState(false);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
 
+  const currencySymbol = currency === 'PHP' ? '₱' : currency;
+  const formatCurrencyNumber = (val: number) =>
+    val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatCurrency = (val: number) =>
-    `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${currencySymbol} ${formatCurrencyNumber(val)}`;
+  const renderAccountingAmount = (val: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatCurrencyNumber(val)}</span>
+    </span>
+  );
 
   const escapeHtml = (value: any): string =>
     String(value ?? '')
@@ -694,14 +703,14 @@ const ARCustomerLedgerView: React.FC<ARCustomerLedgerViewProps> = ({
                   <td className="px-4 py-3">
                     <div className="text-xs font-medium text-gray-800">{line.description}</div>
                   </td>
-                  <td className="px-4 py-3 text-right text-xs font-mono font-bold text-emerald-600">
-                    {line.debit ? formatCurrency(line.debit) : '-'}
+                  <td className="px-4 py-3 text-xs font-mono font-bold text-emerald-600">
+                    {line.debit ? renderAccountingAmount(line.debit) : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right text-xs font-mono font-bold text-red-600">
-                    {line.credit ? formatCurrency(line.credit) : '-'}
+                  <td className="px-4 py-3 text-xs font-mono font-bold text-red-600">
+                    {line.credit ? renderAccountingAmount(line.credit) : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right text-xs font-mono font-bold text-slate-900">
-                    {formatCurrency(line.balance)}
+                  <td className="px-4 py-3 text-xs font-mono font-bold text-slate-900">
+                    {renderAccountingAmount(line.balance)}
                   </td>
                 </tr>
               ))}

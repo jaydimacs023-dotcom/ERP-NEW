@@ -199,12 +199,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       >
                         <ChevronRight size={18} />
                       </button>
-                      <button 
+                      {/* <button 
                         onClick={() => onDeleteEmployee(emp.id)}
                         className="p-2 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-lg"
                       >
                         <Trash2 size={18} />
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>

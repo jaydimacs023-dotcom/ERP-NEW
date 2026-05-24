@@ -113,7 +113,7 @@ Prevent loading full tables into React memory.
 ## Create Generic Pagination Service
 
 * [x] Add reusable `fetchPage()` method
-* [ ] Support:
+* [x] Support:
 
   * [x] page
   * [x] pageSize
@@ -126,23 +126,23 @@ Prevent loading full tables into React memory.
 
 ### High Priority
 
-* [ ] Students
-* [ ] Invoices
-* [ ] Payments
-* [ ] Ledger
-* [ ] Audit Trail
-* [ ] Journal Entries
-* [ ] Enrollments
-* [ ] Inventory
+* [x] Students
+* [x] Invoices
+* [x] Payments
+* [x] Ledger
+* [x] Audit Trail
+* [x] Journal Entries
+* [x] Enrollments
+* [x] Inventory
 
 ### Medium Priority
 
-* [ ] Vendors
-* [ ] Sponsors
-* [ ] Batches
-* [ ] Qualifications
-* [ ] Purchase Orders
-* [ ] Payables
+* [x] Vendors
+* [x] Sponsors
+* [x] Batches
+* [x] Qualifications
+* [x] Purchase Orders
+* [x] Payables
 
 ---
 
@@ -163,7 +163,10 @@ Only load:
 
 ## Tasks
 
-* [ ] Audit `getInitialData()`
+* [x] Audit `getInitialData()`
+  Audit notes:
+  * Phase 4 preload removals were rolled back because AR/accounting workflows still require startup availability for invoices, invoice lines, payments, payment applications, journal entries, and journal lines.
+  * Reattempt only after AR dashboards/forms/reports have explicit lazy queries or summary RPCs for every dependency.
 * [ ] Remove invoices preload
 * [ ] Remove payments preload
 * [ ] Remove journal entries preload

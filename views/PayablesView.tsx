@@ -5,6 +5,9 @@ import {
 } from '../types';
 import { AccountingService } from '../accountingService';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import {
   Search, Calculator, Building, Coins, AlertCircle, Calendar,
   X, Plus, FileText, Edit, Trash2, Eye, CheckCircle, Clock,
@@ -85,6 +88,9 @@ const formatPayableDate = (value?: string) => {
   }).format(date);
 };
 
+const PAGE_SIZE = 10;
+const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
+
 const PayablesView: React.FC<PayablesViewProps> = ({
   orgId,
   payables,
@@ -109,8 +115,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // ============================================================================
   const [activeTab, setActiveTab] = useState<APTab>('list');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PayableStatus | 'all'>('all');
   const [vendorFilter, setVendorFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -118,6 +126,12 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const [showPostGLModal, setShowPostGLModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverPayables, setServerPayables] = useState<Payable[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
 
   // Form state for Create/Edit
   const [formData, setFormData] = useState<Partial<Payable>>({
@@ -185,6 +199,76 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     vendorTaxSettings.filter((s: any) => s.orgId === orgId),
     [vendorTaxSettings, orgId]
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, statusFilter, vendorFilter]);
+
+  const payableFilters = useMemo(() => {
+    const filters: PageFilter[] = [
+      { column: 'org_id', operator: 'eq', value: orgId },
+      { column: 'is_deleted', operator: 'eq', value: false }
+    ];
+
+    if (statusFilter !== 'all') {
+      filters.push({ column: 'status', operator: 'eq', value: statusFilter });
+    }
+    if (vendorFilter !== 'all') {
+      filters.push({ column: 'vendor_id', operator: 'eq', value: vendorFilter });
+    }
+
+    return filters;
+  }, [orgId, statusFilter, vendorFilter]);
+
+  useEffect(() => {
+    if (!orgId || activeTab !== 'list') return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Payable>('payables', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: PAYABLE_COLUMNS,
+      filters: payableFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['payable_number', 'description', 'reference_document'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'bill_date', ascending: false }, { column: 'created_at', ascending: false }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerPayables(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[PayablesView] Failed to load payable page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load payables.');
+        setServerPayables([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeTab, currentPage, debouncedSearchTerm, orgId, payableFilters, refreshKey]);
 
   // Get expense and liability accounts for dropdown
   const expenseAccounts = useMemo(() =>
@@ -305,7 +389,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // FILTERING & SEARCHING
   // ============================================================================
   const filteredPayables = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return orgPayables
       .filter(p => {
@@ -330,7 +414,25 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         return matchesSearch && matchesStatus && matchesVendor;
       })
       .sort((a, b) => (b.billDate || '').localeCompare(a.billDate || ''));
-  }, [orgPayables, searchTerm, statusFilter, vendorFilter, orgVendors]);
+  }, [orgPayables, debouncedSearchTerm, statusFilter, vendorFilter, orgVendors]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedPayables,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredPayables, [debouncedSearchTerm, statusFilter, vendorFilter], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError;
+  const paginatedPayables = useFallbackRows ? fallbackPaginatedPayables : serverPayables;
+  const totalItems = useFallbackRows ? filteredPayables.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverPayables.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveListFilters =
     searchTerm.trim() !== '' ||
@@ -585,6 +687,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     };
 
     onCreatePayable(newPayable);
+    setRefreshKey(key => key + 1);
     onNotify('success', `${INVOICE_TYPES.find(t => t.value === formData.invoiceType)?.label || 'Payable'} ${newPayable.payableNumber} created successfully.`);
     setShowCreateModal(false);
     resetForm();
@@ -628,6 +731,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     };
 
     onUpdatePayable(selectedPayable.id, updates);
+    setRefreshKey(key => key + 1);
     onNotify('success', `Payable ${formData.payableNumber} updated successfully.`);
     setShowEditModal(false);
     setSelectedPayable(null);
@@ -635,7 +739,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    const payable = orgPayables.find(p => p.id === id);
+    const payable = [...serverPayables, ...orgPayables].find(p => p.id === id);
     if (payable?.status === 'paid') {
       onNotify('error', 'Cannot delete a paid payable.');
       return;
@@ -646,12 +750,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     onDeletePayable(id);
+    setRefreshKey(key => key + 1);
     onNotify('success', 'Payable deleted successfully.');
     setConfirmDelete(null);
   };
 
   const handleStatusChange = (id: string, newStatus: PayableStatus) => {
-    const payable = orgPayables.find(p => p.id === id);
+    const payable = [...serverPayables, ...orgPayables].find(p => p.id === id);
     if (!payable) return;
 
     const updates: Partial<Payable> = {
@@ -670,6 +775,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     onUpdatePayable(id, updates);
+    setRefreshKey(key => key + 1);
     onNotify('success', `Payable status updated to ${STATUS_CONFIG[newStatus].label}.`);
   };
 
@@ -806,6 +912,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       approvedBy: currentUserId,
       approvedAt: new Date().toISOString(),
     });
+    setRefreshKey(key => key + 1);
 
     onNotify('success', `Journal entry posted for ${selectedPayable.payableNumber}`);
     setShowPostGLModal(false);
@@ -894,6 +1001,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       paidBy: currentUserId,
       paidAt: new Date().toISOString(),
     });
+    setRefreshKey(key => key + 1);
 
     onNotify('success', `Payment of \u20B1${formatCurrency(paymentData.amountPaid)} processed for ${selectedPayable.payableNumber}`);
     setShowPaymentModal(false);
@@ -989,7 +1097,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           </button>
 
           <p className="ml-auto text-xs text-gray-500">
-          Showing <span className="font-semibold text-gray-700">{filteredPayables.length}</span> of {orgPayables.length}
+          Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching payable{totalItems !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -1010,8 +1118,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredPayables.length > 0 ? (
-              filteredPayables.map(payable => {
+            {isLoadingPage && !useFallbackRows ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  Loading payables...
+                </td>
+              </tr>
+            ) : totalItems > 0 ? (
+              paginatedPayables.map(payable => {
                   const statusConfig = STATUS_CONFIG[payable.status];
                   const isOverdue = payable.status !== 'paid' && payable.status !== 'cancelled' && new Date(payable.dueDate) < new Date();
                   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
@@ -1145,7 +1260,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <FileText size={40} className="mx-auto mb-2 text-gray-300" />
-                  {hasActiveListFilters
+                  {pageLoadError
+                    ? 'Unable to load payables from Supabase.'
+                    : hasActiveListFilters
                     ? 'Try adjusting your search or filters.'
                     : 'No payables found. Create your first payable to get started.'}
                 </td>
@@ -1153,6 +1270,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="payables"
+        />
       </div>
     </>
   );

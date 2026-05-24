@@ -1,6 +1,9 @@
 ﻿import React, { useState, useMemo } from 'react';
 import { Vendor, VendorType, VendorStatus, ChartOfAccount, JournalLine, AccountClass } from '../types';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import { 
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
   Edit, AlertCircle, MapPin, Building, Link as LinkIcon,
@@ -9,6 +12,7 @@ import {
 } from 'lucide-react';
 
 interface VendorsViewProps {
+  orgId: string;
   vendors: Vendor[];
   accounts: ChartOfAccount[];
   lines: JournalLine[];
@@ -35,6 +39,9 @@ const PAYMENT_TERMS = [
   { value: 90, label: 'Net 90' },
 ];
 
+const PAGE_SIZE = 10;
+const VENDOR_COLUMNS = 'id,org_id,name,category,email,contact_number,address,ap_account_id,created_at,updated_at';
+
 const STATUS_CONFIG: Record<VendorStatus, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
   active: { label: 'Active', color: 'text-brand', bgColor: 'bg-brand/10', icon: CheckCircle },
   blocked: { label: 'Blocked', color: 'text-rose-600', bgColor: 'bg-rose-50', icon: XCircle },
@@ -42,17 +49,25 @@ const STATUS_CONFIG: Record<VendorStatus, { label: string; color: string; bgColo
 };
 
 const VendorsView: React.FC<VendorsViewProps> = ({ 
-  vendors, accounts, lines, onAddVendor, onUpdateVendor, onDeleteVendor, onNotify 
+  orgId, vendors, accounts, lines, onAddVendor, onUpdateVendor, onDeleteVendor, onNotify 
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<VendorStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editingVendor, setEditingVendor] = useState<Partial<Vendor> | null>(null);
   const [viewingVendor, setViewingVendor] = useState<Vendor | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverVendors, setServerVendors] = useState<Vendor[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
 
   const [formData, setFormData] = useState<Partial<Vendor>>({
     name: '',
@@ -90,8 +105,73 @@ const VendorsView: React.FC<VendorsViewProps> = ({
     });
   };
 
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, debouncedSearchTerm, orgId, statusFilter]);
+
+  const vendorFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    if (categoryFilter !== 'all') {
+      filters.push({ column: 'category', operator: 'eq', value: categoryFilter });
+    }
+    return filters;
+  }, [categoryFilter, orgId]);
+
+  React.useEffect(() => {
+    if (!orgId || statusFilter !== 'all') return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Vendor>('vendors', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: VENDOR_COLUMNS,
+      filters: vendorFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['name', 'category', 'email', 'contact_number', 'address'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'name', ascending: true }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerVendors(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[VendorsView] Failed to load vendor page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load vendors.');
+        setServerVendors([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, orgId, refreshKey, statusFilter, vendorFilters]);
+
   const filteredVendors = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return vendors
       .filter(v => {
@@ -115,7 +195,25 @@ const VendorsView: React.FC<VendorsViewProps> = ({
         return matchesSearch && matchesStatus && matchesCategory;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [vendors, searchTerm, statusFilter, categoryFilter]);
+  }, [vendors, debouncedSearchTerm, statusFilter, categoryFilter]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedVendors,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredVendors, [debouncedSearchTerm, statusFilter, categoryFilter], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError || statusFilter !== 'all';
+  const paginatedVendors = useFallbackRows ? fallbackPaginatedVendors : serverVendors;
+  const totalItems = useFallbackRows ? filteredVendors.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverVendors.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || categoryFilter !== 'all';
 
@@ -178,6 +276,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
     };
 
     onAddVendor?.(newVendor);
+    setRefreshKey(key => key + 1);
     setShowModal(false);
     resetForm();
     onNotify?.('success', 'Vendor created successfully.');
@@ -208,6 +307,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       bankBranch: editingVendor.bankBranch,
       updatedAt: new Date().toISOString()
     });
+    setRefreshKey(key => key + 1);
     setShowEditModal(false);
     setEditingVendor(null);
     onNotify?.('success', 'Vendor updated successfully.');
@@ -221,6 +321,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       return;
     }
     onDeleteVendor?.(id);
+    setRefreshKey(key => key + 1);
     setConfirmDelete(null);
     onNotify?.('success', 'Vendor deleted successfully.');
   };
@@ -518,7 +619,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           </button>
 
           <div className="ml-auto text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-700">{filteredVendors.length}</span> of {vendors.length} vendors
+            Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching vendor{totalItems !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
@@ -537,7 +638,14 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredVendors.length > 0 ? filteredVendors.map(vendor => {
+            {isLoadingPage && !useFallbackRows ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <Truck size={40} className="mx-auto mb-2 text-gray-300" />
+                  Loading vendors...
+                </td>
+              </tr>
+            ) : totalItems > 0 ? paginatedVendors.map(vendor => {
               const linkedAcc = accounts.find(a => a.id === vendor.apAccountId);
               const balance = vendorApBalances[vendor.id] || 0;
               const statusConfig = STATUS_CONFIG[vendor.status || 'active'];
@@ -621,7 +729,9 @@ const VendorsView: React.FC<VendorsViewProps> = ({
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                   <Truck size={40} className="mx-auto mb-2 text-gray-300" />
-                  {hasActiveFilters
+                  {pageLoadError
+                    ? 'Unable to load vendors from Supabase.'
+                    : hasActiveFilters
                     ? 'Try adjusting your search or filters.'
                     : 'Add your first vendor to your procurement master registry.'}
                 </td>
@@ -629,6 +739,15 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="vendors"
+        />
       </div>
 
       {/* Create Modal */}

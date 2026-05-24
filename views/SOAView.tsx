@@ -269,7 +269,6 @@ const SOAView: React.FC<SOAViewProps> = ({
           <label className="flex h-11 items-center overflow-hidden rounded-md border border-gray-200 text-sm font-semibold shadow-sm">
             <span className="px-3 text-slate-500">As Of Date</span>
             <input type="date" value={asOfDate} onChange={event => setAsOfDate(event.target.value)} className="h-full border-l border-gray-200 px-3 font-bold outline-none" />
-            <Calendar size={16} className="mx-3 text-[#06146f]" />
           </label>
 
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">

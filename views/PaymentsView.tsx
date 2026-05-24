@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { AccountClass, Payment, PaymentApplication, PaymentMethod, PaymentStatus, Sponsor, Student, Invoice, BankAccount, ChartOfAccount, JournalEntry, Organization, User as AppUser } from '../types';
 import { generateUUID } from '../utils/uuid';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter, PageOrder } from '../services/IDataService';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
@@ -91,6 +93,10 @@ type ApplyPaymentColumn = {
   render: (inv: Invoice, invoiceSelectionMap: Record<string, boolean>, invoiceApplyMap: Record<string, number>, transactionDescriptions: Record<string, string>, setTransactionDescriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>, handleInvoiceTick: (inv: Invoice, checked: boolean) => void) => React.ReactNode;
 };
 
+const PAYMENT_PAGE_SIZE = 7;
+const PAYMENT_COLUMNS = 'id,org_id,payment_no,sponsor_id,student_id,payment_date,status,payment_method,ref_no,bank_account_id,check_number,check_date,amount_received,ewt_amount_certified,total_applied,customer_deposit_balance,journal_entry_id,voided_at,voided_by,void_reason,posted_at,posted_by,notes,created_at,created_by,updated_at,updated_by,is_deleted,deleted_at,deleted_by';
+const PAYMENT_APPLICATION_COLUMNS = 'id,org_id,payment_id,invoice_id,application_no,amount_applied,is_reversed,reversal_reason,reversed_at,reversed_by,gl_reference,journal_entry_id,created_at,created_by,updated_at,updated_by';
+
 const PaymentsView: React.FC<PaymentsViewProps> = ({
   currentOrgId,
   organization,
@@ -127,6 +133,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   
   // List filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'ALL'>('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -137,6 +144,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [payerFilterMode, setPayerFilterMode] = useState<'ALL' | 'CUSTOM'>('ALL');
   const [payerSearchTerm, setPayerSearchTerm] = useState('');
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [serverPayments, setServerPayments] = useState<Payment[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverCurrentPage, setServerCurrentPage] = useState(1);
+  const [isLoadingPaymentPage, setIsLoadingPaymentPage] = useState(false);
+  const [paymentPageError, setPaymentPageError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Application state
   const [invoiceApplyMap, setInvoiceApplyMap] = useState<Record<string, number>>({});
@@ -201,6 +215,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     ewtAmountCertified: ''
   });
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
   const selectedPayorId = payorType === 'SPONSOR' ? formData.sponsorId : formData.studentId;
   // Read-only for posted/voided payments when viewing, or for payments with certain statuses
   const isReadOnly = editingPayment && (editingPayment.status === 'POSTED' || editingPayment.status === 'VOIDED' || editingPayment.status === 'OPEN' || editingPayment.status === 'CLOSED');
@@ -217,9 +236,17 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }).format(value ?? 0);
   };
 
+  const currencySymbol = (currency || 'PHP') === 'PHP' ? '₱' : (currency || 'PHP');
+  const renderAccountingAmount = (amount: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 font-medium text-gray-800 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatInputCurrency(amount || 0)}</span>
+    </span>
+  );
+
   const formatPesoKpiAmount = (amount: number) => {
     if ((currency || 'PHP') === 'PHP') {
-      return `?${formatInputCurrency(amount)}`;
+      return `₱${formatInputCurrency(amount)}`;
     }
     return formatCurrency(amount);
   };
@@ -458,8 +485,62 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const getPaymentApplicationGlReferenceLabel = (payment: Payment) => {
     const applications = getPaymentApplicationRecords(payment);
-    if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending';
+    if (applications.length === 0) return payment.status === 'DRAFT' ? '-' : 'Pending GL';
     return applications.map(getPaymentApplicationGlReference).join(', ');
+  };
+
+  const getPaymentJournalEntry = (payment: Payment) => {
+    const savedReference = String(payment.glEntryNumber || '').trim();
+    return journalEntries.find(je =>
+      (payment.journalEntryId && je.id === payment.journalEntryId) ||
+      (
+        String(je.sourceType || '').toUpperCase() === 'PAYMENT' &&
+        (je.sourceRef === payment.id || je.reference === payment.paymentNo)
+      ) ||
+      (!!savedReference && (je.glEntryNumber === savedReference || je.reference === savedReference)) ||
+      (!!payment.paymentNo && je.reference === payment.paymentNo)
+    );
+  };
+
+  const getPaymentGlReference = (payment: Payment) => {
+    const savedReference = String(payment.glEntryNumber || '').trim();
+    if (savedReference) return savedReference;
+
+    const journalEntry = getPaymentJournalEntry(payment);
+    return String(journalEntry?.glEntryNumber || journalEntry?.reference || '').trim();
+  };
+
+  const getPaymentGlReferenceLabel = (payment: Payment) => {
+    if (payment.status === 'DRAFT') return '-';
+    return getPaymentGlReference(payment) || 'Pending GL';
+  };
+
+  const renderPaymentGlReference = (
+    payment: Payment,
+    className = 'font-medium text-gray-800'
+  ) => {
+    const label = getPaymentGlReferenceLabel(payment);
+    const journalEntry = getPaymentJournalEntry(payment);
+    const isPendingGl = label === 'Pending GL';
+    const pendingClassName = `${className} ${isPendingGl ? 'text-amber-700' : ''}`;
+
+    if (!onViewJournal || !journalEntry?.id || isPendingGl || label === '-') {
+      return <span className={pendingClassName}>{label}</span>;
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onViewJournal(journalEntry.id);
+        }}
+        className={`${className} text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-200`}
+        title={`View journal entry ${label}`}
+      >
+        {label}
+      </button>
+    );
   };
 
   const renderPaymentApplicationGlReference = (
@@ -470,7 +551,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const journalEntry = getPaymentApplicationJournalEntry(application);
 
     if (!onViewJournal || !journalEntry?.id || label === 'Pending') {
-      return <span className={className}>{label}</span>;
+      return <span className={`${className} ${label === 'Pending' ? 'text-amber-700' : ''}`}>{label}</span>;
     }
 
     return (
@@ -494,7 +575,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   ) => {
     const applications = getPaymentApplicationRecords(payment);
     if (applications.length === 0) {
-      return <span className={className}>{payment.status === 'DRAFT' ? '-' : 'Pending'}</span>;
+      return <span className={`${className} ${payment.status === 'DRAFT' ? '' : 'text-amber-700'}`}>{payment.status === 'DRAFT' ? '-' : 'Pending GL'}</span>;
     }
 
     return (
@@ -536,12 +617,33 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
 
     const activeApplications = getActiveApplications(payment);
+    const availableBalance = getAvailablePaymentBalance(payment);
+    const hasAppliedAmount = Number(payment.totalApplied ?? 0) > 0;
+
     if (activeApplications.length === 0) {
-      return payment.status === 'CLOSED' && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+      return availableBalance <= 0.01 && (hasAppliedAmount || payment.status === 'CLOSED') ? 'CLOSED' : 'OPEN';
     }
 
     const allApplicationsClosed = activeApplications.every(app => getApplicationStatusLabel(payment, app) === 'CLOSED');
-    return allApplicationsClosed && getAvailablePaymentBalance(payment) <= 0.01 ? 'CLOSED' : 'OPEN';
+    return allApplicationsClosed && availableBalance <= 0.01 ? 'CLOSED' : 'OPEN';
+  };
+
+  const getPaymentRegistryStatus = (payment: Payment): PaymentStatus => {
+    if (payment.status === 'VOIDED' || payment.status === 'DRAFT') {
+      return payment.status;
+    }
+
+    if (
+      payment.status === 'POSTED' ||
+      payment.status === 'CLOSED' ||
+      !!payment.postedAt ||
+      !!payment.journalEntryId ||
+      !!getPaymentGlReference(payment)
+    ) {
+      return 'POSTED';
+    }
+
+    return 'OPEN';
   };
 
   const canApplyPayment = (payment: Payment) =>
@@ -744,33 +846,52 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     setViewMode('create-payment');
   };
 
+  const hydratePaymentApplications = async (payment: Payment): Promise<Payment> => {
+    if ((payment.applications || []).length > 0) return payment;
+
+    try {
+      const result = await DataServiceFactory.getService().fetchPage<PaymentApplication>('payment_applications', {
+        page: 1,
+        pageSize: 200,
+        columns: PAYMENT_APPLICATION_COLUMNS,
+        filters: [{ column: 'payment_id', operator: 'eq', value: payment.id }],
+        orderBy: [{ column: 'created_at', ascending: true }]
+      });
+      return { ...payment, applications: result.rows };
+    } catch (error) {
+      console.error('[PaymentsView] Failed to load payment applications:', error);
+      return payment;
+    }
+  };
+
   // Load payment for viewing in the payment interface (for all statuses)
-  const loadPaymentForViewing = (payment: Payment) => {
-    setEditingPayment(payment);
-    setSourceInvoiceId((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
-    setPayorType(payment.sponsorId ? 'SPONSOR' : 'STUDENT');
+  const loadPaymentForViewing = async (payment: Payment) => {
+    const hydratedPayment = await hydratePaymentApplications(payment);
+    setEditingPayment(hydratedPayment);
+    setSourceInvoiceId((hydratedPayment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId);
+    setPayorType(hydratedPayment.sponsorId ? 'SPONSOR' : 'STUDENT');
     setInvoiceApplyMap({});
     setInvoiceSelectionMap({});
     setFormData({
-      paymentNo: payment.paymentNo,
-      crNo: payment.crNo || '',
-      sponsorId: payment.sponsorId || '',
-      studentId: payment.studentId || '',
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod,
-      refNo: payment.refNo || '',
-      bankAccountId: payment.bankAccountId || defaultCashAccountId,
-      checkNumber: payment.checkNumber || '',
-      checkDate: payment.checkDate || '',
-      amountReceived: payment.amountReceived,
-      ewtAmountCertified: payment.ewtAmountCertified,
-      notes: payment.notes || ''
+      paymentNo: hydratedPayment.paymentNo,
+      crNo: hydratedPayment.crNo || '',
+      sponsorId: hydratedPayment.sponsorId || '',
+      studentId: hydratedPayment.studentId || '',
+      paymentDate: hydratedPayment.paymentDate,
+      paymentMethod: hydratedPayment.paymentMethod,
+      refNo: hydratedPayment.refNo || '',
+      bankAccountId: hydratedPayment.bankAccountId || defaultCashAccountId,
+      checkNumber: hydratedPayment.checkNumber || '',
+      checkDate: hydratedPayment.checkDate || '',
+      amountReceived: hydratedPayment.amountReceived,
+      ewtAmountCertified: hydratedPayment.ewtAmountCertified,
+      notes: hydratedPayment.notes || ''
     });
     setViewMode('create-payment');
   };
 
-  const loadPaymentForDetails = (payment: Payment) => {
-    loadPaymentForViewing(payment);
+  const loadPaymentForDetails = async (payment: Payment) => {
+    await loadPaymentForViewing(payment);
     setViewMode('payment-details');
   };
 
@@ -1253,6 +1374,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     const payment = buildPayment('DRAFT');
     if (editingPayment) onUpdatePayment(payment);
     else onAddPayment(payment);
+    setRefreshKey(key => key + 1);
     setViewMode('list');
     setEditingPayment(null);
   };
@@ -1275,6 +1397,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     } else {
       onAddPayment(payment);
     }
+    setRefreshKey(key => key + 1);
     setViewMode('list');
     setEditingPayment(null);
   };
@@ -1318,6 +1441,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         const description = transactionDescriptions[invoiceId] || `Payment application for invoice ${invoices.find(inv => inv.id === invoiceId)?.invoiceNo || invoiceId}`;
         await onApplyToInvoice(paymentWithHeaderChanges.id, invoiceId, applyAmount);
       }
+      setRefreshKey(key => key + 1);
     }
 
     if (!onApplyToInvoice) {
@@ -1346,6 +1470,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
         updatedAt: new Date().toISOString()
       };
       onUpdatePayment(updatedPayment);
+      setRefreshKey(key => key + 1);
       setEditingPayment(updatedPayment);
     }
 
@@ -1511,8 +1636,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       case 'DRAFT':
         return 'ON HOLD';
       case 'OPEN':
-      case 'POSTED':
         return 'OPEN';
+      case 'POSTED':
+        return 'POSTED';
       case 'CLOSED':
         return 'CLOSED';
       case 'VOIDED':
@@ -1561,9 +1687,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       case 'paymentApplicationNo':
         return getPaymentApplicationNumberLabel(payment);
       case 'status':
-        return getDisplayStatusLabel(mode === 'applications' ? getApplicationRegistryStatus(payment) : payment.status);
+        return getDisplayStatusLabel(mode === 'applications' ? getApplicationRegistryStatus(payment) : getPaymentRegistryStatus(payment));
       case 'glReference':
-        return mode === 'applications' ? getPaymentApplicationGlReferenceLabel(payment) : (payment.glEntryNumber || '');
+        return mode === 'applications' ? getPaymentApplicationGlReferenceLabel(payment) : getPaymentGlReferenceLabel(payment);
       case 'payor':
         return getPayorName(payment);
       case 'method':
@@ -1629,10 +1755,10 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       align: 'text-left',
       minWidth: 96,
       sortKey: 'status',
-      value: (payment) => getDisplayStatusLabel(payment.status),
+      value: (payment) => getDisplayStatusLabel(getPaymentRegistryStatus(payment)),
       render: (payment) => (
         <span className="font-medium text-gray-800">
-          {getDisplayStatusLabel(payment.status)}
+          {getDisplayStatusLabel(getPaymentRegistryStatus(payment))}
         </span>
       )
     },
@@ -1642,11 +1768,9 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       align: 'text-left',
       minWidth: 128,
       sortKey: 'glReference',
-      value: (payment) => payment.glEntryNumber || '',
+      value: (payment) => getPaymentGlReferenceLabel(payment),
       render: (payment) => (
-        <span className="font-medium text-gray-800">
-          {payment.glEntryNumber || (payment.status === 'DRAFT' ? '-' : 'Pending')}
-        </span>
+        renderPaymentGlReference(payment)
       )
     },
     {
@@ -1689,7 +1813,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'amountReceived',
       value: (payment) => Number(payment.amountReceived ?? 0) + Number(payment.ewtAmountCertified ?? 0),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(payment.amountReceived + payment.ewtAmountCertified)}</span>
+        renderAccountingAmount(payment.amountReceived + payment.ewtAmountCertified)
       )
     },
     {
@@ -1700,7 +1824,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'amountApplied',
       value: (payment) => Number(payment.totalApplied ?? 0),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(payment.totalApplied)}</span>
+        renderAccountingAmount(payment.totalApplied)
       )
     },
     {
@@ -1711,7 +1835,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'balance',
       value: (payment) => Number(payment.customerDepositBalance ?? 0),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(payment.customerDepositBalance)}</span>
+        renderAccountingAmount(payment.customerDepositBalance)
       )
     },
     {
@@ -1742,6 +1866,115 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     .map(key => paymentRegistryColumns.find(col => col.key === key))
     .filter(Boolean) as PaymentRegistryColumn[];
 
+  const serverSortKeyMap: Record<string, string> = {
+    date: 'payment_date',
+    paymentDate: 'payment_date',
+    postPeriod: 'payment_date',
+    paymentNo: 'payment_no',
+    status: 'status',
+    glReference: 'journal_entry_id',
+    method: 'payment_method',
+    amountReceived: 'amount_received',
+    amountApplied: 'total_applied',
+    balance: 'customer_deposit_balance',
+    createdOn: 'created_at'
+  };
+  const serverSortColumn = serverSortKeyMap[sortConfig.key] || 'payment_date';
+  const serverFetchEnabled =
+    listTab === 'payments' &&
+    Boolean(currentOrgId) &&
+    statusFilter === 'ALL' &&
+    payerFilterMode !== 'CUSTOM' &&
+    sortConfig.key !== 'glReference' &&
+    sortConfig.key !== 'payor' &&
+    sortConfig.key !== 'createdBy';
+
+  const paymentFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (currentOrgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: currentOrgId });
+    }
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+
+    if (statusFilter !== 'ALL') {
+      filters.push({
+        column: 'status',
+        operator: statusFilter === 'OPEN' ? 'in' : 'eq',
+        value: statusFilter === 'OPEN' ? '(OPEN,POSTED)' : statusFilter
+      });
+    }
+
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    if (dateFilterMode === 'TODAY') {
+      filters.push({ column: 'payment_date', operator: 'eq', value: todayStr });
+    } else if (dateFilterMode === 'THIS_MONTH') {
+      filters.push({ column: 'payment_date', operator: 'gte', value: monthStart });
+      filters.push({ column: 'payment_date', operator: 'lte', value: monthEnd });
+    } else if (dateFilterMode === 'CUSTOM') {
+      if (dateFrom) filters.push({ column: 'payment_date', operator: 'gte', value: dateFrom });
+      if (dateTo) filters.push({ column: 'payment_date', operator: 'lte', value: dateTo });
+    }
+
+    return filters;
+  }, [currentOrgId, dateFilterMode, dateFrom, dateTo, statusFilter]);
+
+  const paymentOrderBy = useMemo<PageOrder[]>(() => {
+    if (sortConfig.direction === 'none') {
+      return [{ column: 'payment_date', ascending: false }];
+    }
+    return [{ column: serverSortColumn, ascending: sortConfig.direction === 'asc' }];
+  }, [serverSortColumn, sortConfig.direction]);
+
+  useEffect(() => {
+    setServerCurrentPage(1);
+  }, [currentOrgId, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, listTab, payerFilterMode, payerSearchTerm, sortConfig, statusFilter]);
+
+  useEffect(() => {
+    if (!serverFetchEnabled) return;
+
+    let isActive = true;
+    setIsLoadingPaymentPage(true);
+    setPaymentPageError('');
+
+    DataServiceFactory.getService().fetchPage<Payment>('payments', {
+      page: serverCurrentPage,
+      pageSize: PAYMENT_PAGE_SIZE,
+      columns: PAYMENT_COLUMNS,
+      filters: paymentFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['payment_no', 'ref_no', 'notes'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: paymentOrderBy
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerPayments(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[PaymentsView] Failed to load payment page:', error);
+        setPaymentPageError(error instanceof Error ? error.message : 'Failed to load payments.');
+        setServerPayments([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPaymentPage(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedSearchTerm, paymentFilters, paymentOrderBy, refreshKey, serverCurrentPage, serverFetchEnabled]);
+
   const applyRegistryFilters = (list: Payment[], mode: ListTab) => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -1753,15 +1986,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       const applicationNo = mode === 'applications' ? getPaymentApplicationNumberLabel(pay).toLowerCase() : '';
       const applicationGlReference = mode === 'applications' ? getPaymentApplicationGlReferenceLabel(pay).toLowerCase() : '';
       const matchesSearch =
-        pay.paymentNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        applicationNo.includes(searchTerm.toLowerCase()) ||
-        (pay.crNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payor.includes(searchTerm.toLowerCase()) ||
-        (pay.refNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (pay.glEntryNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        applicationGlReference.includes(searchTerm.toLowerCase());
+        pay.paymentNo.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        applicationNo.includes(debouncedSearchTerm.toLowerCase()) ||
+        (pay.crNo || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        payor.includes(debouncedSearchTerm.toLowerCase()) ||
+        (pay.refNo || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        getPaymentGlReferenceLabel(pay).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        applicationGlReference.includes(debouncedSearchTerm.toLowerCase());
 
-      const effectiveStatus = mode === 'applications' ? getApplicationRegistryStatus(pay) : pay.status;
+      const effectiveStatus = mode === 'applications' ? getApplicationRegistryStatus(pay) : getPaymentRegistryStatus(pay);
       const matchesStatus = statusFilter === 'ALL' ||
         (statusFilter === 'OPEN'
           ? (effectiveStatus === 'OPEN' || effectiveStatus === 'POSTED')
@@ -1802,16 +2035,25 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const filteredPayments = useMemo(() => {
     return sortRegistryPayments(applyRegistryFilters(payments, 'payments'), 'payments');
-  }, [payments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
+  }, [payments, debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
   const {
-    currentPage: paymentCurrentPage,
-    totalPages: paymentTotalPages,
-    pageStartIndex: paymentPageStartIndex,
-    pageEndIndex: paymentPageEndIndex,
-    paginatedRows: paginatedPayments,
-    setCurrentPage: setPaymentCurrentPage
-  } = usePaginatedRows(filteredPayments, [listTab, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig]);
+    currentPage: fallbackPaymentCurrentPage,
+    totalPages: fallbackPaymentTotalPages,
+    pageStartIndex: fallbackPaymentPageStartIndex,
+    pageEndIndex: fallbackPaymentPageEndIndex,
+    paginatedRows: fallbackPaginatedPayments,
+    setCurrentPage: setFallbackPaymentCurrentPage
+  } = usePaginatedRows(filteredPayments, [listTab, debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig], PAYMENT_PAGE_SIZE);
+
+  const usePaymentFallbackRows = !serverFetchEnabled || !!paymentPageError;
+  const paginatedPayments = usePaymentFallbackRows ? fallbackPaginatedPayments : serverPayments;
+  const paymentTotalItems = usePaymentFallbackRows ? filteredPayments.length : serverTotal;
+  const paymentTotalPages = usePaymentFallbackRows ? fallbackPaymentTotalPages : serverTotalPages;
+  const paymentCurrentPage = usePaymentFallbackRows ? fallbackPaymentCurrentPage : serverCurrentPage;
+  const paymentPageStartIndex = usePaymentFallbackRows ? fallbackPaymentPageStartIndex : (serverCurrentPage - 1) * PAYMENT_PAGE_SIZE;
+  const paymentPageEndIndex = usePaymentFallbackRows ? fallbackPaymentPageEndIndex : Math.min(paymentPageStartIndex + serverPayments.length, serverTotal);
+  const setPaymentCurrentPage = usePaymentFallbackRows ? setFallbackPaymentCurrentPage : setServerCurrentPage;
 
   const exportToExcel = () => {
     const rows = getExportRows();
@@ -1888,15 +2130,16 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
   };
 
   const paymentStats = useMemo(() => {
-    const draftCount = payments.filter(p => p.status === 'DRAFT').length;
-    const openCount = payments.filter(p => p.status === 'OPEN' || p.status === 'POSTED').length;
-    const closedCount = payments.filter(p => p.status === 'CLOSED').length;
-    const unappliedPayments = payments.reduce((sum, payment) => {
-      if (payment.status !== 'OPEN' && payment.status !== 'POSTED') return sum;
+    const statsSource = usePaymentFallbackRows ? payments : serverPayments;
+    const draftCount = statsSource.filter(p => getPaymentRegistryStatus(p) === 'DRAFT').length;
+    const openCount = statsSource.filter(p => getPaymentRegistryStatus(p) === 'OPEN').length;
+    const closedCount = statsSource.filter(p => getPaymentRegistryStatus(p) === 'POSTED').length;
+    const unappliedPayments = statsSource.reduce((sum, payment) => {
+      if (getPaymentRegistryStatus(payment) !== 'OPEN') return sum;
       return sum + getAvailablePaymentBalance(payment);
     }, 0);
     return { draftCount, openCount, closedCount, unappliedPayments };
-  }, [payments]);
+  }, [journalEntries, payments, serverPayments, usePaymentFallbackRows]);
 
   const paymentApplicationBaseList = useMemo(
     () => payments.filter(payment => payment.status !== 'VOIDED'),
@@ -1941,7 +2184,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const filteredApplicationPayments = useMemo(() => {
     return sortRegistryPayments(applyRegistryFilters(currentApplicationPayments, 'applications'), 'applications');
-  }, [currentApplicationPayments, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
+  }, [currentApplicationPayments, debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig, sponsors, students, users]);
 
   const {
     currentPage: applicationCurrentPage,
@@ -1950,7 +2193,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     pageEndIndex: applicationPageEndIndex,
     paginatedRows: paginatedApplicationPayments,
     setCurrentPage: setApplicationCurrentPage
-  } = usePaginatedRows(filteredApplicationPayments, [listTab, applicationListTab, searchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig]);
+  } = usePaginatedRows(filteredApplicationPayments, [listTab, applicationListTab, debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, payerFilterMode, payerSearchTerm, sortConfig], PAYMENT_PAGE_SIZE);
 
   const filteredApplicationRemainingBalance = useMemo(() => {
     return filteredApplicationPayments.reduce((sum, payment) => sum + getAvailablePaymentBalance(payment), 0);
@@ -2103,7 +2346,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'amountReceived',
       value: (payment) => getTotalPaymentCredit(payment),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(getTotalPaymentCredit(payment))}</span>
+        renderAccountingAmount(getTotalPaymentCredit(payment))
       )
     },
     {
@@ -2114,7 +2357,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'amountApplied',
       value: (payment) => Number(payment.totalApplied ?? 0),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(Number(payment.totalApplied ?? 0))}</span>
+        renderAccountingAmount(Number(payment.totalApplied ?? 0))
       )
     },
     {
@@ -2125,7 +2368,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'balance',
       value: (payment) => getAvailablePaymentBalance(payment),
       render: (payment) => (
-        <span className="font-medium text-gray-800">{formatCurrency(getAvailablePaymentBalance(payment))}</span>
+        renderAccountingAmount(getAvailablePaymentBalance(payment))
       )
     },
     {
@@ -2318,6 +2561,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <option value="ALL">All</option>
             <option value="DRAFT">ON HOLD</option>
             <option value="OPEN">OPEN</option>
+            <option value="POSTED">POSTED</option>
             <option value="CLOSED">CLOSED</option>
             <option value="VOIDED">VOIDED</option>
           </select>
@@ -2721,7 +2965,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <p className="mt-2 text-2xl font-semibold text-blue-600">{paymentStats.openCount}</p>
           </div>
           <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Closed</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Posted</p>
             <p className="mt-2 text-2xl font-semibold text-emerald-600">{paymentStats.closedCount}</p>
           </div>
           <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
@@ -2791,12 +3035,12 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredPayments.length === 0 ? (
+                {paymentTotalItems === 0 ? (
                   <tr>
                     <td colSpan={registryColumns.length} className="p-12 text-center text-gray-500">
                       <FileText size={48} className="mx-auto mb-4 text-gray-300" />
                       <div className="space-y-1">
-                        <p className="text-lg font-semibold text-gray-700">No payments recorded</p>
+                        <p className="text-lg font-semibold text-gray-700">{isLoadingPaymentPage && !usePaymentFallbackRows ? 'Loading payments...' : 'No payments recorded'}</p>
                         <p className="text-sm text-gray-500">Click "New Payment" to get started</p>
                       </div>
                     </td>
@@ -2826,7 +3070,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
             <PaginationControls
               currentPage={paymentCurrentPage}
               totalPages={paymentTotalPages}
-              totalItems={filteredPayments.length}
+              totalItems={paymentTotalItems}
               pageStartIndex={paymentPageStartIndex}
               pageEndIndex={paymentPageEndIndex}
               onPageChange={setPaymentCurrentPage}
@@ -3044,6 +3288,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                       if (!voidReason.trim()) return;
                       if (onVoidPayment) onVoidPayment(voidingPayment.id, voidReason);
                       else onUpdatePayment({ ...voidingPayment, status: 'VOIDED', voidReason, voidedAt: new Date().toISOString() });
+                      setRefreshKey(key => key + 1);
                       setShowVoidModal(false);
                       setVoidingPayment(null);
                       setVoidReason('');
@@ -3345,13 +3590,13 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
                           style={{ cursor: 'pointer' }}
                         >
                           <FileText size={16} />
-                          <span>{editingPayment.glEntryNumber || `GL No. ${editingPayment.journalEntryId!.slice(-8).toUpperCase()}`}</span>
+                          <span>{getPaymentGlReferenceLabel(editingPayment)}</span>
                           <span className="text-base font-normal text-emerald-600 ml-auto">{'-> View Journal Entry'}</span>
                         </button>
                       ) : (
                         <>
                           <input
-                            value={editingPayment?.glEntryNumber || ''}
+                            value={editingPayment ? getPaymentGlReferenceLabel(editingPayment) : ''}
                             readOnly
                             placeholder="Generated when payment is approved"
                             className="w-full mt-1 px-3 py-2 border border-brand-light rounded-lg bg-gray-50 cursor-default focus:border-brand"
