@@ -28,7 +28,7 @@ export class SupabaseDataService implements IDataService {
 
   private getSelectColumns(table: string): string {
     const selectColumns: Record<string, string> = {
-      organizations: 'id,name,currency,tax_id,is_vat_registered,subscription_status,plan_type,pending_plan_type,payment_reference,license_expiry,created_at,updated_at,primary_color,logo_url',
+      organizations: 'id,name,currency,institution_type,tax_id,is_vat_registered,subscription_status,plan_type,pending_plan_type,payment_reference,license_expiry,created_at,updated_at,primary_color,logo_url',
       users: 'id,org_id,name,email,last_name,profile_photo,contact_number,address,password_hash,salt,role,last_login_at,is_active,failed_login_attempts,locked_until,created_at,updated_at,auth_uid,trainer_id,student_id',
       students: 'id,org_id,uli,last_name,first_name,middle_name,extension,sex,date_of_birth,email,contact_number,street,barangay,city,province,guardian,location_id,sponsor_id,documents,created_at,updated_at,profile_photo,mailing_region,tesda_employment_status,tesda_employment_type,tesda_learner_classifications,tesda_other_classification,tesda_disability_types,tesda_disability_causes,tesda_course_qualification,tesda_scholarship_package,tesda_privacy_consent',
       batches: 'id,org_id,qualification_id,trainer_id,sponsor_id,location_id,batch_code,name,year,start_date,end_date,status,max_students,current_students,student_ids,created_at,updated_at,billable_student_limit',
@@ -84,6 +84,35 @@ export class SupabaseDataService implements IDataService {
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        if (
+          table === 'organizations' &&
+          /institution_type/i.test(errorBody) &&
+          /schema cache|could not find|column/i.test(errorBody)
+        ) {
+          console.warn("[Supabase] organizations.institution_type not available yet; retrying organizations fetch without it.");
+          const fallbackUrl = new URL(`${this.baseUrl}/${table}`);
+          fallbackUrl.searchParams.set(
+            'select',
+            this.getSelectColumns(table)
+              .split(',')
+              .filter(column => column !== 'institution_type')
+              .join(',')
+          );
+          const fallbackResponse = await fetch(fallbackUrl, {
+            headers: await this.getHeaders(),
+          });
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json() as T[];
+            console.debug(`[Supabase] âœ… ${table}: ${fallbackData.length} rows (legacy schema fallback)`);
+            return fallbackData;
+          }
+
+          console.error(`[Supabase] Legacy organizations fetch fallback failed: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+          console.error(`[Supabase] Fallback response body:`, await fallbackResponse.text());
+          return [] as T[];
+        }
         // Handle 404 (table not found) gracefully
         if (response.status === 404) {
           console.warn(`[Supabase] ⚠️ Table not found: '${table}' (404) - using empty array`);
@@ -91,7 +120,6 @@ export class SupabaseDataService implements IDataService {
         }
         // Handle RLS permission errors with clear guidance
         if (response.status === 403 || response.status === 401) {
-          const errorBody = await response.text();
           console.error(`[Supabase] 🔒 RLS Permission Error on '${table}': ${response.status}`);
           console.error(`[Supabase] This usually means Row Level Security (RLS) is enabled but no policies are defined.`);
           console.error(`[Supabase] Run FIX_JOURNAL_RLS.sql in Supabase SQL Editor to fix this.`);
@@ -99,7 +127,6 @@ export class SupabaseDataService implements IDataService {
           return [] as T[];
         }
         console.error(`[Supabase] ❌ Error fetching ${table}: ${response.status} ${response.statusText}`);
-        const errorBody = await response.text();
         console.error(`[Supabase] Response body:`, errorBody);
         return [] as T[];
       }
@@ -723,7 +750,7 @@ export class SupabaseDataService implements IDataService {
         'tesda_course_qualification', 'tesda_scholarship_package', 'tesda_privacy_consent',
         'location_id', 'sponsor_id', 'profile_photo', 'documents', 'created_at', 'updated_at'
       ],
-      organizations: ['id', 'name', 'currency', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'primary_color', 'logo_url'],
+      organizations: ['id', 'name', 'currency', 'institution_type', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'updated_at', 'primary_color', 'logo_url'],
       users: ['id', 'name', 'email', 'last_name', 'profile_photo', 'contact_number', 'address', 'password_hash', 'salt', 'role', 'org_id', 'student_id', 'trainer_id', 'is_active', 'auth_uid', 'created_at', 'updated_at'],
       trainers: ['id', 'org_id', 'first_name', 'last_name', 'middle_name', 'email', 'contact_number', 'specialization', 'qualification_ids', 'created_at', 'updated_at'],
       qualifications: ['id', 'org_id', 'code', 'name', 'duration_days', 'sector', 'created_at', 'updated_at'],
@@ -877,7 +904,10 @@ export class SupabaseDataService implements IDataService {
   // ============================================================================
 
   async createOrganization(org: any): Promise<any> {
-    const snakeCaseOrg = this.camelToSnake(org);
+    const snakeCaseOrg = this.camelToSnake({
+      ...org,
+      institutionType: org?.institutionType || 'TRAINING'
+    });
     const filteredOrg = this.filterToTableSchema('organizations', snakeCaseOrg);
     if ((filteredOrg as any).id && !this.isValidUUID((filteredOrg as any).id)) {
       delete (filteredOrg as any).id;

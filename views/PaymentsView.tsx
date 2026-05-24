@@ -11,23 +11,19 @@ import {
   ArrowRight,
   ArrowLeft,
   ArrowUpDown,
-  Building2,
   Calendar,
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  CreditCard,
   Clock,
   Download,
   DollarSign,
   FileSpreadsheet,
-  Landmark,
   Plus,
   Printer,
   Save,
   Search,
   CornerUpLeft,
-  User,
   Wallet,
   X,
   XCircle,
@@ -1648,14 +1644,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
   };
 
-  const getMethodIcon = (method: PaymentMethod) => {
-    switch (method) {
-      case 'CASH': return <Wallet size={14} className="text-emerald-600" />;
-      case 'BANK_TRANSFER': return <Landmark size={14} className="text-sky-600" />;
-      case 'CREDIT_CARD': return <CreditCard size={14} className="text-indigo-600" />;
-      default: return <Wallet size={14} className="text-gray-600" />;
-    }
-  };
 
   const handleSort = (columnKey: string) => {
     setSortConfig(current => {
@@ -1781,12 +1769,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'payor',
       value: (payment) => getPayorName(payment),
       render: (payment) => (
-        <span className="inline-flex items-center gap-2 font-medium text-gray-800">
-          {payment.sponsorId ? (
-            <Building2 size={14} className="text-gray-400" />
-          ) : (
-            <User size={14} className="text-gray-400" />
-          )}
+        <span className="font-medium text-gray-800">
           {getPayorName(payment)}
         </span>
       )
@@ -1799,10 +1782,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'method',
       value: (payment) => payment.paymentMethod || '',
       render: (payment) => (
-        <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-          {getMethodIcon(payment.paymentMethod)}
-          <span>{payment.paymentMethod}</span>
-        </span>
+        <span className="font-medium text-gray-800">{payment.paymentMethod}</span>
       )
     },
     {
@@ -2328,12 +2308,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
       sortKey: 'payor',
       value: (payment) => getPayorName(payment),
       render: (payment) => (
-        <span className="inline-flex items-center gap-2 font-medium text-gray-800">
-          {payment.sponsorId ? (
-            <Building2 size={14} className="text-gray-400" />
-          ) : (
-            <User size={14} className="text-gray-400" />
-          )}
+        <span className="font-medium text-gray-800">
           {getPayorName(payment)}
         </span>
       )
@@ -4613,6 +4588,5 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 };
 
 export default PaymentsView;
-
 
 

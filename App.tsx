@@ -151,6 +151,13 @@ function withAutoCompletedAssessmentRegistration<T extends AssessmentRegistratio
   return registration;
 }
 
+function normalizeOrganization(organization: Organization): Organization {
+  return {
+    ...organization,
+    institutionType: organization.institutionType || 'TRAINING'
+  };
+}
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -699,7 +706,7 @@ export default function App() {
           accounts: data.accounts.length
         });
 
-        setOrganizations(data.organizations);
+        setOrganizations(data.organizations.map(normalizeOrganization));
         setUsers(data.users);
         setStudents(data.students);
         setQualifications(data.qualifications);
@@ -2503,7 +2510,7 @@ export default function App() {
     try {
       console.info('[App] Creating organization:', org.name);
       const savedOrg = await dataService.createOrganization(org);
-      setOrganizations(prev => [...prev, savedOrg]);
+      setOrganizations(prev => [...prev, normalizeOrganization(savedOrg)]);
 
       // Audit: Organization created
       AuditService.create(savedOrg.id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', savedOrg.id, org.name);
@@ -2513,7 +2520,7 @@ export default function App() {
       console.error('[App] Error creating organization:', error);
       handleNotify('error', 'Failed to create organization. Falling back to memory storage.');
       // Fallback to memory storage if Supabase fails
-      setOrganizations(prev => [...prev, org]);
+      setOrganizations(prev => [...prev, normalizeOrganization(org)]);
     }
   };
 
@@ -2524,13 +2531,13 @@ export default function App() {
       return;
     }
 
-    const optimisticOrg = { ...existing, ...updates };
+    const optimisticOrg = normalizeOrganization({ ...existing, ...updates });
     setOrganizations(prev => prev.map(o => o.id === id ? optimisticOrg : o));
 
     try {
       console.info('[App] Updating organization in datasource:', id, updates);
       const updatedFromDb = await dataService.updateOrganization(id, updates);
-      const merged = { ...optimisticOrg, ...updatedFromDb };
+      const merged = normalizeOrganization({ ...optimisticOrg, ...updatedFromDb });
       setOrganizations(prev => prev.map(o => o.id === id ? merged : o));
 
       AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, merged);
@@ -2570,7 +2577,7 @@ export default function App() {
       console.info('[App] Restoring backup for organization:', backupData.metadata?.orgId);
 
       // Update all state with restored data
-      if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations);
+      if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations.map(normalizeOrganization));
       if (backupData.data.users?.length) setUsers(backupData.data.users);
       if (backupData.data.students?.length) setStudents(backupData.data.students);
       if (backupData.data.qualifications?.length) setQualifications(backupData.data.qualifications);
@@ -2766,7 +2773,7 @@ export default function App() {
 
       // Create organization
       const savedOrg = await dataService.createOrganization(org);
-      setOrganizations(p => [...p, savedOrg]);
+      setOrganizations(p => [...p, normalizeOrganization(savedOrg)]);
 
       // Create admin user
       const savedAdmin = await dataService.createUser(admin);
@@ -2794,7 +2801,7 @@ export default function App() {
       console.error('[App] Error during registration:', error);
       handleNotify('error', 'Registration failed. Falling back to memory storage.');
       // Fallback to memory storage
-      setOrganizations(p => [...p, org]);
+      setOrganizations(p => [...p, normalizeOrganization(org)]);
       setUsers(p => [...p, admin]);
       setCurrentUser(admin);
       setCurrentOrgId(org.id);
@@ -4146,7 +4153,7 @@ export default function App() {
       case 'REORDER_POINT': setReorderPoints(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'GOODS_RECEIPT': setGoodsReceipts(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'EFT_BATCH': setEftBatches(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
-      case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? normalizeOrganization({ ...x, ...updates }) : x)); break;
       case 'USER': setUsers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'INVOICE': setInvoices(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
     }
@@ -6493,10 +6500,6 @@ export default function App() {
 
         <nav className="flex-1 overflow-y-auto py-8 px-4 scrollbar-hide">
           {/* Navigation Items (unchanged logic) */}
-          <div className="mb-8">
-            {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Account</p>}
-            <NavItem icon={<UserCircle size={20} />} label="Profile" active={activeTab === 'profile'} onClick={() => navigateTo('profile')} compact={!sidebarOpen} brandColor={brandColor} />
-          </div>
           {!isSysAdmin && (
             <>
               {currentUser.role === 'STUDENT' && (
@@ -6510,13 +6513,6 @@ export default function App() {
             <div className="mb-8">
               {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Instructor Portal</p>}
               <NavItem icon={<LayoutDashboard size={20} />} label="Trainer Console" active={activeTab === 'trainer-portal'} onClick={() => setActiveTab('trainer-portal')} compact={!sidebarOpen} brandColor={brandColor} />
-            </div>
-          )}
-
-          {userCanAccess('feedback') && (
-            <div className="mb-8">
-              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Support</p>}
-              <NavItem icon={<MessageSquare size={20} />} label="Feedback Ticket" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
 
@@ -6671,7 +6667,6 @@ export default function App() {
               <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => navigateTo('schema')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => navigateTo('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<MessageSquare size={20} />} label="Users Feedback" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
         </nav>
@@ -6690,7 +6685,12 @@ export default function App() {
         )}
 
         <div className="p-6 mt-auto border-t border-slate-200">
-          <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            title={!sidebarOpen ? 'Logout' : undefined}
+            aria-label={!sidebarOpen ? 'Logout' : undefined}
+            className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100"
+          >
             <LogOut size={20} />
             {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
           </button>
@@ -6710,6 +6710,36 @@ export default function App() {
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{showJournalForm ? 'new journal entry' : activeTab.replace('-', ' ')}</h2>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigateTo('profile')}
+                title="Profile"
+                aria-label="Profile"
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                  activeTab === 'profile'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <UserCircle size={16} />
+              </button>
+              {userCanAccess('feedback') && (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('feedback')}
+                  title={isSysAdmin ? 'Users Feedback' : 'Feedback Ticket'}
+                  aria-label={isSysAdmin ? 'Users Feedback' : 'Feedback Ticket'}
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                    activeTab === 'feedback'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <MessageSquare size={16} />
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
@@ -6877,7 +6907,11 @@ export default function App() {
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
-          {activeTab === 'subscription' && isSysAdmin && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'subscription' && isSysAdmin && currentOrg && (
+            <div className="system-owner-minimal">
+              <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />
+            </div>
+          )}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} organization={currentOrg} />}
 
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
@@ -7056,41 +7090,61 @@ export default function App() {
             onDeleteUser={handleDeleteUser}
           />}
           {activeTab === 'audit' && canViewAuditTrail && <AuditTrail orgId={currentOrgId} logs={auditLogs} brandColor={brandColor} />}
-          {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />}
-          {activeTab === 'backup-restore' && (
-            <BackupRestoreView
-              organizations={organizations}
-              currentOrgId={currentOrgId}
-              currentUserId={currentUser?.id || ''}
-              currentUserName={currentUser?.email || 'System'}
-              allData={{
-                organizations, users, students, qualifications, trainers, batches, sponsors,
-                vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
-                budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
-                checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
-                stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
-                fixedAssets, bankAccounts, locations
-              }}
-              onRestore={handleRestoreBackup}
-              onNotify={handleNotify}
-              currency={currentOrg?.currency || 'USD'}
-            />
+          {activeTab === 'maintenance' && (
+            <div className="system-owner-minimal">
+              <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />
+            </div>
           )}
-          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />}
-          {activeTab === 'schema' && <SchemaManualView />}
-          {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
+          {activeTab === 'backup-restore' && (
+            <div className="system-owner-minimal">
+              <BackupRestoreView
+                organizations={organizations}
+                currentOrgId={currentOrgId}
+                currentUserId={currentUser?.id || ''}
+                currentUserName={currentUser?.email || 'System'}
+                allData={{
+                  organizations, users, students, qualifications, trainers, batches, sponsors,
+                  vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
+                  budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
+                  checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
+                  stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
+                  fixedAssets, bankAccounts, locations
+                }}
+                onRestore={handleRestoreBackup}
+                onNotify={handleNotify}
+                currency={currentOrg?.currency || 'USD'}
+              />
+            </div>
+          )}
+          {activeTab === 'tenant-mgmt' && (
+            <div className="system-owner-minimal">
+              <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />
+            </div>
+          )}
+          {activeTab === 'schema' && (
+            <div className="system-owner-minimal">
+              <SchemaManualView />
+            </div>
+          )}
+          {activeTab === 'payment-monitoring' && (
+            <div className="system-owner-minimal">
+              <PaymentMonitoringView payments={payments} organizations={organizations} />
+            </div>
+          )}
           {activeTab === 'feedback' && (
-            <FeedbackManagementView
-              tickets={feedbackTickets}
-              currentUser={currentUser}
-              currentOrgId={currentOrgId}
-              organizations={organizations}
-              users={users}
-              brandColor={brandColor}
-              onCreateTicket={handleCreateFeedbackTicket}
-              onUpdateTicket={handleUpdateFeedbackTicket}
-              onNotify={handleNotify}
-            />
+            <div className={isSysAdmin ? 'system-owner-minimal' : undefined}>
+              <FeedbackManagementView
+                tickets={feedbackTickets}
+                currentUser={currentUser}
+                currentOrgId={currentOrgId}
+                organizations={organizations}
+                users={users}
+                brandColor={brandColor}
+                onCreateTicket={handleCreateFeedbackTicket}
+                onUpdateTicket={handleUpdateFeedbackTicket}
+                onNotify={handleNotify}
+              />
+            </div>
           )}
           {activeTab === 'soa' && (
             <SOAView
@@ -7295,6 +7349,8 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button
       onClick={onClick}
+      title={compact ? label : undefined}
+      aria-label={compact ? label : undefined}
       className={`w-full border border-transparent text-left flex items-center gap-4 p-3.5 rounded-2xl outline-none transition-colors group focus:outline-none ${active ? 'text-white shadow-none' : 'text-slate-600 hover:text-brand hover:bg-brand/10 focus-visible:bg-brand/10'} `}
       style={{
         ...(active ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: 'none' } : {}),
@@ -7330,6 +7386,8 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
     <div className="mb-8">
       <button
         onClick={onToggle}
+        title={compact ? label : undefined}
+        aria-label={compact ? label : undefined}
         className="w-full flex items-center justify-between mb-4 px-4 pb-3 border-b border-slate-200 group"
       >
         {!compact && (

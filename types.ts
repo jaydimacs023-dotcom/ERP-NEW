@@ -99,6 +99,7 @@ export enum InventoryValuationMethod {
 
 export type SubscriptionStatus = 'ACTIVE' | 'TRIAL' | 'SUSPENDED' | 'EXPIRED' | 'PENDING';
 export type PlanType = 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+export type InstitutionType = 'TRAINING' | 'ACADEMIC' | 'HYBRID';
 
 export interface BaseEntity {
   isDeleted?: boolean;
@@ -126,6 +127,7 @@ export interface Organization extends BaseEntity {
   id: string;
   name: string;
   currency: string;
+  institutionType?: InstitutionType;
   taxId?: string;
   isVatRegistered: boolean;
   subscriptionStatus: SubscriptionStatus;
