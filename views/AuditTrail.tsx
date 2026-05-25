@@ -1,20 +1,47 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AuditLog } from '../types';
-import { ChevronDown, Clock, Filter, History, RotateCcw, Search, ShieldCheck, User } from 'lucide-react';
+import { ChevronDown, Clock, Filter, History, RotateCcw, Search, ShieldCheck } from 'lucide-react';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 
 interface AuditTrailProps {
   orgId: string;
-  logs: AuditLog[];
+  logs?: AuditLog[];
   brandColor?: string;
 }
 
 type DateFilterMode = 'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM';
+type AuditTrailTab = 'BUSINESS' | 'SYSTEM';
 
 const todayKey = () => new Date().toISOString().split('T')[0];
+const PAGE_SIZE = 7;
+const AUDIT_COLUMNS = 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at';
+const SYSTEM_MOVEMENT_ACTIONS = ['LOGIN', 'LOGOUT'];
 
-const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f46e5' }) => {
+const isSystemMovementLog = (log: Pick<AuditLog, 'action'>) =>
+  SYSTEM_MOVEMENT_ACTIONS.includes(String(log.action || '').toUpperCase());
+
+const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
+const dateEndIso = (date: string) => `${date}T23:59:59.999Z`;
+
+const tomorrowIsoStart = () => {
+  const date = new Date(`${todayKey()}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString();
+};
+
+const monthRange = () => {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start: start.toISOString(), end: end.toISOString() };
+};
+
+const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = '#4f46e5' }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [activeAuditTab, setActiveAuditTab] = useState<AuditTrailTab>('BUSINESS');
   const [actionFilter, setActionFilter] = useState('ALL');
   const [entityFilter, setEntityFilter] = useState('ALL');
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('ALL');
@@ -23,36 +50,148 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   const [showEntityDropdown, setShowEntityDropdown] = useState(false);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverLogs, setServerLogs] = useState<AuditLog[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const orgLogs = useMemo(
     () => logs.filter(log => log.orgId === orgId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [logs, orgId]
   );
 
+  const categoryOrgLogs = useMemo(
+    () => orgLogs.filter(log => activeAuditTab === 'SYSTEM' ? isSystemMovementLog(log) : !isSystemMovementLog(log)),
+    [activeAuditTab, orgLogs]
+  );
+
   const actionOptions = useMemo(
-    () => ['ALL', ...Array.from(new Set(orgLogs.map(log => log.action).filter(Boolean))).sort()],
-    [orgLogs]
+    () => ['ALL', ...Array.from(new Set([...categoryOrgLogs.map(log => log.action), ...serverLogs.map(log => log.action)].filter(Boolean))).sort()],
+    [categoryOrgLogs, serverLogs]
   );
 
   const entityOptions = useMemo(
-    () => ['ALL', ...Array.from(new Set(orgLogs.map(log => log.entityType).filter(Boolean))).sort()],
-    [orgLogs]
+    () => ['ALL', ...Array.from(new Set([...categoryOrgLogs.map(log => log.entityType), ...serverLogs.map(log => log.entityType)].filter(Boolean))).sort()],
+    [categoryOrgLogs, serverLogs]
   );
 
-  const filteredLogs = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+  const auditFilters = useMemo(() => {
+    const filters: PageFilter[] = [{ column: 'org_id', operator: 'eq', value: orgId }];
+
+    filters.push({
+      column: 'action',
+      operator: activeAuditTab === 'SYSTEM' ? 'in' : 'not.in',
+      value: `(${SYSTEM_MOVEMENT_ACTIONS.join(',')})`
+    });
+
+    if (actionFilter !== 'ALL') {
+      filters.push({ column: 'action', operator: 'eq', value: actionFilter });
+    }
+
+    if (entityFilter !== 'ALL') {
+      filters.push({ column: 'entity_type', operator: 'eq', value: entityFilter });
+    }
+
+    if (dateFilterMode === 'TODAY') {
+      filters.push({ column: 'created_at', operator: 'gte', value: dateStartIso(todayKey()) });
+      filters.push({ column: 'created_at', operator: 'lt', value: tomorrowIsoStart() });
+    } else if (dateFilterMode === 'THIS_MONTH') {
+      const { start, end } = monthRange();
+      filters.push({ column: 'created_at', operator: 'gte', value: start });
+      filters.push({ column: 'created_at', operator: 'lt', value: end });
+    } else if (dateFilterMode === 'CUSTOM') {
+      if (dateFrom) {
+        filters.push({ column: 'created_at', operator: 'gte', value: dateStartIso(dateFrom) });
+      }
+      if (dateTo) {
+        filters.push({ column: 'created_at', operator: 'lte', value: dateEndIso(dateTo) });
+      }
+    }
+
+    return filters;
+  }, [actionFilter, activeAuditTab, dateFilterMode, dateFrom, dateTo, entityFilter, orgId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [actionFilter, activeAuditTab, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter, orgId]);
+
+  useEffect(() => {
+    setActionFilter('ALL');
+    setEntityFilter('ALL');
+    setShowActionDropdown(false);
+    setShowEntityDropdown(false);
+  }, [activeAuditTab]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadAuditPage = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const result = await DataServiceFactory.getService().fetchPage<AuditLog>('audit_logs', {
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          columns: AUDIT_COLUMNS,
+          filters: auditFilters,
+          search: debouncedSearchTerm.trim()
+            ? {
+              columns: ['action', 'entity_type', 'details', 'ip_address'],
+              term: debouncedSearchTerm
+            }
+            : undefined,
+          orderBy: [{ column: 'created_at', ascending: false }]
+        });
+
+        if (!isActive) return;
+        setServerLogs(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      } catch (error) {
+        if (!isActive) return;
+        console.error('[AuditTrail] Failed to load audit logs page:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load audit logs.');
+        setServerLogs([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    if (orgId) {
+      loadAuditPage();
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [auditFilters, currentPage, debouncedSearchTerm, orgId]);
+
+  const localFilteredLogs = useMemo(() => {
+    const term = debouncedSearchTerm.trim().toLowerCase();
     const now = new Date();
     const month = now.getMonth();
     const year = now.getFullYear();
 
-    return orgLogs.filter(log => {
+    return categoryOrgLogs.filter(log => {
       const matchesSearch =
         !term ||
-        log.userId.toLowerCase().includes(term) ||
-        log.action.toLowerCase().includes(term) ||
-        log.entityType.toLowerCase().includes(term) ||
-        log.entityId.toLowerCase().includes(term) ||
-        log.details.toLowerCase().includes(term) ||
+        String(log.userId || '').toLowerCase().includes(term) ||
+        String(log.action || '').toLowerCase().includes(term) ||
+        String(log.entityType || '').toLowerCase().includes(term) ||
+        String(log.entityId || '').toLowerCase().includes(term) ||
+        String(log.details || '').toLowerCase().includes(term) ||
         String(log.ipAddress || '').toLowerCase().includes(term);
 
       const matchesAction = actionFilter === 'ALL' || log.action === actionFilter;
@@ -73,28 +212,41 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
 
       return matchesSearch && matchesAction && matchesEntity && matchesDate;
     });
-  }, [actionFilter, dateFilterMode, dateFrom, dateTo, entityFilter, orgLogs, searchTerm]);
+  }, [actionFilter, categoryOrgLogs, dateFilterMode, dateFrom, dateTo, debouncedSearchTerm, entityFilter]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedLogs,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(localFilteredLogs, [debouncedSearchTerm, actionFilter, activeAuditTab, entityFilter, dateFilterMode, dateFrom, dateTo]);
+
+  const useFallbackRows = !!loadError;
+  const paginatedLogs = useFallbackRows ? fallbackPaginatedLogs : serverLogs;
+  const totalItems = useFallbackRows ? localFilteredLogs.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverLogs.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const summary = useMemo(() => {
-    const users = new Set(filteredLogs.map(log => log.userId)).size;
-    const entityTypes = new Set(filteredLogs.map(log => log.entityType)).size;
-    const todayEvents = filteredLogs.filter(log => log.createdAt.slice(0, 10) === todayKey()).length;
+    const visibleLogs = useFallbackRows ? localFilteredLogs : serverLogs;
+    const users = new Set(visibleLogs.map(log => log.userId).filter(Boolean)).size;
+    const entityTypes = new Set(visibleLogs.map(log => log.entityType).filter(Boolean)).size;
+    const todayEvents = dateFilterMode === 'TODAY' && !useFallbackRows
+      ? serverTotal
+      : visibleLogs.filter(log => log.createdAt.slice(0, 10) === todayKey()).length;
+
     return {
-      total: filteredLogs.length,
+      total: totalItems,
       users,
       entityTypes,
       todayEvents
     };
-  }, [filteredLogs]);
-
-  const {
-    currentPage,
-    totalPages,
-    pageStartIndex,
-    pageEndIndex,
-    paginatedRows: paginatedLogs,
-    setCurrentPage
-  } = usePaginatedRows(filteredLogs, [searchTerm, actionFilter, entityFilter, dateFilterMode, dateFrom, dateTo]);
+  }, [dateFilterMode, localFilteredLogs, serverLogs, serverTotal, totalItems, useFallbackRows]);
 
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
@@ -138,6 +290,31 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
         >
           <ShieldCheck size={18} />
           {summary.total} Events
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[
+            { key: 'BUSINESS' as const, label: 'Business Transactions', description: 'Posting, approvals, updates, receipts, invoices, and operational records' },
+            { key: 'SYSTEM' as const, label: 'System Movement', description: 'Login and logout activity' }
+          ].map(tab => {
+            const active = activeAuditTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveAuditTab(tab.key)}
+                className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+                  active ? 'border-transparent text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                style={active ? { backgroundColor: brandColor } : undefined}
+              >
+                <span className="block text-sm font-bold">{tab.label}</span>
+                <span className={`mt-1 block text-xs ${active ? 'text-white/80' : 'text-gray-400'}`}>{tab.description}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -326,7 +503,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
 
           <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
             <Filter size={14} />
-            <span>{filteredLogs.length} record{filteredLogs.length !== 1 ? 's' : ''}</span>
+            <span>{totalItems} record{totalItems !== 1 ? 's' : ''}</span>
           </div>
         </div>
       </div>
@@ -343,12 +520,21 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredLogs.length === 0 ? (
+            {isLoading ? (
               <tr>
                 <td colSpan={5} className="px-6 py-20 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <History size={32} className="text-gray-300" />
-                    <p>No audit records found for the current search and filter.</p>
+                    <p>Loading audit records...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : totalItems === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-20 text-center text-gray-500">
+                  <div className="flex flex-col items-center gap-3">
+                    <History size={32} className="text-gray-300" />
+                    <p>{loadError ? 'Unable to load audit records from Supabase.' : 'No audit records found for the current search and filter.'}</p>
                   </div>
                 </td>
               </tr>
@@ -402,12 +588,12 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs, brandColor = '#4f4
           </tbody>
         </table>
         <PaginationControls
-          currentPage={currentPage}
+          currentPage={activePage}
           totalPages={totalPages}
-          totalItems={filteredLogs.length}
+          totalItems={totalItems}
           pageStartIndex={pageStartIndex}
           pageEndIndex={pageEndIndex}
-          onPageChange={setCurrentPage}
+          onPageChange={handlePageChange}
           itemLabel="audit records"
         />
       </div>

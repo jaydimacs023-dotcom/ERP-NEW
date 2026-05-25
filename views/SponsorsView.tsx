@@ -3,6 +3,9 @@ import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../
 import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 import { 
   Search, Plus, Handshake, Mail, Phone, User, Trash2, X, 
   Building, Edit2, Loader2, CheckCircle, AlertCircle, MapPin,
@@ -16,6 +19,7 @@ interface Toast {
 }
 
 interface SponsorsViewProps {
+  orgId: string;
   sponsors: Sponsor[];
   accounts?: ChartOfAccount[];
   entries?: JournalEntry[];
@@ -26,17 +30,28 @@ interface SponsorsViewProps {
   onDeleteSponsor: (id: string) => void | Promise<boolean>;
 }
 
+const PAGE_SIZE = 10;
+const SPONSOR_COLUMNS = 'id,org_id,sponsor_code,name,contact_person,email,phone,address,tin,tax_type,ewt_rate,ar_account_id,created_at,updated_at,is_deleted,deleted_at,deleted_by';
+
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
-  sponsors, accounts = [], entries = [], lines = [], currency = '?', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
+  orgId, sponsors, accounts = [], entries = [], lines = [], currency = '?', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
   const [showSOAFor, setShowSOAFor] = useState<Sponsor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [taxTypeFilter, setTaxTypeFilter] = useState<TaxType | 'ALL'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [serverSponsors, setServerSponsors] = useState<Sponsor[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
 
   const [formData, setFormData] = useState<Partial<Sponsor>>({
     sponsorCode: '',
@@ -51,8 +66,74 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
     arAccountId: ''
   });
 
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, taxTypeFilter]);
+
+  const sponsorFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) {
+      filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    }
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (taxTypeFilter !== 'ALL') {
+      filters.push({ column: 'tax_type', operator: 'eq', value: taxTypeFilter });
+    }
+    return filters;
+  }, [orgId, taxTypeFilter]);
+
+  React.useEffect(() => {
+    if (!orgId) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<Sponsor>('sponsors', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: SPONSOR_COLUMNS,
+      filters: sponsorFilters,
+      search: debouncedSearchTerm.trim()
+        ? {
+          columns: ['name', 'sponsor_code', 'contact_person', 'email', 'phone', 'tin', 'address'],
+          term: debouncedSearchTerm
+        }
+        : undefined,
+      orderBy: [{ column: 'name', ascending: true }]
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerSponsors(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[SponsorsView] Failed to load sponsor page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load sponsors.');
+        setServerSponsors([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPage(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, orgId, refreshKey, sponsorFilters]);
+
   const filteredSponsors = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return sponsors
       .filter(s => {
@@ -74,7 +155,25 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         return matchesSearch && matchesTaxType;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [sponsors, searchTerm, taxTypeFilter]);
+  }, [sponsors, debouncedSearchTerm, taxTypeFilter]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedSponsors,
+    setCurrentPage: setFallbackCurrentPage
+  } = usePaginatedRows(filteredSponsors, [debouncedSearchTerm, taxTypeFilter], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError;
+  const paginatedSponsors = useFallbackRows ? fallbackPaginatedSponsors : serverSponsors;
+  const totalItems = useFallbackRows ? filteredSponsors.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverSponsors.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || taxTypeFilter !== 'ALL';
 
@@ -118,6 +217,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           updatedAt: new Date().toISOString()
         };
         await onUpdateSponsor(updatedSponsor);
+        setRefreshKey(key => key + 1);
         showToast(`Sponsor "${updatedSponsor.name}" updated successfully!`, 'success');
       } else {
         // Create new sponsor with proper UUID
@@ -137,6 +237,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           createdAt: new Date().toISOString()
         };
         await onAddSponsor(newSponsor);
+        setRefreshKey(key => key + 1);
         showToast(`Sponsor "${newSponsor.name}" created successfully!`, 'success');
       }
       
@@ -153,7 +254,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this sponsor? This action cannot be undone.')) return;
     
-    const sponsorToDelete = sponsors.find(s => s.id === id);
+    const sponsorToDelete = [...serverSponsors, ...sponsors].find(s => s.id === id);
     const sponsorName = sponsorToDelete?.name || 'Unknown';
     
     setDeletingId(id);
@@ -162,6 +263,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
       if (result === false) {
         showToast('Cannot delete sponsor: It is currently in use by students or batches.', 'error');
       } else {
+        setRefreshKey(key => key + 1);
         showToast(`Sponsor "${sponsorName}" deleted successfully!`, 'success');
       }
     } catch (error) {
@@ -267,7 +369,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           </button>
 
           <div className="ml-auto text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-700">{filteredSponsors.length}</span> of {sponsors.filter(s => !s.isDeleted).length} sponsors
+            Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching sponsor{totalItems !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
@@ -285,7 +387,14 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredSponsors.length > 0 ? filteredSponsors.map(sponsor => (
+            {isLoadingPage && !useFallbackRows ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <Building size={40} className="mx-auto mb-2 text-gray-300" />
+                  Loading sponsors...
+                </td>
+              </tr>
+            ) : totalItems > 0 ? paginatedSponsors.map(sponsor => (
               <tr key={sponsor.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -390,7 +499,9 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                   <Building size={40} className="mx-auto mb-2 text-gray-300" />
-                  {hasActiveFilters
+                  {pageLoadError
+                    ? 'Unable to load sponsors from Supabase.'
+                    : hasActiveFilters
                     ? 'Try adjusting your search or filters.'
                     : 'No sponsors registered in the system.'}
                 </td>
@@ -398,6 +509,15 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="sponsors"
+        />
       </div>
 
       {showModal && (

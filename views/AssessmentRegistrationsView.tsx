@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { AssessmentRegistration, AssessmentRegistrationStatus, AssessmentType, Qualification, Student } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
-import { ClipboardCheck, Plus, Search, X, Edit2, User, Award } from 'lucide-react';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { ClipboardCheck, Plus, Search, X, User, Award } from 'lucide-react';
 
 interface AssessmentRegistrationsViewProps {
   registrations: AssessmentRegistration[];
@@ -58,6 +59,15 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
         return bDate.localeCompare(aDate);
       });
   }, [registrations, searchTerm, students, qualifications]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedRegistrations,
+    setCurrentPage
+  } = usePaginatedRows(filteredRegistrations, [searchTerm], 7);
 
   const resetForm = () => {
     setEditingRegistration(null);
@@ -153,49 +163,42 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-brand">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase">Candidate</th>
-                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase">Qualification</th>
-                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase">Assessment</th>
-                <th className="px-5 py-4 text-right text-xs font-semibold text-white uppercase">Action</th>
+                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase w-[34%]">Candidate</th>
+                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase w-[34%]">Qualification</th>
+                <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase w-[32%]">Assessment</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRegistrations.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-16 text-center text-gray-400">
+                  <td colSpan={3} className="px-5 py-16 text-center text-gray-400">
                     <ClipboardCheck size={44} className="mx-auto mb-3 text-gray-200" />
                     <p className="text-sm font-semibold">No assessment registrations found.</p>
                   </td>
                 </tr>
-              ) : filteredRegistrations.map(registration => {
+              ) : paginatedRegistrations.map(registration => {
                 const student = students.find(s => s.id === registration.studentId);
                 const qualification = qualifications.find(q => q.id === registration.qualificationId);
                 return (
-                  <tr key={registration.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openEdit(registration)}>
-                    <td className="px-5 py-4">
+                  <tr key={registration.id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => openEdit(registration)}>
+                    <td className="px-5 py-4 align-middle">
                       <p className="text-sm font-semibold text-gray-900">{student ? `${student.lastName}, ${student.firstName}` : 'Unknown candidate'}</p>
                       <p className="text-xs text-gray-500">{registration.registrationCode || registration.id}</p>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 align-middle">
                       <p className="text-sm font-semibold text-gray-800">{qualification?.name || 'Unknown qualification'}</p>
                       <p className="text-xs text-gray-500">{qualification?.code || '-'}</p>
                     </td>
-                    <td className="px-5 py-4">
-                      <p className="text-sm text-gray-700">{registration.assessmentDate || 'To be announced'}</p>
-                      <p className="text-xs text-gray-500">{registration.assessmentType.replace(/_/g, ' ')}</p>
-                      <p className="text-xs font-semibold text-gray-600">{registration.status.replace(/_/g, ' ')}</p>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={event => {
-                          event.stopPropagation();
-                          openEdit(registration);
-                        }}
-                        className="p-2 rounded text-gray-400 hover:text-brand hover:bg-brand/10"
-                        title="Edit registration"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                    <td className="px-5 py-4 align-middle">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{registration.assessmentDate || 'To be announced'}</p>
+                          <p className="text-xs text-gray-500">{registration.assessmentType.replace(/_/g, ' ')}</p>
+                        </div>
+                        <span className="inline-flex w-fit rounded border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600 uppercase">
+                          {registration.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -203,6 +206,15 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredRegistrations.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="registrations"
+        />
       </div>
 
       {showModal && (

@@ -1,7 +1,7 @@
 ﻿
 import React, { useState, useMemo } from 'react';
 import { Database, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, ChevronRight, KeyRound } from 'lucide-react';
-import { Organization, User } from '../types';
+import { InstitutionType, Organization, User } from '../types';
 import { authService } from '../services/AuthService';
 
 interface LoginViewProps {
@@ -25,6 +25,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regCurrency, setRegCurrency] = useState('PHP');
+  const [regInstitutionType, setRegInstitutionType] = useState<InstitutionType>('TRAINING');
 
   // Password strength analysis
   const passwordStrength = useMemo(() => {
@@ -89,6 +90,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
         id: newOrgId,
         name: regOrgName,
         currency: regCurrency,
+        institutionType: regInstitutionType,
         isVatRegistered: true,
         subscriptionStatus: 'TRIAL',
         planType: 'PROFESSIONAL',
@@ -283,7 +285,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Currency</label>
                         <select
@@ -294,6 +296,18 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                           <option value="PHP">PHP</option>
                           <option value="USD">USD</option>
                           <option value="EUR">EUR</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Institution</label>
+                        <select
+                          className="w-full appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                          value={regInstitutionType}
+                          onChange={e => setRegInstitutionType(e.target.value as InstitutionType)}
+                        >
+                          <option value="TRAINING">Training</option>
+                          <option value="ACADEMIC">Academic</option>
+                          <option value="HYBRID">Hybrid</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -367,4 +381,3 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 };
 
 export default LoginView;
-

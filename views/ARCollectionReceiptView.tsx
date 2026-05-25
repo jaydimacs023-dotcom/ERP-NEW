@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Building2,
   Calendar,
@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { BankAccount, JournalEntry, JournalLine, Sponsor, Student } from '../types';
+import { BankAccount, JournalEntry, JournalLine, Payment, Sponsor, Student } from '../types';
 import { format } from 'date-fns';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
@@ -19,6 +19,7 @@ import PaginationControls, { usePaginatedRows } from '../components/PaginationCo
 interface ARCollectionReceiptViewProps {
   entries: JournalEntry[];
   lines: JournalLine[];
+  payments?: Payment[];
   bankAccounts: BankAccount[];
   students: Student[];
   sponsors: Sponsor[];
@@ -42,6 +43,7 @@ const todayKey = () => new Date().toISOString().split('T')[0];
 const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
   entries,
   lines,
+  payments = [],
   bankAccounts,
   students,
   sponsors,
@@ -56,12 +58,25 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [columnOrder, setColumnOrder] = useState(['receiptNo', 'payer', 'date', 'bank', 'amount']);
+  const [draggedColumnIdx, setDraggedColumnIdx] = useState<number | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizeRef = useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
 
+  const currencySymbol = currency === 'PHP' ? '₱' : currency;
+  const formatCurrencyNumber = (val: number) =>
+    val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatCurrency = (val: number) =>
-    `${currency} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${currencySymbol} ${formatCurrencyNumber(val)}`;
+  const renderAccountingAmount = (val: number) => (
+    <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 font-medium text-gray-800 tabular-nums">
+      <span className="text-left">{currencySymbol}</span>
+      <span className="truncate text-right">{formatCurrencyNumber(val)}</span>
+    </span>
+  );
 
   const collectionRows = useMemo<CollectionRow[]>(() => {
-    return entries
+    const journalRows = entries
       .filter(entry => entry.sourceType === 'COLLECTION' && entry.status === 'POSTED')
       .map(entry => {
         const entryLines = lines.filter(line => line.journalEntryId === entry.id);
@@ -89,9 +104,64 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
           bankName: bank?.bankName || 'Treasury',
           amount: cashLine?.debit || 0,
         };
-      })
+      });
+
+    const collectionEntryIds = new Set(journalRows.map(row => row.entry.id));
+    const finalizedPaymentStatuses = new Set(['OPEN', 'POSTED', 'CLOSED']);
+    const paymentRows = payments
+      .filter(payment =>
+        !payment.isDeleted &&
+        finalizedPaymentStatuses.has(payment.status) &&
+        (!payment.journalEntryId || !collectionEntryIds.has(payment.journalEntryId))
+      )
+      .map(payment => {
+        let payerName = 'Unassigned Payor';
+        let payerType: PayerTypeFilter = 'OTHER';
+
+        if (payment.sponsorId) {
+          payerType = 'SPONSOR';
+          payerName = sponsors.find(sponsor => sponsor.id === payment.sponsorId)?.name || 'Unknown Sponsor';
+        } else if (payment.studentId) {
+          payerType = 'STUDENT';
+          const student = students.find(item => item.id === payment.studentId);
+          payerName = student ? `${student.lastName}, ${student.firstName}` : 'Unknown Student';
+        }
+
+        const journalLine = payment.journalEntryId
+          ? lines.find(line => line.journalEntryId === payment.journalEntryId && line.debit > 0)
+          : undefined;
+        const bank = bankAccounts.find(account =>
+          account.id === payment.bankAccountId ||
+          account.glAccountId === journalLine?.accountId
+        );
+        const receiptNo = String(payment.crNo || payment.paymentNo || payment.glEntryNumber || '').trim() || payment.id;
+        const description = String(payment.notes || '').trim() || `Payment ${payment.paymentNo}`;
+
+        return {
+          entry: {
+            id: `payment-${payment.id}`,
+            orgId: payment.orgId,
+            periodId: '',
+            date: payment.paymentDate,
+            description,
+            reference: receiptNo,
+            glEntryNumber: payment.glEntryNumber,
+            status: 'POSTED',
+            createdBy: payment.createdBy || payment.postedBy || 'system',
+            createdAt: payment.createdAt || payment.postedAt || payment.paymentDate,
+            sourceType: 'PAYMENT',
+            sourceRef: payment.id
+          } as JournalEntry,
+          payerName,
+          payerType,
+          bankName: bank?.bankName || 'Treasury',
+          amount: Number(payment.amountReceived || 0) + Number(payment.ewtAmountCertified || 0),
+        };
+      });
+
+    return [...journalRows, ...paymentRows]
       .sort((a, b) => new Date(b.entry.date).getTime() - new Date(a.entry.date).getTime());
-  }, [bankAccounts, entries, lines, sponsors, students]);
+  }, [bankAccounts, entries, lines, payments, sponsors, students]);
 
   const filteredCollections = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -179,6 +249,79 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
 
   const dateFilterLabel =
     dateFilterMode === 'ALL' ? 'All' : dateFilterMode === 'TODAY' ? 'Today' : dateFilterMode === 'THIS_MONTH' ? 'This Month' : 'Between...';
+
+  const registryColumns = useMemo(() => {
+    const baseColumns = [
+      {
+        key: 'receiptNo',
+        label: 'Receipt No.',
+        width: 'w-40',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.entry.reference || '-',
+      },
+      {
+        key: 'payer',
+        label: 'Sponsor/Student',
+        width: 'w-64',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.payerName,
+      },
+      {
+        key: 'date',
+        label: 'Transaction Date',
+        width: 'w-32',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.entry.date ? format(new Date(row.entry.date), 'MM-dd-yyyy') : '-',
+      },
+      {
+        key: 'bank',
+        label: 'Bank',
+        width: 'w-44',
+        align: 'text-left' as const,
+        render: (row: CollectionRow) => row.bankName,
+      },
+      {
+        key: 'amount',
+        label: 'Amount',
+        width: 'w-36',
+        align: 'text-right' as const,
+        render: (row: CollectionRow) => renderAccountingAmount(row.amount),
+      },
+    ];
+
+    return columnOrder.map(key => baseColumns.find(column => column.key === key)).filter(Boolean) as typeof baseColumns;
+  }, [columnOrder, currency]);
+
+  const handleColumnDragStart = (event: React.DragEvent, index: number) => {
+    setDraggedColumnIdx(index);
+    event.dataTransfer.effectAllowed = 'move';
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleColumnDragEnd = (event: React.DragEvent) => {
+    setDraggedColumnIdx(null);
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleColumnDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleColumnDrop = (event: React.DragEvent, dropIndex: number) => {
+    event.preventDefault();
+    if (draggedColumnIdx === null || draggedColumnIdx === dropIndex) return;
+
+    const nextOrder = [...columnOrder];
+    const [draggedKey] = nextOrder.splice(draggedColumnIdx, 1);
+    nextOrder.splice(dropIndex, 0, draggedKey);
+    setColumnOrder(nextOrder);
+    setDraggedColumnIdx(null);
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -358,80 +501,126 @@ const ARCollectionReceiptView: React.FC<ARCollectionReceiptViewProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead style={{ backgroundColor: brandColor }}>
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Receipt #</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Payer</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wide text-white">Bank</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-white">Amount</th>
-                <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-white">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredCollections.length > 0 ? paginatedCollections.map(row => (
-                <tr key={row.entry.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-5 text-xs font-mono font-bold text-gray-700">{row.entry.reference}</td>
-                  <td className="px-6 py-5">
-                    <div className="text-sm font-semibold text-gray-800">{row.payerName}</div>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
-                          row.payerType === 'STUDENT' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : ''
-                        }`}
-                        style={row.payerType !== 'STUDENT'
-                          ? { backgroundColor: 'var(--acm-primary-light)', color: brandColor, borderColor: 'var(--acm-primary-light)' }
-                          : undefined}
-                      >
-                        {row.payerType === 'SPONSOR' ? <Building2 size={12} /> : row.payerType === 'STUDENT' ? <GraduationCap size={12} /> : <FileText size={12} />}
-                        {row.payerType === 'SPONSOR' ? 'Sponsor' : row.payerType === 'STUDENT' ? 'Student' : 'Other'}
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full font-sans">
+          <thead className="bg-emerald-600 border-b">
+            <tr>
+              {registryColumns.map((column, index) => (
+                <th
+                  key={column.key}
+                  draggable
+                  onDragStart={(event) => handleColumnDragStart(event, index)}
+                  onDragEnd={handleColumnDragEnd}
+                  onDragOver={handleColumnDragOver}
+                  onDrop={(event) => handleColumnDrop(event, index)}
+                  className={`px-4 py-3 ${column.align} cursor-move font-semibold text-white ${draggedColumnIdx === index ? 'bg-emerald-700 border-dashed border-2 border-emerald-300 opacity-50' : ''} group select-none transition-colors border-x border-transparent hover:bg-emerald-700 hover:border-emerald-200 relative`}
+                  style={columnWidths[column.key] ? { width: columnWidths[column.key], minWidth: columnWidths[column.key] } : undefined}
+                  title="Drag to reorder column"
+                >
+                  <div className={`flex items-center ${column.align === 'text-right' ? 'justify-end' : ''} text-[13px] font-bold text-white`}>
+                    {column.label}
+                  </div>
+                  <div
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      const th = event.currentTarget.parentElement;
+                      if (!th) return;
+                      resizeRef.current = {
+                        colKey: column.key,
+                        startX: event.clientX,
+                        startWidth: th.getBoundingClientRect().width,
+                      };
+                      const onMouseMove = (moveEvent: MouseEvent) => {
+                        if (!resizeRef.current) return;
+                        const diff = moveEvent.clientX - resizeRef.current.startX;
+                        const newWidth = Math.max(60, resizeRef.current.startWidth + diff);
+                        setColumnWidths(prev => ({ ...prev, [resizeRef.current!.colKey]: newWidth }));
+                      };
+                      const onMouseUp = () => {
+                        resizeRef.current = null;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                      };
+                      document.addEventListener('mousemove', onMouseMove);
+                      document.addEventListener('mouseup', onMouseUp);
+                      document.body.style.cursor = 'col-resize';
+                      document.body.style.userSelect = 'none';
+                    }}
+                    className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-emerald-400 transition-colors z-10"
+                    title="Drag to resize column"
+                    draggable={false}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filteredCollections.length > 0 ? paginatedCollections.map(row => (
+              <tr
+                key={row.entry.id}
+                role="button"
+                tabIndex={0}
+                className="cursor-pointer transition-colors hover:bg-gray-50 focus:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                onClick={() => setSelected(row)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelected(row);
+                  }
+                }}
+                title="Click to view collection receipt"
+              >
+                {registryColumns.map(column => (
+                  <td
+                    key={column.key}
+                    className={`px-4 py-3 ${column.align} cursor-pointer`}
+                    style={columnWidths[column.key] ? { width: columnWidths[column.key], minWidth: columnWidths[column.key] } : undefined}
+                  >
+                    {column.key === 'payer' ? (
+                      <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+                        {row.payerType === 'SPONSOR' ? (
+                          <Building2 size={14} className="text-gray-400" />
+                        ) : row.payerType === 'STUDENT' ? (
+                          <GraduationCap size={14} className="text-gray-400" />
+                        ) : (
+                          <FileText size={14} className="text-gray-400" />
+                        )}
+                        {column.render(row)}
                       </span>
-                    </div>
+                    ) : column.key === 'bank' ? (
+                      <span className="inline-flex items-center gap-2 font-medium text-gray-800">
+                        <Calendar size={14} className="text-gray-400" />
+                        {column.render(row)}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-gray-800">{column.render(row)}</span>
+                    )}
                   </td>
-                  <td className="px-6 py-5 text-xs text-gray-600">{format(new Date(row.entry.date), 'yyyy-MM-dd')}</td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-2 text-xs font-medium text-gray-600">
-                      <Calendar size={12} className="text-gray-400" />
-                      {row.bankName}
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-right text-xs font-mono font-semibold text-gray-900">{formatCurrency(row.amount)}</td>
-                  <td className="px-6 py-5 text-right">
+                ))}
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={registryColumns.length} className="px-4 py-12 text-center text-gray-500">
+                  <FileText size={40} className="mx-auto mb-2 text-gray-300" />
+                  <div>No collection receipts found</div>
+                  {hasActiveFilters && (
                     <button
-                      onClick={() => setSelected(row)}
-                      className="px-3 py-2 text-xs font-semibold text-white rounded transition-colors"
+                      type="button"
+                      onClick={clearFilters}
+                      className="mt-3 px-5 py-2 text-white rounded text-sm font-semibold transition-all"
                       style={{ backgroundColor: brandColor }}
                     >
-                      View
+                      Clear Filters
                     </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-3 text-gray-400">
-                      <FileText size={28} className="opacity-40" />
-                      <p className="text-sm font-medium">No collection receipts found for the current search and filter.</p>
-                      {hasActiveFilters && (
-                        <button
-                          type="button"
-                          onClick={clearFilters}
-                          className="mt-2 px-5 py-2 text-white rounded text-sm font-semibold transition-all"
-                          style={{ backgroundColor: brandColor }}
-                        >
-                          Clear Filters
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  )}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}

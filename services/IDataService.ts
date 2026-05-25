@@ -86,8 +86,59 @@ export interface InitialData {
   feedbackTickets: FeedbackTicket[];
 }
 
+export type PageFilterOperator =
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'like'
+  | 'ilike'
+  | 'is'
+  | 'in'
+  | 'not.in'
+  | 'cs'
+  | 'cd'
+  | 'ov';
+
+export interface PageFilter {
+  column: string;
+  operator?: PageFilterOperator;
+  value: string | number | boolean | null;
+}
+
+export interface PageOrder {
+  column: string;
+  ascending?: boolean;
+  nullsFirst?: boolean;
+}
+
+export interface FetchPageOptions {
+  page?: number;
+  pageSize?: number;
+  columns?: string;
+  filters?: PageFilter[];
+  orderBy?: PageOrder[];
+  search?: {
+    columns: string[];
+    term: string;
+  };
+}
+
+export interface PaginatedResult<T> {
+  rows: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface IDataService {
   getInitialData(): Promise<InitialData>;
+
+  // Generic server-side pagination foundation for large list screens.
+  fetchPage<T>(table: string, options?: FetchPageOptions): Promise<PaginatedResult<T>>;
 
   // Organization CRUD
   createOrganization(org: Organization): Promise<Organization>;

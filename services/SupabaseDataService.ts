@@ -1,5 +1,5 @@
 
-import { IDataService, InitialData } from './IDataService';
+import { FetchPageOptions, IDataService, InitialData, PaginatedResult } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
 import { FeedbackTicket, Invoice, TaxCategoryEntry } from '../types';
@@ -24,6 +24,26 @@ export class SupabaseDataService implements IDataService {
   // Getter for baseUrl (alias for supabaseUrl REST endpoint)
   private get baseUrl(): string {
     return `${this.supabaseUrl}/rest/v1`;
+  }
+
+  private getSelectColumns(table: string): string {
+    const selectColumns: Record<string, string> = {
+      organizations: 'id,name,currency,institution_type,tax_id,is_vat_registered,subscription_status,plan_type,pending_plan_type,payment_reference,license_expiry,created_at,updated_at,primary_color,logo_url',
+      users: 'id,org_id,name,email,last_name,profile_photo,contact_number,address,password_hash,salt,role,last_login_at,is_active,failed_login_attempts,locked_until,created_at,updated_at,auth_uid,trainer_id,student_id',
+      students: 'id,org_id,uli,last_name,first_name,middle_name,extension,sex,date_of_birth,email,contact_number,street,barangay,city,province,guardian,location_id,sponsor_id,documents,created_at,updated_at,profile_photo,mailing_region,tesda_employment_status,tesda_employment_type,tesda_learner_classifications,tesda_other_classification,tesda_disability_types,tesda_disability_causes,tesda_course_qualification,tesda_scholarship_package,tesda_privacy_consent',
+      batches: 'id,org_id,qualification_id,trainer_id,sponsor_id,location_id,batch_code,name,year,start_date,end_date,status,max_students,current_students,student_ids,created_at,updated_at,billable_student_limit',
+      invoices: 'id,org_id,invoice_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id',
+      invoice_lines: 'id,invoice_id,line_number,description,course_fee_id,enrollment_id,quantity,unit_price,amount,tax_category_id,vat_amount,gl_account_id,is_deleted,deleted_at,deleted_by,created_at,updated_at,net_amount,gross_amount,org_id,classification_code,assessment_registration_id,line_type',
+      payments: 'id,org_id,payment_no,sponsor_id,student_id,payment_date,status,payment_method,ref_no,bank_account_id,check_number,check_date,amount_received,ewt_amount_certified,total_applied,customer_deposit_balance,journal_entry_id,voided_at,voided_by,void_reason,posted_at,posted_by,notes,created_at,created_by,updated_at,updated_by,is_deleted,deleted_at,deleted_by',
+      payment_applications: 'id,payment_id,invoice_id,amount_applied,is_reversed,reversal_reason,reversed_at,reversed_by,created_at,created_by,updated_at',
+      journal_entries: 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id',
+      journal_lines: 'id,journal_entry_id,account_id,debit,credit,memo,contact_id,contact_type,batch_id,item_id,asset_id,is_cleared,created_at,description,classification_code,tax_category_id',
+      audit_logs: 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at',
+      enrollments: 'id,org_id,enrollment_code,student_id,batch_id,sponsor_id,billing_status,enrollment_status,enrollment_date,total_fees,billed_amount,notes,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,billing_type',
+      tax_categories: 'id,org_id,code,description,type,rate,is_inclusive,output_account_id,created_at,updated_at,tax_type',
+    };
+
+    return selectColumns[table] || '*';
   }
 
   private isUuid(value?: string | null): boolean {
@@ -55,7 +75,8 @@ export class SupabaseDataService implements IDataService {
     }
 
     try {
-      const url = `${this.supabaseUrl}/rest/v1/${table}?select=*`;
+      const url = new URL(`${this.baseUrl}/${table}`);
+      url.searchParams.set('select', this.getSelectColumns(table));
       console.debug(`[Supabase] 📡 Fetching ${table}...`);
 
       const response = await fetch(url, {
@@ -63,6 +84,35 @@ export class SupabaseDataService implements IDataService {
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        if (
+          table === 'organizations' &&
+          /institution_type/i.test(errorBody) &&
+          /schema cache|could not find|column/i.test(errorBody)
+        ) {
+          console.warn("[Supabase] organizations.institution_type not available yet; retrying organizations fetch without it.");
+          const fallbackUrl = new URL(`${this.baseUrl}/${table}`);
+          fallbackUrl.searchParams.set(
+            'select',
+            this.getSelectColumns(table)
+              .split(',')
+              .filter(column => column !== 'institution_type')
+              .join(',')
+          );
+          const fallbackResponse = await fetch(fallbackUrl, {
+            headers: await this.getHeaders(),
+          });
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json() as T[];
+            console.debug(`[Supabase] âœ… ${table}: ${fallbackData.length} rows (legacy schema fallback)`);
+            return fallbackData;
+          }
+
+          console.error(`[Supabase] Legacy organizations fetch fallback failed: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+          console.error(`[Supabase] Fallback response body:`, await fallbackResponse.text());
+          return [] as T[];
+        }
         // Handle 404 (table not found) gracefully
         if (response.status === 404) {
           console.warn(`[Supabase] ⚠️ Table not found: '${table}' (404) - using empty array`);
@@ -70,7 +120,6 @@ export class SupabaseDataService implements IDataService {
         }
         // Handle RLS permission errors with clear guidance
         if (response.status === 403 || response.status === 401) {
-          const errorBody = await response.text();
           console.error(`[Supabase] 🔒 RLS Permission Error on '${table}': ${response.status}`);
           console.error(`[Supabase] This usually means Row Level Security (RLS) is enabled but no policies are defined.`);
           console.error(`[Supabase] Run FIX_JOURNAL_RLS.sql in Supabase SQL Editor to fix this.`);
@@ -78,7 +127,6 @@ export class SupabaseDataService implements IDataService {
           return [] as T[];
         }
         console.error(`[Supabase] ❌ Error fetching ${table}: ${response.status} ${response.statusText}`);
-        const errorBody = await response.text();
         console.error(`[Supabase] Response body:`, errorBody);
         return [] as T[];
       }
@@ -627,7 +675,7 @@ export class SupabaseDataService implements IDataService {
             ? this.snakeToCamel(returnedRow)
             : { id, ...this.snakeToCamel(payload) };
           if (!returnedRow) {
-            console.warn(`[Supabase] Update ${table} (${id}) returned no row representation; using submitted payload as local result.`);
+            console.debug(`[Supabase] Update ${table} (${id}) completed without row representation; using submitted payload locally.`);
           }
           console.info(`[Supabase] Updated ${table}:`, camelResult);
           return camelResult as T;
@@ -696,10 +744,14 @@ export class SupabaseDataService implements IDataService {
         'sex', 'date_of_birth', 'birth_region', 'birth_province', 'birth_city',
         'civil_status', 'educational_attainment', 'nationality', 'email', 'contact_number',
         'street', 'barangay', 'city', 'district', 'province', 'guardian',
+        'mailing_region', 'tesda_employment_status', 'tesda_employment_type',
+        'tesda_learner_classifications', 'tesda_other_classification',
+        'tesda_disability_types', 'tesda_disability_causes',
+        'tesda_course_qualification', 'tesda_scholarship_package', 'tesda_privacy_consent',
         'location_id', 'sponsor_id', 'profile_photo', 'documents', 'created_at', 'updated_at'
       ],
-      organizations: ['id', 'name', 'currency', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'primary_color', 'logo_url'],
-      users: ['id', 'name', 'email', 'password_hash', 'salt', 'role', 'org_id', 'student_id', 'trainer_id', 'is_active', 'auth_uid', 'created_at', 'updated_at'],
+      organizations: ['id', 'name', 'currency', 'institution_type', 'tax_id', 'is_vat_registered', 'subscription_status', 'plan_type', 'pending_plan_type', 'payment_reference', 'license_expiry', 'created_at', 'updated_at', 'primary_color', 'logo_url'],
+      users: ['id', 'name', 'email', 'last_name', 'profile_photo', 'contact_number', 'address', 'password_hash', 'salt', 'role', 'org_id', 'student_id', 'trainer_id', 'is_active', 'auth_uid', 'created_at', 'updated_at'],
       trainers: ['id', 'org_id', 'first_name', 'last_name', 'middle_name', 'email', 'contact_number', 'specialization', 'qualification_ids', 'created_at', 'updated_at'],
       qualifications: ['id', 'org_id', 'code', 'name', 'duration_days', 'sector', 'created_at', 'updated_at'],
       employees: ['id', 'org_id', 'first_name', 'last_name', 'designation', 'tin', 'sss', 'philhealth', 'pagibig', 'basic_salary', 'bank_name', 'bank_account', 'is_active', 'created_at', 'updated_at'],
@@ -852,7 +904,10 @@ export class SupabaseDataService implements IDataService {
   // ============================================================================
 
   async createOrganization(org: any): Promise<any> {
-    const snakeCaseOrg = this.camelToSnake(org);
+    const snakeCaseOrg = this.camelToSnake({
+      ...org,
+      institutionType: org?.institutionType || 'TRAINING'
+    });
     const filteredOrg = this.filterToTableSchema('organizations', snakeCaseOrg);
     if ((filteredOrg as any).id && !this.isValidUUID((filteredOrg as any).id)) {
       delete (filteredOrg as any).id;
@@ -1004,6 +1059,9 @@ export class SupabaseDataService implements IDataService {
     if (!snakeCaseStudent.org_id) {
       console.warn('[Supabase] Warning: student missing org_id, using empty string');
     }
+    if (snakeCaseStudent.date_of_birth === '') {
+      delete snakeCaseStudent.date_of_birth;
+    }
 
     // Normalize documents array for storage in Supabase (supports TEXT[] and JSONB variations)
     if (snakeCaseStudent.documents) {
@@ -1054,6 +1112,7 @@ export class SupabaseDataService implements IDataService {
     // Convert empty strings to null for UUID columns
     if (snakeCaseUpdates.location_id === '') snakeCaseUpdates.location_id = null;
     if (snakeCaseUpdates.sponsor_id === '') snakeCaseUpdates.sponsor_id = null;
+    if (snakeCaseUpdates.date_of_birth === '') snakeCaseUpdates.date_of_birth = null;
 
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();
@@ -1975,6 +2034,73 @@ export class SupabaseDataService implements IDataService {
       }));
   }
 
+  async fetchPage<T>(table: string, options: FetchPageOptions = {}): Promise<PaginatedResult<T>> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      throw new Error(`Supabase credentials not configured for table '${table}'`);
+    }
+
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.min(Math.max(1, options.pageSize || 25), 200);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const url = new URL(`${this.baseUrl}/${table}`);
+
+    url.searchParams.set('select', options.columns || '*');
+    url.searchParams.set('offset', String(from));
+    url.searchParams.set('limit', String(pageSize));
+
+    for (const filter of options.filters || []) {
+      const operator = filter.operator || 'eq';
+      const value = filter.value === null ? 'null' : String(filter.value);
+      url.searchParams.set(filter.column, `${operator}.${value}`);
+    }
+
+    const searchTerm = options.search?.term?.trim();
+    if (searchTerm && options.search?.columns.length) {
+      const escapedTerm = searchTerm.replace(/[%*_]/g, '\\$&');
+      const clauses = options.search.columns.map(column => `${column}.ilike.*${escapedTerm}*`);
+      url.searchParams.set('or', `(${clauses.join(',')})`);
+    }
+
+    if (options.orderBy?.length) {
+      url.searchParams.set(
+        'order',
+        options.orderBy
+          .map(order => {
+            const direction = order.ascending === false ? 'desc' : 'asc';
+            const nulls = order.nullsFirst === undefined ? '' : `.${order.nullsFirst ? 'nullsfirst' : 'nullslast'}`;
+            return `${order.column}.${direction}${nulls}`;
+          })
+          .join(',')
+      );
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        ...(await this.getHeaders()),
+        Prefer: 'count=exact',
+        Range: `${from}-${to}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch ${table} page: ${response.status} ${errorText}`);
+    }
+
+    const rows = await response.json();
+    const contentRange = response.headers.get('content-range') || '';
+    const total = Number(contentRange.split('/')[1] || rows.length || 0);
+
+    return {
+      rows: this.snakeToCamel(rows) as T[],
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+  }
+
   /**
    * Create a payment using the edge function for atomic payment number generation
    * This prevents duplicate key errors from concurrent requests
@@ -2061,8 +2187,16 @@ export class SupabaseDataService implements IDataService {
   }
 
   private async getInvoiceRawForGuard(id: string): Promise<any | null> {
-    const invoices = await this.fetchFromSupabase<any>('invoices');
-    return Array.isArray(invoices) ? invoices.find((i: any) => i.id === id) || null : null;
+    const response = await fetch(`${this.baseUrl}/invoices?id=eq.${encodeURIComponent(id)}&select=${this.getSelectColumns('invoices')}&limit=1`, {
+      headers: await this.getHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load invoice guard row: ${response.status} ${await response.text()}`);
+    }
+
+    const invoices = await response.json();
+    return Array.isArray(invoices) ? invoices[0] || null : null;
   }
 
   private async assertInvoiceLinesMutable(invoiceId: string): Promise<void> {
@@ -2088,6 +2222,7 @@ export class SupabaseDataService implements IDataService {
       const response = await fetch(organizationsWriteUrl, {
         method: 'POST',
         headers: {
+          'apikey': this.supabaseKey,
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
@@ -2099,14 +2234,14 @@ export class SupabaseDataService implements IDataService {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        let errorMsg = `Organizations edge function error: ${response.status}`;
+        let errorMsg = '';
         try {
           const jsonError = JSON.parse(errorBody);
-          errorMsg = jsonError.error || jsonError.message || errorMsg;
+          errorMsg = jsonError.error || jsonError.message || '';
         } catch {
-          errorMsg = errorBody || errorMsg;
+          errorMsg = errorBody || '';
         }
-        throw new Error(errorMsg);
+        throw new Error(`Organizations edge function error: ${response.status}${errorMsg ? ` - ${errorMsg}` : ''}`);
       }
 
       const result = await response.json();
@@ -2116,14 +2251,18 @@ export class SupabaseDataService implements IDataService {
 
       return this.snakeToCamel(result.organization);
     } catch (error) {
-      console.error('[SupabaseDataService] Error writing organization via edge function:', error);
+      if (this.isRecoverableOrganizationWriteError(error)) {
+        console.warn('[SupabaseDataService] Organization edge function unavailable or unauthorized; using REST fallback when allowed:', error);
+      } else {
+        console.error('[SupabaseDataService] Error writing organization via edge function:', error);
+      }
       throw error;
     }
   }
 
   private isRecoverableOrganizationWriteError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
-    return /requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
+    return /organizations edge function error:\s*(401|403)|authentication required|requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
   }
 
   /**
@@ -4724,9 +4863,20 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getFeedbackTickets(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]> {
+    if (this.isLocalSupabase()) {
+      return this.getFeedbackTicketsViaLocalRest(context);
+    }
+
     try {
       return await this.callFeedbackTicketsFunction<FeedbackTicket[]>('list', context || {});
     } catch (error) {
+      if (this.isLocalSupabase() && this.isRecoverableFeedbackTicketsAuthConfigError(error)) {
+        console.warn(
+          '[SupabaseDataService] feedback-tickets edge function auth is not fully configured locally; using local REST fallback for ticket listing.',
+          error
+        );
+        return this.getFeedbackTicketsViaLocalRest(context);
+      }
       if (this.isRecoverableFeedbackTicketsFunctionError(error)) {
         console.warn(
           '[SupabaseDataService] feedback-tickets edge function is unavailable; showing no feedback tickets until it is deployed/reachable.',
@@ -4738,6 +4888,36 @@ export class SupabaseDataService implements IDataService {
     }
   }
 
+  private isLocalSupabase(): boolean {
+    return this.supabaseUrl.startsWith('http://127.0.0.1:') || this.supabaseUrl.startsWith('http://localhost:');
+  }
+
+  private async getFeedbackTicketsViaLocalRest(context?: { orgId?: string; isSystemAdmin?: boolean; userId?: string }): Promise<FeedbackTicket[]> {
+    const url = new URL(`${this.baseUrl}/feedback_tickets`);
+    url.searchParams.set(
+      'select',
+      'id,org_id,title,description,screenshot_data_url,screenshot_name,status,priority,created_by,created_by_name,created_by_role,assigned_to,admin_notes,resolved_at,created_at,updated_at,is_deleted,deleted_at,deleted_by'
+    );
+    url.searchParams.set('is_deleted', 'eq.false');
+    url.searchParams.set('order', 'created_at.desc');
+
+    if (!context?.isSystemAdmin) {
+      if (context?.orgId) {
+        url.searchParams.set('org_id', `eq.${context.orgId}`);
+      }
+      if (context?.userId) {
+        url.searchParams.set('created_by', `eq.${context.userId}`);
+      }
+    }
+
+    const response = await fetch(url.toString(), { headers: await this.getHeaders() });
+    if (!response.ok) {
+      throw new Error(`Local feedback tickets REST fallback failed: ${response.status} ${await response.text()}`);
+    }
+
+    return this.snakeToCamel(await response.json()) as FeedbackTicket[];
+  }
+
   private async callFeedbackTicketsFunction<T>(action: string, payload: any): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
       throw new Error('Supabase credentials not configured');
@@ -4746,7 +4926,7 @@ export class SupabaseDataService implements IDataService {
     try {
       const token = await this.getAuthToken();
       const url = `${this.supabaseUrl}/functions/v1/feedback-tickets`;
-      const response = await fetch(url, {
+      const response = await fetch(url.toString(), {
         method: 'POST',
         headers: {
           'apikey': this.supabaseKey,
@@ -4779,7 +4959,7 @@ export class SupabaseDataService implements IDataService {
   private parseEdgeFunctionError(errorBody: string): string {
     try {
       const jsonError = JSON.parse(errorBody);
-      return jsonError.error || jsonError.message || errorBody;
+      return jsonError.error || jsonError.message || jsonError.msg || errorBody;
     } catch {
       return errorBody || 'Unknown edge function error';
     }
@@ -4788,6 +4968,11 @@ export class SupabaseDataService implements IDataService {
   private isRecoverableFeedbackTicketsFunctionError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return /feedback tickets function is unreachable|requested function was not found|not_found|failed to fetch|networkerror|load failed/i.test(message);
+  }
+
+  private isRecoverableFeedbackTicketsAuthConfigError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /AT_ERP_JWT_SECRET is not configured|Invalid JWT|Invalid or expired application token/i.test(message);
   }
 
   // ============================================================================
@@ -5214,27 +5399,43 @@ export class SupabaseDataService implements IDataService {
   }
 
   async fetchTaxCategories(orgId: string): Promise<TaxCategoryEntry[]> {
-    // previous attempt to include the filter in the table string produced
-    // a malformed URL because fetchFromSupabase appends `?select=*` unconditionally.
-    // To avoid the 400 error, fetch everything and filter in JS (dataset is small).
-    const all = await this.fetchFromSupabase<any>('tax_categories');
-    const filtered = Array.isArray(all) ? all.filter((d: any) => d.org_id === orgId) : [];
-    if (filtered.length === 0) {
+    const response = await fetch(
+      `${this.baseUrl}/tax_categories?org_id=eq.${encodeURIComponent(orgId)}&select=${this.getSelectColumns('tax_categories')}&order=code.asc`,
+      { headers: await this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tax categories: ${response.status} ${await response.text()}`);
+    }
+    const rows = await response.json();
+    if (!Array.isArray(rows) || rows.length === 0) {
       console.debug('[Supabase] fetchTaxCategories returned empty set for org', orgId);
     }
-    return this.snakeToCamel(filtered);
+    return this.snakeToCamel(rows);
   }
 
   async getInvoicesByOrg(orgId: string): Promise<Invoice[]> {
     console.debug('[Supabase] getInvoicesByOrg called with orgId:', orgId);
-    const invoices = await this.fetchFromSupabase<any>('invoices');
-    return this.snakeToCamel(invoices.filter((i: any) => i.org_id === orgId && !i.is_deleted));
+    const response = await fetch(
+      `${this.baseUrl}/invoices?org_id=eq.${encodeURIComponent(orgId)}&is_deleted=eq.false&select=${this.getSelectColumns('invoices')}&order=invoice_date.desc`,
+      { headers: await this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch invoices by org: ${response.status} ${await response.text()}`);
+    }
+    return this.snakeToCamel(await response.json());
   }
 
   async getInvoiceById(id: string): Promise<any | null> {
     console.debug('[Supabase] getInvoiceById called with id:', id);
-    const invoices = await this.fetchFromSupabase<any>('invoices');
-    const invoice = invoices.find((i: any) => i.id === id);
+    const response = await fetch(
+      `${this.baseUrl}/invoices?id=eq.${encodeURIComponent(id)}&select=${this.getSelectColumns('invoices')}&limit=1`,
+      { headers: await this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch invoice by id: ${response.status} ${await response.text()}`);
+    }
+    const invoices = await response.json();
+    const invoice = Array.isArray(invoices) ? invoices[0] : null;
     if (!invoice) return null;
 
     const camelInvoice = this.snakeToCamel(invoice);
@@ -5264,8 +5465,15 @@ export class SupabaseDataService implements IDataService {
   }
 
   async updateInvoiceLine(id: string, updates: Partial<any>): Promise<any> {
-    const existingLines = await this.fetchFromSupabase<any>('invoice_lines');
-    const existingLine = Array.isArray(existingLines) ? existingLines.find((line: any) => line.id === id) : null;
+    const existingResponse = await fetch(
+      `${this.baseUrl}/invoice_lines?id=eq.${encodeURIComponent(id)}&select=id,invoice_id&limit=1`,
+      { headers: await this.getHeaders() }
+    );
+    if (!existingResponse.ok) {
+      throw new Error(`Failed to fetch invoice line for update guard: ${existingResponse.status} ${await existingResponse.text()}`);
+    }
+    const existingLines = await existingResponse.json();
+    const existingLine = Array.isArray(existingLines) ? existingLines[0] || null : null;
     await this.assertInvoiceLinesMutable(existingLine?.invoice_id || existingLine?.invoiceId || (updates as any).invoiceId || (updates as any).invoice_id);
     const snakeCaseUpdates = this.camelToSnake(updates);
     const filteredUpdates = this.filterToTableSchema('invoice_lines', snakeCaseUpdates);
@@ -5273,15 +5481,28 @@ export class SupabaseDataService implements IDataService {
   }
 
   async deleteInvoiceLine(id: string): Promise<void> {
-    const existingLines = await this.fetchFromSupabase<any>('invoice_lines');
-    const existingLine = Array.isArray(existingLines) ? existingLines.find((line: any) => line.id === id) : null;
+    const existingResponse = await fetch(
+      `${this.baseUrl}/invoice_lines?id=eq.${encodeURIComponent(id)}&select=id,invoice_id&limit=1`,
+      { headers: await this.getHeaders() }
+    );
+    if (!existingResponse.ok) {
+      throw new Error(`Failed to fetch invoice line for delete guard: ${existingResponse.status} ${await existingResponse.text()}`);
+    }
+    const existingLines = await existingResponse.json();
+    const existingLine = Array.isArray(existingLines) ? existingLines[0] || null : null;
     await this.assertInvoiceLinesMutable(existingLine?.invoice_id || existingLine?.invoiceId);
     return this.deleteFromSupabase('invoice_lines', id);
   }
 
   async getInvoiceLinesByInvoice(invoiceId: string): Promise<any[]> {
-    const lines = await this.fetchFromSupabase<any>('invoice_lines');
-    return this.snakeToCamel(lines.filter((l: any) => l.invoice_id === invoiceId && !l.is_deleted));
+    const response = await fetch(
+      `${this.baseUrl}/invoice_lines?invoice_id=eq.${encodeURIComponent(invoiceId)}&is_deleted=eq.false&select=${this.getSelectColumns('invoice_lines')}&order=line_number.asc`,
+      { headers: await this.getHeaders() }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch invoice lines: ${response.status} ${await response.text()}`);
+    }
+    return this.snakeToCamel(await response.json());
   }
 
   async createInvoiceLines(lines: any[]): Promise<any[]> {

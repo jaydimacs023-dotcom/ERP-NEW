@@ -21,6 +21,7 @@ interface FeedbackManagementViewProps {
   currentOrgId: string;
   organizations: Organization[];
   users: User[];
+  brandColor: string;
   onCreateTicket: (ticket: FeedbackTicket) => Promise<void> | void;
   onUpdateTicket: (id: string, updates: Partial<FeedbackTicket>) => Promise<void> | void;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -35,6 +36,7 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
   currentOrgId,
   organizations,
   users,
+  brandColor,
   onCreateTicket,
   onUpdateTicket,
   onNotify
@@ -78,6 +80,7 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
   }, [currentOrgId, currentUser.id, isSystemAdmin, organizations, searchTerm, statusFilter, tickets]);
 
   const selectedTicket = visibleTickets.find(ticket => ticket.id === selectedTicketId) || visibleTickets[0];
+  const brandSoft = `${brandColor}14`;
 
   const stats = useMemo(() => ({
     open: tickets.filter(ticket => ticket.status === 'OPEN').length,
@@ -95,16 +98,15 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
     });
   };
 
-  const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const attachScreenshotFile = (file: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       onNotify('error', 'Please attach an image file for the screenshot.');
-      return;
+      return false;
     }
     if (file.size > 3 * 1024 * 1024) {
       onNotify('error', 'Screenshot must be 3MB or smaller.');
-      return;
+      return false;
     }
 
     const reader = new FileReader();
@@ -116,6 +118,28 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
       }));
     };
     reader.readAsDataURL(file);
+    return true;
+  };
+
+  const handleScreenshotPaste = (event: React.ClipboardEvent) => {
+    const items = Array.from(event.clipboardData.items);
+    const imageItem = items.find(item => item.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    const extension = file.type.split('/')[1] || 'png';
+    const namedFile = new File(
+      [file],
+      `pasted-screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`,
+      { type: file.type }
+    );
+
+    if (attachScreenshotFile(namedFile)) {
+      event.preventDefault();
+      onNotify('success', 'Pasted screenshot attached.');
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -164,11 +188,11 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
   const getAssigneeName = (id?: string) => users.find(user => user.id === id)?.name || 'Unassigned';
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-5 pb-20">
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-5">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-md bg-[#025959] text-white flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-md text-white flex items-center justify-center" style={{ backgroundColor: brandColor }}>
               <MessageSquare size={20} />
             </div>
             <div>
@@ -190,39 +214,50 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
       </header>
 
       {!isSystemAdmin && (
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-            <Send size={18} className="text-[#025959]" />
+        <form onSubmit={handleSubmit} onPaste={handleScreenshotPaste} className="bg-white border border-gray-200 rounded-md overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-3" style={{ backgroundColor: brandSoft }}>
+            <Send size={17} style={{ color: brandColor }} />
             <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Create Feedback</h2>
           </div>
-          <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5">
-            <div className="space-y-4">
+          <div className="p-5 grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
+            <div className="space-y-3">
               <input
                 value={form.title}
                 onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full px-4 py-3 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none"
+                className="w-full px-3 py-2.5 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none"
+                style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
                 placeholder="Short title of the issue"
               />
               <textarea
                 value={form.description}
                 onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full min-h-[150px] px-4 py-3 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none resize-y"
+                className="w-full min-h-[132px] px-3 py-2.5 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none resize-y"
+                style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
                 placeholder="Describe what happened, where it happened, and what you expected."
               />
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <select
                 value={form.priority}
                 onChange={e => setForm(prev => ({ ...prev, priority: e.target.value as FeedbackTicketPriority }))}
-                className="w-full px-4 py-3 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none"
+                className="w-full px-3 py-2.5 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none"
+                style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
               >
                 {priorityOptions.map(priority => <option key={priority} value={priority}>{priority}</option>)}
               </select>
-              <label className="min-h-[112px] border border-dashed border-gray-300 rounded bg-gray-50 hover:bg-gray-100 transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer text-center px-4">
-                <Camera size={22} className="text-gray-500" />
-                <span className="text-xs font-semibold text-gray-600">{form.screenshotName || 'Attach screenshot'}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotChange} />
-              </label>
+              <div className="relative">
+                <Camera size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  readOnly
+                  value={form.screenshotName}
+                  onPaste={handleScreenshotPaste}
+                  className="w-full px-10 py-2.5 rounded border border-gray-200 bg-white text-sm text-gray-700 focus:ring-1 outline-none"
+                  style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                  placeholder="Paste screenshot here"
+                  aria-label="Paste screenshot"
+                />
+              </div>
               {form.screenshotDataUrl && (
                 <button
                   type="button"
@@ -235,7 +270,8 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded bg-[#025959] text-white text-sm font-semibold hover:bg-[#014343] disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded text-white text-sm font-semibold disabled:opacity-60"
+                style={{ backgroundColor: brandColor }}
               >
                 <Send size={16} /> {isSubmitting ? 'Submitting...' : 'Submit Ticket'}
               </button>
@@ -244,14 +280,15 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
         </form>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-md shadow-sm p-4 flex flex-col md:flex-row gap-3">
+      <div className="bg-white border border-gray-200 rounded-md p-3 flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
           <input
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search feedback, user, tenant, status..."
-            className="w-full pl-10 pr-4 py-2.5 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none"
+            className="w-full pl-10 pr-4 py-2.5 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none"
+            style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -259,7 +296,8 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as 'ALL' | FeedbackTicketStatus)}
-            className="px-4 py-2.5 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none"
+            className="px-4 py-2.5 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none"
+            style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
           >
             <option value="ALL">All Statuses</option>
             {statusOptions.map(status => <option key={status} value={status}>{formatLabel(status)}</option>)}
@@ -268,7 +306,7 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_1fr] gap-6">
-        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
           <div className="divide-y divide-gray-100">
             {visibleTickets.length === 0 ? (
               <div className="p-10 text-center text-gray-500">
@@ -281,7 +319,11 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
                   key={ticket.id}
                   type="button"
                   onClick={() => setSelectedTicketId(ticket.id)}
-                  className={`w-full text-left p-5 hover:bg-gray-50 transition-colors ${selectedTicket?.id === ticket.id ? 'bg-[#025959]/5' : 'bg-white'}`}
+                  className="w-full text-left p-4 hover:bg-gray-50 transition-colors border-l-2"
+                  style={{
+                    backgroundColor: selectedTicket?.id === ticket.id ? brandSoft : '#ffffff',
+                    borderLeftColor: selectedTicket?.id === ticket.id ? brandColor : 'transparent'
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -301,7 +343,7 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-md shadow-sm min-h-[420px]">
+        <div className="bg-white border border-gray-200 rounded-md min-h-[420px]">
           {selectedTicket ? (
             <div className="p-6 space-y-6">
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-gray-100 pb-5">
@@ -346,7 +388,8 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
                   <textarea
                     value={adminNotes[selectedTicket.id] ?? selectedTicket.adminNotes ?? ''}
                     onChange={e => setAdminNotes(prev => ({ ...prev, [selectedTicket.id]: e.target.value }))}
-                    className="w-full min-h-[90px] px-4 py-3 rounded border border-gray-200 bg-gray-50 text-sm focus:ring-1 focus:ring-[#025959] outline-none resize-y"
+                    className="w-full min-h-[90px] px-4 py-3 rounded border border-gray-200 bg-white text-sm focus:ring-1 outline-none resize-y"
+                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
                     placeholder="Add internal notes or resolution details."
                   />
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -355,7 +398,10 @@ const FeedbackManagementView: React.FC<FeedbackManagementViewProps> = ({
                         key={status}
                         type="button"
                         onClick={() => updateStatus(selectedTicket, status)}
-                        className={`px-3 py-2 rounded border text-xs font-semibold transition-colors ${selectedTicket.status === status ? 'bg-[#025959] text-white border-[#025959]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                        className="px-3 py-2 rounded border text-xs font-semibold transition-colors"
+                        style={selectedTicket.status === status
+                          ? { backgroundColor: brandColor, borderColor: brandColor, color: '#fff' }
+                          : { backgroundColor: '#fff', borderColor: '#e5e7eb', color: '#4b5563' }}
                       >
                         {formatLabel(status)}
                       </button>

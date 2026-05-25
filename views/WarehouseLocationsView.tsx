@@ -1,9 +1,13 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, Download, MapPin, Building2, AlertCircle, ChevronDown, RotateCcw } from 'lucide-react';
 import { WarehouseLocation, Organization } from '../types';
 import { DataExportService } from '../services/DataExportService';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 
 interface WarehouseLocationsViewProps {
+  orgId: string;
   locations: WarehouseLocation[];
   onAdd: (location: Omit<WarehouseLocation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onUpdate: (id: string, location: Partial<WarehouseLocation>) => Promise<void>;
@@ -27,7 +31,11 @@ const INITIAL_FORM: FormData = {
   isActive: true,
 };
 
+const PAGE_SIZE = 10;
+const WAREHOUSE_LOCATION_COLUMNS = 'id,org_id,code,name,location,address,description,is_active,is_deleted,created_at,updated_at';
+
 export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
+  orgId,
   locations,
   onAdd,
   onUpdate,
@@ -47,6 +55,14 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverLocations, setServerLocations] = useState<WarehouseLocation[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -113,9 +129,11 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       };
       if (editingId) {
         await onUpdate(editingId, payload);
+        setRefreshKey(key => key + 1);
         setSuccess('Warehouse location updated successfully');
       } else {
         await onAdd(payload);
+        setRefreshKey(key => key + 1);
         setSuccess('Warehouse location added successfully');
       }
       setShowForm(false);
@@ -135,6 +153,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       setSubmitting(true);
       try {
         await onDelete(id);
+        setRefreshKey(key => key + 1);
         setSuccess('Warehouse location deleted successfully');
         setTimeout(() => setSuccess(null), 3000);
       } catch (err) {
@@ -148,9 +167,65 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   };
 
   const activeLocations = useMemo(() => locations.filter((loc) => !loc.isDeleted), [locations]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, statusFilter]);
+
+  const locationFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (statusFilter !== 'ALL') filters.push({ column: 'is_active', operator: 'eq', value: statusFilter === 'ACTIVE' });
+    return filters;
+  }, [orgId, statusFilter]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<WarehouseLocation>('warehouse_locations', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: WAREHOUSE_LOCATION_COLUMNS,
+      filters: locationFilters,
+      search: debouncedSearchTerm.trim()
+        ? { columns: ['code', 'name', 'location', 'address', 'description'], term: debouncedSearchTerm }
+        : undefined,
+      orderBy: [{ column: 'code', ascending: true }],
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerLocations(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[WarehouseLocationsView] Failed to load warehouse location page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load warehouse locations.');
+        setServerLocations([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPage(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, locationFilters, orgId, refreshKey]);
 
   const filteredLocations = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return activeLocations
       .filter((loc) => {
@@ -168,7 +243,25 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [activeLocations, searchTerm, statusFilter]);
+  }, [activeLocations, debouncedSearchTerm, statusFilter]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedLocations,
+    setCurrentPage: setFallbackCurrentPage,
+  } = usePaginatedRows(filteredLocations, [debouncedSearchTerm, statusFilter], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError;
+  const paginatedLocations = useFallbackRows ? fallbackPaginatedLocations : serverLocations;
+  const totalItems = useFallbackRows ? filteredLocations.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverLocations.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || statusFilter !== 'ALL';
 
@@ -431,7 +524,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
             </button>
 
             <div className="ml-auto text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-700">{filteredLocations.length}</span> of {activeLocations.length} locations
+              Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching locations
             </div>
           </div>
         </div>
@@ -451,14 +544,14 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {isLoading ? (
+              {(isLoading || isLoadingPage) ? (
                 <tr>
                    <td colSpan={5} className="px-4 py-16 text-center">
                       <div className="w-10 h-10 border-4 rounded-full animate-spin mx-auto mb-4 border-brand-light border-t-gray-300"></div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Mapping Logistics Architecture...</p>
                    </td>
                 </tr>
-              ) : filteredLocations.length === 0 ? (
+              ) : paginatedLocations.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
                     <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -473,7 +566,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredLocations.map((loc) => (
+                paginatedLocations.map((loc) => (
                   <tr key={loc.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-4 py-3">
                        <div className="text-left">
@@ -532,7 +625,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                   <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} className="text-brand" /></div>
                   <div>
                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Logistics Integrity</p>
-                     <p className="text-xs font-bold text-gray-600">Total physical storage footprint: {filteredLocations.length} registered zones.</p>
+                     <p className="text-xs font-bold text-gray-600">Total physical storage footprint: {totalItems} registered zones.</p>
                   </div>
                </div>
                <div className="text-right">
@@ -541,7 +634,16 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                </div>
            </div>
         )}
-      </div>
+      </div>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="locations"
+        />
     </div>
   );
 };

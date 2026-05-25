@@ -1,8 +1,12 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, X, ChevronDown, Package, MapPin, Calendar, Hash, FileText, Filter, Search, ArrowUpRight, ArrowDownLeft, RefreshCcw, Check } from 'lucide-react';
 import { InventoryTransaction, StockItem, InventoryTransactionType, Organization } from '../types';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter, PageOrder } from '../services/IDataService';
 
 interface InventoryTransactionsViewProps {
+  orgId: string;
   transactions: InventoryTransaction[];
   items: StockItem[];
   locations: any[];
@@ -10,6 +14,9 @@ interface InventoryTransactionsViewProps {
   isLoading?: boolean;
   organization?: Organization;
 }
+
+const PAGE_SIZE = 10;
+const INVENTORY_TRANSACTION_COLUMNS = 'id,org_id,reference_number,stock_item_id,from_location_id,to_location_id,transaction_type,quantity,unit_cost,total_cost,notes,journal_entry_id,created_by,created_at,is_deleted';
 
 interface TransactionWithDetails extends InventoryTransaction {
   item?: StockItem;
@@ -37,6 +44,7 @@ const TRANSACTION_TYPE_UI: Record<InventoryTransactionType, { color: string, ico
 };
 
 export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps> = ({
+  orgId,
   transactions,
   items,
   locations,
@@ -51,16 +59,99 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverTransactions, setServerTransactions] = useState<InventoryTransaction[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, selectedItemFilter, selectedTypeFilter, sortBy, sortOrder]);
+
+  const transactionFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (selectedTypeFilter !== 'ALL') filters.push({ column: 'transaction_type', operator: 'eq', value: selectedTypeFilter });
+    if (selectedItemFilter !== 'ALL') filters.push({ column: 'stock_item_id', operator: 'eq', value: selectedItemFilter });
+    return filters;
+  }, [orgId, selectedItemFilter, selectedTypeFilter]);
+
+  const transactionOrder = useMemo<PageOrder[]>(() => {
+    if (sortBy === 'type') return [{ column: 'transaction_type', ascending: sortOrder === 'asc' }];
+    return [{ column: 'created_at', ascending: sortOrder === 'asc' }];
+  }, [sortBy, sortOrder]);
+
+  const canUseServerRows = sortBy !== 'item';
+
+  useEffect(() => {
+    if (!orgId || !canUseServerRows) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<InventoryTransaction>('inventory_transactions', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: INVENTORY_TRANSACTION_COLUMNS,
+      filters: transactionFilters,
+      search: debouncedSearchTerm.trim()
+        ? { columns: ['reference_number', 'notes'], term: debouncedSearchTerm }
+        : undefined,
+      orderBy: transactionOrder,
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerTransactions(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[InventoryTransactionsView] Failed to load transaction page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load inventory transactions.');
+        setServerTransactions([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPage(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [canUseServerRows, currentPage, debouncedSearchTerm, orgId, transactionFilters, transactionOrder]);
 
   const transactionsWithDetails = useMemo<TransactionWithDetails[]>(() => {
-    return transactions
+    const sourceTransactions = (!orgId || pageLoadError || !canUseServerRows) ? transactions : serverTransactions;
+
+    return sourceTransactions
       .filter((t) => !t.isDeleted)
-      .map((t) => ({
-        ...t,
-        item: items.find((i) => i.id === t.stockItemId),
-        location: locations.find((l) => l.id === t.warehouseLocationId),
-      }));
-  }, [transactions, items, locations]);
+      .map((t) => {
+        const normalized = {
+          ...t,
+          type: (t as any).type || (t as any).transactionType,
+          warehouseLocationId: (t as any).warehouseLocationId || (t as any).toLocationId || (t as any).fromLocationId,
+        } as TransactionWithDetails;
+
+        return {
+          ...normalized,
+          item: items.find((i) => i.id === normalized.stockItemId),
+          location: locations.find((l) => l.id === normalized.warehouseLocationId),
+        };
+      });
+  }, [canUseServerRows, items, locations, orgId, pageLoadError, serverTransactions, transactions]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = transactionsWithDetails;
@@ -73,8 +164,8 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
       filtered = filtered.filter((t) => t.stockItemId === selectedItemFilter);
     }
 
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
+    if (debouncedSearchTerm && (!orgId || pageLoadError || !canUseServerRows)) {
+      const lowerSearch = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(t => 
         t.item?.code.toLowerCase().includes(lowerSearch) ||
         t.item?.name.toLowerCase().includes(lowerSearch) ||
@@ -101,7 +192,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     });
 
     return sorted;
-  }, [transactionsWithDetails, selectedTypeFilter, selectedItemFilter, sortBy, sortOrder, searchTerm]);
+  }, [canUseServerRows, debouncedSearchTerm, orgId, pageLoadError, selectedItemFilter, selectedTypeFilter, sortBy, sortOrder, transactionsWithDetails]);
 
   const summaries = useMemo(() => {
     const totalQty = transactionsWithDetails.reduce((acc, t) => acc + t.quantity, 0);
@@ -121,6 +212,24 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     selectedItemFilter !== 'ALL' ||
     sortBy !== 'date' ||
     sortOrder !== 'desc';
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedTransactions,
+    setCurrentPage: setFallbackCurrentPage,
+  } = usePaginatedRows(filteredTransactions, [debouncedSearchTerm, selectedItemFilter, selectedTypeFilter, sortBy, sortOrder], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError || !canUseServerRows;
+  const paginatedTransactions = useFallbackRows ? fallbackPaginatedTransactions : filteredTransactions;
+  const totalItems = useFallbackRows ? filteredTransactions.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + paginatedTransactions.length, totalItems);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const handleExport = () => {
     const csv = [
@@ -288,7 +397,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           </button>
 
           <div className="text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-700">{filteredTransactions.length}</span> of {transactionsWithDetails.length} transactions
+            Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching transactions
           </div>
         </div>
       </div>
@@ -306,14 +415,14 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {isLoading ? (
+              {(isLoading || isLoadingPage) ? (
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
                       <div className="w-10 h-10 border-4 border-orange-200 rounded-full animate-spin mx-auto mb-4" style={{ borderTopColor: brandColor }}></div>
                       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.3em]">Querying Archive Nodes...</p>
                    </td>
                 </tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : paginatedTransactions.length === 0 ? (
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
                       <p className="text-sm font-semibold text-gray-900 uppercase tracking-wide">No matching snapshots found</p>
@@ -321,7 +430,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                    </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
+                paginatedTransactions.map((tx) => (
                   <React.Fragment key={tx.id}>
                     <tr className="hover:bg-gray-50 transition-colors group cursor-pointer"
                         onClick={() => setExpandedId(expandedId === tx.id ? null : tx.id)}>
@@ -422,7 +531,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                   <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><Check size={16} style={{ color: brandColor }} /></div>
                   <div>
                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Archive Integrity</p>
-                     <p className="text-xs font-bold text-gray-600">Total volume recorded: {summaries.totalQty.toLocaleString()} units mapped.</p>
+                     <p className="text-xs font-bold text-gray-600">Total volume recorded on this view: {summaries.totalQty.toLocaleString()} units mapped.</p>
                   </div>
                </div>
                <div className="text-right">
@@ -431,7 +540,16 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                </div>
            </div>
         )}
-      </div>
+      </div>
+        <PaginationControls
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={handlePageChange}
+          itemLabel="transactions"
+        />
     </div>
   );
 };

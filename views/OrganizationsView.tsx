@@ -23,6 +23,7 @@ const OrganizationsView: React.FC<OrganizationsViewProps> = ({ orgs, onAddOrg, o
       id: `org-${Date.now()}`,
       name: newOrgName,
       currency: currency,
+      institutionType: 'TRAINING',
       isVatRegistered: false,
       subscriptionStatus: 'ACTIVE',
       planType: 'BASIC',

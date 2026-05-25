@@ -1,8 +1,12 @@
-﻿import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, AlertCircle, Package, ShieldCheck, Database, Info, Tag, Zap, Target, ChevronDown, RotateCcw } from 'lucide-react';
 import { StockItem, InventoryValuationMethod, Organization } from '../types';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+import { DataServiceFactory } from '../services/DataServiceFactory';
+import type { PageFilter } from '../services/IDataService';
 
 interface StockItemsViewProps {
+  orgId: string;
   items: StockItem[];
   accounts: any[];
   onAdd: (item: Omit<StockItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -28,6 +32,8 @@ interface FormData {
 
 const VALUATION_METHODS: InventoryValuationMethod[] = ['FIFO', 'LIFO', 'WEIGHTED_AVERAGE', 'STANDARD_COST'];
 const UNITS = ['PCS', 'BOX', 'KG', 'L', 'M', 'HOUR', 'SERVICE'];
+const PAGE_SIZE = 10;
+const STOCK_ITEM_COLUMNS = 'id,org_id,code,name,description,type,unit_of_measure,valuation_method,reorder_level,reorder_quantity,safety_stock,is_active,is_deleted,created_at,updated_at';
 
 const INITIAL_FORM: FormData = {
   code: '',
@@ -43,6 +49,7 @@ const INITIAL_FORM: FormData = {
 };
 
 export const StockItemsView: React.FC<StockItemsViewProps> = ({
+  orgId,
   items,
   accounts,
   onAdd,
@@ -63,6 +70,14 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
   const [success, setSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverItems, setServerItems] = useState<StockItem[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageLoadError, setPageLoadError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -147,9 +162,11 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
 
       if (editingId) {
         await onUpdate(editingId, payload);
+        setRefreshKey(key => key + 1);
         setSuccess('Item updated successfully');
       } else {
         await onAdd(payload);
+        setRefreshKey(key => key + 1);
         setSuccess('Item added successfully');
       }
 
@@ -172,6 +189,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       setSubmitting(true);
       try {
         await onDelete(id);
+        setRefreshKey(key => key + 1);
         setSuccess('Item deleted successfully');
         setTimeout(() => setSuccess(null), 3000);
       } catch (err) {
@@ -185,10 +203,67 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
     }
   };
 
-  const activeItems = React.useMemo(() => items.filter((item) => !item.isDeleted), [items]);
+  const activeItems = useMemo(() => items.filter((item) => !item.isDeleted), [items]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
-  const filteredItems = React.useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, orgId, statusFilter, typeFilter]);
+
+  const itemFilters = useMemo(() => {
+    const filters: PageFilter[] = [];
+    if (orgId) filters.push({ column: 'org_id', operator: 'eq', value: orgId });
+    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
+    if (typeFilter !== 'ALL') filters.push({ column: 'type', operator: 'eq', value: typeFilter });
+    if (statusFilter !== 'ALL') filters.push({ column: 'is_active', operator: 'eq', value: statusFilter === 'ACTIVE' });
+    return filters;
+  }, [orgId, statusFilter, typeFilter]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    let isActive = true;
+    setIsLoadingPage(true);
+    setPageLoadError('');
+
+    DataServiceFactory.getService().fetchPage<StockItem>('stock_items', {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      columns: STOCK_ITEM_COLUMNS,
+      filters: itemFilters,
+      search: debouncedSearchTerm.trim()
+        ? { columns: ['code', 'name', 'description', 'unit_of_measure', 'valuation_method'], term: debouncedSearchTerm }
+        : undefined,
+      orderBy: [{ column: 'code', ascending: true }],
+    })
+      .then(result => {
+        if (!isActive) return;
+        setServerItems(result.rows);
+        setServerTotal(result.total);
+        setServerTotalPages(result.totalPages);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[StockItemsView] Failed to load stock item page:', error);
+        setPageLoadError(error instanceof Error ? error.message : 'Failed to load stock items.');
+        setServerItems([]);
+        setServerTotal(0);
+        setServerTotalPages(1);
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingPage(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentPage, debouncedSearchTerm, itemFilters, orgId, refreshKey]);
+
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = debouncedSearchTerm.trim().toLowerCase();
 
     return activeItems
       .filter((item) => {
@@ -209,7 +284,25 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
         return matchesSearch && matchesType && matchesStatus;
       })
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [activeItems, searchTerm, typeFilter, statusFilter]);
+  }, [activeItems, debouncedSearchTerm, typeFilter, statusFilter]);
+
+  const {
+    currentPage: fallbackCurrentPage,
+    totalPages: fallbackTotalPages,
+    pageStartIndex: fallbackPageStartIndex,
+    pageEndIndex: fallbackPageEndIndex,
+    paginatedRows: fallbackPaginatedItems,
+    setCurrentPage: setFallbackCurrentPage,
+  } = usePaginatedRows(filteredItems, [debouncedSearchTerm, statusFilter, typeFilter], PAGE_SIZE);
+
+  const useFallbackRows = !orgId || !!pageLoadError;
+  const paginatedItems = useFallbackRows ? fallbackPaginatedItems : serverItems;
+  const totalItems = useFallbackRows ? filteredItems.length : serverTotal;
+  const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
+  const activePage = useFallbackRows ? fallbackCurrentPage : currentPage;
+  const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverItems.length, serverTotal);
+  const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || statusFilter !== 'ALL';
 
@@ -336,7 +429,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
             </button>
 
             <div className="ml-auto text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-700">{filteredItems.length}</span> of {activeItems.length} items
+              Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching items
             </div>
           </div>
         </div>
@@ -468,7 +561,14 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredItems.length === 0 ? (
+                {(isLoading || isLoadingPage) ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                      <div className="mx-auto mb-3 h-8 w-8 rounded-full border-4 border-brand-light border-t-gray-300 animate-spin"></div>
+                      Loading stock items...
+                    </td>
+                  </tr>
+                ) : paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
                        <Package size={40} className="mx-auto mb-2 text-gray-300" />
@@ -476,7 +576,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map(item => (
+                  paginatedItems.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-4">
@@ -546,7 +646,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                  <div className="p-3 bg-white rounded border border-gray-100 shadow-sm text-brand"><Database size={20} /></div>
                  <div>
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1.5">Master Index State</p>
-                    <p className="text-xs font-bold text-gray-600">Total of {filteredItems.length} logistics definitions active for simulation.</p>
+                    <p className="text-xs font-bold text-gray-600">Total of {totalItems} logistics definitions active for simulation.</p>
                  </div>
               </div>
               <div className="text-right">
@@ -554,7 +654,15 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                  <p className="text-xs font-semibold text-gray-300 italic mt-2 uppercase tracking-tighter">System Pulse: {new Date().toISOString()}</p>
               </div>
           </div>
-        </div>
+          <PaginationControls
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageStartIndex={pageStartIndex}
+            pageEndIndex={pageEndIndex}
+            onPageChange={handlePageChange}
+            itemLabel="stock items"
+          />        </div>
       )}
     </div>
   );

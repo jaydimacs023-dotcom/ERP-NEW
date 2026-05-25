@@ -18,6 +18,13 @@ interface ReportsProps {
 
 type ReportType = 'BS' | 'IS' | 'TB' | 'CFS' | 'CUSTOM';
 
+interface DetailedFinancialRow {
+  account: ChartOfAccount;
+  summary: TransactionSummary;
+  depth: number;
+  hasChildren: boolean;
+}
+
 const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualifications, batches, orgName = 'Institution Ledger', currency = 'USD', logoUrl }) => {
   const [reportType, setReportType] = useState<ReportType>('BS');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>('');
@@ -56,11 +63,66 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
     return AccountingService.getLedgerSummaries(accounts, targetLines);
   }, [accounts, entries, lines, batches, startDate, endDate, selectedQualificationId, reportType]);
 
+  const buildDetailedFinancialRows = (sourceSummaries: TransactionSummary[], accountClass: AccountClass) => {
+    const summariesByAccountId = new Map(sourceSummaries.map(summary => [summary.accountId, summary]));
+    const accountsByParentId = accounts.reduce<Map<string, ChartOfAccount[]>>((map, account) => {
+      const parentKey = account.parentId || '__root__';
+      const siblings = map.get(parentKey) || [];
+      siblings.push(account);
+      map.set(parentKey, siblings);
+      return map;
+    }, new Map());
+
+    accountsByParentId.forEach(siblings => {
+      siblings.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.name.localeCompare(b.name));
+    });
+
+    const collectAccountRows = (account: ChartOfAccount, depth: number): DetailedFinancialRow[] => {
+      const children = accountsByParentId.get(account.id) || [];
+      const childRows = children.flatMap(child => collectAccountRows(child, depth + 1));
+
+      const summary = summariesByAccountId.get(account.id);
+      const balance = summary?.balance || 0;
+      const hasVisibleBalance = Math.abs(balance) > 0.01;
+      const shouldShow = account.class === accountClass && (hasVisibleBalance || childRows.length > 0);
+
+      if (!summary || !shouldShow) {
+        return [];
+      }
+
+      return [{
+        account,
+        summary,
+        depth,
+        hasChildren: children.length > 0
+      }, ...childRows];
+    };
+
+    return (accountsByParentId.get('__root__') || [])
+      .filter(account => account.class === accountClass)
+      .flatMap(account => collectAccountRows(account, 0));
+  };
+
   const bs = useMemo(() => AccountingService.generateBalanceSheet(reportSummariesBS, accounts), [reportSummariesBS, accounts]);
+
+  const balanceSheetDetails = useMemo(() => {
+    return {
+      assets: buildDetailedFinancialRows(reportSummariesBS, AccountClass.ASSET),
+      liabilities: buildDetailedFinancialRows(reportSummariesBS, AccountClass.LIABILITY),
+      equity: buildDetailedFinancialRows(reportSummariesBS, AccountClass.EQUITY)
+    };
+  }, [accounts, reportSummariesBS]);
 
   const isReport = useMemo(() => {
     return AccountingService.generateIncomeStatement(reportSummariesIS, accounts);
   }, [reportSummariesIS, accounts]);
+
+  const incomeStatementDetails = useMemo(() => {
+    return {
+      revenue: buildDetailedFinancialRows(reportSummariesIS, AccountClass.REVENUE),
+      expenses: buildDetailedFinancialRows(reportSummariesIS, AccountClass.EXPENSE)
+    };
+  }, [accounts, reportSummariesIS]);
 
   const cfsReport = useMemo(() => {
     const periodLines = lines.filter(l => {
@@ -85,21 +147,21 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
     if (reportType === 'BS') {
       filename = `Balance_Sheet_${timestamp}.csv`;
-      csvContent += "Category,Account Name,Balance\n";
-      bs.assets.forEach(a => csvContent += `Assets,"${a.accountName}",${a.balance}\n`);
-      csvContent += `Total Assets,,${bs.totalAssets}\n`;
-      bs.liabilities.forEach(l => csvContent += `Liabilities,"${l.accountName}",${l.balance}\n`);
-      csvContent += `Total Liabilities,,${bs.totalLiabilities}\n`;
-      bs.equity.forEach(e => csvContent += `Equity,"${e.accountName}",${e.balance}\n`);
-      csvContent += `Total Equity,,${bs.totalEquity}\n`;
+      csvContent += "Category,Level,Account Code,Account Name,Account Type,Balance\n";
+      balanceSheetDetails.assets.forEach(row => csvContent += `Assets,${row.depth + 1},"${row.account.code}","${row.account.name}",${row.account.isHeader ? 'Header' : 'Posting'},${row.summary.balance}\n`);
+      csvContent += `Total Assets,,,,,${bs.totalAssets}\n`;
+      balanceSheetDetails.liabilities.forEach(row => csvContent += `Liabilities,${row.depth + 1},"${row.account.code}","${row.account.name}",${row.account.isHeader ? 'Header' : 'Posting'},${row.summary.balance}\n`);
+      csvContent += `Total Liabilities,,,,,${bs.totalLiabilities}\n`;
+      balanceSheetDetails.equity.forEach(row => csvContent += `Equity,${row.depth + 1},"${row.account.code}","${row.account.name}",${row.account.isHeader ? 'Header' : 'Posting'},${row.summary.balance}\n`);
+      csvContent += `Total Equity,,,,,${bs.totalEquity}\n`;
     } else if (reportType === 'IS') {
       filename = `Income_Statement_${timestamp}.csv`;
-      csvContent += "Category,Account Name,Balance\n";
-      isReport.revenue.forEach(r => csvContent += `Revenue,"${r.accountName}",${r.balance}\n`);
-      csvContent += `Total Revenue,,${isReport.totalRevenue}\n`;
-      isReport.expenses.forEach(e => csvContent += `Expenses,"${e.accountName}",${e.balance}\n`);
-      csvContent += `Total Expenses,,${isReport.totalExpenses}\n`;
-      csvContent += `Net Income,,${isReport.netIncome}\n`;
+      csvContent += "Category,Level,Account Code,Account Name,Account Type,Balance\n";
+      incomeStatementDetails.revenue.forEach(row => csvContent += `Revenue,${row.depth + 1},"${row.account.code}","${row.account.name}",${row.account.isHeader ? 'Header' : 'Posting'},${row.summary.balance}\n`);
+      csvContent += `Total Revenue,,,,,${isReport.totalRevenue}\n`;
+      incomeStatementDetails.expenses.forEach(row => csvContent += `Expenses,${row.depth + 1},"${row.account.code}","${row.account.name}",${row.account.isHeader ? 'Header' : 'Posting'},${row.summary.balance}\n`);
+      csvContent += `Total Expenses,,,,,${isReport.totalExpenses}\n`;
+      csvContent += `Net Income,,,,,${isReport.netIncome}\n`;
     } else if (reportType === 'CFS') {
       filename = `Cash_Flow_${timestamp}.csv`;
       csvContent += "Activity,Item,Amount\n";
@@ -286,9 +348,9 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
               <>
                 {reportType === 'BS' && (
                   <div className="space-y-12 max-w-3xl mx-auto">
-                    <FinancialSection title="I. ASSETS" items={bs.assets} total={bs.totalAssets} symbol={currencySymbol} />
-                    <FinancialSection title="II. LIABILITIES" items={bs.liabilities} total={bs.totalLiabilities} symbol={currencySymbol} />
-                    <FinancialSection title="III. OWNER'S EQUITY" items={bs.equity} total={bs.totalEquity} symbol={currencySymbol} />
+                    <DetailedFinancialSection title="I. ASSETS" rows={balanceSheetDetails.assets} total={bs.totalAssets} symbol={currencySymbol} />
+                    <DetailedFinancialSection title="II. LIABILITIES" rows={balanceSheetDetails.liabilities} total={bs.totalLiabilities} symbol={currencySymbol} />
+                    <DetailedFinancialSection title="III. OWNER'S EQUITY" rows={balanceSheetDetails.equity} total={bs.totalEquity} symbol={currencySymbol} />
 
                     <div className="pt-10 mt-6 border-t-2 border-gray-800 flex justify-between items-center">
                       <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">TOTAL LIABILITIES AND EQUITY</span>
@@ -301,8 +363,8 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
                 {reportType === 'IS' && (
                   <div className="space-y-12 max-w-3xl mx-auto">
-                    <FinancialSection title="REVENUE SOURCES" items={isReport.revenue} total={isReport.totalRevenue} symbol={currencySymbol} />
-                    <FinancialSection title="OPERATING EXPENSES" items={isReport.expenses} total={isReport.totalExpenses} symbol={currencySymbol} />
+                    <DetailedFinancialSection title="REVENUE SOURCES" rows={incomeStatementDetails.revenue} total={isReport.totalRevenue} symbol={currencySymbol} />
+                    <DetailedFinancialSection title="OPERATING EXPENSES" rows={incomeStatementDetails.expenses} total={isReport.totalExpenses} symbol={currencySymbol} />
 
                     <div className={`pt-10 mt-6 border-t-2 border-gray-800 flex justify-between items-center ${isReport.netIncome >= 0 ? 'text-brand print:text-gray-900' : 'text-rose-700 print:text-gray-900'}`}>
                       <span className="text-sm font-semibold uppercase tracking-wide">NET COMPREHENSIVE INCOME / (LOSS)</span>
@@ -501,6 +563,59 @@ const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void,
     {icon}{label}
   </button>
 );
+
+const DetailedFinancialSection: React.FC<{ title: string, rows: DetailedFinancialRow[], total: number, symbol: string }> = ({ title, rows, total, symbol }) => {
+  return (
+    <div className="animate-in fade-in duration-700 slide-in-from-bottom-2">
+      <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-8 flex items-center gap-4">
+        <div className="flex-1 h-px bg-gray-100 print:bg-gray-800"></div>
+        {title}
+        <div className="flex-1 h-px bg-gray-100 print:bg-gray-800"></div>
+      </h4>
+      <div className="space-y-2 px-5">
+        {rows.length > 0 ? rows.map(row => {
+          const isGroup = row.account.isHeader || row.hasChildren;
+          const indentStyle = { paddingLeft: `${row.depth * 1.25}rem` };
+
+          return (
+            <div
+              key={row.account.id}
+              className={`grid grid-cols-[1fr_auto] gap-4 py-2 ${isGroup ? 'border-t border-gray-50 first:border-t-0' : ''}`}
+            >
+              <div className="min-w-0 flex items-center gap-3" style={indentStyle}>
+                <ChevronRight
+                  size={12}
+                  className={`${isGroup ? 'text-brand print:text-gray-900' : 'text-gray-200 print:text-gray-900'} transition-colors`}
+                />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className={`text-sm tracking-tight print:text-gray-900 ${isGroup ? 'font-semibold text-gray-800 uppercase' : 'font-medium text-gray-600'}`}>
+                      {row.account.name}
+                    </span>
+                    <span className="text-[10px] font-semibold text-gray-300 uppercase tracking-wide print:text-gray-700">
+                      {row.account.code}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <span className={`font-mono text-xs text-right print:text-gray-900 ${isGroup ? 'font-semibold text-gray-800' : 'font-medium text-gray-500'}`}>
+                {row.summary.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          );
+        }) : (
+          <div className="py-4 text-center text-gray-300 italic text-xs uppercase tracking-wide print:text-gray-400">
+            No activity attributed to this segment.
+          </div>
+        )}
+        <div className="flex justify-between items-center pt-6 mt-6 border-t border-gray-100 text-sm font-semibold text-gray-900 uppercase tracking-wide print:border-gray-800">
+          <span>SUBTOTAL {title}</span>
+          <span className="border-b-2 border-gray-800 pb-1">{symbol} {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const FinancialSection: React.FC<{ title: string, items: TransactionSummary[], total: number, symbol: string }> = ({ title, items, total, symbol }) => {
   const visibleItems = items.filter(i => Math.abs(i.balance) > 0.01);

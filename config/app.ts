@@ -8,13 +8,6 @@
 // Vite automatically exposes VITE_* env vars via import.meta.env
 const env = import.meta.env;
 
-console.debug('[Config] Vite import.meta.env:', {
-  keys: Object.keys(env).filter(k => k.startsWith('VITE_')),
-  VITE_SUPABASE_URL: env.VITE_SUPABASE_URL?.substring(0, 40) || 'MISSING',
-  VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY ? 'PRESENT' : 'MISSING',
-  VITE_FORCE_SUPABASE: env.VITE_FORCE_SUPABASE
-});
-
 // Check for runtime override in browser
 const getRuntimeOverride = () => {
   if (typeof window !== 'undefined' && window.localStorage) {
@@ -29,6 +22,27 @@ const isProduction = (env.MODE || env.NODE_ENV) === 'production';
 const supabaseUrl = env.VITE_SUPABASE_URL || '';
 const supabaseKey = env.VITE_SUPABASE_ANON_KEY || '';
 const hasSupabaseCreds = supabaseUrl.length > 0 && supabaseKey.length > 0;
+const appEnv = (env.VITE_APP_ENV || '').toLowerCase();
+const isLocalAppEnv = appEnv === 'local' || supabaseUrl.startsWith('http://127.0.0.1:54321');
+const pointsToHostedSupabase = /^https:\/\/[^/]+\.supabase\.co\/?$/i.test(supabaseUrl);
+const enableDebug = env.VITE_ENABLE_DEBUG === 'true' || env.DEV;
+
+if (enableDebug) {
+  console.info('[Config] Active Supabase runtime config:', {
+    mode: env.MODE || env.NODE_ENV || 'development',
+    VITE_APP_ENV: env.VITE_APP_ENV || 'MISSING',
+    VITE_SUPABASE_URL: supabaseUrl || 'MISSING',
+    VITE_SUPABASE_ANON_KEY: supabaseKey || 'MISSING',
+    isLocalSupabase: supabaseUrl.startsWith('http://127.0.0.1:54321'),
+    loadedViteKeys: Object.keys(env).filter(k => k.startsWith('VITE_')),
+  });
+}
+
+if (isLocalAppEnv && pointsToHostedSupabase) {
+  throw new Error(
+    `[Config] Refusing to start: VITE_APP_ENV is local but VITE_SUPABASE_URL points to hosted Supabase (${supabaseUrl}).`
+  );
+}
 
 export const config = {
   mode: env.MODE || env.NODE_ENV || 'development',
@@ -64,5 +78,5 @@ if (!hasSupabaseCreds && runtimeOverride === 'CLOUD') {
   console.warn("[ERP System] Cloud Mode was requested but credentials are missing. Falling back to MOCK_LOCAL.");
 }
 
-console.log(`%c[ERP System] Data Strategy: ${config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_CLOUD'}`, 
+console.log(`%c[ERP System] Data Strategy: ${config.useMockData ? 'MOCK_LOCAL' : 'SUPABASE_LOCAL_OR_CONFIGURED'}`,
   `color: white; background: ${config.useMockData ? '#4f46e5' : '#059669'}; padding: 2px 8px; border-radius: 4px; font-weight: bold;`);

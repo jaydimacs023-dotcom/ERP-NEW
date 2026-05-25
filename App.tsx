@@ -81,6 +81,7 @@ import AlumniEmploymentView from './views/AlumniEmploymentView';
 import CustomerMasterListView from './views/CustomerMasterListView';
 import ARCalendarTasksView from './views/ARCalendarTasksView';
 import FeedbackManagementView from './views/FeedbackManagementView';
+import UserProfileView from './views/UserProfileView';
 
 // Lucide Icons
 import {
@@ -93,7 +94,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -148,6 +149,13 @@ function withAutoCompletedAssessmentRegistration<T extends AssessmentRegistratio
     return { ...registration, status: 'COMPLETED', updatedAt: registration.updatedAt || new Date().toISOString() };
   }
   return registration;
+}
+
+function normalizeOrganization(organization: Organization): Organization {
+  return {
+    ...organization,
+    institutionType: organization.institutionType || 'TRAINING'
+  };
 }
 
 export default function App() {
@@ -222,7 +230,8 @@ export default function App() {
           }
 
           // Lookup app user record by email
-          const appUserRes = await fetch(`${config.supabase.url}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=*`, {
+          const appUserColumns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active';
+          const appUserRes = await fetch(`${config.supabase.url}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=${appUserColumns}`, {
             headers: {
               apikey: config.supabase.anonKey,
               Authorization: `Bearer ${config.supabase.anonKey}`,
@@ -248,6 +257,10 @@ export default function App() {
             id: su.id,
             name: su.name || email.split('@')[0],
             email: su.email,
+            lastName: su.last_name || undefined,
+            profilePhoto: su.profile_photo || undefined,
+            contactNumber: su.contact_number || undefined,
+            address: su.address || undefined,
             role: su.role || 'ADMIN',
             orgId: su.org_id || '',
             studentId: su.student_id || undefined,
@@ -693,7 +706,7 @@ export default function App() {
           accounts: data.accounts.length
         });
 
-        setOrganizations(data.organizations);
+        setOrganizations(data.organizations.map(normalizeOrganization));
         setUsers(data.users);
         setStudents(data.students);
         setQualifications(data.qualifications);
@@ -1121,17 +1134,51 @@ export default function App() {
         // backfill payment records with glEntryNumber from their journal entries
         const paymentGlBackfills: Array<{ id: string; glEntryNumber: string }> = [];
         const paymentStatusBackfills: Array<{ id: string; status: Payment['status'] }> = [];
+        const paymentAmountBackfills: Array<{ id: string; amountReceived: number; totalApplied: number; customerDepositBalance: number; status: Payment['status'] }> = [];
         const paymentJournalDescriptionBackfills = new Map<string, string>();
         const paymentLineBackfills = new Map<string, Partial<JournalLine>>();
         const paymentsWithApplications = loadedPayments.map(payment => {
           const apps = loadedPaymentApplications.filter(app => app.paymentId === payment.id);
-          const appliedTotal = apps.filter(app => !app.isReversed).reduce((sum, app) => sum + (app.amountApplied || 0), 0);
-          const grossReceived = (payment.amountReceived || 0) + (payment.ewtAmountCertified || 0);
+          const activeApps = apps.filter(app => !app.isReversed);
+          const appliedTotal = activeApps.reduce((sum, app) => sum + (app.amountApplied || 0), 0);
+          const totalApplied = payment.totalApplied ?? appliedTotal;
+          const sourceInvoiceId = String((payment as Payment & { sourceInvoiceId?: string }).sourceInvoiceId || '').trim();
+          const appliedInvoiceIds = Array.from(new Set(activeApps.map(app => String(app.invoiceId || '').trim()).filter(Boolean)));
+          const reconciledInvoiceId = sourceInvoiceId || (appliedInvoiceIds.length === 1 ? appliedInvoiceIds[0] : '');
+          const sourceInvoice = reconciledInvoiceId ? normalizedInvoices.find(invoice => invoice.id === reconciledInvoiceId) : undefined;
+          const allApplicationsBelongToSourceInvoice =
+            !!reconciledInvoiceId &&
+            activeApps.length > 0 &&
+            activeApps.every(app => app.invoiceId === reconciledInvoiceId);
+          const sourceInvoiceIsSettled =
+            !!sourceInvoice &&
+            (String(sourceInvoice.status || '').toUpperCase() === 'CLOSED' || Number(sourceInvoice.balanceDue ?? 0) <= 0.01);
+          const originalAmountReceived = Number(payment.amountReceived || 0);
+          const ewtAmount = Number(payment.ewtAmountCertified || 0);
+          let resolvedAmountReceived = originalAmountReceived;
+          let grossReceived = resolvedAmountReceived + ewtAmount;
           const paymentTransactionDescription = resolvePaymentTransactionDescription(payment);
-          const resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - appliedTotal, 0);
+          let resolvedBalance = payment.customerDepositBalance ?? Math.max(grossReceived - totalApplied, 0);
+
+          // Invoice-linked payments are meant to represent actual receipts for that invoice.
+          // If the invoice is now settled and this payment only applied to that invoice, trim
+          // an overstated default receipt amount down to the amount actually applied.
+          const shouldReconcileSourceInvoiceReceipt =
+            allApplicationsBelongToSourceInvoice &&
+            resolvedBalance > 0.01 &&
+            grossReceived > totalApplied + 0.01 &&
+            Math.abs(resolvedBalance - (grossReceived - totalApplied)) <= 0.01;
+
+          if (shouldReconcileSourceInvoiceReceipt) {
+            resolvedAmountReceived = Math.max(totalApplied - ewtAmount, 0);
+            grossReceived = resolvedAmountReceived + ewtAmount;
+            resolvedBalance = 0;
+          }
+
+          const resolvedPaymentForStatus = { ...payment, amountReceived: resolvedAmountReceived };
           const resolvedStatus = resolveAppliedPaymentStatus(
-            payment,
-            payment.totalApplied ?? appliedTotal,
+            resolvedPaymentForStatus,
+            totalApplied,
             resolvedBalance
           );
           const persistableResolvedStatus = getPersistablePaymentStatus(resolvedStatus);
@@ -1162,11 +1209,11 @@ export default function App() {
 
           if (payment.journalEntryId) {
             const entryLines = normalizedJournalLines.filter((line: any) => line.journalEntryId === payment.journalEntryId);
-            const amountReceived = Number(payment.amountReceived || 0);
-            const ewtAmount = Number(payment.ewtAmountCertified || 0);
-            const totalCredit = amountReceived + ewtAmount;
+            const amountReceived = originalAmountReceived;
+            const originalTotalCredit = amountReceived + ewtAmount;
+            const resolvedTotalCredit = resolvedAmountReceived + ewtAmount;
             const cashLine = entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - amountReceived) < 0.001 && Number(line.credit || 0) === 0);
-            const depositsLine = entryLines.find((line: any) => Math.abs(Number(line.credit || 0) - totalCredit) < 0.001);
+            const depositsLine = entryLines.find((line: any) => Math.abs(Number(line.credit || 0) - originalTotalCredit) < 0.001);
             const ewtLine = ewtAmount > 0
               ? entryLines.find((line: any) => Math.abs(Number(line.debit || 0) - ewtAmount) < 0.001 && Number(line.credit || 0) === 0)
               : null;
@@ -1183,10 +1230,32 @@ export default function App() {
 
             queuePaymentLineBackfill(cashLine, paymentTransactionDescription);
             queuePaymentLineBackfill(depositsLine, paymentTransactionDescription);
+            if (shouldReconcileSourceInvoiceReceipt) {
+              if (cashLine && Math.abs(Number(cashLine.debit || 0) - resolvedAmountReceived) > 0.001) {
+                cashLine.debit = resolvedAmountReceived;
+                const current = paymentLineBackfills.get(cashLine.id) || {};
+                paymentLineBackfills.set(cashLine.id, { ...current, debit: resolvedAmountReceived });
+              }
+              if (depositsLine && Math.abs(Number(depositsLine.credit || 0) - resolvedTotalCredit) > 0.001) {
+                depositsLine.credit = resolvedTotalCredit;
+                const current = paymentLineBackfills.get(depositsLine.id) || {};
+                paymentLineBackfills.set(depositsLine.id, { ...current, credit: resolvedTotalCredit });
+              }
+            }
             if (ewtLine) {
               const ewtDescription = `Creditable Withholding Tax (CWT 2307) for ${payment.paymentNo}`;
               queuePaymentLineBackfill(ewtLine, ewtDescription);
             }
+          }
+
+          if (shouldReconcileSourceInvoiceReceipt) {
+            paymentAmountBackfills.push({
+              id: payment.id,
+              amountReceived: resolvedAmountReceived,
+              totalApplied,
+              customerDepositBalance: resolvedBalance,
+              status: persistableResolvedStatus
+            });
           }
 
           return {
@@ -1194,7 +1263,8 @@ export default function App() {
             status: resolvedStatus,
             glEntryNumber,
             applications: apps,
-            totalApplied: payment.totalApplied ?? appliedTotal,
+            amountReceived: resolvedAmountReceived,
+            totalApplied,
             customerDepositBalance: resolvedBalance
           } as Payment;
         });
@@ -1226,6 +1296,28 @@ export default function App() {
               }
             })
             .catch(err => console.warn('[App] failed to backfill payment lifecycle statuses', err));
+        }
+        if (paymentAmountBackfills.length > 0) {
+          Promise.allSettled(
+            paymentAmountBackfills.map((paymentBackfill) => {
+              return dataService.updateEntity('payments', paymentBackfill.id, {
+                amountReceived: paymentBackfill.amountReceived,
+                totalApplied: paymentBackfill.totalApplied,
+                customerDepositBalance: paymentBackfill.customerDepositBalance,
+                status: paymentBackfill.status,
+                updatedAt: new Date().toISOString()
+              });
+            })
+          )
+            .then(results => {
+              const failures = results.filter(result => result.status === 'rejected');
+              if (failures.length > 0) {
+                console.warn('[App] some invoice-linked payment amount reconciliations failed', failures);
+              } else {
+                console.info('[App] reconciled overstated invoice-linked payment receipts');
+              }
+            })
+            .catch(err => console.warn('[App] failed to reconcile invoice-linked payment receipts', err));
         }
         if (paymentLineBackfills.size > 0) {
           Promise.allSettled(
@@ -1455,12 +1547,19 @@ export default function App() {
   const isRegistrar = hasOperationsAccess(currentUser?.role);
   const isAR = hasARAccess(currentUser?.role);
   const isAP = hasAPAccess(currentUser?.role);
+  const canViewAuditTrail = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
 
   useEffect(() => {
     if (activeTab === 'subscription' && !isSysAdmin) {
       setActiveTab('dashboard');
     }
   }, [activeTab, isSysAdmin]);
+
+  useEffect(() => {
+    if (activeTab === 'audit' && !canViewAuditTrail) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, canViewAuditTrail]);
 
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
@@ -2411,7 +2510,7 @@ export default function App() {
     try {
       console.info('[App] Creating organization:', org.name);
       const savedOrg = await dataService.createOrganization(org);
-      setOrganizations(prev => [...prev, savedOrg]);
+      setOrganizations(prev => [...prev, normalizeOrganization(savedOrg)]);
 
       // Audit: Organization created
       AuditService.create(savedOrg.id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', savedOrg.id, org.name);
@@ -2421,7 +2520,7 @@ export default function App() {
       console.error('[App] Error creating organization:', error);
       handleNotify('error', 'Failed to create organization. Falling back to memory storage.');
       // Fallback to memory storage if Supabase fails
-      setOrganizations(prev => [...prev, org]);
+      setOrganizations(prev => [...prev, normalizeOrganization(org)]);
     }
   };
 
@@ -2432,13 +2531,13 @@ export default function App() {
       return;
     }
 
-    const optimisticOrg = { ...existing, ...updates };
+    const optimisticOrg = normalizeOrganization({ ...existing, ...updates });
     setOrganizations(prev => prev.map(o => o.id === id ? optimisticOrg : o));
 
     try {
       console.info('[App] Updating organization in datasource:', id, updates);
       const updatedFromDb = await dataService.updateOrganization(id, updates);
-      const merged = { ...optimisticOrg, ...updatedFromDb };
+      const merged = normalizeOrganization({ ...optimisticOrg, ...updatedFromDb });
       setOrganizations(prev => prev.map(o => o.id === id ? merged : o));
 
       AuditService.update(id, currentUser?.id || 'system', currentUser?.name || 'System', 'ORGANIZATION', id, existing?.name, existing, merged);
@@ -2478,7 +2577,7 @@ export default function App() {
       console.info('[App] Restoring backup for organization:', backupData.metadata?.orgId);
 
       // Update all state with restored data
-      if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations);
+      if (backupData.data.organizations?.length) setOrganizations(backupData.data.organizations.map(normalizeOrganization));
       if (backupData.data.users?.length) setUsers(backupData.data.users);
       if (backupData.data.students?.length) setStudents(backupData.data.students);
       if (backupData.data.qualifications?.length) setQualifications(backupData.data.qualifications);
@@ -2626,13 +2725,55 @@ export default function App() {
     }
   };
 
+  const handleUpdateCurrentUserProfile = async (updates: Partial<User>) => {
+    if (!currentUser) return;
+
+    const cleanUpdates: Partial<User> = {
+      name: updates.name ?? '',
+      lastName: updates.lastName || undefined,
+      email: updates.email ?? '',
+      contactNumber: updates.contactNumber || undefined,
+      address: updates.address || undefined,
+      profilePhoto: updates.profilePhoto || undefined
+    };
+
+    try {
+      const updated = await dataService.updateUser(currentUser.id, {
+        ...cleanUpdates,
+        updatedAt: new Date().toISOString()
+      } as Partial<User>);
+      const mergedUser = { ...currentUser, ...cleanUpdates, ...updated };
+
+      setCurrentUser(mergedUser);
+      setUsers(prev => prev.map(user => user.id === currentUser.id ? { ...user, ...mergedUser } : user));
+      authService.updateStoredUser(mergedUser);
+      localStorage.setItem('at_erp_session', JSON.stringify({
+        user: mergedUser,
+        token: btoa(JSON.stringify({ userId: mergedUser.id, email: mergedUser.email, iat: Date.now() }))
+      }));
+      handleNotify('success', 'Profile updated successfully');
+    } catch (error) {
+      console.error('[App] Error updating profile:', error);
+      const mergedUser = { ...currentUser, ...cleanUpdates };
+
+      setCurrentUser(mergedUser);
+      setUsers(prev => prev.map(user => user.id === currentUser.id ? { ...user, ...mergedUser } : user));
+      authService.updateStoredUser(mergedUser);
+      localStorage.setItem('at_erp_session', JSON.stringify({
+        user: mergedUser,
+        token: btoa(JSON.stringify({ userId: mergedUser.id, email: mergedUser.email, iat: Date.now() }))
+      }));
+      handleNotify('error', 'Profile saved locally, but Supabase update failed.');
+    }
+  };
+
   const handleRegisterWithPersistence = async (org: Organization, admin: User) => {
     try {
       console.info('[App] Registering new organization and admin user');
 
       // Create organization
       const savedOrg = await dataService.createOrganization(org);
-      setOrganizations(p => [...p, savedOrg]);
+      setOrganizations(p => [...p, normalizeOrganization(savedOrg)]);
 
       // Create admin user
       const savedAdmin = await dataService.createUser(admin);
@@ -2660,7 +2801,7 @@ export default function App() {
       console.error('[App] Error during registration:', error);
       handleNotify('error', 'Registration failed. Falling back to memory storage.');
       // Fallback to memory storage
-      setOrganizations(p => [...p, org]);
+      setOrganizations(p => [...p, normalizeOrganization(org)]);
       setUsers(p => [...p, admin]);
       setCurrentUser(admin);
       setCurrentOrgId(org.id);
@@ -4012,7 +4153,7 @@ export default function App() {
       case 'REORDER_POINT': setReorderPoints(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'GOODS_RECEIPT': setGoodsReceipts(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'EFT_BATCH': setEftBatches(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
-      case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
+      case 'ORGANIZATION': setOrganizations(prev => prev.map(x => x.id === id ? normalizeOrganization({ ...x, ...updates }) : x)); break;
       case 'USER': setUsers(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
       case 'INVOICE': setInvoices(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x)); break;
     }
@@ -5683,25 +5824,74 @@ export default function App() {
       };
 
       // 2. Persist Payment application totals.
+      const existingPaymentApplications = payment.applications || [];
+      const nextPaymentApplications = [...existingPaymentApplications, persistedApplication];
+      const nextTotalApplied = (payment.totalApplied || 0) + amount;
+      const isSingleInvoiceReceipt =
+        String((payment as PaymentWithSource).sourceInvoiceId || '').trim() === invoiceId &&
+        nextPaymentApplications
+          .filter(app => !app.isReversed)
+          .every(app => app.invoiceId === invoiceId);
+      const shouldReconcileReceiptAmountToApplication =
+        isSingleInvoiceReceipt &&
+        getPaymentTotalCredit(payment) > nextTotalApplied + 0.01;
+      const reconciledAmountReceived = shouldReconcileReceiptAmountToApplication
+        ? Math.max(nextTotalApplied - Number(payment.ewtAmountCertified || 0), 0)
+        : Number(payment.amountReceived || 0);
+      const reconciledDepositBalance = shouldReconcileReceiptAmountToApplication
+        ? 0
+        : applicationValidation.projectedBalance;
       const updatedPayment = {
         ...payment,
-        applications: [...(payment.applications || []), persistedApplication],
-        totalApplied: (payment.totalApplied || 0) + amount,
-        customerDepositBalance: applicationValidation.projectedBalance,
+        amountReceived: reconciledAmountReceived,
+        applications: nextPaymentApplications,
+        totalApplied: nextTotalApplied,
+        customerDepositBalance: reconciledDepositBalance,
         status: resolveAppliedPaymentStatus(
-          payment,
-          (payment.totalApplied || 0) + amount,
-          applicationValidation.projectedBalance
+          { ...payment, amountReceived: reconciledAmountReceived },
+          nextTotalApplied,
+          reconciledDepositBalance
         ),
         updatedAt: new Date().toISOString()
       };
       const persistedPaymentStatus = getPersistablePaymentStatus(updatedPayment.status);
       await dataService.updateEntity('payments', paymentId, {
+        amountReceived: updatedPayment.amountReceived,
         totalApplied: updatedPayment.totalApplied,
         customerDepositBalance: updatedPayment.customerDepositBalance,
         status: persistedPaymentStatus,
         updatedAt: updatedPayment.updatedAt
       });
+
+      if (shouldReconcileReceiptAmountToApplication && payment.journalEntryId) {
+        const paymentEntryLines = journalLines.filter(line => line.journalEntryId === payment.journalEntryId);
+        const previousAmountReceived = Number(payment.amountReceived || 0);
+        const previousTotalCredit = previousAmountReceived + Number(payment.ewtAmountCertified || 0);
+        const reconciledTotalCredit = reconciledAmountReceived + Number(payment.ewtAmountCertified || 0);
+        const cashLine = paymentEntryLines.find(line =>
+          Math.abs(Number(line.debit || 0) - previousAmountReceived) < 0.001 &&
+          Number(line.credit || 0) === 0
+        );
+        const depositsLine = paymentEntryLines.find(line =>
+          Math.abs(Number(line.credit || 0) - previousTotalCredit) < 0.001
+        );
+        const lineUpdates: Promise<JournalLine>[] = [];
+
+        if (cashLine && Math.abs(Number(cashLine.debit || 0) - reconciledAmountReceived) > 0.001) {
+          lineUpdates.push(dataService.updateJournalLine(cashLine.id, { debit: reconciledAmountReceived }));
+        }
+        if (depositsLine && Math.abs(Number(depositsLine.credit || 0) - reconciledTotalCredit) > 0.001) {
+          lineUpdates.push(dataService.updateJournalLine(depositsLine.id, { credit: reconciledTotalCredit }));
+        }
+        if (lineUpdates.length > 0) {
+          const updatedLines = await Promise.all(lineUpdates);
+          setJournalLines(prev => prev.map(line => {
+            const updatedLine = updatedLines.find(item => item.id === line.id);
+            return updatedLine ? { ...line, ...updatedLine } : line;
+          }));
+        }
+      }
+
       setPayments(prev => prev.map(p => p.id === paymentId ? updatedPayment : p));
 
       // 3. Persist Invoice balance/status update.
@@ -6326,13 +6516,6 @@ export default function App() {
             </div>
           )}
 
-          {userCanAccess('feedback') && (
-            <div className="mb-8">
-              {sidebarOpen && <p className="text-[10px] text-slate-600 uppercase tracking-[0.3em] mb-4 px-4">Support</p>}
-              <NavItem icon={<MessageSquare size={20} />} label="Feedback Ticket" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
-            </div>
-          )}
-
           {currentUser.role === 'AR_SPECIALIST' && (
             <div className="space-y-6">
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6360,7 +6543,6 @@ export default function App() {
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
                 <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
             </div>
           )}
@@ -6406,6 +6588,7 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
               compact={!sidebarOpen}
             >
+              <NavItem icon={<LayoutDashboard size={20} />} label="Registrar Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Users size={20} />} label="Learners" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<GraduationCap size={20} />} label="Trainers" active={activeTab === 'trainers'} onClick={() => navigateTo('trainers')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Award size={20} />} label="Qualifications" active={activeTab === 'qualifications'} onClick={() => navigateTo('qualifications')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6469,7 +6652,7 @@ export default function App() {
                 )}
               </div>
               <NavItem icon={<UserCog size={20} />} label="Security/RBAC" active={activeTab === 'users'} onClick={() => navigateTo('users')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />
+              {canViewAuditTrail && <NavItem icon={<History size={20} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => navigateTo('audit')} compact={!sidebarOpen} brandColor={brandColor} />}
             </NavSection>
           )}
             </>
@@ -6484,7 +6667,6 @@ export default function App() {
               <NavItem icon={<Wallet size={20} />} label="Subscription" active={activeTab === 'subscription'} onClick={() => navigateTo('subscription')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Binary size={20} />} label="Data Schema" active={activeTab === 'schema'} onClick={() => navigateTo('schema')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<BarChart2 size={20} />} label="Payment Monitoring" active={activeTab === 'payment-monitoring'} onClick={() => navigateTo('payment-monitoring')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<MessageSquare size={20} />} label="Users Feedback" active={activeTab === 'feedback'} onClick={() => navigateTo('feedback')} compact={!sidebarOpen} brandColor={brandColor} />
             </div>
           )}
         </nav>
@@ -6503,7 +6685,12 @@ export default function App() {
         )}
 
         <div className="p-6 mt-auto border-t border-slate-200">
-          <button onClick={() => setShowLogoutConfirm(true)} className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100">
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            title={!sidebarOpen ? 'Logout' : undefined}
+            aria-label={!sidebarOpen ? 'Logout' : undefined}
+            className="w-full flex items-center gap-3 p-3 text-slate-600 hover:text-slate-900 transition-colors rounded-xl hover:bg-slate-100"
+          >
             <LogOut size={20} />
             {sidebarOpen && <span className="text-xs font-black uppercase tracking-widest">Logout</span>}
           </button>
@@ -6523,13 +6710,47 @@ export default function App() {
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{showJournalForm ? 'new journal entry' : activeTab.replace('-', ' ')}</h2>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigateTo('profile')}
+                title="Profile"
+                aria-label="Profile"
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                  activeTab === 'profile'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <UserCircle size={16} />
+              </button>
+              {userCanAccess('feedback') && (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('feedback')}
+                  title={isSysAdmin ? 'Users Feedback' : 'Feedback Ticket'}
+                  aria-label={isSysAdmin ? 'Users Feedback' : 'Feedback Ticket'}
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                    activeTab === 'feedback'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <MessageSquare size={16} />
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-xs font-black text-slate-800 leading-none">{currentUser.name}</p>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{currentUser.role.replace('_', ' ')}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase">
-                {currentUser.name.substring(0, 2)}
+              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black border-2 border-white shadow-xl uppercase overflow-hidden">
+                {currentUser.profilePhoto ? (
+                  <img src={currentUser.profilePhoto} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  `${currentUser.name.substring(0, 1)}${(currentUser.lastName || currentUser.name.substring(1, 2)).substring(0, 1)}`.toUpperCase()
+                )}
               </div>
             </div>
           </div>
@@ -6570,6 +6791,14 @@ export default function App() {
           ) : (
             <>
           {/* View Router (unchanged) */}
+          {activeTab === 'profile' && currentUser && (
+            <UserProfileView
+              currentUser={currentUser}
+              brandColor={brandColor}
+              onUpdateProfile={handleUpdateCurrentUserProfile}
+            />
+          )}
+
           {activeTab === 'student-portal' && currentUser.studentId && (
             <StudentPortalView
               student={students.find(s => s.id === currentUser.studentId)!}
@@ -6623,7 +6852,7 @@ export default function App() {
               onNotify={handleNotify}
             />
           )}
-          {activeTab === 'ledger' && <Ledger accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && <Ledger orgId={currentOrgId} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           {activeTab === 'collection-report' && (
             <ARCollectionReportView
@@ -6643,7 +6872,7 @@ export default function App() {
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'po' && <PurchaseOrdersView purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
+          {activeTab === 'po' && <PurchaseOrdersView orgId={currentOrgId} purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={postedLines} qualifications={qualifications} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
@@ -6651,6 +6880,7 @@ export default function App() {
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
           {activeTab === 'sponsors' && (
             <SponsorsView
+              orgId={currentOrgId}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               accounts={filteredAccounts}
               entries={activeJournalEntries}
@@ -6661,27 +6891,31 @@ export default function App() {
               onDeleteSponsor={handleDeleteSponsor}
             />
           )}
-          {activeTab === 'vendors' && <VendorsView vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
+          {activeTab === 'vendors' && <VendorsView orgId={currentOrgId} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} lines={filteredLines} onAddVendor={handleAddVendor} onUpdateVendor={handleUpdateVendor} onDeleteVendor={handleDeleteVendor} onNotify={handleNotify} />}
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
 
           {/* Inventory Management Views */}
           {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} />}
-          {activeTab === 'warehouse-locations' && <WarehouseLocationsView locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'stock-items' && <StockItemsView items={stockItems.filter(i => !i.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'warehouse-locations' && <WarehouseLocationsView orgId={currentOrgId} locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'stock-items' && <StockItemsView orgId={currentOrgId} items={stockItems.filter(i => !i.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
           {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} onPostGL={handlePostJournal} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'inventory-transactions' && <InventoryTransactionsView transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'inventory-transactions' && <InventoryTransactionsView orgId={currentOrgId} transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? { ...l, isCleared: !l.isCleared } : l))} onNotify={handleNotify} />}
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
           {activeTab === 'branding' && currentOrg && <BrandingView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
-          {activeTab === 'subscription' && isSysAdmin && currentOrg && <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />}
+          {activeTab === 'subscription' && isSysAdmin && currentOrg && (
+            <div className="system-owner-minimal">
+              <SubscriptionView organization={currentOrg} onUpdate={o => handleUpdateOrganization(o.id, o)} />
+            </div>
+          )}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} organization={currentOrg} />}
 
           {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
-          {activeTab === 'students' && <StudentsView students={students.filter(s => s.orgId === currentOrgId)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
+          {activeTab === 'students' && <StudentsView orgId={currentOrgId} students={students.filter(s => s.orgId === currentOrgId)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView organization={currentOrg} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView organization={currentOrg} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
@@ -6699,7 +6933,7 @@ export default function App() {
               onDeleteReport={handleDeleteAlumniReport}
             />
           )}
-          {activeTab === 'enrollments' && <EnrollmentsView enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
+          {activeTab === 'enrollments' && <EnrollmentsView orgId={currentOrgId} enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} currency={currentOrg?.currency || 'PHP'} onAddEnrollment={handleAddEnrollment} onUpdateEnrollment={handleUpdateEnrollment} onDeleteEnrollment={handleDeleteEnrollment} />}
           {activeTab === 'assessment-registrations' && (
             <AssessmentRegistrationsView
               registrations={assessmentRegistrations.filter(r => r.orgId === currentOrgId && !r.isDeleted)}
@@ -6855,41 +7089,62 @@ export default function App() {
             onAddUser={handleAddUser}
             onDeleteUser={handleDeleteUser}
           />}
-          {activeTab === 'audit' && <AuditTrail orgId={currentOrgId} logs={auditLogs} brandColor={brandColor} />}
-          {activeTab === 'maintenance' && <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />}
-          {activeTab === 'backup-restore' && (
-            <BackupRestoreView
-              organizations={organizations}
-              currentOrgId={currentOrgId}
-              currentUserId={currentUser?.id || ''}
-              currentUserName={currentUser?.email || 'System'}
-              allData={{
-                organizations, users, students, qualifications, trainers, batches, sponsors,
-                vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
-                budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
-                checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
-                stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
-                fixedAssets, bankAccounts, locations
-              }}
-              onRestore={handleRestoreBackup}
-              onNotify={handleNotify}
-              currency={currentOrg?.currency || 'USD'}
-            />
+          {activeTab === 'audit' && canViewAuditTrail && <AuditTrail orgId={currentOrgId} logs={auditLogs} brandColor={brandColor} />}
+          {activeTab === 'maintenance' && (
+            <div className="system-owner-minimal">
+              <MaintenanceView logs={auditLogs} onExport={() => { }} onImport={() => { }} />
+            </div>
           )}
-          {activeTab === 'tenant-mgmt' && <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />}
-          {activeTab === 'schema' && <SchemaManualView />}
-          {activeTab === 'payment-monitoring' && <PaymentMonitoringView payments={payments} organizations={organizations} />}
+          {activeTab === 'backup-restore' && (
+            <div className="system-owner-minimal">
+              <BackupRestoreView
+                organizations={organizations}
+                currentOrgId={currentOrgId}
+                currentUserId={currentUser?.id || ''}
+                currentUserName={currentUser?.email || 'System'}
+                allData={{
+                  organizations, users, students, qualifications, trainers, batches, sponsors,
+                  vendors, employees, payrollRuns, journalEntries, JournalLines: journalLines, auditLogs,
+                  budgets: [], chartOfAccounts: accounts, purchaseOrders, paymentHistory, payables, accountingPeriods,
+                  checkVouchers, eftBatches, goodsReceipts, bankReconciliations, warehouseLocations,
+                  stockItems, inventoryLevels, inventoryTransactions, stockAdjustments, nonStockItems: items,
+                  fixedAssets, bankAccounts, locations
+                }}
+                onRestore={handleRestoreBackup}
+                onNotify={handleNotify}
+                currency={currentOrg?.currency || 'USD'}
+              />
+            </div>
+          )}
+          {activeTab === 'tenant-mgmt' && (
+            <div className="system-owner-minimal">
+              <TenantManagementView organizations={organizations} onAddTenant={handleAddOrganization} onUpdateTenant={(id, updates) => handleUpdateOrganization(id, updates)} />
+            </div>
+          )}
+          {activeTab === 'schema' && (
+            <div className="system-owner-minimal">
+              <SchemaManualView />
+            </div>
+          )}
+          {activeTab === 'payment-monitoring' && (
+            <div className="system-owner-minimal">
+              <PaymentMonitoringView payments={payments} organizations={organizations} />
+            </div>
+          )}
           {activeTab === 'feedback' && (
-            <FeedbackManagementView
-              tickets={feedbackTickets}
-              currentUser={currentUser}
-              currentOrgId={currentOrgId}
-              organizations={organizations}
-              users={users}
-              onCreateTicket={handleCreateFeedbackTicket}
-              onUpdateTicket={handleUpdateFeedbackTicket}
-              onNotify={handleNotify}
-            />
+            <div className={isSysAdmin ? 'system-owner-minimal' : undefined}>
+              <FeedbackManagementView
+                tickets={feedbackTickets}
+                currentUser={currentUser}
+                currentOrgId={currentOrgId}
+                organizations={organizations}
+                users={users}
+                brandColor={brandColor}
+                onCreateTicket={handleCreateFeedbackTicket}
+                onUpdateTicket={handleUpdateFeedbackTicket}
+                onNotify={handleNotify}
+              />
+            </div>
           )}
           {activeTab === 'soa' && (
             <SOAView
@@ -6976,6 +7231,7 @@ export default function App() {
             <ARCollectionReceiptView
               entries={activeJournalEntries}
               lines={filteredLines}
+              payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
               bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
               students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
@@ -7093,6 +7349,8 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
   return (
     <button
       onClick={onClick}
+      title={compact ? label : undefined}
+      aria-label={compact ? label : undefined}
       className={`w-full border border-transparent text-left flex items-center gap-4 p-3.5 rounded-2xl outline-none transition-colors group focus:outline-none ${active ? 'text-white shadow-none' : 'text-slate-600 hover:text-brand hover:bg-brand/10 focus-visible:bg-brand/10'} `}
       style={{
         ...(active ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: 'none' } : {}),
@@ -7128,6 +7386,8 @@ function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionPr
     <div className="mb-8">
       <button
         onClick={onToggle}
+        title={compact ? label : undefined}
+        aria-label={compact ? label : undefined}
         className="w-full flex items-center justify-between mb-4 px-4 pb-3 border-b border-slate-200 group"
       >
         {!compact && (

@@ -130,6 +130,25 @@ class TokenManagerClass {
   }
 
   /**
+   * Update the stored user profile without replacing the token pair.
+   */
+  updateCurrentUser(updates: Partial<User>): User | null {
+    if (!this.session) return null;
+
+    this.session = {
+      ...this.session,
+      user: {
+        ...this.session.user,
+        ...updates
+      }
+    };
+
+    this.saveSession();
+    this.notifyListeners();
+    return this.session.user;
+  }
+
+  /**
    * Get current authentication state
    */
   getAuthState(): AuthState {

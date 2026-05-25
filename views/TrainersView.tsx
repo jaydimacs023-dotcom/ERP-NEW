@@ -3,6 +3,7 @@ import { Batch, Trainer, Qualification, TrainerSchedule, Organization } from '..
 import EmptyState from '../components/EmptyState';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { 
   Search, Plus, Filter, GraduationCap, Award, Mail, Phone, 
   Trash2, X, Info, ShieldCheck, CheckCircle, ChevronRight,
@@ -41,6 +42,7 @@ const TrainersView: React.FC<TrainersViewProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState<Trainer | null>(null);
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null);
+  const [viewingTrainer, setViewingTrainer] = useState<Trainer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -71,6 +73,15 @@ const TrainersView: React.FC<TrainersViewProps> = ({
     const matchesFilter = specializationFilter === 'ALL' || t.specialization === specializationFilter;
     return matchesSearch && matchesFilter;
   });
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedTrainers,
+    setCurrentPage
+  } = usePaginatedRows(filteredTrainers, [searchTerm, specializationFilter], 7);
 
   const resetForm = () => {
     setFormData({
@@ -131,6 +142,9 @@ const TrainersView: React.FC<TrainersViewProps> = ({
           updatedAt: new Date().toISOString()
         };
         await onUpdateTrainer(updatedTrainer);
+        if (viewingTrainer?.id === updatedTrainer.id) {
+          setViewingTrainer(updatedTrainer);
+        }
         showToast(`Trainer "${formData.firstName} ${formData.lastName}" updated successfully!`, 'success');
       } else {
         // Create new trainer with proper UUID
@@ -194,11 +208,157 @@ const TrainersView: React.FC<TrainersViewProps> = ({
       ? trainer.qualificationIds.filter(id => id !== qualId)
       : [...trainer.qualificationIds, qualId];
     
-    await onUpdateTrainer({ ...trainer, qualificationIds: newQualIds, updatedAt: new Date().toISOString() });
+    const updatedTrainer = { ...trainer, qualificationIds: newQualIds, updatedAt: new Date().toISOString() };
+    await onUpdateTrainer(updatedTrainer);
+    if (viewingTrainer?.id === trainer.id) {
+      setViewingTrainer(updatedTrainer);
+    }
+    if (showAssignModal?.id === trainer.id) {
+      setShowAssignModal(updatedTrainer);
+    }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {viewingTrainer && !showModal && (() => {
+        const trainerQualifications = viewingTrainer.qualificationIds
+          .map(id => qualifications.find(q => q.id === id))
+          .filter((q): q is Qualification => !!q);
+        const trainerBatches = batches.filter(b => b.trainerId === viewingTrainer.id && !b.isDeleted);
+        const trainerSchedules = schedules.filter(s => s.trainerId === viewingTrainer.id && !s.isDeleted);
+
+        return (
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div
+              className="rounded-md border bg-white p-5 shadow-sm"
+              style={{ borderColor: `${brandColor}30`, background: `linear-gradient(90deg, ${brandColor}10, #ffffff 45%)` }}
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setViewingTrainer(null)}
+                    className="mb-4 inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-brand hover:text-brand"
+                  >
+                    <ChevronRight size={15} className="rotate-180" />
+                    Back to Trainers
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded border border-brand-light bg-brand/10 text-brand text-sm font-semibold">
+                      {viewingTrainer.lastName[0]}{viewingTrainer.firstName[0]}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 tracking-tight">
+                        {viewingTrainer.lastName}, {viewingTrainer.firstName}
+                      </h2>
+                      <p className="text-sm text-gray-500">{viewingTrainer.specialization || 'General'} trainer profile.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignModal(viewingTrainer)}
+                    className="inline-flex items-center justify-center gap-2 rounded border border-brand-light bg-brand/10 px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-brand/15"
+                  >
+                    <PlusCircle size={17} />
+                    Assign Qualifications
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(viewingTrainer)}
+                    className="inline-flex items-center justify-center gap-2 rounded bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition-colors hover:bg-brand-hover"
+                  >
+                    <Edit2 size={17} />
+                    Edit Trainer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Email</p>
+                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <Mail size={15} className="text-brand" />
+                  {viewingTrainer.email}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Contact</p>
+                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <Phone size={15} className="text-brand" />
+                  {viewingTrainer.contactNumber || 'Not recorded'}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Specialization</p>
+                <p className="mt-3 text-sm font-semibold text-gray-800">{viewingTrainer.specialization || 'General'}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Award size={17} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Qualifications</h3>
+                </div>
+                {trainerQualifications.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {trainerQualifications.map(qual => (
+                      <span key={qual.id} className="rounded border border-brand-light bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">
+                        {qual.code}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No qualifications assigned.</p>
+                )}
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <BookOpen size={17} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Current Workload</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Batches</p>
+                    <p className="mt-2 text-xl font-semibold text-gray-900">{trainerBatches.length}</p>
+                  </div>
+                  <div className="rounded border border-gray-100 bg-gray-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Schedules</p>
+                    <p className="mt-2 text-xl font-semibold text-gray-900">{trainerSchedules.length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {trainerBatches.length > 0 && (
+              <div className="rounded-md border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <GraduationCap size={17} className="text-brand" />
+                  <h3 className="text-sm font-semibold text-gray-900">Assigned Batches</h3>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {trainerBatches.slice(0, 6).map(batch => (
+                    <div key={batch.id} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                      <p className="text-sm font-semibold text-gray-800">{batch.name}</p>
+                      <p className="text-xs text-gray-400">{batch.status}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {!viewingTrainer && (
+        <>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Professional Trainers</h2>
@@ -257,93 +417,68 @@ const TrainersView: React.FC<TrainersViewProps> = ({
       </div>
 
       <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-brand border-b">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Trainer Info</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Specialization</th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wide">Qualifications</th>
-              <th className="px-6 py-4 text-right text-xs font-semibold text-white uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredTrainers.length > 0 ? filteredTrainers.map(trainer => (
-              <tr key={trainer.id} className="hover:bg-gray-50 transition-colors group">
-                <td className="px-6 py-5">
+            {filteredTrainers.length > 0 ? paginatedTrainers.map(trainer => (
+              <tr
+                key={trainer.id}
+                onClick={() => setViewingTrainer(trainer)}
+                className="hover:bg-gray-50/80 transition-colors group cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setViewingTrainer(trainer);
+                  }
+                }}
+              >
+                <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-gray-800 flex items-center justify-center text-white font-semibold text-xs">
+                    <div className="w-9 h-9 rounded border border-brand-light bg-brand/10 flex items-center justify-center text-brand font-semibold text-xs">
                       {trainer.lastName[0]}{trainer.firstName[0]}
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-gray-800 leading-tight">
                         {trainer.lastName.toUpperCase()}, {trainer.firstName}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs font-medium text-gray-400 uppercase tracking-tighter">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-medium text-gray-400">
                         <div className="flex items-center gap-1"><Mail size={10} /> {trainer.email}</div>
                         <div className="flex items-center gap-1"><Phone size={10} /> {trainer.contactNumber}</div>
                       </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-5">
-                   <div className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg border w-fit">
+                <td className="px-6 py-4">
+                   <div className="text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 w-fit">
                      {trainer.specialization}
                    </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-1.5">
                     {trainer.qualificationIds.length > 0 ? trainer.qualificationIds.map(id => {
                       const qual = qualifications.find(q => q.id === id);
                       return qual ? (
-                        <div key={id} className="px-2 py-0.5 bg-brand/10 text-brand border border-brand-light rounded-md text-xs font-semibold uppercase tracking-tight">
+                        <div key={id} className="px-2 py-0.5 bg-brand/10 text-brand border border-brand-light rounded text-xs font-semibold">
                           {qual.code}
                         </div>
                       ) : null;
                     }) : (
                       <span className="text-xs text-gray-400 italic font-medium">No qualifications assigned</span>
                     )}
-                    <button 
-                      onClick={() => setShowAssignModal(trainer)}
-                      className="p-1 hover:bg-brand-light text-brand hover:text-brand rounded transition-colors"
-                      title="Assign Qualifications"
-                    >
-                      <PlusCircle size={14} />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-6 py-5 text-right">
-                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => openEditModal(trainer)}
-                      className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded-lg transition-colors"
-                      title="Edit Trainer"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(trainer.id)}
-                      disabled={
-                        deletingId === trainer.id ||
-                        batches.some(b => b.trainerId === trainer.id && (b.status === 'PLANNED' || b.status === 'ONGOING')) ||
-                        schedules.some(s => s.trainerId === trainer.id)
-                      }
-                      className="p-2 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-lg transition-colors disabled:opacity-50"
-                      title={
-                        batches.some(b => b.trainerId === trainer.id && (b.status === 'PLANNED' || b.status === 'ONGOING'))
-                          ? 'Cannot delete trainer while they are assigned to active batches.'
-                          : schedules.some(s => s.trainerId === trainer.id)
-                            ? 'Cannot delete trainer while they have active schedules.'
-                            : 'Delete Trainer'
-                      }
-                    >
-                      {deletingId === trainer.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button>
                   </div>
                 </td>
               </tr>
             )) : (
               <tr>
-                <td colSpan={4} className="px-6 py-20">
+                <td colSpan={3} className="px-6 py-20">
                   <EmptyState 
                     title="No trainers registered"
                     description="Add your first trainer to get started with staff management."
@@ -356,7 +491,18 @@ const TrainersView: React.FC<TrainersViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredTrainers.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="trainers"
+        />
       </div>
+        </>
+      )}
 
       {/* Registration/Edit Modal */}
       {showModal && (

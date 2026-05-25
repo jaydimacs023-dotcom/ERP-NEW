@@ -12,7 +12,11 @@ type JwtPayload = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const AT_ERP_JWT_SECRET = Deno.env.get("AT_ERP_JWT_SECRET") ?? "";
+const AT_ERP_JWT_SECRET =
+  Deno.env.get("AT_ERP_JWT_SECRET") ??
+  (SUPABASE_URL.startsWith("http://127.0.0.1:") || SUPABASE_URL.startsWith("http://localhost:")
+    ? "AT-ERP-JWT-SECRET-KEY-2024-CHANGE-IN-PRODUCTION"
+    : "");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
