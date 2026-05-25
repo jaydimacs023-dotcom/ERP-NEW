@@ -137,7 +137,280 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   };
 
   const handlePrint = () => {
-    window.print();
+    const previousTitle = document.title;
+    const reportLabel =
+      reportType === 'BS' ? 'Balance Sheet' :
+        reportType === 'IS' ? 'Profit and Loss' :
+          reportType === 'CFS' ? 'Cash Flow' :
+            reportType === 'TB' ? 'Trial Balance' : 'Financial Report';
+
+    const printTitle = `${orgName} - ${reportLabel}`;
+    const reportNode = document.querySelector<HTMLElement>('.reports-print-area');
+
+    if (!reportNode) {
+      window.print();
+      return;
+    }
+
+    const reportClone = reportNode.cloneNode(true) as HTMLElement;
+    reportClone.querySelector('.reports-print-header')?.remove();
+    reportClone.querySelector('.reports-print-footer')?.remove();
+
+    const applyImportantStyle = (selector: string, styles: string) => {
+      const element = reportClone.querySelector<HTMLElement>(selector);
+      if (!element) return;
+      element.setAttribute('style', `${element.getAttribute('style') || ''}; ${styles}`);
+    };
+
+    reportClone.setAttribute(
+      'style',
+      `${reportClone.getAttribute('style') || ''}; width:auto !important; max-width:none !important; margin:0 !important; padding:6mm 0 !important; border:0 !important; box-shadow:none !important; background:#fff !important; color:#000 !important;`
+    );
+    applyImportantStyle(
+      '.reports-screen-header',
+      'display:block !important; text-align:center !important; padding:2mm 0 5mm 0 !important; margin:0 !important; border-bottom:0 !important; background:#fff !important;'
+    );
+    applyImportantStyle(
+      '.reports-print-body',
+      'display:block !important; padding:0 !important; margin:0 !important; background:#fff !important; line-height:1.2 !important;'
+    );
+    applyImportantStyle(
+      '.reports-signatures',
+      'display:block !important; padding:5mm 0 0 0 !important; margin:0 !important; page-break-inside:avoid !important; break-inside:avoid !important;'
+    );
+    applyImportantStyle(
+      '.reports-signatures > div',
+      'display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:14mm !important; padding-top:8mm !important; margin:0 !important;'
+    );
+
+    const styles = Array.from(document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'))
+      .map(node => {
+        if (node.tagName.toLowerCase() === 'link') {
+          const link = node as HTMLLinkElement;
+          return `<link rel="stylesheet" href="${link.href}">`;
+        }
+        return `<style>${node.innerHTML}</style>`;
+      })
+      .join('\n');
+
+    const escapeHtml = (value: string) => value.replace(/[<>&"]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[char] || char));
+    const printFrame = document.createElement('iframe');
+
+    printFrame.setAttribute('title', printTitle);
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.opacity = '0';
+
+    document.body.appendChild(printFrame);
+
+    const printDocument = printFrame.contentDocument || printFrame.contentWindow?.document;
+    const printContext = printFrame.contentWindow;
+
+    if (!printDocument || !printContext) {
+      printFrame.remove();
+      document.title = printTitle;
+      window.print();
+      window.setTimeout(() => {
+        document.title = previousTitle;
+      }, 500);
+      return;
+    }
+
+    printDocument.open();
+    printDocument.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>${escapeHtml(printTitle)}</title>
+          ${styles}
+          <style>
+            @page { size: A4 portrait; margin: 20mm 14mm 20mm 14mm; }
+            html, body {
+              width: auto !important;
+              min-height: 0 !important;
+              margin: 0 !important;
+              padding: 4mm 0 !important;
+              overflow: visible !important;
+              background: #fff !important;
+              color: #000 !important;
+            }
+            body {
+              font-family: "Inter", "Open Sans", "Segoe UI", Arial, sans-serif;
+              font-size: 11px;
+              line-height: 1.2;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            body * {
+              visibility: visible !important;
+            }
+            .reports-print-area {
+              position: static !important;
+              display: block !important;
+              width: auto !important;
+              max-width: none !important;
+              min-height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              color: #000 !important;
+              background: #fff !important;
+              border: 0 !important;
+              box-shadow: none !important;
+              border-radius: 0 !important;
+              overflow: visible !important;
+            }
+            .reports-print-header {
+              display: flex !important;
+              align-items: center !important;
+              justify-content: space-between !important;
+              gap: 12mm !important;
+              padding: 3mm 0 6mm 0 !important;
+              margin: 0 0 7mm 0 !important;
+              border-bottom: 1px solid #000 !important;
+              page-break-inside: avoid !important;
+            }
+            .reports-print-logo {
+              width: 22mm !important;
+              height: 22mm !important;
+              object-fit: contain !important;
+            }
+          .reports-screen-header {
+              padding: 0 0 7mm 0 !important;
+              margin: 0 !important;
+              border-bottom: 0 !important;
+              background: #fff !important;
+              text-align: center !important;
+            }
+            .reports-print-body {
+              padding: 0 !important;
+              background: #fff !important;
+              line-height: 1.2 !important;
+            }
+            .reports-print-body .space-y-12 > :not([hidden]) ~ :not([hidden]) {
+              margin-top: 6mm !important;
+            }
+            .reports-print-body .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+              margin-top: 2mm !important;
+            }
+            .reports-print-body .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+              margin-top: 1mm !important;
+            }
+            .reports-print-body :where(.py-2, .py-4, .py-5, .py-6) {
+              padding-top: 1.2mm !important;
+              padding-bottom: 1.2mm !important;
+            }
+            .reports-print-body :where(.pt-4, .pt-6, .pt-10) {
+              padding-top: 3mm !important;
+            }
+            .reports-print-body :where(.mt-4, .mt-6) {
+              margin-top: 3mm !important;
+            }
+            .reports-print-body :where(.mb-3, .mb-6, .mb-8) {
+              margin-bottom: 3mm !important;
+            }
+            .reports-print-body :where(.px-5) {
+              padding-left: 3mm !important;
+              padding-right: 3mm !important;
+            }
+            .reports-print-body :where(.text-sm) {
+              font-size: 11px !important;
+            }
+            .reports-print-body :where(.text-xs) {
+              font-size: 10px !important;
+            }
+            .reports-signatures {
+              display: block !important;
+              padding: 5mm 0 0 0 !important;
+              margin: 0 !important;
+            }
+            .reports-signatures > div {
+              display: grid !important;
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+              gap: 14mm !important;
+              padding-top: 8mm !important;
+              margin: 0 !important;
+            }
+            .reports-print-footer {
+              padding: 8mm 0 4mm 0 !important;
+              margin-top: 8mm !important;
+              background: #fff !important;
+              border-top: 1px solid #000 !important;
+            }
+            .reports-print-area,
+            .reports-print-area :where(h1, h2, h3, h4, p, span, div, td, th) {
+              color: #000 !important;
+            }
+            .reports-print-area :where(.bg-gray-50, .bg-gray-100, .bg-brand, .bg-brand\\/5, .bg-brand\\/10, .bg-rose-50) {
+              background: #fff !important;
+            }
+            .reports-print-area :where(.shadow-sm, .shadow-md, .shadow-lg, [class*="shadow-"]) {
+              box-shadow: none !important;
+            }
+            .reports-print-area :where(.rounded, .rounded-md, .rounded-lg, .rounded-full) {
+              border-radius: 0 !important;
+            }
+            .reports-print-area table,
+            .reports-print-area th,
+            .reports-print-area td {
+              border-color: #000 !important;
+            }
+            .reports-print-area tr {
+              page-break-inside: avoid !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${reportClone.outerHTML}
+        </body>
+      </html>
+    `);
+    printDocument.close();
+
+    const printNow = () => {
+      printContext.focus();
+      printContext.print();
+      window.setTimeout(() => {
+        printFrame.remove();
+      }, 1000);
+    };
+
+    const waitForImages = () => {
+      const images = Array.from(printDocument.images);
+      const pendingImages = images.filter(image => !image.complete);
+
+      if (pendingImages.length === 0) {
+        printContext.setTimeout(printNow, 250);
+        return;
+      }
+
+      let resolved = 0;
+      const resolveImage = () => {
+        resolved += 1;
+        if (resolved >= pendingImages.length) {
+          printContext.setTimeout(printNow, 250);
+        }
+      };
+
+      pendingImages.forEach(image => {
+        image.onload = resolveImage;
+        image.onerror = resolveImage;
+      });
+    };
+
+    if (printDocument.readyState === 'complete') {
+      waitForImages();
+    } else {
+      printFrame.onload = waitForImages;
+    }
   };
 
   const handleExport = () => {
@@ -204,7 +477,211 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   const activeQualification = qualifications.find(q => q.id === selectedQualificationId);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="reports-view space-y-8 animate-in fade-in duration-500 pb-20">
+      <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 18mm 12mm 18mm 12mm;
+        }
+
+        @media print {
+          body {
+            background: #fff !important;
+            color: #000 !important;
+            margin: 0 !important;
+            padding: 4mm 0 !important;
+            font-size: 11px !important;
+            line-height: 1.2 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          html,
+          body,
+          #root {
+            width: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            background: #fff !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .reports-view {
+            display: block !important;
+            width: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            overflow: visible !important;
+          }
+
+          .reports-view > * + * {
+            margin-top: 0 !important;
+          }
+
+          .reports-view > .no-print {
+            display: none !important;
+          }
+
+          .reports-print-area,
+          .reports-print-area * {
+            visibility: visible !important;
+          }
+
+          .reports-print-area {
+            position: static !important;
+            display: block !important;
+            width: auto !important;
+            max-width: none !important;
+            min-height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+            background: #fff !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+          }
+
+          .reports-print-area,
+          .reports-print-area :where(h1, h2, h3, h4, p, span, div, td, th) {
+            color: #000 !important;
+          }
+
+          .reports-print-area :where(.bg-gray-50, .bg-gray-100, .bg-brand, .bg-brand\\/5, .bg-brand\\/10, .bg-rose-50) {
+            background: #fff !important;
+          }
+
+          .reports-print-area :where(.shadow-sm, .shadow-md, .shadow-lg, [class*="shadow-"]) {
+            box-shadow: none !important;
+          }
+
+          .reports-print-area :where(.rounded, .rounded-md, .rounded-lg, .rounded-full) {
+            border-radius: 0 !important;
+          }
+
+          .reports-print-header {
+            display: none !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 12mm !important;
+            padding: 3mm 0 6mm 0 !important;
+            margin: 0 0 7mm 0 !important;
+            border-bottom: 1px solid #000 !important;
+            page-break-inside: avoid !important;
+          }
+
+          .reports-print-logo {
+            width: 22mm !important;
+            height: 22mm !important;
+            object-fit: contain !important;
+          }
+
+          .reports-print-title-block {
+            flex: 1 !important;
+            text-align: left !important;
+          }
+
+          .reports-screen-header {
+            padding: 0 0 5mm 0 !important;
+            margin: 0 !important;
+            border-bottom: 0 !important;
+            background: #fff !important;
+            text-align: center !important;
+          }
+
+          .reports-print-body {
+            padding: 0 !important;
+            background: #fff !important;
+            line-height: 1.2 !important;
+          }
+
+          .reports-print-body .space-y-12 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 6mm !important;
+          }
+
+          .reports-print-body .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 2mm !important;
+          }
+
+          .reports-print-body .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 1mm !important;
+          }
+
+          .reports-print-body :where(.py-2, .py-4, .py-5, .py-6) {
+            padding-top: 1.2mm !important;
+            padding-bottom: 1.2mm !important;
+          }
+
+          .reports-print-body :where(.pt-4, .pt-6, .pt-10) {
+            padding-top: 3mm !important;
+          }
+
+          .reports-print-body :where(.mt-4, .mt-6) {
+            margin-top: 3mm !important;
+          }
+
+          .reports-print-body :where(.mb-3, .mb-6, .mb-8) {
+            margin-bottom: 3mm !important;
+          }
+
+          .reports-print-body :where(.px-5) {
+            padding-left: 3mm !important;
+            padding-right: 3mm !important;
+          }
+
+          .reports-print-body :where(.text-sm) {
+            font-size: 11px !important;
+          }
+
+          .reports-print-body :where(.text-xs) {
+            font-size: 10px !important;
+          }
+
+          .reports-print-footer {
+            display: none !important;
+            padding: 8mm 0 4mm 0 !important;
+            margin-top: 8mm !important;
+            background: #fff !important;
+            border-top: 1px solid #000 !important;
+          }
+
+          .reports-signatures {
+            padding: 5mm 0 0 0 !important;
+            margin: 0 !important;
+          }
+
+          .reports-signatures > div {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 14mm !important;
+            padding-top: 8mm !important;
+            margin: 0 !important;
+          }
+
+          .reports-print-area table,
+          .reports-print-area th,
+          .reports-print-area td {
+            border-color: #000 !important;
+          }
+
+          .reports-print-area tr,
+          .reports-print-area .reports-section {
+            page-break-inside: avoid !important;
+          }
+
+          .reports-print-area .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 no-print">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Institutional Financial Reports</h2>
@@ -304,8 +781,33 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
       {/* Standard Reports Container */}
       {reportType !== 'CUSTOM' && (
-        <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
-          <div className="p-16 border-b border-gray-50 bg-gray-50/20 text-center print:bg-white print:p-8">
+        <div className="reports-print-area bg-white rounded-md shadow-sm border border-gray-200 overflow-visible flex flex-col min-h-[800px] print:border-none print:shadow-none print:rounded-none">
+          <div className="reports-print-header hidden">
+            <div className="flex items-center gap-4">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  className="reports-print-logo"
+                  alt={`${orgName} logo`}
+                  data-reports-print-logo="true"
+                />
+              ) : (
+                <div className="reports-print-logo flex items-center justify-center border border-gray-900">
+                  <Building2 size={28} />
+                </div>
+              )}
+              <div className="reports-print-title-block">
+                <h1 className="text-base font-semibold uppercase leading-tight">{orgName}</h1>
+                <p className="mt-1 text-[11px] font-semibold uppercase text-gray-600">Official Financial Report</p>
+              </div>
+            </div>
+            <div className="text-right text-[10px] font-semibold uppercase leading-relaxed text-gray-700">
+              <p>Printed {formatDateLabel(new Date().toISOString().split('T')[0])}</p>
+              <p>Internal Use Only</p>
+            </div>
+          </div>
+
+          <div className="reports-screen-header p-16 border-b border-gray-50 bg-gray-50/20 text-center print:bg-white print:p-8">
             <div className="flex items-center justify-center gap-2 mb-4 no-print">
               <div className="w-12 h-1 bg-brand rounded-full"></div>
               <div className="w-2 h-2 bg-brand rounded-full"></div>
@@ -335,7 +837,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             </div>
           </div>
 
-          <div className="p-16 flex-1 bg-white print:p-8">
+          <div className="reports-print-body p-16 flex-1 bg-white print:p-8">
             {(!reportSummariesBS || reportSummariesBS.length === 0) && (!reportSummariesIS || reportSummariesIS.length === 0) ? (
               <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center">
                 <div className="p-4 bg-gray-100 rounded-full">
@@ -495,7 +997,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             )}
           </div>
 
-          <div className="hidden print:block p-16 pt-0">
+          <div className="reports-signatures hidden print:block p-16 pt-0">
             <div className="grid grid-cols-2 gap-20 pt-20">
               <div className="space-y-12">
                 <div className="border-t border-gray-800 pt-3">
@@ -512,7 +1014,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             </div>
           </div>
 
-          <div className="px-16 py-10 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-white print:border-gray-800">
+          <div className="reports-print-footer px-16 py-10 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-white print:border-gray-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center text-brand print:bg-white print:border print:border-gray-800">
                 <ShieldCheck size={20} />
@@ -530,27 +1032,6 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
           </div>
         </div>
       )}
-
-      {/* Print-Only Confidentiality Watermark - Moved to the bottom of the main flow */}
-      <div className="hidden print:flex justify-between items-center border-b-2 border-gray-800 pb-8 mt-12 mb-8">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 rounded-full border-2 border-gray-800 flex items-center justify-center overflow-hidden shrink-0">
-            {logoUrl ? (
-              <img src={logoUrl} className="w-full h-full object-cover" alt="Institutional Logo" />
-            ) : (
-              <Building2 size={32} className="text-gray-900" />
-            )}
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold uppercase tracking-tight leading-none">{orgName}</h1>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-1">Official Institutional Financial Record</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Security Classification</p>
-          <p className="text-xs font-semibold text-rose-600 uppercase">Highly Confidential</p>
-        </div>
-      </div>
     </div>
   );
 };
