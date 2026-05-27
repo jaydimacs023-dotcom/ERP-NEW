@@ -33,6 +33,25 @@ interface SponsorsViewProps {
 const PAGE_SIZE = 10;
 const SPONSOR_COLUMNS = 'id,org_id,sponsor_code,name,contact_person,email,phone,address,tin,tax_type,ewt_rate,ar_account_id,created_at,updated_at,is_deleted,deleted_at,deleted_by';
 
+const getNextSponsorCode = (sponsorRecords: Sponsor[]) => {
+  const highest = sponsorRecords.reduce<{ prefix: string; number: number; width: number } | null>((current, sponsor) => {
+    const code = (sponsor.sponsorCode || '').trim();
+    const match = code.match(/^(.*?)(\d+)$/);
+    if (!match) return current;
+
+    const number = Number.parseInt(match[2], 10);
+    if (Number.isNaN(number)) return current;
+    if (!current || number > current.number) {
+      return { prefix: match[1], number, width: match[2].length };
+    }
+    return current;
+  }, null);
+
+  if (!highest) return 'SP-001';
+
+  return `${highest.prefix}${String(highest.number + 1).padStart(Math.max(highest.width, 3), '0')}`;
+};
+
 const SponsorsView: React.FC<SponsorsViewProps> = ({ 
   orgId, sponsors, accounts = [], entries = [], lines = [], currency = '?', onAddSponsor, onUpdateSponsor, onDeleteSponsor 
 }) => {
@@ -176,10 +195,17 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || taxTypeFilter !== 'ALL';
+  const nextSponsorCode = useMemo(() => getNextSponsorCode([...sponsors, ...serverSponsors]), [serverSponsors, sponsors]);
 
   const resetForm = () => {
     setFormData({ sponsorCode: '', name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
     setEditingSponsor(null);
+  };
+
+  const openCreateModal = () => {
+    setEditingSponsor(null);
+    setFormData({ sponsorCode: nextSponsorCode, name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
+    setShowModal(true);
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -224,7 +250,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
         const newSponsor: Sponsor = {
           id: generateUUID(),
           orgId: '', // Will be set by App.tsx handler
-          sponsorCode: formData.sponsorCode,
+          sponsorCode: formData.sponsorCode || nextSponsorCode,
           name: formData.name!,
           contactPerson: formData.contactPerson,
           email: formData.email,
@@ -322,7 +348,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           <p className="text-sm text-gray-500 font-normal italic">Manage donors, corporate grants, and sponsorship records.</p>
         </div>
         <button 
-          onClick={() => { resetForm(); setShowModal(true); }}
+          onClick={openCreateModal}
           className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-md shadow-brand/20 font-medium text-sm active:scale-95"
         >
           <Plus size={18} /> New Sponsor
@@ -542,8 +568,9 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                     <div className="relative">
                       <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input 
-                        placeholder="e.g. SP-001" 
-                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium font-mono"
+                        readOnly={!editingSponsor}
+                        placeholder="Auto-generated" 
+                        className={`w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium font-mono ${editingSponsor ? 'bg-gray-50' : 'bg-gray-100 text-gray-700 cursor-default'}`}
                         value={formData.sponsorCode || ''} 
                         onChange={e => setFormData({...formData, sponsorCode: e.target.value})} 
                       />

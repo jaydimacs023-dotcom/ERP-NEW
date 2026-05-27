@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   CheckCircle2,
@@ -142,50 +142,7 @@ const createSeedTasks = (
       } satisfies ARTask;
     });
 
-  if (invoiceTasks.length > 0) return invoiceTasks;
-
-  const sponsor = sponsors[0];
-  const student = students[0];
-  return [
-    {
-      id: 'seed-follow-up',
-      taskDate: fallbackDates[2],
-      taskTime: '10:00',
-      taskType: 'Customer Call',
-      customerType: 'Sponsor',
-      customerId: sponsor?.id || '',
-      customerName: sponsor?.name || 'OWWA',
-      relatedReference: 'INV-2026-00003',
-      description: 'Call sponsor for payment commitment on overdue account.',
-      priority: 'High',
-      status: 'Pending',
-      assignedTo: userName,
-      remarks: '',
-      createdBy: userName,
-      createdDate: new Date().toISOString(),
-      lastUpdatedBy: userName,
-      lastUpdatedDate: new Date().toISOString(),
-    },
-    {
-      id: 'seed-soa',
-      taskDate: fallbackDates[4],
-      taskTime: '09:00',
-      taskType: 'Send SOA',
-      customerType: 'Student',
-      customerId: student?.id || '',
-      customerName: student ? getStudentName(student) : 'Student Account',
-      relatedReference: 'SOA-2026-0007',
-      description: 'Send statement of account for the current billing cycle.',
-      priority: 'Normal',
-      status: 'Pending',
-      assignedTo: userName,
-      remarks: '',
-      createdBy: userName,
-      createdDate: new Date().toISOString(),
-      lastUpdatedBy: userName,
-      lastUpdatedDate: new Date().toISOString(),
-    },
-  ];
+  return invoiceTasks;
 };
 
 const cn = (...classes: Array<string | false | undefined>) => classes.filter(Boolean).join(' ');
@@ -198,9 +155,13 @@ const ARCalendarTasksView: React.FC<ARCalendarTasksViewProps> = ({
   brandColor = '#059669',
   onNotify,
 }) => {
+  const seedTasks = useMemo(
+    () => createSeedTasks(invoices, sponsors, students, currentUser),
+    [currentUser, invoices, sponsors, students]
+  );
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('Month');
-  const [tasks, setTasks] = useState<ARTask[]>(() => createSeedTasks(invoices, sponsors, students, currentUser));
+  const [tasks, setTasks] = useState<ARTask[]>(() => seedTasks);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | TaskStatus>('All');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -226,6 +187,17 @@ const ARCalendarTasksView: React.FC<ARCalendarTasksViewProps> = ({
 
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) || null : null;
   const today = todayKey();
+
+  useEffect(() => {
+    setTasks(prev => {
+      const manualTasks = prev.filter(task => !task.id.startsWith('seed-'));
+      return [...seedTasks, ...manualTasks];
+    });
+    setSelectedTaskId(prev => {
+      if (!prev || !prev.startsWith('seed-')) return prev;
+      return seedTasks.some(task => task.id === prev) ? prev : null;
+    });
+  }, [seedTasks]);
 
   const metrics = useMemo(() => {
     const completedThisMonth = tasks.filter(task => {

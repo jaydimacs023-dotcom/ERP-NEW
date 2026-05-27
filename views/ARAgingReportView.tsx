@@ -2,8 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
-  BarChart3,
-  Calendar,
   ChevronDown,
   ChevronRight,
   Download,
@@ -11,7 +9,7 @@ import {
   Printer,
   RotateCcw,
 } from 'lucide-react';
-import { Sponsor, Student, JournalEntry, JournalLine, ChartOfAccount, AccountClass } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, ChartOfAccount, AccountClass, Invoice } from '../types';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface ARAgingReportViewProps {
@@ -20,21 +18,23 @@ interface ARAgingReportViewProps {
   accounts: ChartOfAccount[];
   students: Student[];
   sponsors: Sponsor[];
+  invoices?: Invoice[];
   currency: string;
   brandColor?: string;
   orgName?: string;
 }
 
 type PayorTypeFilter = 'ALL' | 'SPONSOR' | 'STUDENT';
-type StatusFilter = 'ALL' | 'OPEN' | 'OVERDUE';
-type PeriodFilter = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'YEARLY';
+type StatusFilter = 'OPEN_OVERDUE' | 'OPEN' | 'OVERDUE' | 'ALL';
 type AgingBucketKey = 'current' | 'thirty' | 'sixty' | 'ninety' | 'overNinety';
 
 interface AgingLineItem {
   id: string;
   journalEntryId: string;
+  transactionDate: string;
   dueDate: string;
-  referenceLabel: string;
+  invoiceNo: string;
+  glReferenceNo: string;
   current: number;
   thirty: number;
   sixty: number;
@@ -57,34 +57,60 @@ interface AgingRow {
   ninety: number;
   overNinety: number;
   type: PayorTypeFilter;
+  transactionDate: string;
   dueDate: string;
   status: 'Open' | 'Overdue' | 'Partially Overdue';
   lineItems: AgingLineItem[];
 }
 
-const periodOptions: Array<{ value: PeriodFilter; label: string }> = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly' },
-  { value: 'SEMI_ANNUAL', label: 'Semi Annual' },
-  { value: 'YEARLY', label: 'Yearly' },
-];
-
 const normalizePayorType = (type?: JournalLine['contactType']): PayorTypeFilter | 'OTHER' =>
   type === 'SPONSOR' || type === 'STUDENT' ? type : 'OTHER';
 
-const getPeriodStartDate = (asOfDate: string, period: PeriodFilter) => {
-  const date = new Date(`${asOfDate}T00:00:00`);
-  const daysByPeriod: Record<PeriodFilter, number> = {
-    WEEKLY: 6,
-    MONTHLY: 30,
-    QUARTERLY: 91,
-    SEMI_ANNUAL: 182,
-    YEARLY: 364,
-  };
-  date.setDate(date.getDate() - daysByPeriod[period]);
-  return date.toISOString().split('T')[0];
+const getLocalDateString = () => {
+  const date = new Date();
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().split('T')[0];
 };
+
+const isGlReference = (value?: string) => /^GL(?:\s*No\.?)?[\s-]*\d+$/i.test((value || '').trim());
+const isInvoiceReference = (value?: string) => /^INV[-\w]*/i.test((value || '').trim());
+
+const getInvoiceNumber = (entry: JournalEntry, invoices: Invoice[]) => {
+  const linkedInvoice = invoices.find(invoice =>
+    invoice.id === entry.sourceRef ||
+    invoice.journalEntryId === entry.id ||
+    invoice.invoiceNo === entry.reference ||
+    invoice.invoiceNo === entry.sourceRef
+  );
+  if (linkedInvoice?.invoiceNo) return linkedInvoice.invoiceNo;
+
+  const candidates = [entry.reference, entry.sourceRef].filter(Boolean) as string[];
+  const invoiceReference = candidates.find(isInvoiceReference);
+  return invoiceReference || '-';
+};
+
+const getGlReferenceNumber = (entry: JournalEntry) =>
+  entry.glEntryNumber || (isGlReference(entry.reference) ? entry.reference : '') || '-';
+
+interface AgingCharge {
+  id: string;
+  journalEntryId: string;
+  transactionDate: string;
+  dueDate: string;
+  invoiceNo: string;
+  glReferenceNo: string;
+  balance: number;
+}
+
+interface AgingGroup {
+  payorName: string;
+  customerCode: string;
+  accountNo: string;
+  accountName: string;
+  type: PayorTypeFilter;
+  charges: AgingCharge[];
+  credits: number;
+}
 
 const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
   entries,
@@ -92,18 +118,18 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
   accounts,
   students,
   sponsors,
+  invoices = [],
   currency,
   brandColor = '#0b8f4d',
   orgName = 'Institution',
 }) => {
-  const [period, setPeriod] = useState<PeriodFilter>('MONTHLY');
-  const [agingAsOf, setAgingAsOf] = useState(new Date().toISOString().split('T')[0]);
+  const today = getLocalDateString();
+  const [agingAsOf, setAgingAsOf] = useState(today);
   const [payorTypeFilter, setPayorTypeFilter] = useState<PayorTypeFilter>('ALL');
   const [accountFilter, setAccountFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('OPEN');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('OPEN_OVERDUE');
   const [expandedPayorId, setExpandedPayorId] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState({ period: 'MONTHLY', agingAsOf: new Date().toISOString().split('T')[0] });
 
   const formatCurrency = (val: number) =>
     `${currency}${currency.length === 1 ? '' : ' '}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -113,9 +139,6 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? value : format(parsed, 'MM-dd-yyyy');
   };
-
-  const getPeriodLabel = (value: PeriodFilter | string) =>
-    periodOptions.find(option => option.value === value)?.label || 'Monthly';
 
   const arAccounts = useMemo(
     () => accounts.filter(account =>
@@ -128,15 +151,13 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
 
   const agingReport = useMemo<AgingRow[]>(() => {
     const targetAccountIds = new Set(arAccounts.map(account => account.id));
-    const periodStartDate = getPeriodStartDate(appliedFilters.agingAsOf, appliedFilters.period as PeriodFilter);
     const targetEntries = entries.filter(entry =>
-      entry.date >= periodStartDate &&
-      entry.date <= appliedFilters.agingAsOf &&
+      entry.date <= agingAsOf &&
       entry.status === 'POSTED'
     );
     const entryMap = new Map(targetEntries.map(entry => [entry.id, entry]));
-    const referenceDate = new Date(`${appliedFilters.agingAsOf}T00:00:00`);
-    const buckets: Record<string, AgingRow> = {};
+    const referenceDate = new Date(`${agingAsOf}T00:00:00`);
+    const groups: Record<string, AgingGroup> = {};
 
     lines
       .filter(line => entryMap.has(line.journalEntryId) && targetAccountIds.has(line.accountId) && line.contactId)
@@ -155,59 +176,98 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
         const customerCode = sponsor?.sponsorCode || student?.uli || line.contactId;
         const runtimeEntry = entry as JournalEntry & { dueDate?: string; invoiceDueDate?: string; invoice_due_date?: string };
         const dueDate = runtimeEntry.dueDate || runtimeEntry.invoiceDueDate || runtimeEntry.invoice_due_date || entry.date;
-        const ageDays = Math.floor((referenceDate.getTime() - new Date(`${dueDate}T00:00:00`).getTime()) / (1000 * 60 * 60 * 24));
         const amount = line.debit - line.credit;
         if (Math.abs(amount) <= 0.01) return;
 
-        const bucket: AgingBucketKey =
-          ageDays <= 0 ? 'current' :
-          ageDays <= 30 ? 'thirty' :
-          ageDays <= 60 ? 'sixty' :
-          ageDays <= 90 ? 'ninety' :
-          'overNinety';
-
-        if (!buckets[groupKey]) {
-          buckets[groupKey] = {
-            id: groupKey,
+        if (!groups[groupKey]) {
+          groups[groupKey] = {
             payorName,
             customerCode,
             accountNo: account?.code || '-',
             accountName: account?.name || 'Accounts Receivable',
-            total: 0,
-            current: 0,
-            thirty: 0,
-            sixty: 0,
-            ninety: 0,
-            overNinety: 0,
             type: payorType,
-            dueDate,
-            status: 'Open',
-            lineItems: [],
+            charges: [],
+            credits: 0,
           };
         }
 
-        buckets[groupKey].total += amount;
-        buckets[groupKey][bucket] += amount;
-        if (dueDate < buckets[groupKey].dueDate) {
-          buckets[groupKey].dueDate = dueDate;
+        if (amount > 0) {
+          groups[groupKey].charges.push({
+            id: line.id,
+            journalEntryId: line.journalEntryId,
+            transactionDate: entry.date,
+            dueDate,
+            invoiceNo: getInvoiceNumber(entry, invoices),
+            glReferenceNo: getGlReferenceNumber(entry),
+            balance: amount,
+          });
+        } else {
+          groups[groupKey].credits += Math.abs(amount);
         }
-
-        buckets[groupKey].lineItems.push({
-          id: line.id,
-          journalEntryId: line.journalEntryId,
-          dueDate,
-          referenceLabel: entry.reference || entry.glEntryNumber || entry.sourceRef || line.journalEntryId,
-          current: bucket === 'current' ? amount : 0,
-          thirty: bucket === 'thirty' ? amount : 0,
-          sixty: bucket === 'sixty' ? amount : 0,
-          ninety: bucket === 'ninety' ? amount : 0,
-          overNinety: bucket === 'overNinety' ? amount : 0,
-          balance: amount,
-          status: ageDays <= 0 ? 'Open' : 'Overdue',
-        });
       });
 
-    return Object.values(buckets)
+    return Object.entries(groups)
+      .map(([id, group]) => {
+        let unappliedCredits = group.credits;
+        const charges = group.charges
+          .slice()
+          .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.journalEntryId.localeCompare(b.journalEntryId))
+          .map(charge => {
+            const appliedCredit = Math.min(charge.balance, unappliedCredits);
+            unappliedCredits -= appliedCredit;
+            return { ...charge, balance: charge.balance - appliedCredit };
+          })
+          .filter(charge => charge.balance > 0.01);
+
+        const row: AgingRow = {
+          id,
+          payorName: group.payorName,
+          customerCode: group.customerCode,
+          accountNo: group.accountNo,
+          accountName: group.accountName,
+          total: 0,
+          current: 0,
+          thirty: 0,
+          sixty: 0,
+          ninety: 0,
+          overNinety: 0,
+          type: group.type,
+          transactionDate: charges[0]?.transactionDate || '',
+          dueDate: charges[0]?.dueDate || '',
+          status: 'Open',
+          lineItems: [],
+        };
+
+        charges.forEach(charge => {
+          const ageDays = Math.floor((referenceDate.getTime() - new Date(`${charge.dueDate}T00:00:00`).getTime()) / (1000 * 60 * 60 * 24));
+          const bucket: AgingBucketKey =
+            ageDays <= 0 ? 'current' :
+            ageDays <= 30 ? 'thirty' :
+            ageDays <= 60 ? 'sixty' :
+            ageDays <= 90 ? 'ninety' :
+            'overNinety';
+
+          row.total += charge.balance;
+          row[bucket] += charge.balance;
+          row.lineItems.push({
+            id: charge.id,
+            journalEntryId: charge.journalEntryId,
+            transactionDate: charge.transactionDate,
+            dueDate: charge.dueDate,
+            invoiceNo: charge.invoiceNo,
+            glReferenceNo: charge.glReferenceNo,
+            current: bucket === 'current' ? charge.balance : 0,
+            thirty: bucket === 'thirty' ? charge.balance : 0,
+            sixty: bucket === 'sixty' ? charge.balance : 0,
+            ninety: bucket === 'ninety' ? charge.balance : 0,
+            overNinety: bucket === 'overNinety' ? charge.balance : 0,
+            balance: charge.balance,
+            status: ageDays <= 0 ? 'Open' : 'Overdue',
+          });
+        });
+
+        return row;
+      })
       .filter(row => Math.abs(row.total) > 0.01)
       .map(row => {
         const overdue = row.thirty + row.sixty + row.ninety + row.overNinety;
@@ -215,16 +275,17 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
         return {
           ...row,
           status,
-          lineItems: row.lineItems.sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+          lineItems: row.lineItems.sort((a, b) => a.transactionDate.localeCompare(b.transactionDate) || a.dueDate.localeCompare(b.dueDate)),
         };
       })
       .sort((a, b) => b.total - a.total);
-  }, [appliedFilters, arAccounts, entries, lines, sponsors, students]);
+  }, [agingAsOf, arAccounts, entries, invoices, lines, sponsors, students]);
 
   const filteredAgingReport = useMemo(() => agingReport.filter(row => {
     const matchesPayorType = payorTypeFilter === 'ALL' || row.type === payorTypeFilter;
     const matchesAccount = accountFilter === 'ALL' || row.accountNo === accountFilter;
     const matchesStatus =
+      statusFilter === 'OPEN_OVERDUE' ||
       statusFilter === 'ALL' ||
       (statusFilter === 'OPEN' && row.status === 'Open') ||
       (statusFilter === 'OVERDUE' && row.status !== 'Open');
@@ -238,7 +299,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
     pageEndIndex,
     paginatedRows: paginatedAgingReport,
     setCurrentPage,
-  } = usePaginatedRows(filteredAgingReport, [period, agingAsOf, payorTypeFilter, accountFilter, statusFilter], 8);
+  } = usePaginatedRows(filteredAgingReport, [agingAsOf, payorTypeFilter, accountFilter, statusFilter], 8);
 
   const totals = useMemo(() => filteredAgingReport.reduce(
     (sum, row) => ({
@@ -253,48 +314,60 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
     { current: 0, thirty: 0, sixty: 0, ninety: 0, overNinety: 0, total: 0, overdueAccounts: 0 }
   ), [filteredAgingReport]);
 
-  const handleGenerate = () => {
-    setAppliedFilters({ period, agingAsOf });
-    setExpandedPayorId(null);
-  };
-
   const clearFilters = () => {
-    setPeriod('MONTHLY');
-    setAgingAsOf(new Date().toISOString().split('T')[0]);
+    setAgingAsOf(today);
     setPayorTypeFilter('ALL');
     setAccountFilter('ALL');
-    setStatusFilter('OPEN');
+    setStatusFilter('OPEN_OVERDUE');
     setExpandedPayorId(null);
-    setAppliedFilters({ period: 'MONTHLY', agingAsOf: new Date().toISOString().split('T')[0] });
   };
 
   const exportCsv = () => {
-    const header = ['Payor Name', 'Account No.', 'Customer Code', 'Current', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Total Oustanding', 'Due Date', 'Status'];
-    const csvRows = filteredAgingReport.map(row => [
-      row.payorName,
-      row.accountNo,
-      row.customerCode,
-      row.current,
-      row.thirty,
-      row.sixty,
-      row.ninety,
-      row.overNinety,
-      row.total,
-      row.dueDate,
-      row.status,
+    const header = ['Row Type', 'Payor Name', 'Customer Code', 'Invoice No.', 'GL Reference No.', 'Transaction Date', 'Current', '1-30 Days', '31-60 Days', '61-90 Days', 'Over 90 Days', 'Total Outstanding / Balance', 'Due Date', 'Status'];
+    const csvRows = filteredAgingReport.flatMap(row => [
+      [
+        'Summary',
+        row.payorName,
+        row.customerCode,
+        '',
+        '',
+        row.transactionDate,
+        row.current,
+        row.thirty,
+        row.sixty,
+        row.ninety,
+        row.overNinety,
+        row.total,
+        row.dueDate,
+        row.status,
+      ],
+      ...row.lineItems.map(item => [
+        'Detail',
+        row.payorName,
+        row.customerCode,
+        item.invoiceNo,
+        item.glReferenceNo,
+        item.transactionDate,
+        item.current,
+        item.thirty,
+        item.sixty,
+        item.ninety,
+        item.overNinety,
+        item.balance,
+        item.dueDate,
+        item.status,
+      ]),
     ]);
     const csv = [header, ...csvRows].map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `ar-aging-report-${appliedFilters.agingAsOf}.csv`;
+    link.download = `ar-aging-report-${agingAsOf}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
 
   if (showPrintPreview) {
-    const reportPeriodLabel = `${getPeriodLabel(appliedFilters.period)} Aging Report`;
-
     return (
       <div className="space-y-5 pb-10 text-slate-900">
         <style>{`
@@ -359,13 +432,13 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
             <h1 className="text-2xl font-bold leading-tight text-black">{orgName}</h1>
             <h2 className="mt-2 text-xl font-bold leading-tight text-black">Accounts Receivable</h2>
             <h3 className="mt-2 text-xl font-bold leading-tight text-black">Aging Report</h3>
-            <h4 className="mt-2 text-lg font-bold leading-tight text-black">{reportPeriodLabel}</h4>
+            <h4 className="mt-2 text-lg font-bold leading-tight text-black">As of Date Aging Report - {formatDateLabel(agingAsOf)}</h4>
           </div>
 
           <div className="mt-5 flex items-center gap-8">
             <div className="h-0.5 flex-1 bg-blue-500"></div>
             <div className="whitespace-nowrap text-base font-bold text-[#06146f]">
-              As of Date: {formatDateLabel(appliedFilters.agingAsOf)}
+              As of Date: {formatDateLabel(agingAsOf)}
             </div>
             <div className="h-0.5 flex-1 bg-blue-500"></div>
           </div>
@@ -376,6 +449,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
                 <tr>
                   <th className="border border-gray-300 px-3 py-3 text-center font-bold">Customer ID</th>
                   <th className="border border-gray-300 px-3 py-3 text-left font-bold">Payor Name / Student Name</th>
+                  <th className="border border-gray-300 px-3 py-3 text-center font-bold">Transaction Date</th>
                   <th className="border border-gray-300 px-3 py-3 text-right font-bold">Current</th>
                   <th className="border border-gray-300 px-3 py-3 text-right font-bold">1-30 Days</th>
                   <th className="border border-gray-300 px-3 py-3 text-right font-bold">31-60 Days</th>
@@ -390,6 +464,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
                   <tr key={row.id}>
                     <td className="border border-gray-200 px-3 py-3 text-center font-semibold">{row.customerCode}</td>
                     <td className="border border-gray-200 px-3 py-3 font-semibold">{row.payorName}</td>
+                    <td className="border border-gray-200 px-3 py-3 text-center font-semibold">{formatDateLabel(row.transactionDate)}</td>
                     <td className="border border-gray-200 px-3 py-3 text-right font-semibold">{formatCurrency(row.current)}</td>
                     <td className="border border-gray-200 px-3 py-3 text-right font-semibold">{formatCurrency(row.thirty)}</td>
                     <td className="border border-gray-200 px-3 py-3 text-right font-semibold">{formatCurrency(row.sixty)}</td>
@@ -401,13 +476,13 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
                 ))}
                 {filteredAgingReport.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="border border-gray-200 px-3 py-8 text-center text-gray-500">
+                    <td colSpan={10} className="border border-gray-200 px-3 py-8 text-center text-gray-500">
                       No outstanding receivables found for the selected filters.
                     </td>
                   </tr>
                 )}
                 <tr className="font-bold">
-                  <td colSpan={2} className="border border-gray-200 px-3 py-3">Grand Total Outstanding:</td>
+                  <td colSpan={3} className="border border-gray-200 px-3 py-3">Grand Total Outstanding:</td>
                   <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(totals.current)}</td>
                   <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(totals.thirty)}</td>
                   <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(totals.sixty)}</td>
@@ -495,17 +570,18 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
           </div>
         </div>
 
-        <div className="ar-aging-no-print mt-4 flex flex-wrap items-center gap-3 border-y border-gray-100 bg-white py-2">
+        <div className="ar-aging-no-print mt-4 overflow-x-auto border-y border-gray-100 bg-white py-2">
+          <div className="flex min-w-max flex-nowrap items-center gap-3">
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            Period:
-            <select value={period} onChange={event => setPeriod(event.target.value as PeriodFilter)} className="bg-transparent font-bold outline-none">
-              {periodOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            Report Basis:
+            <select value="AS_OF_DATE" disabled className="bg-transparent font-bold outline-none disabled:opacity-100">
+              <option value="AS_OF_DATE">As of Date</option>
             </select>
             <ChevronDown size={14} className="pointer-events-none -ml-6 opacity-0" />
           </label>
 
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            As Of Date:
+            As of Date:
             <input type="date" value={agingAsOf} onChange={event => setAgingAsOf(event.target.value)} className="bg-transparent font-bold outline-none" />
           </label>
 
@@ -521,7 +597,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
           <label className="flex h-11 min-w-[250px] items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
             Account No.:
             <select value={accountFilter} onChange={event => setAccountFilter(event.target.value)} className="min-w-0 flex-1 bg-transparent font-medium outline-none">
-              <option value="ALL">Select account no.</option>
+              <option value="ALL">All Receivable</option>
               {arAccounts.map(account => <option key={account.id} value={account.code}>{account.code} - {account.name}</option>)}
             </select>
           </label>
@@ -529,7 +605,8 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
             Status:
             <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as StatusFilter)} className="bg-transparent font-bold outline-none">
-              <option value="OPEN">Open</option>
+              <option value="OPEN_OVERDUE">Open and Overdue</option>
+              <option value="OPEN">Open Only</option>
               <option value="OVERDUE">Overdue</option>
               <option value="ALL">All</option>
             </select>
@@ -538,31 +615,30 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
           <button type="button" onClick={clearFilters} className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[#06146f]" title="Reset filters">
             <RotateCcw size={20} />
           </button>
-          <button type="button" onClick={handleGenerate} className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700">
-            <BarChart3 size={18} /> Generate
-          </button>
           <button type="button" onClick={exportCsv} className="inline-flex h-11 items-center gap-2 rounded-md border border-gray-200 px-4 text-sm font-bold shadow-sm">
             <Download size={18} /> Export
           </button>
           <button type="button" onClick={() => setShowPrintPreview(true)} className="inline-flex h-11 items-center gap-2 rounded-md border border-gray-200 px-4 text-sm font-bold shadow-sm">
             <Printer size={18} /> Print
           </button>
+          </div>
         </div>
 
         <div className="mt-4 overflow-hidden rounded-md border border-gray-200">
           <div className="overflow-x-auto">
-            <table className="min-w-[1180px] w-full border-collapse text-sm">
+            <table className="min-w-[1300px] w-full border-collapse text-sm">
               <thead className="bg-emerald-700 text-white">
                 <tr>
                   <th className="w-10 border-r border-white/25 px-4 py-3"></th>
-                  <th className="border-r border-white/25 px-4 py-3 text-left font-bold">Account No. / Customer Code</th>
+                  <th className="border-r border-white/25 px-4 py-3 text-left font-bold">Customer Code</th>
                   <th className="border-r border-white/25 px-4 py-3 text-left font-bold">Payor Name</th>
+                  <th className="border-r border-white/25 px-4 py-3 text-center font-bold">Transaction Date</th>
                   <th className="border-r border-white/25 px-4 py-3 text-right font-bold">Current</th>
                   <th className="border-r border-white/25 px-4 py-3 text-right font-bold">1-30 Days</th>
                   <th className="border-r border-white/25 px-4 py-3 text-right font-bold">31-60 Days</th>
                   <th className="border-r border-white/25 px-4 py-3 text-right font-bold">61-90 Days</th>
                   <th className="border-r border-white/25 px-4 py-3 text-right font-bold">Over 90 Days</th>
-                  <th className="border-r border-white/25 px-4 py-3 text-right font-bold">Total Oustanding</th>
+                  <th className="border-r border-white/25 px-4 py-3 text-right font-bold">Total Outstanding</th>
                   <th className="border-r border-white/25 px-4 py-3 text-center font-bold">Due Date</th>
                   <th className="px-4 py-3 text-center font-bold">Status</th>
                 </tr>
@@ -580,10 +656,10 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
                           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                         </td>
                         <td className="border-l border-gray-200 px-4 py-4 text-[#06146f]">
-                          <div>{row.customerCode}</div>
-                          <div className="text-xs font-medium text-gray-500">{row.accountNo} - {row.accountName}</div>
+                          {row.customerCode}
                         </td>
                         <td className="border-l border-gray-200 px-4 py-4">{row.payorName}</td>
+                        <td className="border-l border-gray-200 px-4 py-4 text-center">{formatDateLabel(row.transactionDate)}</td>
                         <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(row.current)}</td>
                         <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(row.thirty)}</td>
                         <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(row.sixty)}</td>
@@ -594,44 +670,41 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
                         <td className="border-l border-gray-200 px-4 py-4 text-center text-blue-600">{row.status}</td>
                       </tr>
                       {isExpanded && (
-                        <tr className="border-b border-gray-200 bg-slate-50">
-                          <td></td>
-                          <td colSpan={10} className="p-4">
-                            <div className="rounded-md border border-gray-200 bg-white p-4">
-                              <h3 className="mb-3 text-base font-bold text-emerald-700">Invoice Details</h3>
-                              <table className="w-full min-w-[920px] border-collapse text-sm">
-                                <thead className="bg-gray-50">
-                                  <tr>
-                                    <th className="border border-gray-200 px-3 py-3 text-center">Invoice No.</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-center">Due Date</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">Current</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">1-30 Days</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">31-60 Days</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">61-90 Days</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">Over 90 Days</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-right">Balance</th>
-                                    <th className="border border-gray-200 px-3 py-3 text-center">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {row.lineItems.map(item => (
-                                    <tr key={item.id}>
-                                      <td className="border border-gray-200 px-3 py-3 text-center text-blue-600">{item.referenceLabel}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-center">{formatDateLabel(item.dueDate)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(item.current)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(item.thirty)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(item.sixty)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(item.ninety)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right">{formatCurrency(item.overNinety)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-right font-bold">{formatCurrency(item.balance)}</td>
-                                      <td className="border border-gray-200 px-3 py-3 text-center text-blue-600">{item.status}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
+                        <>
+                          <tr aria-hidden="true" className="h-[6px] bg-gray-200">
+                            <td colSpan={12} className="p-0"></td>
+                          </tr>
+                          <tr className="border-b border-gray-200 bg-slate-100 text-xs font-bold text-slate-500">
+                            <td className="px-4 py-2"></td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-left">Invoice No.</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-left">GL Reference No.</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-left">Transaction Date</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">Current</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">1-30 Days</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">31-60 Days</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">61-90 Days</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">Over 90 Days</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-right">Balance</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-center">Due Date</td>
+                            <td className="border-l border-gray-200 px-4 py-2 text-center">Status</td>
+                          </tr>
+                          {row.lineItems.map(item => (
+                            <tr key={item.id} className="border-b border-gray-200 bg-slate-50 text-sm">
+                              <td className="px-4 py-3"></td>
+                              <td className="border-l border-gray-200 px-4 py-3 font-semibold text-slate-700">{item.invoiceNo}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-slate-700">{item.glReferenceNo}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-center">{formatDateLabel(item.transactionDate)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right">{formatCurrency(item.current)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right">{formatCurrency(item.thirty)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right">{formatCurrency(item.sixty)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right">{formatCurrency(item.ninety)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right">{formatCurrency(item.overNinety)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-right font-bold">{formatCurrency(item.balance)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-center">{formatDateLabel(item.dueDate)}</td>
+                              <td className="border-l border-gray-200 px-4 py-3 text-center text-blue-600">{item.status}</td>
+                            </tr>
+                          ))}
+                        </>
                       )}
                     </React.Fragment>
                   );
@@ -639,7 +712,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
 
                 {filteredAgingReport.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="py-16 text-center text-gray-500">
+                    <td colSpan={12} className="py-16 text-center text-gray-500">
                       <FileText size={28} className="mx-auto mb-3 opacity-40" />
                       No outstanding receivables found for the selected filters.
                     </td>
@@ -649,7 +722,7 @@ const ARAgingReportView: React.FC<ARAgingReportViewProps> = ({
               {filteredAgingReport.length > 0 && (
                 <tfoot className="bg-gray-50 font-bold">
                   <tr>
-                    <td colSpan={3} className="px-4 py-4 text-left">Grand Total Outstanding:</td>
+                    <td colSpan={4} className="px-4 py-4 text-left">Grand Total Outstanding:</td>
                     <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(totals.current)}</td>
                     <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(totals.thirty)}</td>
                     <td className="border-l border-gray-200 px-4 py-4 text-right">{formatCurrency(totals.sixty)}</td>

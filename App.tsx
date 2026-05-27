@@ -7164,6 +7164,7 @@ export default function App() {
               entries={activeJournalEntries}
               lines={filteredLines}
               accounts={filteredAccounts}
+              invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
               currency={currentOrg?.currency || 'USD'}
               brandColor={brandColor}
             />

@@ -33,6 +33,25 @@ interface CustomerMasterListViewProps {
 
 const PAGE_SIZE = 7;
 
+const getNextSponsorCode = (sponsorRecords: Sponsor[]) => {
+    const highest = sponsorRecords.reduce<{ prefix: string; number: number; width: number } | null>((current, sponsor) => {
+        const code = (sponsor.sponsorCode || '').trim();
+        const match = code.match(/^(.*?)(\d+)$/);
+        if (!match) return current;
+
+        const number = Number.parseInt(match[2], 10);
+        if (Number.isNaN(number)) return current;
+        if (!current || number > current.number) {
+            return { prefix: match[1], number, width: match[2].length };
+        }
+        return current;
+    }, null);
+
+    if (!highest) return 'SP-001';
+
+    return `${highest.prefix}${String(highest.number + 1).padStart(Math.max(highest.width, 3), '0')}`;
+};
+
 const MANDATORY_DOCS = [
     'TOR (Transcript of Records)',
     'Birth Certificate',
@@ -100,6 +119,12 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         setEditingSponsor(null);
     };
 
+    const openCreateSponsorModal = () => {
+        setEditingSponsor(null);
+        setSponsorFormData({ sponsorCode: getNextSponsorCode(sponsors), name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: 'NON_VAT', ewtRate: 0, arAccountId: '' });
+        setShowSponsorModal(true);
+    };
+
     const resetStudentForm = () => {
         setStudentFormData({
             uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
@@ -124,6 +149,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                     id: `sp-${Date.now()}`,
                     orgId: '',
                     ...sponsorFormData,
+                    sponsorCode: sponsorFormData.sponsorCode || getNextSponsorCode(sponsors),
                     name: sponsorFormData.name!,
                     createdAt: new Date().toISOString()
                 } as Sponsor);
@@ -407,7 +433,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                     </div>
                     {/* {activeSubTab === 'sponsors' ? (
                         <button
-                            onClick={() => { resetSponsorForm(); setShowSponsorModal(true); }}
+                            onClick={openCreateSponsorModal}
                             className="flex items-center gap-2 px-6 py-2.5 text-white rounded-xl transition-all font-semibold text-[10px] uppercase tracking-widest"
                             style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
                         >
@@ -756,10 +782,11 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                     </label>
                                     <input
                                         type="text"
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-slate-900/5 outline-none transition-all"
+                                        readOnly={!editingSponsor}
+                                        className={`w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-slate-900/5 outline-none transition-all ${editingSponsor ? 'bg-slate-50' : 'bg-slate-100 text-slate-700 cursor-default'}`}
                                         value={sponsorFormData.sponsorCode}
                                         onChange={(e) => setSponsorFormData(prev => ({ ...prev, sponsorCode: e.target.value }))}
-                                        placeholder="e.g. SP-2024-001"
+                                        placeholder="Auto-generated"
                                     />
                                 </div>
                                 <div className="space-y-2">
