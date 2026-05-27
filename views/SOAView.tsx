@@ -220,22 +220,22 @@ const SOAView: React.FC<SOAViewProps> = ({
         </section>
       </div>
 
-      <section className="rounded-md border border-gray-200 bg-white px-4 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
+      <section className="overflow-x-auto rounded-md border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        <div className="flex min-w-max flex-nowrap items-center gap-3">
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            Period:
-            <select value={period} onChange={event => setPeriod(event.target.value as PeriodFilter)} className="bg-transparent font-bold outline-none">
-              {periodOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            Report Basis:
+            <select value="AS_OF_DATE" disabled className="bg-transparent font-bold outline-none disabled:opacity-100">
+              <option value="AS_OF_DATE">As of Date</option>
             </select>
           </label>
 
-          <label className="flex h-11 items-center overflow-hidden rounded-md border border-gray-200 text-sm font-semibold shadow-sm">
-            <span className="px-3 text-slate-500">As Of Date</span>
-            <input type="date" value={asOfDate} onChange={event => setAsOfDate(event.target.value)} className="h-full border-l border-gray-200 px-3 font-bold outline-none" />
+          <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
+            As of Date:
+            <input type="date" value={asOfDate} onChange={event => setAsOfDate(event.target.value)} className="bg-transparent font-bold outline-none" />
           </label>
 
           <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            Customer Type:
+            Payor Type:
             <select value={customerType} onChange={event => setCustomerType(event.target.value as CustomerTypeFilter)} className="bg-transparent font-bold outline-none">
               <option value="ALL">All</option>
               <option value="SPONSOR">Sponsor</option>
@@ -243,33 +243,16 @@ const SOAView: React.FC<SOAViewProps> = ({
             </select>
           </label>
 
-          <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            Delivery Method:
-            <select value={deliveryMethod} onChange={event => setDeliveryMethod(event.target.value as DeliveryMethodFilter)} className="bg-transparent font-bold outline-none">
-              <option value="ALL">All</option>
-              <option value="EMAIL">Email</option>
-              <option value="PRINT">Print</option>
-            </select>
-          </label>
-
-          <label className="flex h-11 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
-            Status:
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as StatusFilter)} className="bg-transparent font-bold outline-none">
-              <option value="ALL">Open, Overdue</option>
-              <option value="OPEN">Open</option>
-              <option value="OVERDUE">Overdue</option>
+          <label className="flex h-11 min-w-[250px] items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-semibold shadow-sm">
+            Account No.:
+            <select value={accountFilter} onChange={event => setAccountFilter(event.target.value)} className="min-w-0 flex-1 bg-transparent font-medium outline-none">
+              <option value="ALL">All Receivable</option>
+              {arAccounts.map(account => <option key={account.id} value={account.code}>{account.code} - {account.name}</option>)}
             </select>
           </label>
 
           <button type="button" onClick={clearFilters} className="inline-flex h-11 w-11 items-center justify-center rounded-md text-[#06146f]" title="Reset filters">
             <RotateCcw size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setAppliedFilters({ period, asOfDate })}
-            className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
-          >
-            <BarChart3 size={18} /> Generate
           </button>
           <button type="button" onClick={exportCsv} className="inline-flex h-11 items-center gap-2 rounded-md border border-gray-200 px-4 text-sm font-bold shadow-sm">
             <Download size={18} /> Export

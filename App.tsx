@@ -6840,6 +6840,7 @@ export default function App() {
               entries={activeJournalEntries}
               enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
               payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+              invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
             />
           )}
           {activeTab === 'ar-calendar-tasks' && (

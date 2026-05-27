@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus, Qualification, Enrollment, Payment } from '../types';
+import { TransactionSummary, AccountClass, JournalLine, ChartOfAccount, User, Student, Sponsor, JournalEntry, Batch, BatchStatus, Qualification, Enrollment, Payment, Invoice } from '../types';
 import { TrendingUp, TrendingDown, DollarSign, Activity, Banknote, FileClock, BarChart3, LineChart as LucideLineChart, Printer, Users, Calendar, AlertCircle, Layers, CheckCircle, Clock, Award, Handshake, UserRound } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -20,9 +20,10 @@ interface DashboardProps {
   qualifications?: Qualification[];
   enrollments?: Enrollment[];
   payments?: Payment[];
+  invoices?: Invoice[];
 }
 
-const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [], payments = [] }) => {
+const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', lines, accounts, students = [], sponsors = [], entries = [], batches = [], enrollments = [], payments = [], invoices = [] }) => {
   const [dashboardMode, setDashboardMode] = useState<'sponsors' | 'students'>('sponsors');
   const activeContactType = dashboardMode === 'sponsors' ? 'SPONSOR' : 'STUDENT';
 
@@ -138,19 +139,44 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
 
   // 4. Unbilled Batches Logic
   const unbilledBatches = useMemo(() => {
-    // Candidates: Ongoing or Completed batches
     const candidates = batches.filter(b =>
       !b.isDeleted && (b.status === BatchStatus.ONGOING || b.status === BatchStatus.COMPLETED)
     );
 
-    // Identify Invoiced Batches by looking for Batch Code in Invoice References/Descriptions
-    // This is a heuristic since there isn't a direct hard-link yet.
-    // Ideally, we'd check a link table, but for now we search strings.
+    const billableEnrollments = enrollments.filter(enrollment =>
+      !enrollment.isDeleted &&
+      enrollment.enrollmentStatus !== 'DROPPED' &&
+      enrollment.billingType !== 'FREE_SPONSORED' &&
+      enrollment.billingType !== 'MANUAL_FREE'
+    );
+
+    const hasEnrollmentBillingData = billableEnrollments.length > 0;
+    const enrollmentBatchesWithUnbilledBalance = new Set<string>();
+    const invoiceBilledBatchIds = new Set(
+      invoices
+        .filter(invoice => !invoice.isDeleted && invoice.status !== 'VOIDED' && invoice.batchId)
+        .filter(invoice => dashboardMode === 'sponsors' ? Boolean(invoice.sponsorId) : Boolean(invoice.studentId))
+        .map(invoice => invoice.batchId as string)
+    );
+
+    billableEnrollments.forEach(enrollment => {
+      if (invoiceBilledBatchIds.has(enrollment.batchId)) return;
+
+      const totalFees = Number(enrollment.totalFees || 0);
+      const billedAmount = Number(enrollment.billedAmount || 0);
+      const hasUnbilledStatus = enrollment.billingStatus === 'UNBILLED' || enrollment.billingStatus === 'PARTIALLY_BILLED';
+      const hasRemainingAmount = totalFees > 0 ? billedAmount < totalFees - 0.01 : enrollment.billingStatus !== 'BILLED';
+
+      if (hasUnbilledStatus && hasRemainingAmount) {
+        enrollmentBatchesWithUnbilledBalance.add(enrollment.batchId);
+      }
+    });
+
+    // Fallback for legacy records without enrollment billing metadata.
     const invoicedBatchCodes = new Set<string>();
+    const invoiceEntries = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
 
-    const invoices = entries.filter(e => e.sourceType === 'INVOICE' && e.status !== 'REVERSED');
-
-    invoices.forEach(inv => {
+    invoiceEntries.forEach(inv => {
       const text = `${inv.reference} ${inv.description} `.toLowerCase();
       candidates.forEach(b => {
         if (b.batchCode && text.includes(b.batchCode.toLowerCase())) {
@@ -161,8 +187,8 @@ const ARDashboard: React.FC<DashboardProps> = ({ summaries, currency = 'USD', li
 
     return candidates
       .filter(b => dashboardMode === 'sponsors' ? Boolean(b.sponsorId) : (b.studentIds || []).length > 0)
-      .filter(b => !invoicedBatchCodes.has(b.id));
-  }, [batches, entries, dashboardMode]);
+      .filter(b => hasEnrollmentBillingData ? enrollmentBatchesWithUnbilledBalance.has(b.id) : !invoiceBilledBatchIds.has(b.id) && !invoicedBatchCodes.has(b.id));
+  }, [batches, entries, enrollments, invoices, dashboardMode]);
 
   // 5. Receivables by Income Source (using Revenue accounts from invoices)
   // This is tricky because AR lines don't map 1:1 to Revenue lines purely by account.
