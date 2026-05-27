@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  BarChart3,
-  Calendar,
   Download,
   Eye,
   FileText,
@@ -23,10 +21,7 @@ interface SOAViewProps {
   orgName?: string;
 }
 
-type PeriodFilter = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'YEARLY';
 type CustomerTypeFilter = 'ALL' | 'SPONSOR' | 'STUDENT';
-type DeliveryMethodFilter = 'ALL' | 'EMAIL' | 'PRINT';
-type StatusFilter = 'ALL' | 'OPEN' | 'OVERDUE';
 
 interface SOARow {
   id: string;
@@ -41,27 +36,6 @@ interface SOARow {
   overdueAmount: number;
   status: 'Open' | 'Overdue';
 }
-
-const periodOptions: Array<{ value: PeriodFilter; label: string }> = [
-  { value: 'WEEKLY', label: 'Weekly' },
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly' },
-  { value: 'SEMI_ANNUAL', label: 'Semi Annual' },
-  { value: 'YEARLY', label: 'Yearly' },
-];
-
-const getPeriodStartDate = (asOfDate: string, period: PeriodFilter) => {
-  const date = new Date(`${asOfDate}T00:00:00`);
-  const daysByPeriod: Record<PeriodFilter, number> = {
-    WEEKLY: 6,
-    MONTHLY: 30,
-    QUARTERLY: 91,
-    SEMI_ANNUAL: 182,
-    YEARLY: 364,
-  };
-  date.setDate(date.getDate() - daysByPeriod[period]);
-  return date.toISOString().split('T')[0];
-};
 
 const formatDateLabel = (value?: string) => {
   if (!value) return '-';
@@ -80,12 +54,9 @@ const SOAView: React.FC<SOAViewProps> = ({
 }) => {
   const today = new Date().toISOString().split('T')[0];
   const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
-  const [period, setPeriod] = useState<PeriodFilter>('MONTHLY');
   const [asOfDate, setAsOfDate] = useState(today);
   const [customerType, setCustomerType] = useState<CustomerTypeFilter>('ALL');
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethodFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [appliedFilters, setAppliedFilters] = useState({ period: 'MONTHLY' as PeriodFilter, asOfDate: today });
+  const [accountFilter, setAccountFilter] = useState('ALL');
 
   const formatCurrency = (val: number) =>
     `${currency}${currency.length === 1 ? '' : ' '}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -99,20 +70,17 @@ const SOAView: React.FC<SOAViewProps> = ({
     [accounts]
   );
 
-  const periodStartDate = useMemo(
-    () => getPeriodStartDate(appliedFilters.asOfDate, appliedFilters.period),
-    [appliedFilters]
-  );
-
   const soaRows = useMemo<SOARow[]>(() => {
-    const arAccountIds = new Set(arAccounts.map(account => account.id));
+    const selectedArAccounts = accountFilter === 'ALL'
+      ? arAccounts
+      : arAccounts.filter(account => account.code === accountFilter);
+    const arAccountIds = new Set(selectedArAccounts.map(account => account.id));
     const targetEntries = entries.filter(entry =>
       entry.status === 'POSTED' &&
-      entry.date >= periodStartDate &&
-      entry.date <= appliedFilters.asOfDate
+      entry.date <= asOfDate
     );
     const entryMap = new Map(targetEntries.map(entry => [entry.id, entry]));
-    const referenceDate = new Date(`${appliedFilters.asOfDate}T00:00:00`);
+    const referenceDate = new Date(`${asOfDate}T00:00:00`);
     const buckets = new Map<string, { totalOutstanding: number; overdueAmount: number }>();
 
     lines
@@ -150,7 +118,7 @@ const SOAView: React.FC<SOAViewProps> = ({
           customerName: sponsor.name,
           contactPerson: sponsor.contactPerson || `${sponsor.name} Main`,
           email: sponsor.email || '-',
-          coverage: `${formatDateLabel(periodStartDate)} to ${formatDateLabel(appliedFilters.asOfDate)}`,
+          coverage: `As of ${formatDateLabel(asOfDate)}`,
           deliveryMethod: delivery,
           totalOutstanding: balance.totalOutstanding,
           overdueAmount: Math.max(0, balance.overdueAmount),
@@ -159,14 +127,12 @@ const SOAView: React.FC<SOAViewProps> = ({
       })
       .filter(row => Math.abs(row.totalOutstanding) > 0.01)
       .sort((a, b) => b.totalOutstanding - a.totalOutstanding);
-  }, [appliedFilters.asOfDate, arAccounts, entries, lines, periodStartDate, sponsors]);
+  }, [accountFilter, arAccounts, asOfDate, entries, lines, sponsors]);
 
   const filteredRows = useMemo(() => soaRows.filter(row => {
     const matchesCustomer = customerType === 'ALL' || customerType === 'SPONSOR';
-    const matchesDelivery = deliveryMethod === 'ALL' || row.deliveryMethod === deliveryMethod;
-    const matchesStatus = statusFilter === 'ALL' || row.status.toUpperCase() === statusFilter;
-    return matchesCustomer && matchesDelivery && matchesStatus;
-  }), [customerType, deliveryMethod, soaRows, statusFilter]);
+    return matchesCustomer;
+  }), [customerType, soaRows]);
 
   const summary = useMemo(() => {
     const emailCount = filteredRows.filter(row => row.deliveryMethod === 'EMAIL').length;
@@ -188,15 +154,12 @@ const SOAView: React.FC<SOAViewProps> = ({
     pageEndIndex,
     paginatedRows,
     setCurrentPage,
-  } = usePaginatedRows(filteredRows, [period, asOfDate, customerType, deliveryMethod, statusFilter], 8);
+  } = usePaginatedRows(filteredRows, [asOfDate, customerType, accountFilter], 8);
 
   const clearFilters = () => {
-    setPeriod('MONTHLY');
     setAsOfDate(today);
     setCustomerType('ALL');
-    setDeliveryMethod('ALL');
-    setStatusFilter('ALL');
-    setAppliedFilters({ period: 'MONTHLY', asOfDate: today });
+    setAccountFilter('ALL');
   };
 
   const exportCsv = () => {
@@ -217,7 +180,7 @@ const SOAView: React.FC<SOAViewProps> = ({
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `soa-report-${appliedFilters.asOfDate}.csv`;
+    link.download = `soa-report-${asOfDate}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
