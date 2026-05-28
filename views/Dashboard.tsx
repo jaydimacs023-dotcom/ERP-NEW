@@ -691,7 +691,7 @@ const RegistrarDashboard: React.FC<DashboardProps> = ({ students = [], batches =
 };
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
-  const { summaries, currency = 'USD', lines, accounts, currentUser } = props;
+  const { summaries, currency = 'USD', accounts, currentUser } = props;
 
   // Conditional Render for AR Specialist
   if (currentUser?.role === 'AR_SPECIALIST') {
@@ -703,10 +703,19 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     return <RegistrarDashboard {...props} />;
   }
 
-  const assets = summaries.filter(s => s.accountClass === AccountClass.ASSET).reduce((sum, s) => sum + s.balance, 0);
-  const liabilities = summaries.filter(s => s.accountClass === AccountClass.LIABILITY).reduce((sum, s) => sum + s.balance, 0);
-  const revenue = summaries.filter(s => s.accountClass === AccountClass.REVENUE).reduce((sum, s) => sum + s.balance, 0);
-  const expenses = summaries.filter(s => s.accountClass === AccountClass.EXPENSE).reduce((sum, s) => sum + s.balance, 0);
+  const topLevelAccountIds = useMemo(
+    () => new Set(accounts.filter(account => !account.parentId).map(account => account.id)),
+    [accounts]
+  );
+  const topLevelSummaries = useMemo(
+    () => summaries.filter(summary => topLevelAccountIds.has(summary.accountId)),
+    [summaries, topLevelAccountIds]
+  );
+
+  const assets = topLevelSummaries.filter(s => s.accountClass === AccountClass.ASSET).reduce((sum, s) => sum + s.balance, 0);
+  const liabilities = topLevelSummaries.filter(s => s.accountClass === AccountClass.LIABILITY).reduce((sum, s) => sum + s.balance, 0);
+  const revenue = topLevelSummaries.filter(s => s.accountClass === AccountClass.REVENUE).reduce((sum, s) => sum + s.balance, 0);
+  const expenses = topLevelSummaries.filter(s => s.accountClass === AccountClass.EXPENSE).reduce((sum, s) => sum + s.balance, 0);
 
   const netIncome = revenue - expenses;
   const currentRatio = liabilities > 0 ? (assets / liabilities).toFixed(2) : 'N/A';
@@ -864,7 +873,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {[AccountClass.ASSET, AccountClass.LIABILITY, AccountClass.EQUITY, AccountClass.REVENUE, AccountClass.EXPENSE].map(cls => {
-                const s = summaries.filter(sum => sum.accountClass === cls);
+                const s = topLevelSummaries.filter(sum => sum.accountClass === cls);
                 const d = s.reduce((acc, val) => acc + val.totalDebit, 0);
                 const c = s.reduce((acc, val) => acc + val.totalCredit, 0);
                 const b = s.reduce((acc, val) => acc + val.balance, 0);
