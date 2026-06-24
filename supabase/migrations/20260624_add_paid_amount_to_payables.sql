@@ -1,0 +1,1 @@
+-- This migration is no longer needed - using existing amount column instead

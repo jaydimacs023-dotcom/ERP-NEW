@@ -612,7 +612,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
   const openPaymentModal = (payable: Payable) => {
     setSelectedPayable(payable);
-    const remainingAmount = (payable.netPayable || payable.amount) - (payable.paidAmount || 0);
+    const remainingAmount = payable.netPayable || payable.amount;
     setPaymentData({
       paymentMethod: 'bank_transfer',
       bankAccountId: '',
@@ -680,7 +680,6 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       netPayable: formData.netPayable,
       invoiceType: formData.invoiceType,
       inputVatAmount: formData.inputVatAmount,
-      paidAmount: 0,
       createdBy: currentUserId,
       createdAt: new Date().toISOString(),
       isDeleted: false,
@@ -771,7 +770,6 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       updates.paidBy = currentUserId;
       updates.paidAt = new Date().toISOString();
       updates.paymentDate = new Date().toISOString().slice(0, 10);
-      updates.paidAmount = payable.netPayable || payable.amount;
     }
 
     onUpdatePayable(id, updates);
@@ -986,13 +984,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     onPostJournal(journalEntry, lines);
 
     // Update payable status
-    const totalPaid = (selectedPayable.paidAmount || 0) + paymentData.amountPaid;
     const totalDue = selectedPayable.netPayable || selectedPayable.amount;
-    const newStatus: PayableStatus = totalPaid >= totalDue ? 'paid' : 'partially_paid';
+    const newStatus: PayableStatus = 'paid';
 
     onUpdatePayable(selectedPayable.id, {
       status: newStatus,
-      paidAmount: totalPaid,
       paymentDate: paymentData.paymentDate,
       paymentMethod: paymentData.paymentMethod,
       paymentBankAccountId: paymentData.bankAccountId,
@@ -1130,7 +1126,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                   const statusConfig = STATUS_CONFIG[payable.status];
                   const isOverdue = payable.status !== 'paid' && payable.status !== 'cancelled' && new Date(payable.dueDate) < new Date();
                   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
-                  const remainingBalance = (payable.netPayable || payable.amount) - (payable.paidAmount || 0);
+                  const remainingBalance = payable.status === 'paid' ? 0 : (payable.netPayable || payable.amount);
                   const isPosted = !!payable.journalEntryId;
 
                   return (
@@ -1481,7 +1477,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             onClick={() => { resetForm(); setShowCreateModal(true); }}
             className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-medium text-sm active:scale-95"
           >
-            <Plus size={18} /> New Invoice
+            <Plus size={18} /> New Bill
           </button>
         </div>
       </div>
@@ -1489,7 +1485,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         {[
-          { key: 'list', label: 'Invoice List', icon: FileText },
+          { key: 'list', label: 'Bill List', icon: FileText },
           { key: 'aging', label: 'Aging Report', icon: BarChart3 },
           { key: 'reconciliation', label: 'Reconciliation', icon: RefreshCw },
         ].map(tab => (
@@ -1525,7 +1521,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Create Modal */}
       {showCreateModal && (
         <PayableFormModal
-          title="Create Invoice / Bill"
+          title="Create Bill"
           formData={formData}
           setFormData={setFormData}
           vendors={orgVendors}
@@ -1653,7 +1649,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-800">Outstanding Balance</span>
                   <span className="text-xl font-semibold text-brand">
-                    {"\u20B1"}{formatCurrency((selectedPayable.netPayable || selectedPayable.amount) - (selectedPayable.paidAmount || 0))}
+                    {"\u20B1"}{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}
                   </span>
                 </div>
               </div>
@@ -2127,7 +2123,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   const glAccount = accounts.find(a => a.id === payable.glAccountId);
   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
   const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const remainingBalance = (payable.netPayable || payable.amount) - (payable.paidAmount || 0);
+  const remainingBalance = payable.status === 'paid' ? 0 : (payable.netPayable || payable.amount);
 
   return (
     <ModalPortal>
@@ -2199,7 +2195,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Paid Amount</p>
-              <p className="text-brand font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.paidAmount || 0)}</p>
+              <p className="text-brand font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.amount || 0)}</p>
             </div>
             {payable.referenceDocument && (
               <div className="col-span-2">
