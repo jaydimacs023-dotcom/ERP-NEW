@@ -6,8 +6,24 @@
 
 import { 
   StockItem, InventoryLevel, InventoryTransaction, 
-  StockAdjustment, JournalLine 
+  JournalLine
 } from '../types';
+
+const levelQuantity = (level?: InventoryLevel): number =>
+  Number(level?.quantityOnHand ?? level?.quantityAvailable ?? 0);
+
+const itemCost = (item?: StockItem): number =>
+  Number(item?.standardCost ?? item?.costPrice ?? 0);
+
+const transactionDate = (transaction: InventoryTransaction): string =>
+  String((transaction as InventoryTransaction & { postingDate?: string }).postingDate || transaction.createdAt || '');
+
+const transactionDirection = (transaction: InventoryTransaction): 'IN' | 'OUT' => {
+  const signedQuantity = Number((transaction as InventoryTransaction & { quantityChange?: number }).quantityChange);
+  if (Number.isFinite(signedQuantity) && signedQuantity !== 0) return signedQuantity > 0 ? 'IN' : 'OUT';
+  const type = String(transaction.transactionType || '').toUpperCase();
+  return ['SALE', 'DAMAGE', 'WRITEOFF', 'INVENTORY_WRITEOFF'].includes(type) ? 'OUT' : 'IN';
+};
 
 export interface StockAgingData {
   itemCode: string;
@@ -78,18 +94,18 @@ export class InventoryReportingService {
       const level = levels.find(l => l.stockItemId === item.id);
       const itemTransactions = transactions
         .filter(t => t.stockItemId === item.id)
-        .sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime());
+        .sort((a, b) => new Date(transactionDate(b)).getTime() - new Date(transactionDate(a)).getTime());
 
       const lastMovement = itemTransactions.length > 0 
-        ? itemTransactions[0].transactionDate 
+        ? transactionDate(itemTransactions[0])
         : item.createdAt;
 
       const daysInStock = Math.floor(
         (asOfTime - new Date(lastMovement).getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      const currentQuantity = level?.quantity || 0;
-      const value = currentQuantity * item.costPrice;
+      const currentQuantity = levelQuantity(level);
+      const value = currentQuantity * itemCost(item);
 
       let ageCategory: 'Fresh' | 'Active' | 'Slow' | 'Dead';
       if (daysInStock < 30) ageCategory = 'Fresh';
@@ -120,13 +136,13 @@ export class InventoryReportingService {
   ): ValuationData[] {
     return items.map(item => {
       const level = levels.find(l => l.stockItemId === item.id);
-      const quantity = level?.quantity || 0;
+      const quantity = levelQuantity(level);
 
       // FIFO: Assumes oldest costs are consumed first
       // Current stock valued at most recent costs
       const itemTransactions = transactions
-        .filter(t => t.stockItemId === item.id && t.type === 'IN')
-        .sort((a, b) => new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime());
+        .filter(t => t.stockItemId === item.id && transactionDirection(t) === 'IN')
+        .sort((a, b) => new Date(transactionDate(a)).getTime() - new Date(transactionDate(b)).getTime());
 
       let fifoValue = 0;
       let remainingQty = quantity;
@@ -134,7 +150,7 @@ export class InventoryReportingService {
         const txn = itemTransactions[i];
         const qtyFromTxn = Math.min(txn.quantity, remainingQty);
         // Approximate: use historical cost price (simplified)
-        fifoValue += qtyFromTxn * item.costPrice;
+        fifoValue += qtyFromTxn * Number(txn.unitCost || itemCost(item));
         remainingQty -= qtyFromTxn;
       }
 
@@ -145,14 +161,14 @@ export class InventoryReportingService {
       for (let i = 0; i < itemTransactions.length && remainingQty > 0; i++) {
         const txn = itemTransactions[i];
         const qtyFromTxn = Math.min(txn.quantity, remainingQty);
-        lifoValue += qtyFromTxn * item.costPrice;
+        lifoValue += qtyFromTxn * Number(txn.unitCost || itemCost(item));
         remainingQty -= qtyFromTxn;
       }
 
       // Weighted Average Cost
       const totalInboundQty = itemTransactions.reduce((sum, t) => sum + t.quantity, 0);
       const totalInboundValue = itemTransactions.reduce(
-        (sum, t) => sum + (t.quantity * item.costPrice), 
+        (sum, t) => sum + (t.quantity * Number(t.unitCost || itemCost(item))),
         0
       );
       const weightedAvgCost = totalInboundQty > 0 ? totalInboundValue / totalInboundQty : 0;
@@ -165,7 +181,7 @@ export class InventoryReportingService {
         fifoValue,
         lifoValue,
         weightedAvgValue,
-        currentCostPrice: item.costPrice,
+        currentCostPrice: itemCost(item),
       };
     });
   }
@@ -186,16 +202,16 @@ export class InventoryReportingService {
     // Generate periods (last N months)
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const period = date.toISOString().slice(0, 7); // YYYY-MM
+      const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       periodMap[period] = { inbound: 0, outbound: 0 };
     }
 
     // Aggregate transactions by period
     transactions.forEach(txn => {
-      const period = txn.transactionDate.slice(0, 7);
+      const period = transactionDate(txn).slice(0, 7);
       if (periodMap[period]) {
-        if (txn.type === 'IN') periodMap[period].inbound += txn.quantity;
-        else if (txn.type === 'OUT') periodMap[period].outbound += txn.quantity;
+        if (transactionDirection(txn) === 'IN') periodMap[period].inbound += txn.quantity;
+        else periodMap[period].outbound += txn.quantity;
       }
     });
 
@@ -204,11 +220,11 @@ export class InventoryReportingService {
       let runningBalance = 0;
       Object.entries(periodMap).forEach(([period, { inbound, outbound }]) => {
         const itemTxns = transactions.filter(
-          t => t.stockItemId === item.id && t.transactionDate.startsWith(period)
+          t => t.stockItemId === item.id && transactionDate(t).startsWith(period)
         );
         
-        const itemInbound = itemTxns.filter(t => t.type === 'IN').reduce((sum, t) => sum + t.quantity, 0);
-        const itemOutbound = itemTxns.filter(t => t.type === 'OUT').reduce((sum, t) => sum + t.quantity, 0);
+        const itemInbound = itemTxns.filter(t => transactionDirection(t) === 'IN').reduce((sum, t) => sum + t.quantity, 0);
+        const itemOutbound = itemTxns.filter(t => transactionDirection(t) === 'OUT').reduce((sum, t) => sum + t.quantity, 0);
         const netMovement = itemInbound - itemOutbound;
         runningBalance += netMovement;
 
@@ -240,7 +256,7 @@ export class InventoryReportingService {
   ): VarianceData[] {
     return items.map(item => {
       const level = levels.find(l => l.stockItemId === item.id);
-      const actualQuantity = level?.quantity || 0;
+      const actualQuantity = levelQuantity(level);
 
       // Expected quantity from GL ledger
       const itemLines = ledgerLines.filter(l => l.itemId === item.id);
@@ -248,7 +264,7 @@ export class InventoryReportingService {
 
       const variance = actualQuantity - expectedQuantity;
       const variancePercent = expectedQuantity > 0 ? (variance / expectedQuantity) * 100 : 0;
-      const varianceValue = Math.abs(variance) * item.costPrice;
+      const varianceValue = Math.abs(variance) * itemCost(item);
 
       let severity: 'Critical' | 'High' | 'Medium' | 'Low';
       const absVariancePercent = Math.abs(variancePercent);
@@ -283,10 +299,13 @@ export class InventoryReportingService {
     // Calculate annual consumption value per item
     const itemValues = items.map(item => {
       const itemTransactions = transactions.filter(
-        t => t.stockItemId === item.id && t.type === 'OUT'
+        t => t.stockItemId === item.id && transactionDirection(t) === 'OUT'
       );
       const annualConsumption = itemTransactions.reduce((sum, t) => sum + t.quantity, 0);
-      const annualConsumptionValue = annualConsumption * item.costPrice;
+      const annualConsumptionValue = itemTransactions.reduce(
+        (sum, transaction) => sum + transaction.quantity * Number(transaction.unitCost || itemCost(item)),
+        0
+      );
 
       return {
         itemCode: item.code,
@@ -339,16 +358,16 @@ export class InventoryReportingService {
     return items
       .filter(item => {
         const level = levels.find(l => l.stockItemId === item.id);
-        return !level || level.quantity < item.minStockLevel;
+        return !level || levelQuantity(level) < item.minStockLevel;
       })
       .map(item => {
         const level = levels.find(l => l.stockItemId === item.id);
         return {
           itemCode: item.code,
           itemName: item.name,
-          currentQuantity: level?.quantity || 0,
+          currentQuantity: levelQuantity(level),
           minLevel: item.minStockLevel,
-          deficit: item.minStockLevel - (level?.quantity || 0),
+          deficit: item.minStockLevel - levelQuantity(level),
           reorderQuantity: item.reorderQuantity,
         };
       });
@@ -366,7 +385,7 @@ export class InventoryReportingService {
     const totalInventoryValue = levels.reduce(
       (sum, level) => {
         const item = items.find(i => i.id === level.stockItemId);
-        return sum + ((level.quantity || 0) * (item?.costPrice || 0));
+        return sum + (levelQuantity(level) * itemCost(item));
       },
       0
     );
@@ -375,10 +394,10 @@ export class InventoryReportingService {
 
     // Inventory Turnover = Cost of Goods Sold / Average Inventory Value
     const totalOutbound = transactions
-      .filter(t => t.type === 'OUT')
+      .filter(t => transactionDirection(t) === 'OUT')
       .reduce((sum, t) => {
         const item = items.find(i => i.id === t.stockItemId);
-        return sum + (t.quantity * (item?.costPrice || 0));
+        return sum + (t.quantity * Number(t.unitCost || itemCost(item)));
       }, 0);
 
     const inventoryTurnover = totalInventoryValue > 0 ? totalOutbound / totalInventoryValue : 0;
@@ -390,7 +409,7 @@ export class InventoryReportingService {
       inventoryTurnover,
       daysInventoryOutstanding,
       itemCount: items.length,
-      activeItems: items.filter(i => levels.find(l => l.stockItemId === i.id && l.quantity > 0)).length,
+      activeItems: items.filter(i => levels.find(l => l.stockItemId === i.id && levelQuantity(l) > 0)).length,
     };
   }
 }

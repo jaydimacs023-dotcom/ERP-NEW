@@ -168,9 +168,9 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                       </td>
                       <td className="px-8 py-4 text-right">
                          <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
-                           row.ageCategory.startsWith('0-30') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                           row.ageCategory.startsWith('31-60') ? 'bg-orange-50 text-orange-700 border border-orange-100' :
-                           row.ageCategory.startsWith('61-90') ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                           row.ageCategory === 'Fresh' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                           row.ageCategory === 'Active' ? 'bg-orange-50 text-orange-700 border border-orange-100' :
+                           row.ageCategory === 'Slow' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                            'bg-rose-50 text-rose-700 border border-rose-100'
                          }`}>
                            {row.ageCategory}
@@ -189,7 +189,7 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
                <div className="space-y-6">
                   <div className="flex items-center justify-between border-b border-white/10 pb-4">
                      <p className="text-xs font-bold text-gray-400">Average Retention</p>
-                     <p className="text-xl font-semibold">{Math.round(agingReport.reduce((a,b)=>a+b.daysInStock,0)/agingReport.length)} Days</p>
+                     <p className="text-xl font-semibold">{agingReport.length ? Math.round(agingReport.reduce((a,b)=>a+b.daysInStock,0)/agingReport.length) : 0} Days</p>
                   </div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-4">
                      <p className="text-xs font-bold text-gray-400">Total Asset Value</p>

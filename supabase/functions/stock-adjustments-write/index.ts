@@ -81,12 +81,11 @@ function requestedOrgId(actor: JwtPayload, body: any): string {
 }
 
 function adjustmentValues(input: any, actorId: string) {
-  const type = ["DAMAGE", "WRITEOFF", "ADJUSTMENT", "CORRECTION"].includes(input.adjustmentType)
+  const type = ["DAMAGE", "DAMAGED", "LOST", "EXPIRED", "SHRINKAGE", "WRITEOFF", "ADJUSTMENT", "CORRECTION"].includes(input.adjustmentType)
     ? input.adjustmentType
     : "ADJUSTMENT";
   const quantity = Math.abs(Number(input.quantity ?? input.quantityChange ?? 0));
-  const quantityChange = ["DAMAGE", "WRITEOFF"].includes(type) ? -quantity : quantity;
-  const isApproved = Boolean(input.isApproved);
+  const quantityChange = ["DAMAGE", "DAMAGED", "LOST", "EXPIRED", "SHRINKAGE", "WRITEOFF"].includes(type) ? -quantity : quantity;
   return {
     stock_item_id: String(input.stockItemId || input.stock_item_id || ""),
     warehouse_location_id: String(input.warehouseLocationId || input.warehouse_location_id || ""),
@@ -94,8 +93,8 @@ function adjustmentValues(input: any, actorId: string) {
     quantity_change: quantityChange,
     reason: String(input.reason || "").trim(),
     notes: String(input.notes || "").trim() || null,
-    approved_by: isApproved ? actorId : null,
-    approval_date: isApproved ? new Date().toISOString() : null,
+    approved_by: actorId,
+    approval_date: new Date().toISOString(),
   };
 }
 
@@ -132,13 +131,31 @@ Deno.serve(async (request) => {
 
   if (body.action === "list_levels") {
     const { data, error } = await admin
-      .from("inventory_levels")
-      .select("*")
+      .from("inventory_ledger")
+      .select("id,org_id,stock_item_id,warehouse_location_id,running_quantity,posting_date,created_at")
       .eq("org_id", orgId)
-      .eq("is_deleted", false)
-      .order("updated_at", { ascending: false });
+      .order("id", { ascending: false });
     if (error) return json(400, { error: error.message, code: error.code });
-    return json(200, { levels: data || [] });
+    const latest = new Map<string, any>();
+    for (const row of data || []) {
+      const key = `${row.stock_item_id}:${row.warehouse_location_id}`;
+      if (!latest.has(key)) {
+        const quantity = Number(row.running_quantity || 0);
+        latest.set(key, {
+          id: `ledger-${row.id}`,
+          org_id: row.org_id,
+          stock_item_id: row.stock_item_id,
+          warehouse_location_id: row.warehouse_location_id,
+          quantity_on_hand: quantity,
+          quantity_reserved: 0,
+          quantity_available: quantity,
+          last_counted: row.posting_date,
+          updated_at: row.created_at,
+          is_deleted: false,
+        });
+      }
+    }
+    return json(200, { levels: [...latest.values()] });
   }
 
   if (body.action === "create") {

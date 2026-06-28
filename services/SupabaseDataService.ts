@@ -2127,6 +2127,51 @@ export class SupabaseDataService implements IDataService {
       };
     }
 
+    if (table === 'inventory_transactions') {
+      const orgId = String(options.filters?.find(filter => filter.column === 'org_id')?.value || '');
+      let rows = await this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
+      for (const filter of options.filters || []) {
+        if (filter.column === 'org_id') continue;
+        const camelColumn = filter.column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+        const rowValue = (row: any) => row[camelColumn];
+        switch (filter.operator || 'eq') {
+          case 'neq':
+            rows = rows.filter(row => String(rowValue(row)) !== String(filter.value));
+            break;
+          case 'in': {
+            const accepted = Array.isArray(filter.value) ? filter.value.map(String) : String(filter.value).split(',');
+            rows = rows.filter(row => accepted.includes(String(rowValue(row))));
+            break;
+          }
+          default:
+            rows = rows.filter(row => String(rowValue(row)) === String(filter.value));
+        }
+      }
+      const searchTerm = options.search?.term?.trim().toLowerCase();
+      if (searchTerm && options.search?.columns.length) {
+        rows = rows.filter(row => options.search!.columns.some(column => {
+          const camelColumn = column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+          return String(row[camelColumn] || '').toLowerCase().includes(searchTerm);
+        }));
+      }
+      for (const order of [...(options.orderBy || [])].reverse()) {
+        const camelColumn = order.column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+        rows.sort((left, right) => {
+          const comparison = String(left[camelColumn] ?? '').localeCompare(String(right[camelColumn] ?? ''));
+          return order.ascending === false ? -comparison : comparison;
+        });
+      }
+      const total = rows.length;
+      const from = (page - 1) * pageSize;
+      return {
+        rows: rows.slice(from, from + pageSize) as T[],
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+    }
+
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     const url = new URL(`${this.baseUrl}/${table}`);

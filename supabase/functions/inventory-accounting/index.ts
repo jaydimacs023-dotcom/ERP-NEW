@@ -158,10 +158,23 @@ Deno.serve(async request => {
     return error ? response(400, { error: error.message }) : response(200, { result: data || [] });
   }
   if (body.action === "list_transactions") {
-    const { data, error } = await admin.from("inventory_transactions").select("*")
-      .eq("org_id", orgId).eq("is_deleted", false)
-      .order("created_at", { ascending: false }).limit(5000);
-    return error ? response(400, { error: error.message }) : response(200, { result: data || [] });
+    const [transactionsResult, ledgerResult] = await Promise.all([
+      admin.from("inventory_transactions").select("*")
+        .eq("org_id", orgId).eq("is_deleted", false)
+        .order("created_at", { ascending: false }).limit(5000),
+      admin.from("inventory_ledger").select("transaction_id,quantity_change")
+        .eq("org_id", orgId).limit(5000),
+    ]);
+    if (transactionsResult.error) return response(400, { error: transactionsResult.error.message });
+    if (ledgerResult.error) return response(400, { error: ledgerResult.error.message });
+    const quantityByTransaction = new Map(
+      (ledgerResult.data || []).map(row => [row.transaction_id, Number(row.quantity_change || 0)])
+    );
+    const result = (transactionsResult.data || []).map(transaction => ({
+      ...transaction,
+      quantity_change: quantityByTransaction.get(transaction.id),
+    }));
+    return response(200, { result });
   }
   return response(400, { error: "Unsupported action" });
 });

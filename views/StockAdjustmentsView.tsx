@@ -24,14 +24,13 @@ interface StockAdjustmentsViewProps {
 interface FormData {
   stockItemId: string;
   warehouseLocationId: string;
-  adjustmentType: 'DAMAGE' | 'WRITEOFF' | 'ADJUSTMENT' | 'CORRECTION';
+  adjustmentType: typeof ADJUSTMENT_TYPES[number];
   quantity: string;
   reason: string;
   notes: string;
-  isApproved: boolean;
 }
 
-const ADJUSTMENT_TYPES = ['DAMAGE', 'WRITEOFF', 'ADJUSTMENT', 'CORRECTION'] as const;
+const ADJUSTMENT_TYPES = ['ADJUSTMENT', 'CORRECTION', 'DAMAGE', 'LOST', 'EXPIRED', 'SHRINKAGE', 'WRITEOFF'] as const;
 
 const INITIAL_FORM: FormData = {
   stockItemId: '',
@@ -40,7 +39,6 @@ const INITIAL_FORM: FormData = {
   quantity: '',
   reason: '',
   notes: '',
-  isApproved: false,
 };
 
 export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
@@ -94,7 +92,6 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
       quantity: String(adj.quantity ?? ''),
       reason: adj.reason || '',
       notes: adj.notes || '',
-      isApproved: adj.isApproved,
     });
     setError(null);
     setShowForm(true);
@@ -146,7 +143,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
         quantity: Number(formData.quantity),
         reason: formData.reason.trim(),
         notes: formData.notes.trim(),
-        isApproved: formData.isApproved,
+        isApproved: true,
       };
 
       if (editingId) {
@@ -444,22 +441,9 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                     />
                  </div>
 
-                 <div className="md:col-span-2">
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          checked={formData.isApproved}
-                          onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
-                          disabled={submitting}
-                          className="sr-only peer"
-                        />
-                        <div className="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-[#F47721] transition-colors"></div>
-                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
-                      </div>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide group-hover:text-gray-800 transition-colors">Mark as Authorized / Approved</span>
-                    </label>
-                  </div>
+                 <div className="md:col-span-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                   Committing posts an immutable inventory-ledger movement and its balanced journal entry. Corrections must be entered as a new reversing adjustment.
+                 </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -661,26 +645,30 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                               GL Posted
                             </div>
                           )}
-                          <button
-                            onClick={() => handleEditClick(adj)}
-                            disabled={submitting}
-                            className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(adj.id)}
-                            disabled={submitting}
-                            className={`p-2 rounded transition-colors ${
-                              deleting === adj.id
-                                ? 'bg-red-100 text-red-700'
-                                : 'hover:bg-red-50 text-red-600 hover:text-red-700'
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                            title={deleting === adj.id ? 'Click again to confirm' : 'Delete'}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {!adj.isApproved && (
+                            <>
+                              <button
+                                onClick={() => handleEditClick(adj)}
+                                disabled={submitting}
+                                className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(adj.id)}
+                                disabled={submitting}
+                                className={`p-2 rounded transition-colors ${
+                                  deleting === adj.id
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'hover:bg-red-50 text-red-600 hover:text-red-700'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title={deleting === adj.id ? 'Click again to confirm' : 'Delete'}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

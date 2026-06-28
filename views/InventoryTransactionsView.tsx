@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Eye, X, ChevronDown, Package, MapPin, Calendar, Hash, FileText, Filter, Search, ArrowUpRight, ArrowDownLeft, RefreshCcw, Check } from 'lucide-react';
-import { InventoryTransaction, StockItem, InventoryTransactionType, Organization } from '../types';
+import { InventoryTransaction, StockItem, Organization } from '../types';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter, PageOrder } from '../services/IDataService';
@@ -21,9 +21,11 @@ const INVENTORY_TRANSACTION_COLUMNS = 'id,org_id,reference_number,stock_item_id,
 interface TransactionWithDetails extends InventoryTransaction {
   item?: StockItem;
   location?: any;
+  displayType: string;
+  signedQuantity: number;
 }
 
-const TRANSACTION_TYPE_LABELS: Record<InventoryTransactionType, string> = {
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   PURCHASE: 'Stock Inbound',
   SALE: 'Stock Outbound',
   ADJUSTMENT: 'Manual Adj.',
@@ -31,9 +33,14 @@ const TRANSACTION_TYPE_LABELS: Record<InventoryTransactionType, string> = {
   RETURN: 'Customer Return',
   DAMAGE: 'Damage Claim',
   WRITEOFF: 'Write-off (Expensed)',
+  OPENING_INVENTORY: 'Opening Inventory',
+  INVENTORY_WRITEOFF: 'Inventory Write-off',
+  STOCK_ADJUSTMENT: 'Stock Adjustment',
+  CYCLE_COUNT_ADJUSTMENT: 'Count Adjustment',
+  REVERSAL: 'Reversal',
 };
 
-const TRANSACTION_TYPE_UI: Record<InventoryTransactionType, { color: string, icon: React.ReactNode }> = {
+const TRANSACTION_TYPE_UI: Record<string, { color: string, icon: React.ReactNode }> = {
   PURCHASE: { color: 'bg-emerald-100 text-emerald-700', icon: <ArrowDownLeft size={12} /> },
   SALE: { color: 'bg-orange-100 text-orange-700', icon: <ArrowUpRight size={12} /> },
   ADJUSTMENT: { color: 'bg-amber-100 text-amber-700', icon: <RefreshCcw size={12} /> },
@@ -41,7 +48,16 @@ const TRANSACTION_TYPE_UI: Record<InventoryTransactionType, { color: string, ico
   RETURN: { color: 'bg-blue-100 text-blue-700', icon: <ArrowDownLeft size={12} /> },
   DAMAGE: { color: 'bg-rose-100 text-rose-700', icon: <ArrowUpRight size={12} /> },
   WRITEOFF: { color: 'bg-gray-100 text-gray-700', icon: <ArrowUpRight size={12} /> },
+  OPENING_INVENTORY: { color: 'bg-emerald-100 text-emerald-700', icon: <ArrowDownLeft size={12} /> },
+  INVENTORY_WRITEOFF: { color: 'bg-rose-100 text-rose-700', icon: <ArrowUpRight size={12} /> },
+  STOCK_ADJUSTMENT: { color: 'bg-amber-100 text-amber-700', icon: <RefreshCcw size={12} /> },
+  CYCLE_COUNT_ADJUSTMENT: { color: 'bg-blue-100 text-blue-700', icon: <RefreshCcw size={12} /> },
+  REVERSAL: { color: 'bg-violet-100 text-violet-700', icon: <RefreshCcw size={12} /> },
 };
+
+const FALLBACK_TYPE_UI = { color: 'bg-gray-100 text-gray-700', icon: <RefreshCcw size={12} /> };
+const transactionTypeLabel = (type: string) =>
+  TRANSACTION_TYPE_LABELS[type] || type.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
 
 export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps> = ({
   orgId,
@@ -53,7 +69,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
   organization,
 }) => {
   const brandColor = organization?.primaryColor || '#F47721';
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<InventoryTransactionType | 'ALL'>('ALL');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'item' | 'type'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -141,7 +157,8 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
       .map((t) => {
         const normalized = {
           ...t,
-          type: (t as any).type || (t as any).transactionType,
+          displayType: String((t as any).transactionType || (t as any).type || 'UNKNOWN').toUpperCase(),
+          signedQuantity: Number((t as any).quantityChange ?? t.quantity ?? 0),
           warehouseLocationId: (t as any).warehouseLocationId || (t as any).toLocationId || (t as any).fromLocationId,
         } as TransactionWithDetails;
 
@@ -157,7 +174,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     let filtered = transactionsWithDetails;
 
     if (selectedTypeFilter !== 'ALL') {
-      filtered = filtered.filter((t) => t.type === selectedTypeFilter);
+      filtered = filtered.filter((t) => t.displayType === selectedTypeFilter);
     }
 
     if (selectedItemFilter !== 'ALL') {
@@ -184,7 +201,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           comparison = (a.item?.code || '').localeCompare(b.item?.code || '');
           break;
         case 'type':
-          comparison = a.type.localeCompare(b.type);
+          comparison = a.displayType.localeCompare(b.displayType);
           break;
       }
 
@@ -199,9 +216,9 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
     const summary = {
       totalTransactions: transactionsWithDetails.length,
       totalQty,
-      purchases: transactionsWithDetails.filter((t) => t.type === 'PURCHASE').length,
-      sales: transactionsWithDetails.filter((t) => t.type === 'SALE').length,
-      abnormal: transactionsWithDetails.filter((t) => ['DAMAGE', 'WRITEOFF', 'ADJUSTMENT'].includes(t.type)).length,
+      purchases: transactionsWithDetails.filter((t) => ['PURCHASE', 'RETURN', 'OPENING_INVENTORY'].includes(t.displayType)).length,
+      sales: transactionsWithDetails.filter((t) => t.displayType === 'SALE').length,
+      abnormal: transactionsWithDetails.filter((t) => ['DAMAGE', 'WRITEOFF', 'INVENTORY_WRITEOFF', 'ADJUSTMENT', 'STOCK_ADJUSTMENT', 'CYCLE_COUNT_ADJUSTMENT'].includes(t.displayType)).length,
     };
     return summary;
   }, [transactionsWithDetails]);
@@ -239,8 +256,8 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
           new Date(t.createdAt).toLocaleDateString(),
           `"${t.item?.code || ''}"`,
           `"${t.item?.name || ''}"`,
-          `"${TRANSACTION_TYPE_LABELS[t.type]}"`,
-          t.quantity,
+          `"${transactionTypeLabel(t.displayType)}"`,
+          t.signedQuantity,
           `"${t.item?.unitOfMeasure || ''}"`,
           `"${t.location?.code || ''}"`,
           `"${t.referenceNumber || ''}"`,
@@ -451,15 +468,15 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                       </td>
                       <td className="px-6 py-5">
                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide flex items-center gap-1 ${TRANSACTION_TYPE_UI[tx.type].color} bg-white border border-black/5`}>
-                               {TRANSACTION_TYPE_UI[tx.type].icon}
-                               {TRANSACTION_TYPE_LABELS[tx.type]}
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide flex items-center gap-1 ${(TRANSACTION_TYPE_UI[tx.displayType] || FALLBACK_TYPE_UI).color} bg-white border border-black/5`}>
+                               {(TRANSACTION_TYPE_UI[tx.displayType] || FALLBACK_TYPE_UI).icon}
+                               {transactionTypeLabel(tx.displayType)}
                             </span>
                          </div>
                       </td>
                       <td className="px-6 py-5 text-right font-mono">
                          <div className="text-sm font-semibold">
-                            {tx.quantity > 0 ? '+' : ''}{tx.quantity}
+                            {tx.signedQuantity > 0 ? '+' : ''}{tx.signedQuantity}
                             <span className="text-[9px] text-gray-400 ml-1 font-bold">{tx.item?.unitOfMeasure}</span>
                          </div>
                       </td>

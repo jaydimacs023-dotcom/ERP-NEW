@@ -571,15 +571,22 @@ export default function App() {
   const [reorderPoints, setReorderPoints] = useState<ReorderPoint[]>([]);
 
   useEffect(() => {
-    if (!currentOrgId || !['inventory', 'stock-items', 'stock-levels'].includes(activeTab)) return;
+    if (!currentOrgId || !['inventory', 'stock-items', 'stock-levels', 'inventory-reports'].includes(activeTab)) return;
 
     let isActive = true;
-    dataService.getInventoryLevelsByOrg(currentOrgId)
-      .then(levels => {
-        if (isActive) setInventoryLevels(levels);
+    Promise.all([
+      dataService.getInventoryLevelsByOrg(currentOrgId),
+      activeTab === 'inventory-reports'
+        ? dataService.getInventoryTransactionsByOrg(currentOrgId)
+        : Promise.resolve<InventoryTransaction[] | null>(null),
+    ])
+      .then(([levels, transactions]) => {
+        if (!isActive) return;
+        setInventoryLevels(levels);
+        if (transactions) setInventoryTransactions(transactions);
       })
       .catch(error => {
-        console.error('[App] Failed to refresh inventory levels:', error);
+        console.error('[App] Failed to refresh inventory analytics data:', error);
       });
 
     return () => {
@@ -6966,8 +6973,8 @@ export default function App() {
           {/* Inventory Management Views */}
           {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} />}
           {activeTab === 'warehouse-locations' && <WarehouseLocationsView orgId={currentOrgId} locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'inventory-classes' && <InventoryClassesView classes={inventoryClasses} accounts={filteredAccounts} warehouses={warehouseLocations} onSave={handleSaveInventoryClass} />}
-          {activeTab === 'opening-inventory' && <OpeningInventoryView items={stockItems} warehouses={warehouseLocations} onPost={handlePostOpeningInventory} />}
+          {activeTab === 'inventory-classes' && <InventoryClassesView classes={inventoryClasses} accounts={filteredAccounts} warehouses={warehouseLocations} organization={currentOrg} onSave={handleSaveInventoryClass} />}
+          {activeTab === 'opening-inventory' && <OpeningInventoryView items={stockItems} warehouses={warehouseLocations} organization={currentOrg} onPost={handlePostOpeningInventory} />}
           {activeTab === 'stock-items' && <StockItemsView orgId={currentOrgId} items={stockItems.filter(i => !i.isDeleted)} inventoryClasses={inventoryClasses} accounts={filteredAccounts} locations={warehouseLocations.filter(location => !location.isDeleted)} levels={inventoryLevels.filter(level => !level.isDeleted)} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} onManageQuantity={() => setActiveTab('stock-adjustments')} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
           {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}

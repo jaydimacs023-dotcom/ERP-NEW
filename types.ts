@@ -751,7 +751,9 @@ export interface OpeningInventoryLine {
   warehouseLocationId: string;
   stockItemId: string;
   quantity: number;
+  quantityChange?: number;
   unitCost: number;
+  postingDate?: string;
   batchLot?: string;
   expirationDate?: string;
   remarks?: string;

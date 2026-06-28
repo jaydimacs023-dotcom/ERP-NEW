@@ -12,7 +12,7 @@ create table if not exists public.inventory_classes (
   write_off_account_id uuid references public.chart_of_accounts(id),
   opening_balance_equity_account_id uuid references public.chart_of_accounts(id),
   default_warehouse_id uuid references public.warehouse_locations(id),
-  valuation_method text not null default 'FIFO'
+  valuation_method text not null default 'WEIGHTED_AVERAGE'
     check (valuation_method in ('FIFO','WEIGHTED_AVERAGE','STANDARD_COST')),
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -198,10 +198,6 @@ begin
   where id = v_item.inventory_class_id and org_id = p_org_id and is_active;
   if not found then raise exception 'Active Inventory Class not found'; end if;
 
-  v_cost := coalesce(nullif(p_unit_cost, 0), v_item.standard_cost, 0);
-  if v_cost < 0 then raise exception 'Unit cost cannot be negative'; end if;
-  v_amount := round(abs(p_quantity_change) * v_cost, 4);
-
   select coalesce(running_quantity, 0), coalesce(running_value, 0)
     into v_current_qty, v_current_value
   from public.inventory_ledger
@@ -223,6 +219,14 @@ begin
   end if;
   v_current_qty := coalesce(v_current_qty, 0);
   v_current_value := coalesce(v_current_value, 0);
+  if p_quantity_change < 0 and v_current_qty > 0
+     and coalesce(v_item.valuation_method_override, v_class.valuation_method) = 'WEIGHTED_AVERAGE' then
+    v_cost := round(v_current_value / v_current_qty, 4);
+  else
+    v_cost := coalesce(nullif(p_unit_cost, 0), v_item.standard_cost, 0);
+  end if;
+  if v_cost < 0 then raise exception 'Unit cost cannot be negative'; end if;
+  v_amount := round(abs(p_quantity_change) * v_cost, 4);
   v_new_qty := v_current_qty + p_quantity_change;
   if v_new_qty < 0 then raise exception 'Insufficient stock: available %, requested %', v_current_qty, abs(p_quantity_change); end if;
   v_new_value := v_current_value + case when p_quantity_change > 0 then v_amount else -v_amount end;

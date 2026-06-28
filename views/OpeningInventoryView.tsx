@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
-import { OpeningInventoryLine, StockItem, WarehouseLocation } from '../types';
+import { OpeningInventoryLine, Organization, StockItem, WarehouseLocation } from '../types';
 
 interface Props {
   items: StockItem[];
   warehouses: WarehouseLocation[];
+  organization?: Organization;
   onPost: (document: { documentNumber: string; postingDate: string; remarks: string; lines: OpeningInventoryLine[] }) => Promise<void>;
 }
 
 const blankLine = (): OpeningInventoryLine => ({ warehouseLocationId: '', stockItemId: '', quantity: 0, unitCost: 0 });
 
-export default function OpeningInventoryView({ items, warehouses, onPost }: Props) {
+export default function OpeningInventoryView({ items, warehouses, organization, onPost }: Props) {
+  const brandColor = organization?.primaryColor || '#F47721';
   const [documentNumber, setDocumentNumber] = useState(`OPEN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`);
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState('Beginning inventory');
@@ -46,14 +48,14 @@ export default function OpeningInventoryView({ items, warehouses, onPost }: Prop
         <p className="text-sm text-gray-500">One-time beginning balances. Posted documents are immutable.</p>
       </header>
       <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-        <div className="p-5 bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4" style={{ backgroundColor: brandColor }}>
           <input value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} className="h-11 px-3 rounded bg-white" placeholder="Document number" />
           <input type="date" value={postingDate} onChange={e => setPostingDate(e.target.value)} className="h-11 px-3 rounded bg-white" />
           <input value={remarks} onChange={e => setRemarks(e.target.value)} className="h-11 px-3 rounded bg-white" placeholder="Remarks" />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 border-b"><tr><th className="p-3 text-left">Warehouse</th><th className="p-3 text-left">Item</th><th className="p-3 text-right">Quantity</th><th className="p-3 text-right">Unit Cost</th><th className="p-3 text-left">Batch / Lot</th><th className="p-3 text-left">Expiration</th><th></th></tr></thead>
+            <thead className="border-b" style={{ backgroundColor: `${brandColor}12` }}><tr><th className="p-3 text-left">Warehouse</th><th className="p-3 text-left">Item</th><th className="p-3 text-right">Quantity</th><th className="p-3 text-right">Unit Cost</th><th className="p-3 text-left">Batch / Lot</th><th className="p-3 text-left">Expiration</th><th></th></tr></thead>
             <tbody>
               {lines.map((line, index) => (
                 <tr key={index} className="border-b">
@@ -71,8 +73,21 @@ export default function OpeningInventoryView({ items, warehouses, onPost }: Prop
         </div>
         {error && <p className="px-5 pt-4 text-sm text-red-600">{error}</p>}
         <div className="p-5 flex items-center justify-between gap-3">
-          <button onClick={() => setLines(current => [...current, blankLine()])} className="flex items-center gap-2 px-4 py-2 border rounded text-sm"><Plus size={16}/> Add Line</button>
-          <button onClick={post} disabled={posting} className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded text-xs font-semibold uppercase disabled:opacity-50"><Upload size={16}/>{posting ? 'Posting…' : 'Post Opening Inventory'}</button>
+          <button
+            onClick={() => setLines(current => [...current, blankLine()])}
+            className="flex items-center gap-2 px-4 py-2 border rounded text-sm transition-colors hover:bg-gray-50"
+            style={{ borderColor: brandColor, color: brandColor }}
+          >
+            <Plus size={16}/> Add Line
+          </button>
+          <button
+            onClick={post}
+            disabled={posting}
+            className="flex items-center gap-2 px-6 py-3 text-white rounded text-xs font-semibold uppercase shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: brandColor }}
+          >
+            <Upload size={16}/>{posting ? 'Posting…' : 'Post Opening Inventory'}
+          </button>
         </div>
       </div>
     </div>
