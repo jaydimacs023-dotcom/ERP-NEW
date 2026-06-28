@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { CourseFee, CourseFeeCategory, Qualification, ChartOfAccount } from '../types';
+import { CourseFee, CourseFeeCategory, CourseFeeFundingType, Qualification, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import {
@@ -39,6 +39,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterQualification, setFilterQualification] = useState<string>('');
+  const [filterFundingType, setFilterFundingType] = useState<CourseFeeFundingType | ''>('');
   const [filterCategory, setFilterCategory] = useState<CourseFeeCategory | ''>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [showModal, setShowModal] = useState(false);
@@ -54,6 +55,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     _key: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     feeCode: '',
     qualificationId: '',
+    fundingType: undefined,
     feeName: '',
     amount: 0,
     glAccountId: '',
@@ -64,8 +66,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     isActive: true,
   });
   const [bulkRows, setBulkRows] = useState<(Partial<CourseFee> & { _key: string })[]>([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
-  const [bulkDefaults, setBulkDefaults] = useState<{ qualificationId: string; glAccountId: string; category: CourseFeeCategory | '' }>({
+  const [bulkDefaults, setBulkDefaults] = useState<{ qualificationId: string; fundingType: CourseFeeFundingType | ''; glAccountId: string; category: CourseFeeCategory | '' }>({
     qualificationId: '',
+    fundingType: '',
     glAccountId: '',
     category: '',
   });
@@ -73,6 +76,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const [formData, setFormData] = useState<Partial<CourseFee>>({
     feeCode: '',
     qualificationId: '',
+    fundingType: undefined,
     feeName: '',
     amount: 0,
     glAccountId: '',
@@ -100,6 +104,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           f.description || '',
           qualification?.code || '',
           qualification?.name || '',
+          f.fundingType === 'TESDA_SCHOLARSHIP' ? 'TESDA Scholarship' :
+            f.fundingType === 'SPONSORED' ? 'Sponsored' :
+              f.fundingType === 'PRIVATE' ? 'Private' : 'Unclassified',
           account?.code || '',
           account?.name || '',
           categoryLabel,
@@ -107,19 +114,21 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
         const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
         const matchesQualification = !filterQualification || f.qualificationId === filterQualification;
+        const matchesFundingType = !filterFundingType || f.fundingType === filterFundingType;
         const matchesCategory = !filterCategory || f.category === filterCategory;
         const matchesStatus =
           statusFilter === 'ALL' ||
           (statusFilter === 'ACTIVE' ? f.isActive : !f.isActive);
 
-        return matchesSearch && matchesQualification && matchesCategory && matchesStatus;
+        return matchesSearch && matchesQualification && matchesFundingType && matchesCategory && matchesStatus;
       })
       .sort((a, b) => a.feeName.localeCompare(b.feeName));
-  }, [courseFees, searchTerm, filterQualification, filterCategory, statusFilter, qualifications, accounts]);
+  }, [courseFees, searchTerm, filterQualification, filterFundingType, filterCategory, statusFilter, qualifications, accounts]);
 
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
     !!filterQualification ||
+    !!filterFundingType ||
     !!filterCategory ||
     statusFilter !== 'ALL';
 
@@ -132,6 +141,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     setFormData({
       feeCode: '',
       qualificationId: '',
+      fundingType: undefined,
       feeName: '',
       amount: 0,
       glAccountId: '',
@@ -155,6 +165,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     setBulkRows(prev => prev.map(r => ({
       ...r,
       qualificationId: bulkDefaults.qualificationId || r.qualificationId,
+      fundingType: bulkDefaults.fundingType || r.fundingType,
       glAccountId: bulkDefaults.glAccountId || r.glAccountId,
       category: (bulkDefaults.category || r.category) as CourseFeeCategory | undefined,
     })));
@@ -163,14 +174,16 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
   const openBulkModal = () => {
     setBulkRows([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
-    setBulkDefaults({ qualificationId: '', glAccountId: '', category: '' });
+    setBulkDefaults({ qualificationId: '', fundingType: '', glAccountId: '', category: '' });
     setShowBulkModal(true);
   };
 
   const handleBulkSubmit = async () => {
-    const validRows = bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId);
+    const validRows = bulkRows.filter(r =>
+      r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0
+    );
     if (validRows.length === 0) {
-      showToast('Please fill in at least one complete row (Name, Course, GL Account required).', 'error');
+      showToast('Please fill in at least one complete row. Course, funding type, name, amount, category, and GL account are required.', 'error');
       return;
     }
 
@@ -199,6 +212,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             orgId: '',
             feeCode: row.feeCode || getNextFeeCode(row.qualificationId!),
             qualificationId: row.qualificationId!,
+            fundingType: row.fundingType!,
             feeName: row.feeName!,
             amount: Number(row.amount) || 0,
             glAccountId: row.glAccountId!,
@@ -250,7 +264,8 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.feeName || !formData.qualificationId || !formData.glAccountId) return;
+    if (!formData.feeName || !formData.qualificationId || !formData.fundingType ||
+      !formData.glAccountId || !formData.category || Number(formData.amount) <= 0) return;
 
     setIsSubmitting(true);
 
@@ -260,6 +275,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           ...editingFee,
           feeCode: formData.feeCode || editingFee.feeCode,
           qualificationId: formData.qualificationId!,
+          fundingType: formData.fundingType!,
           feeName: formData.feeName!,
           amount: Number(formData.amount) || 0,
           glAccountId: formData.glAccountId!,
@@ -279,6 +295,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           orgId: '', // Will be set by App.tsx handler
           feeCode: formData.feeCode || generateFeeCode(formData.qualificationId!),
           qualificationId: formData.qualificationId!,
+          fundingType: formData.fundingType!,
           feeName: formData.feeName!,
           amount: Number(formData.amount) || 0,
           glAccountId: formData.glAccountId!,
@@ -330,6 +347,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     setFormData({
       feeCode: fee.feeCode,
       qualificationId: fee.qualificationId,
+      fundingType: fee.fundingType,
       feeName: fee.feeName,
       amount: fee.amount,
       glAccountId: fee.glAccountId,
@@ -480,11 +498,27 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
           </div>
 
+          <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
+            <span className="text-[13px] text-gray-500 mr-1">Funding:</span>
+            <select
+              value={filterFundingType}
+              onChange={(e) => setFilterFundingType(e.target.value as CourseFeeFundingType | '')}
+              className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[180px]"
+            >
+              <option value="">All</option>
+              <option value="SPONSORED">Sponsored</option>
+              <option value="PRIVATE">Private</option>
+              <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
+            </select>
+            <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
+          </div>
+
           <button
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('ALL');
               setFilterQualification('');
+              setFilterFundingType('');
               setFilterCategory('');
             }}
             className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
@@ -527,7 +561,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <GraduationCap size={14} className="text-gray-400" />
-                    <span className="truncate max-w-[200px]">{getQualificationName(fee.qualificationId)}</span>
+                    <div>
+                      <span className="block truncate max-w-[200px]">{getQualificationName(fee.qualificationId)}</span>
+                    </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -638,6 +674,21 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   </select>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Funding Type *</label>
+                  <select
+                    required
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+                    value={formData.fundingType || ''}
+                    onChange={e => setFormData({ ...formData, fundingType: e.target.value as CourseFeeFundingType })}
+                  >
+                    <option value="">Select funding type...</option>
+                    <option value="SPONSORED">Sponsored</option>
+                    <option value="PRIVATE">Private</option>
+                    <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
+                  </select>
+                </div>
+
                 {/* Fee Code and Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -683,8 +734,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category *</label>
                     <select
+                      required
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                       value={formData.category || ''}
                       onChange={e => setFormData({ ...formData, category: e.target.value as CourseFeeCategory || undefined })}
@@ -800,7 +852,8 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.glAccountId}
+                  disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.fundingType ||
+                    !formData.glAccountId || !formData.category || Number(formData.amount) <= 0}
                   className="flex-1 py-3 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
@@ -829,7 +882,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 <div className="p-2 bg-brand text-white rounded shadow-brand/20"><Copy size={20} /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Bulk Create Course Fees</h3>
-                  <p className="text-xs text-gray-500">Add multiple fee entries at once. Only rows with Name, Course, and GL Account will be saved.</p>
+                  <p className="text-xs text-gray-500">Add multiple fee entries at once. All required billing fields must be complete.</p>
                 </div>
               </div>
               <button onClick={() => setShowBulkModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
@@ -848,7 +901,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     Apply to All
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <select
                     value={bulkDefaults.qualificationId}
                     onChange={e => setBulkDefaults({ ...bulkDefaults, qualificationId: e.target.value })}
@@ -858,6 +911,16 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     {qualifications.filter(q => !q.isDeleted).map(q => (
                       <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
                     ))}
+                  </select>
+                  <select
+                    value={bulkDefaults.fundingType}
+                    onChange={e => setBulkDefaults({ ...bulkDefaults, fundingType: e.target.value as CourseFeeFundingType | '' })}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
+                  >
+                    <option value="">Default Funding Type...</option>
+                    <option value="SPONSORED">Sponsored</option>
+                    <option value="PRIVATE">Private</option>
+                    <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
                   </select>
                   <select
                     value={bulkDefaults.glAccountId}
@@ -891,15 +954,17 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                     <th className="py-2 pr-2 text-left text-xs font-semibold text-gray-400 uppercase w-8">#</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Fee Name *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Course *</th>
-                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase w-28">Amount</th>
-                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Category</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Funding *</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase w-28">Amount *</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Category *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">GL Account *</th>
                     <th className="py-2 pl-2 text-center text-xs font-semibold text-gray-400 uppercase w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {bulkRows.map((row, idx) => {
-                    const isValid = !!(row.feeName && row.qualificationId && row.glAccountId);
+                    const isValid = !!(row.feeName && row.qualificationId && row.fundingType &&
+                      row.glAccountId && row.category && Number(row.amount) > 0);
                     return (
                       <tr key={row._key} className={`border-b border-gray-100 ${isValid ? 'bg-emerald-50/30' : ''}`}>
                         <td className="py-2 pr-2 text-xs text-gray-400 font-mono">{idx + 1}</td>
@@ -910,6 +975,18 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                             value={row.feeName || ''}
                             onChange={e => updateBulkRow(row._key, 'feeName', e.target.value)}
                           />
+                        </td>
+                        <td className="py-2 px-2">
+                          <select
+                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
+                            value={row.fundingType || ''}
+                            onChange={e => updateBulkRow(row._key, 'fundingType', e.target.value)}
+                          >
+                            <option value="">Select...</option>
+                            <option value="SPONSORED">Sponsored</option>
+                            <option value="PRIVATE">Private</option>
+                            <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
+                          </select>
                         </td>
                         <td className="py-2 px-2">
                           <select
@@ -940,7 +1017,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                             value={row.category || ''}
                             onChange={e => updateBulkRow(row._key, 'category', e.target.value || undefined)}
                           >
-                            <option value="">None</option>
+                            <option value="">Select...</option>
                             {CATEGORY_OPTIONS.map(cat => (
                               <option key={cat.value} value={cat.value}>{cat.label}</option>
                             ))}
@@ -986,7 +1063,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             {/* Footer */}
             <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between">
               <p className="text-xs text-gray-500">
-                {bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length} of {bulkRows.length} rows ready to save
+                {bulkRows.filter(r => r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0).length} of {bulkRows.length} rows ready to save
               </p>
               <div className="flex gap-3">
                 <button
@@ -999,13 +1076,13 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 <button
                   type="button"
                   onClick={handleBulkSubmit}
-                  disabled={isBulkSubmitting || bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length === 0}
+                  disabled={isBulkSubmitting || bulkRows.filter(r => r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0).length === 0}
                   className="px-8 py-2.5 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isBulkSubmitting ? (
                     <><Loader2 size={16} className="animate-spin" /> Creating...</>
                   ) : (
-                    <>Create {bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length} Fee{bulkRows.filter(r => r.feeName && r.qualificationId && r.glAccountId).length !== 1 ? 's' : ''}</>
+                    <>Create {bulkRows.filter(r => r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0).length} Fee{bulkRows.filter(r => r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0).length !== 1 ? 's' : ''}</>
                   )}
                 </button>
               </div>

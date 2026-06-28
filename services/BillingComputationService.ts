@@ -8,7 +8,8 @@ import {
   InvoiceLine,
   JournalEntry,
   JournalLine,
-  Payment
+  Payment,
+  Sponsor
 } from '../types';
 
 type RawRecord = Record<string, any>;
@@ -17,6 +18,7 @@ export interface BillingComputationContext {
   batches: Batch[];
   enrollments: Enrollment[];
   courseFees: CourseFee[];
+  sponsors?: Sponsor[];
   invoices?: Invoice[];
   payments?: Payment[];
   journalEntries?: JournalEntry[];
@@ -98,6 +100,17 @@ export class BillingComputationService {
   static getBatchSponsorId(batch?: Batch | null): string {
     const raw = getRaw(batch);
     return String(raw?.sponsorId || raw?.sponsor_id || '').trim();
+  }
+
+  static getBatchCourseFeeFundingType(
+    context: Pick<BillingComputationContext, 'sponsors'>,
+    batch?: Batch | null
+  ): CourseFee['fundingType'] {
+    const sponsorId = this.getBatchSponsorId(batch);
+    if (!sponsorId) return 'PRIVATE';
+    return context.sponsors?.find(sponsor => sponsor.id === sponsorId)?.courseFeeType === 'TESDA_SCHOLARSHIP'
+      ? 'TESDA_SCHOLARSHIP'
+      : 'SPONSORED';
   }
 
   static getBatchBillableStudentLimit(batch?: Batch | null): number {
@@ -182,11 +195,16 @@ export class BillingComputationService {
     const classification = this.classifyEnrollmentsByBatchCap(context, batchId);
     const batch = classification.batch;
     const enrolledQty = this.getValidEnrolledQty(context, batchId);
+    const fundingType = this.getBatchCourseFeeFundingType(context, batch);
     const fees = (context.courseFees || []).filter(fee =>
       !!batch &&
       fee.qualificationId === batch.qualificationId &&
+      fee.fundingType === fundingType &&
       fee.isActive &&
       !fee.isDeleted
+    ).sort((left, right) =>
+      String(left.category || '').localeCompare(String(right.category || '')) ||
+      left.feeName.localeCompare(right.feeName)
     );
 
     const lines = fees.map((fee, index) => {

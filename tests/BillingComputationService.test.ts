@@ -36,6 +36,7 @@ const courseFee = (overrides: Partial<CourseFee> = {}): CourseFee => ({
   orgId: 'org-1',
   feeCode: 'HEO-FEE-001',
   qualificationId: 'qual-1',
+  fundingType: 'SPONSORED',
   feeName: 'Tuition Fee',
   amount: 45000,
   glAccountId: 'revenue-1',
@@ -49,6 +50,7 @@ const context = (overrides: Partial<BillingComputationContext> = {}): BillingCom
   batches: [batch()],
   enrollments: Array.from({ length: 8 }, (_, index) => enrollment(index + 1)),
   courseFees: [courseFee()],
+  sponsors: [{ id: 'sponsor-1', orgId: 'org-1', name: 'Standard Sponsor', courseFeeType: 'SPONSORED' }],
   ...overrides
 });
 
@@ -118,6 +120,58 @@ describe('BillingComputationService', () => {
     expect(result.enrolledQty).toBe(3);
     expect(result.lines[0].quantity).toBe(3);
     expect(result.lines[0].amount).toBe(135000);
+  });
+
+  it('loads sponsored fees when the batch has a sponsor', () => {
+    const result = BillingComputationService.computeCourseFeeInvoice(
+      context({
+        courseFees: [
+          courseFee({ id: 'sponsored-fee', fundingType: 'SPONSORED', amount: 45000 }),
+          courseFee({ id: 'private-fee', fundingType: 'PRIVATE', amount: 30000 }),
+          courseFee({ id: 'other-course-fee', qualificationId: 'qual-2', fundingType: 'SPONSORED' })
+        ]
+      }),
+      'batch-1'
+    );
+
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0].courseFeeId).toBe('sponsored-fee');
+    expect(result.courseFeeTotal).toBe(360000);
+  });
+
+  it('loads private fees when the batch has no sponsor', () => {
+    const result = BillingComputationService.computeCourseFeeInvoice(
+      context({
+        batches: [batch({ sponsorId: undefined })],
+        courseFees: [
+          courseFee({ id: 'sponsored-fee', fundingType: 'SPONSORED', amount: 45000 }),
+          courseFee({ id: 'private-fee', fundingType: 'PRIVATE', amount: 30000 })
+        ]
+      }),
+      'batch-1'
+    );
+
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0].courseFeeId).toBe('private-fee');
+    expect(result.courseFeeTotal).toBe(240000);
+  });
+
+  it('loads the TESDA scholarship schedule without standard sponsored OJT fees', () => {
+    const result = BillingComputationService.computeCourseFeeInvoice(
+      context({
+        sponsors: [{ id: 'sponsor-1', orgId: 'org-1', name: 'TESDA DCDO', courseFeeType: 'TESDA_SCHOLARSHIP' }],
+        courseFees: [
+          courseFee({ id: 'sponsored-training', fundingType: 'SPONSORED', feeName: 'Training Fee' }),
+          courseFee({ id: 'sponsored-ojt', fundingType: 'SPONSORED', feeName: 'OJT Fee' }),
+          courseFee({ id: 'tesda-training', fundingType: 'TESDA_SCHOLARSHIP', feeName: 'Training Fee' }),
+          courseFee({ id: 'tesda-assessment', fundingType: 'TESDA_SCHOLARSHIP', feeName: 'Assessment Fee' })
+        ]
+      }),
+      'batch-1'
+    );
+
+    expect(result.lines.map(line => line.description)).toEqual(['Assessment Fee', 'Training Fee']);
+    expect(result.lines.some(line => line.description === 'OJT Fee')).toBe(false);
   });
 
   it('does not silently recalculate posted invoices and flags quantity mismatch', () => {

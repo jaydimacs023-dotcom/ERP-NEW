@@ -276,6 +276,7 @@ export interface TrainerSchedule extends BaseEntity {
 }
 
 export type TaxType = 'VAT' | 'NON_VAT' | 'ZERO_RATED';
+export type SponsoredCourseFeeType = 'SPONSORED' | 'TESDA_SCHOLARSHIP';
 
 export interface Sponsor extends BaseEntity {
   id: string;
@@ -290,6 +291,7 @@ export interface Sponsor extends BaseEntity {
   taxType?: TaxType; // VAT, Non-VAT, Zero-Rated
   ewtRate?: number; // Expanded Withholding Tax Rate (e.g., 0.02 for 2%)
   arAccountId?: string;
+  courseFeeType?: SponsoredCourseFeeType;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -526,12 +528,14 @@ export interface NonStockItem extends BaseEntity {
 
 // Course Fee - links fees to qualifications/courses with tax tracking
 export type CourseFeeCategory = 'TUITION' | 'REGISTRATION' | 'CERTIFICATION' | 'ASSESSMENT' | 'MATERIALS' | 'MISCELLANEOUS';
+export type CourseFeeFundingType = 'PRIVATE' | 'SPONSORED' | 'TESDA_SCHOLARSHIP';
 
 export interface CourseFee extends BaseEntity {
   id: string;
   orgId: string;
   feeCode: string;               // Unique fee identifier (Fee_ID)
   qualificationId: string;       // Links to Qualification (Course_ID)
+  fundingType: CourseFeeFundingType; // Sponsored or private/walk-in fee structure
   feeName: string;               // Fee_Name
   amount: number;                // Amount
   glAccountId: string;           // GL_Account_Code - links to ChartOfAccount
@@ -582,6 +586,11 @@ export interface StockItem extends BaseEntity {
   code: string;
   name: string;
   description?: string;
+  type: 'STOCK_ITEM' | 'NON_STOCK_ITEM';
+  unitOfMeasure: string;
+  reorderLevel: number;
+  safetyStock: number;
+  isActive: boolean;
   unitPrice: number;
   costPrice: number;
   warehouseLocationId: string;  // Physical location
@@ -590,6 +599,14 @@ export interface StockItem extends BaseEntity {
   expenseAccountId?: string; // Expense account
   taxCategoryId?: string;    // Tax classification (like NonStockItem)
   valuationMethod: InventoryValuationMethod;
+  inventoryClassId?: string;
+  defaultWarehouseId?: string;
+  standardCost: number;
+  valuationMethodOverride?: InventoryValuationMethod;
+  barcode?: string;
+  brand?: string;
+  category?: string;
+  preferredSupplierId?: string;
   minStockLevel: number;
   maxStockLevel: number;
   reorderQuantity: number;
@@ -708,6 +725,51 @@ export interface Enrollment extends BaseEntity {
   notes?: string;               // Optional notes
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface InventoryClass extends BaseEntity {
+  id: string;
+  orgId: string;
+  code: string;
+  name: string;
+  inventoryAssetAccountId: string;
+  cogsAccountId: string;
+  adjustmentAccountId: string;
+  purchasePriceVarianceAccountId?: string;
+  inTransitAccountId?: string;
+  writeOffAccountId?: string;
+  openingBalanceEquityAccountId?: string;
+  defaultWarehouseId?: string;
+  valuationMethod: 'FIFO' | 'WEIGHTED_AVERAGE' | 'STANDARD_COST';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpeningInventoryLine {
+  id?: string;
+  warehouseLocationId: string;
+  stockItemId: string;
+  quantity: number;
+  unitCost: number;
+  batchLot?: string;
+  expirationDate?: string;
+  remarks?: string;
+}
+
+export interface OpeningInventoryDocument extends BaseEntity {
+  id: string;
+  orgId: string;
+  documentNumber: string;
+  postingDate: string;
+  status: 'DRAFT' | 'POSTED' | 'REVERSED';
+  remarks?: string;
+  journalEntryId?: string;
+  lines: OpeningInventoryLine[];
+  createdBy?: string;
+  createdAt: string;
+  postedBy?: string;
+  postedAt?: string;
 }
 
 export interface AssessmentRegistration extends BaseEntity {

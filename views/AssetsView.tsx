@@ -31,11 +31,25 @@ const DEFAULT_ASSET_FILTERS = [
   'land',
   'building',
   'furniture',
-  'equipment',
+  'office_equipment',
   'it_equipment',
+  'training_equipment',
+  'heavy_equipment',
   'vehicles',
   'other',
 ];
+
+const ASSET_CATEGORIES = [
+  'Land',
+  'Building & Improvements',
+  'Furniture & Fixtures',
+  'Office Equipment',
+  'IT & Server Equipment',
+  'Training Equipment',
+  'Heavy Equipment',
+  'Vehicles',
+  'Other Fixed Assets',
+] as const;
 
 const normalizeAssetCategory = (category?: string) => {
   if (!category) return '';
@@ -45,9 +59,11 @@ const normalizeAssetCategory = (category?: string) => {
   if (normalized.includes('land')) return 'land';
   if (normalized.includes('building')) return 'building';
   if (normalized.includes('furniture')) return 'furniture';
-  if (normalized === 'it equipment' || normalized.includes('it equipment')) return 'it_equipment';
+  if (normalized.includes('it equipment') || (normalized.includes('it') && normalized.includes('server'))) return 'it_equipment';
+  if (normalized.includes('training equipment')) return 'training_equipment';
+  if (normalized.includes('heavy equipment')) return 'heavy_equipment';
   if (normalized.includes('vehicle')) return 'vehicles';
-  if (normalized.includes('office equipment') || normalized === 'equipment' || normalized.includes('equipment')) return 'equipment';
+  if (normalized.includes('office equipment') || normalized === 'equipment') return 'office_equipment';
   if (normalized.includes('other')) return 'other';
 
   return normalized.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -63,14 +79,18 @@ const getAssetCategoryLabel = (category?: string) => {
       return 'Building & Improvements';
     case 'furniture':
       return 'Furniture & Fixtures';
-    case 'equipment':
-      return 'Equipment';
+    case 'office_equipment':
+      return 'Office Equipment';
     case 'it_equipment':
-      return 'IT Equipment';
+      return 'IT & Server Equipment';
+    case 'training_equipment':
+      return 'Training Equipment';
+    case 'heavy_equipment':
+      return 'Heavy Equipment';
     case 'vehicles':
       return 'Vehicles';
     case 'other':
-      return 'Other';
+      return 'Other Fixed Assets';
     default:
       return (category || 'Uncategorized')
         .replace(/_/g, ' ')
@@ -106,7 +126,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
     name: '',
     description: '',
     code: `FA-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-    category: 'Equipment',
+    category: 'Office Equipment',
     purchaseDate: new Date().toISOString().split('T')[0],
     purchaseCost: 0,
     depreciationMethod: 'straight-line',
@@ -195,7 +215,7 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
       name: '',
       description: '',
       code: `FA-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-      category: 'Equipment',
+      category: 'Office Equipment',
       purchaseDate: new Date().toISOString().split('T')[0],
       purchaseCost: 0,
       depreciationMethod: 'straight-line',
@@ -481,13 +501,11 @@ const AssetsView: React.FC<AssetsViewProps> = ({ assets, accounts, lines, entrie
                     value={formData.category}
                     onChange={e => setFormData({...formData, category: e.target.value})}
                   >
-                    <option value="Land">Land (Non-Depreciable)</option>
-                    <option value="Building">Building & Improvements</option>
-                    <option value="Furniture">Furniture & Fixtures</option>
-                    <option value="Equipment">Office Equipment</option>
-                    <option value="IT Equipment">IT & Server Equipment</option>
-                    <option value="Vehicles">Service Vehicles</option>
-                    <option value="Other">Other Fixed Assets</option>
+                    {ASSET_CATEGORIES.map(category => (
+                      <option key={category} value={category}>
+                        {category === 'Land' ? 'Land (Non-Depreciable)' : category}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">

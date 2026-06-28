@@ -10,10 +10,17 @@ import {
 
 export class InventoryService {
   /**
-   * Calculate available quantity (on-hand minus reserved)
+   * Calculate available quantity across one or more warehouse levels.
    */
-  static getAvailableQuantity(level: InventoryLevel): number {
-    return level.quantityOnHand - level.quantityReserved;
+  static getAvailableQuantity(levels: InventoryLevel | InventoryLevel[]): number {
+    const rows = Array.isArray(levels) ? levels : [levels];
+    return rows.reduce((total, level) => {
+      const storedAvailable = Number(level.quantityAvailable);
+      const available = Number.isFinite(storedAvailable)
+        ? storedAvailable
+        : Number(level.quantityOnHand || 0) - Number(level.quantityReserved || 0);
+      return total + available;
+    }, 0);
   }
 
   /**
@@ -43,15 +50,15 @@ export class InventoryService {
   /**
    * Check if stock level is below minimum threshold
    */
-  static isLowStock(level: InventoryLevel, item: StockItem): boolean {
-    return this.getAvailableQuantity(level) <= item.minStockLevel;
+  static isLowStock(availableQuantity: number, reorderLevel: number, safetyStock: number = 0): boolean {
+    return availableQuantity <= Math.max(Number(reorderLevel || 0), Number(safetyStock || 0));
   }
 
   /**
    * Check if stock level exceeds maximum threshold
    */
-  static isOverstocked(level: InventoryLevel, item: StockItem): boolean {
-    return level.quantityOnHand > item.maxStockLevel;
+  static isOverstocked(availableQuantity: number, maxLevel: number): boolean {
+    return Number(maxLevel || 0) > 0 && availableQuantity > maxLevel;
   }
 
   /**
@@ -287,21 +294,14 @@ export class InventoryService {
    */
   static getStockStatusBadge(
     availableQuantity: number,
-    minLevel: number,
-    maxLevel: number
-  ): {
-    status: 'URGENT_REORDER' | 'LOW_STOCK' | 'NORMAL' | 'OVERSTOCKED';
-    color: string;
-    icon: string;
-  } {
-    if (availableQuantity <= minLevel) {
-      return { status: 'URGENT_REORDER', color: 'bg-red-100 text-red-800', icon: '⚠️' };
-    } else if (availableQuantity <= minLevel * 1.5) {
-      return { status: 'LOW_STOCK', color: 'bg-yellow-100 text-yellow-800', icon: '⚡' };
-    } else if (availableQuantity > maxLevel) {
-      return { status: 'OVERSTOCKED', color: 'bg-blue-100 text-blue-800', icon: '📦' };
-    } else {
-      return { status: 'NORMAL', color: 'bg-green-100 text-green-800', icon: '✓' };
-    }
+    reorderLevel: number,
+    safetyStock: number = 0,
+    reorderQuantity: number = 0
+  ): 'RED' | 'YELLOW' | 'GREEN' | 'BLUE' {
+    if (availableQuantity <= Number(safetyStock || 0)) return 'RED';
+    if (availableQuantity <= Number(reorderLevel || 0)) return 'YELLOW';
+    const overstockThreshold = Number(reorderLevel || 0) + (Number(reorderQuantity || 0) * 2);
+    if (overstockThreshold > 0 && availableQuantity > overstockThreshold) return 'BLUE';
+    return 'GREEN';
   }
 }

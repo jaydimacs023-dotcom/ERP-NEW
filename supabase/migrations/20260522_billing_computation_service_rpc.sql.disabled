@@ -150,11 +150,18 @@ as $$
     cf.gl_account_id,
     cf.tax_category_id
   from public.batches b
-  join public.course_fees cf on cf.qualification_id = b.qualification_id
+  left join public.sponsors s on s.id = b.sponsor_id
+  join public.course_fees cf
+    on cf.qualification_id = b.qualification_id
+   and cf.funding_type = case
+     when b.sponsor_id is null then 'PRIVATE'
+     when s.course_fee_type = 'TESDA_SCHOLARSHIP' then 'TESDA_SCHOLARSHIP'
+     else 'SPONSORED'
+   end
   where b.id = p_batch_id
     and coalesce(cf.is_active, true) = true
     and coalesce(cf.is_deleted, false) = false
-  order by cf.fee_code, cf.fee_name, cf.id;
+  order by cf.category, cf.fee_name, cf.id;
 $$;
 
 create or replace function public.billing_validate_invoice_lines_against_batch_cap(p_invoice_id uuid)

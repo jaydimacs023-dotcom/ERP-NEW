@@ -25,7 +25,7 @@ interface FormData {
   stockItemId: string;
   warehouseLocationId: string;
   adjustmentType: 'DAMAGE' | 'WRITEOFF' | 'ADJUSTMENT' | 'CORRECTION';
-  quantity: number;
+  quantity: string;
   reason: string;
   notes: string;
   isApproved: boolean;
@@ -37,7 +37,7 @@ const INITIAL_FORM: FormData = {
   stockItemId: '',
   warehouseLocationId: '',
   adjustmentType: 'ADJUSTMENT',
-  quantity: 0,
+  quantity: '',
   reason: '',
   notes: '',
   isApproved: false,
@@ -91,7 +91,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
       stockItemId: adj.stockItemId,
       warehouseLocationId: adj.warehouseLocationId,
       adjustmentType: adj.adjustmentType,
-      quantity: adj.quantity,
+      quantity: String(adj.quantity ?? ''),
       reason: adj.reason || '',
       notes: adj.notes || '',
       isApproved: adj.isApproved,
@@ -116,7 +116,8 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
       setError('Warehouse location is required');
       return false;
     }
-    if (formData.quantity <= 0) {
+    const quantity = Number(formData.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
       setError('Quantity must be greater than zero');
       return false;
     }
@@ -142,7 +143,7 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
         stockItemId: formData.stockItemId,
         warehouseLocationId: formData.warehouseLocationId,
         adjustmentType: formData.adjustmentType,
-        quantity: formData.quantity,
+        quantity: Number(formData.quantity),
         reason: formData.reason.trim(),
         notes: formData.notes.trim(),
         isApproved: formData.isApproved,
@@ -407,9 +408,13 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Quantity Variance *</label>
                     <input
                       type="number"
-                      step="0.01"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      placeholder="Enter quantity"
                       value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                       disabled={submitting}
                       className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800 font-mono"
                     />

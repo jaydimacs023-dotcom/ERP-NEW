@@ -29,10 +29,10 @@ interface PayablesViewProps {
   atcItems?: any[];
   atcRates?: any[];
   currentUserId?: string;
-  onCreatePayable: (payable: Payable) => void;
+  onCreatePayable: (payable: Payable) => Payable | Promise<Payable>;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
   onDeletePayable: (id: string) => void;
-  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => JournalEntry | null | Promise<JournalEntry | null>;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -132,6 +132,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [pageLoadError, setPageLoadError] = useState('');
+  const [isSavingPayable, setIsSavingPayable] = useState(false);
 
   // Form state for Create/Edit
   const [formData, setFormData] = useState<Partial<Payable>>({
@@ -305,13 +306,31 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // ============================================================================
   // AUTO-GENERATE REFERENCE NUMBER
   // ============================================================================
+  const nextPayableNumber = useMemo(() => {
+    const prefix = formData.invoiceType === 'credit_memo'
+      ? 'CM'
+      : formData.invoiceType === 'debit_memo'
+        ? 'DM'
+        : 'BILL';
+    const year = new Date().getFullYear();
+    const matcher = new RegExp(`^${prefix}-${year}-(\\d+)$`, 'i');
+    const highestSequence = payables
+      .filter(payable => payable.orgId === orgId)
+      .reduce((highest, payable) => {
+      const match = payable.payableNumber?.match(matcher);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 0);
+
+    return `${prefix}-${year}-${String(highestSequence + 1).padStart(5, '0')}`;
+  }, [formData.invoiceType, orgId, payables]);
+
   useEffect(() => {
-    if (showCreateModal && !formData.payableNumber) {
-      const prefix = formData.invoiceType === 'credit_memo' ? 'CM' : formData.invoiceType === 'debit_memo' ? 'DM' : 'BILL';
-      const nextRef = AccountingService.getNextReference(orgEntries, prefix);
-      setFormData(prev => ({ ...prev, payableNumber: nextRef }));
+    if (showCreateModal) {
+      setFormData(prev => prev.payableNumber === nextPayableNumber
+        ? prev
+        : { ...prev, payableNumber: nextPayableNumber });
     }
-  }, [showCreateModal, orgEntries, formData.payableNumber, formData.invoiceType]);
+  }, [showCreateModal, nextPayableNumber]);
 
   // ============================================================================
   // AUTO-RESOLVE WITHHOLDING FROM VENDOR TAX SETTINGS
@@ -630,7 +649,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     setShowPostGLModal(true);
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.vendorId) {
@@ -658,7 +677,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       id: `pay-${Date.now()}`,
       orgId,
       vendorId: formData.vendorId!,
-      payableNumber: formData.payableNumber || AccountingService.getNextReference(orgEntries, 'BILL'),
+      payableNumber: nextPayableNumber,
       category: formData.category as PayableCategory || 'general',
       description: formData.description || `Payable from ${selectedVendor.name}`,
       amount: formData.amount!,
@@ -685,11 +704,21 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       isDeleted: false,
     };
 
-    onCreatePayable(newPayable);
-    setRefreshKey(key => key + 1);
-    onNotify('success', `${INVOICE_TYPES.find(t => t.value === formData.invoiceType)?.label || 'Payable'} ${newPayable.payableNumber} created successfully.`);
-    setShowCreateModal(false);
-    resetForm();
+    setIsSavingPayable(true);
+    try {
+      const savedPayable = await onCreatePayable(newPayable);
+      setServerPayables(current => [
+        savedPayable,
+        ...current.filter(payable => payable.id !== savedPayable.id),
+      ].slice(0, PAGE_SIZE));
+      setServerTotal(total => total + 1);
+      setCurrentPage(1);
+      setShowCreateModal(false);
+      resetForm();
+      setRefreshKey(key => key + 1);
+    } finally {
+      setIsSavingPayable(false);
+    }
   };
 
   const handleUpdate = (e: React.FormEvent) => {
@@ -780,31 +809,31 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // ============================================================================
   // POST TO GL HANDLER
   // ============================================================================
-  const handlePostToGL = () => {
-    if (!selectedPayable || !onPostJournal) {
-      onNotify('error', 'Cannot post to GL.');
+  const handleApprovePayable = async (payableToPost: Payable) => {
+    if (!onPostJournal) {
+      onNotify('error', 'Cannot approve this payable because GL posting is unavailable.');
       return;
     }
 
-    const vendor = orgVendors.find(v => v.id === selectedPayable.vendorId);
-    const expenseAccount = orgAccounts.find(a => a.id === selectedPayable.expenseAccountId);
-    const apAccount = orgAccounts.find(a => a.id === selectedPayable.glAccountId) || apControlAccount;
+    const vendor = orgVendors.find(v => v.id === payableToPost.vendorId);
+    const expenseAccount = orgAccounts.find(a => a.id === payableToPost.expenseAccountId);
+    const apAccount = orgAccounts.find(a => a.id === payableToPost.glAccountId) || apControlAccount;
 
     if (!apAccount) {
       onNotify('error', 'AP Control Account not found. Please set up your chart of accounts.');
       return;
     }
-    if (!expenseAccount && selectedPayable.invoiceType === 'standard') {
+    if (!expenseAccount && payableToPost.invoiceType === 'standard') {
       onNotify('error', 'Expense Account not selected.');
       return;
     }
 
     const lines: JournalLine[] = [];
-    const amount = selectedPayable.amount;
-    const withholdingAmount = selectedPayable.withholdingAmount || 0;
-    const inputVat = selectedPayable.inputVatAmount || 0;
-    const netPayable = selectedPayable.netPayable || amount;
-    const isCreditMemo = selectedPayable.invoiceType === 'credit_memo';
+    const amount = payableToPost.amount;
+    const withholdingAmount = payableToPost.withholdingAmount || 0;
+    const inputVat = payableToPost.inputVatAmount || 0;
+    const netPayable = payableToPost.netPayable || amount;
+    const isCreditMemo = payableToPost.invoiceType === 'credit_memo';
 
     if (isCreditMemo) {
       // Credit Memo Entry (reverse of standard):
@@ -818,7 +847,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         description: `Credit Memo from ${vendor?.name}`,
         debit: Math.abs(netPayable),
         credit: 0,
-        contactId: selectedPayable.vendorId,
+        contactId: payableToPost.vendorId,
         contactType: 'VENDOR',
       });
 
@@ -828,10 +857,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           journalEntryId: '',
           orgId,
           accountId: expenseAccount.id,
-          description: `Credit Memo - ${selectedPayable.description}`,
+          description: `Credit Memo - ${payableToPost.description}`,
           debit: 0,
           credit: amount,
-          contactId: selectedPayable.vendorId,
+          contactId: payableToPost.vendorId,
           contactType: 'VENDOR',
         });
       }
@@ -844,10 +873,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           journalEntryId: '',
           orgId,
           accountId: expenseAccount.id,
-          description: `${selectedPayable.description}`,
+          description: `${payableToPost.description}`,
           debit: amount,
           credit: 0,
-          contactId: selectedPayable.vendorId,
+          contactId: payableToPost.vendorId,
           contactType: 'VENDOR',
         });
       }
@@ -859,7 +888,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           journalEntryId: '',
           orgId,
           accountId: inputVatAccount.id,
-          description: `Input VAT - ${selectedPayable.payableNumber}`,
+          description: `Input VAT - ${payableToPost.payableNumber}`,
           debit: inputVat,
           credit: 0,
         });
@@ -887,32 +916,36 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         description: `Payable to ${vendor?.name}`,
         debit: 0,
         credit: netPayable,
-        contactId: selectedPayable.vendorId,
+        contactId: payableToPost.vendorId,
         contactType: 'VENDOR',
       });
     }
 
     const journalEntry: Partial<JournalEntry> = {
       orgId,
-      date: selectedPayable.billDate,
-      reference: selectedPayable.payableNumber,
-      description: `${isCreditMemo ? 'Credit Memo' : 'Vendor Bill'}: ${selectedPayable.description}`,
+      date: payableToPost.billDate,
+      reference: payableToPost.payableNumber,
+      description: `${isCreditMemo ? 'Credit Memo' : 'Vendor Bill'}: ${payableToPost.description}`,
       sourceType: isCreditMemo ? 'CREDIT_MEMO' : 'BILL',
       status: 'POSTED',
     };
 
-    onPostJournal(journalEntry, lines);
+    const postedEntry = await onPostJournal(journalEntry, lines);
+    if (!postedEntry) {
+      onNotify('error', 'Approval stopped because the journal entry could not be posted.');
+      return;
+    }
 
-    // Update payable with journal entry reference
-    onUpdatePayable(selectedPayable.id, {
-      journalEntryId: 'POSTED',
+    await onUpdatePayable(payableToPost.id, {
+      journalEntryId: postedEntry.id,
       status: 'approved',
       approvedBy: currentUserId,
       approvedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
     setRefreshKey(key => key + 1);
 
-    onNotify('success', `Journal entry posted for ${selectedPayable.payableNumber}`);
+    onNotify('success', `Journal entry posted for ${payableToPost.payableNumber}.`);
     setShowPostGLModal(false);
     setSelectedPayable(null);
   };
@@ -1218,15 +1251,6 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                                   <Trash2 size={16} />
                                 </button>
                               )}
-                              {payable.status === 'for_approval' && !isPosted && onPostJournal && (
-                                <button
-                                  onClick={() => openPostGLModal(payable)}
-                                  className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
-                                  title="Post to GL"
-                                >
-                                  <BookOpen size={16} />
-                                </button>
-                              )}
                               {payable.status === 'for_approval' && (
                                 <button
                                   onClick={() => handleStatusChange(payable.id, 'approved')}
@@ -1466,6 +1490,28 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // ============================================================================
   return (
     <div className="space-y-8">
+      {(showCreateModal || (showEditModal && selectedPayable)) ? (
+        <PayableFormPage
+          title={showCreateModal ? 'Create Bill' : `Edit: ${selectedPayable?.payableNumber}`}
+          formData={formData}
+          setFormData={setFormData}
+          vendors={orgVendors}
+          accounts={orgAccounts}
+          expenseAccounts={expenseAccounts}
+          liabilityAccounts={liabilityAccounts}
+          onSubmit={showCreateModal ? handleCreate : handleUpdate}
+          onClose={() => {
+            setShowCreateModal(false);
+            setShowEditModal(false);
+            setSelectedPayable(null);
+            resetForm();
+          }}
+          submitLabel={showCreateModal ? 'Create Bill' : 'Save Changes'}
+          isEdit={showEditModal}
+          isSubmitting={isSavingPayable}
+        />
+      ) : (
+      <>
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
@@ -1518,39 +1564,6 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {activeTab === 'aging' && renderAgingTab()}
       {activeTab === 'reconciliation' && renderReconciliationTab()}
 
-      {/* Create Modal */}
-      {showCreateModal && (
-        <PayableFormModal
-          title="Create Bill"
-          formData={formData}
-          setFormData={setFormData}
-          vendors={orgVendors}
-          accounts={orgAccounts}
-          expenseAccounts={expenseAccounts}
-          liabilityAccounts={liabilityAccounts}
-          onSubmit={handleCreate}
-          onClose={() => { setShowCreateModal(false); resetForm(); }}
-          submitLabel="Create"
-        />
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && selectedPayable && (
-        <PayableFormModal
-          title={`Edit: ${selectedPayable.payableNumber}`}
-          formData={formData}
-          setFormData={setFormData}
-          vendors={orgVendors}
-          accounts={orgAccounts}
-          expenseAccounts={expenseAccounts}
-          liabilityAccounts={liabilityAccounts}
-          onSubmit={handleUpdate}
-          onClose={() => { setShowEditModal(false); setSelectedPayable(null); resetForm(); }}
-          submitLabel="Save Changes"
-          isEdit
-        />
-      )}
-
       {/* View Modal */}
       {showViewModal && selectedPayable && (
         <PayableDetailModal
@@ -1566,61 +1579,40 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         />
       )}
 
-      {/* Post to GL Modal */}
+      {/* Post to GL Modal (available from payable details, not the list table) */}
       {showPostGLModal && selectedPayable && (
         <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white rounded shadow-md w-full max-w-lg p-6 animate-in zoom-in duration-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center border border-brand-light">
-                <BookOpen className="text-brand" size={24} />
+          <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div className="bg-white rounded shadow-md w-full max-w-lg p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center border border-brand-light">
+                  <BookOpen className="text-brand" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Post to General Ledger</h3>
+                  <p className="text-sm text-gray-500">{selectedPayable.payableNumber}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">Post to General Ledger</h3>
-                <p className="text-sm text-gray-500">{selectedPayable.payableNumber}</p>
+              <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded p-4">
+                Confirm posting this payable to the general ledger.
+              </p>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => { setShowPostGLModal(false); setSelectedPayable(null); }}
+                  className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleApprovePayable(selectedPayable)}
+                  className="flex-1 py-2.5 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover"
+                >
+                  Post to GL
+                </button>
               </div>
-            </div>
-
-            <div className="bg-gray-50 rounded p-4 mb-4 space-y-2 text-sm">
-              <p className="font-semibold text-gray-700">Journal Entry Preview:</p>
-              <div className="space-y-1 font-mono text-xs">
-                {selectedPayable.invoiceType !== 'credit_memo' ? (
-                  <>
-                    <p className="text-gray-600">DR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
-                    {selectedPayable.inputVatAmount > 0 && (
-                      <p className="text-gray-600">DR Input VAT ... {"\u20B1"}{formatCurrency(selectedPayable.inputVatAmount)}</p>
-                    )}
-                    {selectedPayable.withholdingAmount > 0 && (
-                      <p className="text-gray-600 pl-4">CR Withholding Tax Payable ... {"\u20B1"}{formatCurrency(selectedPayable.withholdingAmount)}</p>
-                    )}
-                    <p className="text-gray-600 pl-4">CR Accounts Payable ... {"\u20B1"}{formatCurrency(selectedPayable.netPayable || selectedPayable.amount)}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-gray-600">DR Accounts Payable ... {"\u20B1"}{formatCurrency(Math.abs(selectedPayable.netPayable || selectedPayable.amount))}</p>
-                    <p className="text-gray-600 pl-4">CR {orgAccounts.find(a => a.id === selectedPayable.expenseAccountId)?.name || 'Expense'} ... {"\u20B1"}{formatCurrency(selectedPayable.amount)}</p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setShowPostGLModal(false); setSelectedPayable(null); }}
-                className="flex-1 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePostToGL}
-                className="flex-1 py-2.5 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors"
-              >
-                Post to GL
-              </button>
             </div>
           </div>
-        </div>
-</ModalPortal>
+        </ModalPortal>
       )}
 
       {/* Payment Modal */}
@@ -1785,14 +1777,16 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         </div>
 </ModalPortal>
       )}
+      </>
+      )}
     </div>
   );
 };
 
 // ============================================================================
-// PAYABLE FORM MODAL COMPONENT
+// PAYABLE FORM PAGE COMPONENT
 // ============================================================================
-interface PayableFormModalProps {
+interface PayableFormPageProps {
   title: string;
   formData: Partial<Payable>;
   setFormData: React.Dispatch<React.SetStateAction<Partial<Payable>>>;
@@ -1804,9 +1798,10 @@ interface PayableFormModalProps {
   onClose: () => void;
   submitLabel: string;
   isEdit?: boolean;
+  isSubmitting?: boolean;
 }
 
-const PayableFormModal: React.FC<PayableFormModalProps> = ({
+const PayableFormPage: React.FC<PayableFormPageProps> = ({
   title,
   formData,
   setFormData,
@@ -1818,11 +1813,11 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
   onClose,
   submitLabel,
   isEdit = false,
+  isSubmitting = false,
 }) => {
   return (
-    <ModalPortal>
-<div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-      <div className="bg-white rounded-md shadow-md w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200 my-8">
+    <div className="w-full animate-in fade-in slide-in-from-right-2 duration-200">
+      <div className="bg-white rounded-xl shadow-sm w-full overflow-hidden border border-gray-200">
         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-brand text-white rounded shadow-brand/20">
@@ -1830,12 +1825,12 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             </div>
             <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={24} />
+          <button type="button" onClick={onClose} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-brand transition-colors">
+            <ArrowRight size={18} className="rotate-180" /> Back to bills
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-6">
           {/* Invoice Type */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document Type</label>
@@ -1882,11 +1877,12 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="BILL-2026-00001"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm font-mono"
+                readOnly
+                aria-readonly="true"
+                className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded outline-none text-sm font-mono font-semibold text-brand cursor-not-allowed"
                 value={formData.payableNumber || ''}
-                onChange={e => setFormData(prev => ({ ...prev, payableNumber: e.target.value }))}
               />
+              {!isEdit && <p className="text-[11px] text-gray-400">Assigned automatically in sequence.</p>}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
@@ -2080,15 +2076,15 @@ const PayableFormModal: React.FC<PayableFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-1 py-3.5 bg-brand text-white rounded text-sm font-bold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover"
+              disabled={isSubmitting}
+              className="flex-1 py-3.5 bg-brand text-white rounded text-sm font-bold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
             >
-              {submitLabel}
+              {isSubmitting ? 'Saving…' : submitLabel}
             </button>
           </div>
         </form>
       </div>
     </div>
-</ModalPortal>
   );
 };
 

@@ -8,6 +8,15 @@ import { Organization, User, Student, Batch, Trainer, Qualification, Location, T
  * Use Supabase for actual data persistence.
  */
 export class MockDataService implements IDataService {
+  async getInventoryClasses(): Promise<any[]> { return []; }
+  async saveInventoryClass(inventoryClass: any): Promise<any> {
+    return { ...inventoryClass, id: inventoryClass.id || `inventory-class-${Date.now()}` };
+  }
+  async getOpeningInventory(): Promise<any[]> { return []; }
+  async postOpeningInventory(document: any): Promise<any> {
+    return { ...document, id: `opening-${Date.now()}`, status: 'POSTED' };
+  }
+
   async getInitialData(): Promise<InitialData> {
     // Return empty data - use Supabase for actual data
     return {

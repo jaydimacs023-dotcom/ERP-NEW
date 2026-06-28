@@ -499,10 +499,20 @@ const brandColor = organization?.primaryColor || '#059669';
 
   const getSelectableCourseFeesForLine = (line: InvoiceLine) => {
     const qualificationId = getInvoiceQualificationId();
+    const batchSponsorId = formData.batchId
+      ? getBatchSponsorId(batches.find(batch => batch.id === formData.batchId))
+      : '';
+    const registrationSponsorId = formData.assessmentRegistrationId
+      ? assessmentRegistrations.find(registration => registration.id === formData.assessmentRegistrationId)?.sponsorId || ''
+      : '';
+    const fundingType = getCourseFeeFundingTypeForSponsorId(
+      batchSponsorId || registrationSponsorId || formData.sponsorId
+    );
     const matchingFees = courseFees.filter(fee =>
       fee.isActive &&
       !fee.isDeleted &&
-      (!qualificationId || fee.qualificationId === qualificationId)
+      (!qualificationId || fee.qualificationId === qualificationId) &&
+      fee.fundingType === fundingType
     );
 
     if (line.courseFeeId && !matchingFees.some(fee => fee.id === line.courseFeeId)) {
@@ -590,6 +600,7 @@ const brandColor = organization?.primaryColor || '#059669';
     batches,
     enrollments: overrideEnrollments || enrollments,
     courseFees,
+    sponsors,
     invoices,
     payments,
     journalEntries
@@ -603,6 +614,16 @@ const brandColor = organization?.primaryColor || '#059669';
   const getBatchSponsorId = (batch?: Batch | null) => {
     return BillingComputationService.getBatchSponsorId(batch);
   };
+
+  const getCourseFeeFundingTypeForSponsorId = (sponsorId?: string) => {
+    if (!sponsorId) return 'PRIVATE' as const;
+    return sponsors.find(sponsor => sponsor.id === sponsorId)?.courseFeeType === 'TESDA_SCHOLARSHIP'
+      ? 'TESDA_SCHOLARSHIP' as const
+      : 'SPONSORED' as const;
+  };
+
+  const getBatchCourseFeeFundingType = (batch?: Batch | null) =>
+    getCourseFeeFundingTypeForSponsorId(getBatchSponsorId(batch));
 
   const isSponsoredBatchContext = (batch?: Batch | null, fallbackSponsorId = '') => {
     return !!getBatchSponsorId(batch) || !!String(fallbackSponsorId || '').trim();
@@ -794,14 +815,25 @@ const brandColor = organization?.primaryColor || '#059669';
       return;
     }
 
-    const sponsorId = getBatchSponsorId(batch) || formData.sponsorId || '';
-    const backendFeeRows = sponsorId ? await fetchBackendCourseFeeInvoice(batchId) : null;
+    const fundingSponsorId = getBatchSponsorId(batch) || formData.sponsorId || '';
+    const invoiceSponsorId = fundingSponsorId;
+    const backendFeeRows = await fetchBackendCourseFeeInvoice(batchId);
     const backendQty = Number(backendFeeRows?.[0]?.quantity ?? 0);
     const studentsInBatch = getBillableStudentsForBatch(batchId, formData.studentId);
     const nextPrivateStudentId = studentsInBatch[0]?.id || '';
 
     const computedInvoice = BillingComputationService.computeCourseFeeInvoice(getBillingComputationContext(), batchId);
-    const qualificationFees = courseFees.filter(f => f.qualificationId === batch.qualificationId && f.isActive && !f.isDeleted);
+    const qualificationFees = courseFees
+      .filter(f =>
+        f.qualificationId === batch.qualificationId &&
+        f.fundingType === getBatchCourseFeeFundingType(batch) &&
+        f.isActive &&
+        !f.isDeleted
+      )
+      .sort((left, right) =>
+        String(left.category || '').localeCompare(String(right.category || '')) ||
+        left.feeName.localeCompare(right.feeName)
+      );
 
     const manualLines = formData.lines.filter(line => getLineType(line) !== 'COURSE_FEE');
     const shouldPreserveManualLines = manualLines.length > 0
@@ -854,8 +886,8 @@ const brandColor = organization?.primaryColor || '#059669';
       ...prev,
       batchId,
       assessmentRegistrationId: '',
-      sponsorId,
-      studentId: sponsorId ? '' : nextPrivateStudentId,
+      sponsorId: invoiceSponsorId,
+      studentId: fundingSponsorId ? '' : nextPrivateStudentId,
       lines: nextLines
     }));
   };
@@ -871,6 +903,7 @@ const brandColor = organization?.primaryColor || '#059669';
     const qualification = qualifications.find(q => q.id === registration.qualificationId);
     const assessmentFees = courseFees.filter(f =>
       f.qualificationId === registration.qualificationId &&
+      f.fundingType === getCourseFeeFundingTypeForSponsorId(registration.sponsorId) &&
       f.isActive &&
       !f.isDeleted &&
       f.category === 'ASSESSMENT'
@@ -2553,6 +2586,7 @@ const brandColor = organization?.primaryColor || '#059669';
         : batchEnrollments.length;
       const activeCourseFees = courseFees.filter(cf =>
         cf.qualificationId === batch?.qualificationId &&
+        cf.fundingType === getBatchCourseFeeFundingType(batch) &&
         cf.isActive &&
         !cf.isDeleted
       );
@@ -4495,7 +4529,12 @@ const brandColor = organization?.primaryColor || '#059669';
                               const student = students.find(s => s.id === enrollment.studentId);
                               const batch = batches.find(b => b.id === enrollment.batchId);
                               const qualification = batch ? qualifications.find(q => q.id === batch.qualificationId) : null;
-                              const courseFee = courseFees.find(cf => cf.qualificationId === batch?.qualificationId && cf.isActive);
+                              const courseFee = courseFees.find(cf =>
+                                cf.qualificationId === batch?.qualificationId &&
+                                cf.fundingType === getBatchCourseFeeFundingType(batch) &&
+                                cf.isActive &&
+                                !cf.isDeleted
+                              );
                               const feeAmount = courseFee?.amount || enrollment.totalFees || 0;
                               const isSelected = selectedEnrollmentIds.has(enrollment.id);
 

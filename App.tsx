@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
+  Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryClass, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
 } from './types';
 import { AccountingService } from './accountingService';
 import { DataServiceFactory } from './services/DataServiceFactory';
@@ -68,6 +68,8 @@ import StockAdjustmentsView from './views/StockAdjustmentsView';
 import ReorderView from './views/ReorderView';
 import InventoryTransactionsView from './views/InventoryTransactionsView';
 import AdvancedInventoryReports from './views/AdvancedInventoryReports';
+import InventoryClassesView from './views/InventoryClassesView';
+import OpeningInventoryView from './views/OpeningInventoryView';
 import BackupRestoreView from './views/BackupRestoreView';
 // import RecurringInvoicesView from './views/RecurringInvoicesView';
 import RevenueRecognitionView from './views/RevenueRecognitionView';
@@ -94,7 +96,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -562,10 +564,39 @@ export default function App() {
   // Inventory Management State
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [inventoryClasses, setInventoryClasses] = useState<InventoryClass[]>([]);
   const [inventoryLevels, setInventoryLevels] = useState<InventoryLevel[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
   const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>([]);
   const [reorderPoints, setReorderPoints] = useState<ReorderPoint[]>([]);
+
+  useEffect(() => {
+    if (!currentOrgId || !['inventory', 'stock-items', 'stock-levels'].includes(activeTab)) return;
+
+    let isActive = true;
+    dataService.getInventoryLevelsByOrg(currentOrgId)
+      .then(levels => {
+        if (isActive) setInventoryLevels(levels);
+      })
+      .catch(error => {
+        console.error('[App] Failed to refresh inventory levels:', error);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeTab, currentOrgId, dataService]);
+
+  useEffect(() => {
+    if (!currentOrgId || !['inventory-classes', 'stock-items', 'opening-inventory'].includes(activeTab)) return;
+    let isActive = true;
+    dataService.getInventoryClasses(currentOrgId)
+      .then(values => {
+        if (isActive) setInventoryClasses(values);
+      })
+      .catch(error => console.error('[App] Failed to load inventory classes:', error));
+    return () => { isActive = false; };
+  }, [activeTab, currentOrgId, dataService]);
 
   // Advanced AP Features State
   const [checkVouchers, setCheckVouchers] = useState<CheckVoucher[]>([]);
@@ -2413,6 +2444,7 @@ export default function App() {
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', savedPayable.id, payable.payableNumber);
 
       handleNotify('success', `Payable ${payable.payableNumber} created successfully`);
+      return savedPayable;
     } catch (error) {
       console.error('[App] Error creating payable:', error);
       handleNotify('error', 'Failed to create payable. Falling back to memory storage.');
@@ -2424,6 +2456,7 @@ export default function App() {
       } as Payable;
       setPayables(prev => [...prev, fullPayable]);
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', fullPayable.id, payable.payableNumber);
+      return fullPayable;
     }
   };
 
@@ -3686,10 +3719,13 @@ export default function App() {
       AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', created.id, vendor.name);
 
       handleNotify('success', `Vendor "${created.name}" created successfully`);
+      return created;
     } catch (error) {
       console.error('[App] Error creating vendor:', error);
       handleNotify('error', 'Failed to create vendor. Falling back to memory storage.');
-      setVendors(prev => [...prev, { ...vendor, orgId: currentOrgId, id: `ven - ${Date.now()} ` } as Vendor]);
+      const fallbackVendor = { ...vendor, orgId: currentOrgId, id: `ven-${Date.now()}` } as Vendor;
+      setVendors(prev => [...prev, fallbackVendor]);
+      return fallbackVendor;
     }
   };
 
@@ -3704,10 +3740,13 @@ export default function App() {
       AuditService.update(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'VENDOR', id, existing?.name, existing, { ...existing, ...updates });
 
       handleNotify('success', 'Vendor updated successfully');
+      return updated;
     } catch (error) {
       console.error('[App] Error updating vendor:', error);
       handleNotify('error', 'Failed to update vendor. Falling back to memory storage.');
-      setVendors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+      const fallbackVendor = { ...vendors.find(v => v.id === id), ...updates, id } as Vendor;
+      setVendors(prev => prev.map(v => v.id === id ? fallbackVendor : v));
+      return fallbackVendor;
     }
   };
 
@@ -3740,13 +3779,12 @@ export default function App() {
     try {
       console.info('[App] Creating warehouse location:', location.name);
       const newLocation = await dataService.createWarehouseLocation({ ...location, orgId: currentOrgId } as WarehouseLocation);
-      setWarehouseLocations([...warehouseLocations, newLocation]);
+      setWarehouseLocations(previous => [...previous, newLocation]);
       handleNotify('success', `Location "${location.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error adding warehouse location:', error);
-      handleNotify('error', 'Failed to create location. Falling back to memory storage.');
-      const locWithId: WarehouseLocation = { ...location, orgId: currentOrgId, id: `loc - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
-      setWarehouseLocations([...warehouseLocations, locWithId]);
+      handleNotify('error', 'Failed to persist warehouse location.');
+      throw error;
     }
   };
 
@@ -3754,12 +3792,12 @@ export default function App() {
     try {
       console.info('[App] Updating warehouse location:', id);
       const updated = await dataService.updateWarehouseLocation(id, updates);
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? updated : l));
+      setWarehouseLocations(previous => previous.map(l => l.id === id ? updated : l));
       handleNotify('success', 'Location updated successfully');
     } catch (error) {
       console.error('[App] Error updating warehouse location:', error);
-      handleNotify('error', 'Failed to update location. Falling back to memory storage.');
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, ...updates } : l));
+      handleNotify('error', 'Failed to persist warehouse location changes.');
+      throw error;
     }
   };
 
@@ -3767,27 +3805,48 @@ export default function App() {
     try {
       console.info('[App] Deleting warehouse location:', id);
       await dataService.deleteWarehouseLocation(id);
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      setWarehouseLocations(previous => previous.map(l => l.id === id ? { ...l, isDeleted: true } : l));
       handleNotify('success', 'Location deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting warehouse location:', error);
-      handleNotify('error', 'Failed to delete location. Falling back to memory storage.');
-      setWarehouseLocations(warehouseLocations.map(l => l.id === id ? { ...l, isDeleted: true } : l));
+      handleNotify('error', 'Failed to delete warehouse location.');
+      throw error;
     }
   };
 
   // Stock Items CRUD
+  const handleSaveInventoryClass = async (value: Partial<InventoryClass>) => {
+    const saved = await dataService.saveInventoryClass({ ...value, orgId: currentOrgId });
+    setInventoryClasses(previous => {
+      const exists = previous.some(item => item.id === saved.id);
+      return exists
+        ? previous.map(item => item.id === saved.id ? saved : item)
+        : [...previous, saved];
+    });
+    handleNotify('success', `Inventory class "${saved.code}" saved`);
+  };
+
+  const handlePostOpeningInventory = async (document: any) => {
+    const result = await dataService.postOpeningInventory({ ...document, orgId: currentOrgId });
+    const [levels, transactions] = await Promise.all([
+      dataService.getInventoryLevelsByOrg(currentOrgId),
+      dataService.getInventoryTransactionsByOrg(currentOrgId),
+    ]);
+    setInventoryLevels(levels);
+    setInventoryTransactions(transactions);
+    handleNotify('success', `Opening inventory ${result.documentNumber || document.documentNumber} posted`);
+  };
+
   const handleAddStockItem = async (item: Omit<StockItem, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       console.info('[App] Creating stock item:', item.name);
       const newItem = await dataService.createStockItem({ ...item, orgId: currentOrgId } as StockItem);
-      setStockItems([...stockItems, newItem]);
+      setStockItems(previous => [...previous, newItem]);
       handleNotify('success', `Item "${item.name}" created successfully`);
     } catch (error) {
       console.error('[App] Error adding stock item:', error);
-      handleNotify('error', 'Failed to create item. Falling back to memory storage.');
-      const itemWithId: StockItem = { ...item, orgId: currentOrgId, id: `item - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
-      setStockItems([...stockItems, itemWithId]);
+      handleNotify('error', 'Failed to persist stock item.');
+      throw error;
     }
   };
 
@@ -3795,12 +3854,12 @@ export default function App() {
     try {
       console.info('[App] Updating stock item:', id);
       const updated = await dataService.updateStockItem(id, updates);
-      setStockItems(stockItems.map(i => i.id === id ? updated : i));
+      setStockItems(previous => previous.map(i => i.id === id ? updated : i));
       handleNotify('success', 'Item updated successfully');
     } catch (error) {
       console.error('[App] Error updating stock item:', error);
-      handleNotify('error', 'Failed to update item. Falling back to memory storage.');
-      setStockItems(stockItems.map(i => i.id === id ? { ...i, ...updates } : i));
+      handleNotify('error', 'Failed to persist stock item changes.');
+      throw error;
     }
   };
 
@@ -3808,12 +3867,12 @@ export default function App() {
     try {
       console.info('[App] Deleting stock item:', id);
       await dataService.deleteStockItem(id);
-      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
+      setStockItems(previous => previous.map(i => i.id === id ? { ...i, isDeleted: true } : i));
       handleNotify('success', 'Item deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting stock item:', error);
-      handleNotify('error', 'Failed to delete item. Falling back to memory storage.');
-      setStockItems(stockItems.map(i => i.id === id ? { ...i, isDeleted: true } : i));
+      handleNotify('error', 'Failed to delete stock item.');
+      throw error;
     }
   };
 
@@ -3863,13 +3922,16 @@ export default function App() {
     try {
       console.info('[App] Creating stock adjustment');
       const newAdjustment = await dataService.createStockAdjustment({ ...adjustment, orgId: currentOrgId } as StockAdjustment);
-      setStockAdjustments([...stockAdjustments, newAdjustment]);
+      setStockAdjustments(previous => [...previous, newAdjustment]);
+      if (newAdjustment.isApproved) {
+        const refreshedLevels = await dataService.getInventoryLevelsByOrg(currentOrgId);
+        setInventoryLevels(refreshedLevels);
+      }
       handleNotify('success', 'Stock adjustment created successfully');
     } catch (error) {
       console.error('[App] Error adding stock adjustment:', error);
-      handleNotify('error', 'Failed to create adjustment. Falling back to memory storage.');
-      const adjWithId: StockAdjustment = { ...adjustment, orgId: currentOrgId, id: `adj - ${Date.now()} `, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), isDeleted: false } as any;
-      setStockAdjustments([...stockAdjustments, adjWithId]);
+      handleNotify('error', 'Failed to persist stock adjustment.');
+      throw error;
     }
   };
 
@@ -3877,12 +3939,14 @@ export default function App() {
     try {
       console.info('[App] Updating stock adjustment:', id);
       const updated = await dataService.updateStockAdjustment(id, updates);
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? updated : a));
+      setStockAdjustments(previous => previous.map(a => a.id === id ? updated : a));
+      const refreshedLevels = await dataService.getInventoryLevelsByOrg(currentOrgId);
+      setInventoryLevels(refreshedLevels);
       handleNotify('success', 'Stock adjustment updated successfully');
     } catch (error) {
       console.error('[App] Error updating stock adjustment:', error);
-      handleNotify('error', 'Failed to update adjustment. Falling back to memory storage.');
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, ...updates } : a));
+      handleNotify('error', 'Failed to persist stock adjustment changes.');
+      throw error;
     }
   };
 
@@ -3890,12 +3954,14 @@ export default function App() {
     try {
       console.info('[App] Deleting stock adjustment:', id);
       await dataService.deleteStockAdjustment(id);
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+      setStockAdjustments(previous => previous.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+      const refreshedLevels = await dataService.getInventoryLevelsByOrg(currentOrgId);
+      setInventoryLevels(refreshedLevels);
       handleNotify('success', 'Stock adjustment deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting stock adjustment:', error);
-      handleNotify('error', 'Failed to delete adjustment. Falling back to memory storage.');
-      setStockAdjustments(stockAdjustments.map(a => a.id === id ? { ...a, isDeleted: true } : a));
+      handleNotify('error', 'Failed to delete stock adjustment.');
+      throw error;
     }
   };
 
@@ -6624,6 +6690,8 @@ export default function App() {
               <NavItem icon={<Package size={20} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => navigateTo('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<MapPin size={20} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => navigateTo('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Box size={20} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => navigateTo('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<Layers size={20} />} label="Inventory Classes" active={activeTab === 'inventory-classes'} onClick={() => navigateTo('inventory-classes')} compact={!sidebarOpen} brandColor={brandColor} />
+              <NavItem icon={<FilePlus2 size={20} />} label="Opening Inventory" active={activeTab === 'opening-inventory'} onClick={() => navigateTo('opening-inventory')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Layers size={20} />} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => navigateTo('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<AlertCircle size={20} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => navigateTo('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Zap size={20} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => navigateTo('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6898,9 +6966,11 @@ export default function App() {
           {/* Inventory Management Views */}
           {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} />}
           {activeTab === 'warehouse-locations' && <WarehouseLocationsView orgId={currentOrgId} locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'stock-items' && <StockItemsView orgId={currentOrgId} items={stockItems.filter(i => !i.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'inventory-classes' && <InventoryClassesView classes={inventoryClasses} accounts={filteredAccounts} warehouses={warehouseLocations} onSave={handleSaveInventoryClass} />}
+          {activeTab === 'opening-inventory' && <OpeningInventoryView items={stockItems} warehouses={warehouseLocations} onPost={handlePostOpeningInventory} />}
+          {activeTab === 'stock-items' && <StockItemsView orgId={currentOrgId} items={stockItems.filter(i => !i.isDeleted)} inventoryClasses={inventoryClasses} accounts={filteredAccounts} locations={warehouseLocations.filter(location => !location.isDeleted)} levels={inventoryLevels.filter(level => !level.isDeleted)} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} onManageQuantity={() => setActiveTab('stock-adjustments')} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
-          {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} onPostGL={handlePostJournal} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-transactions' && <InventoryTransactionsView orgId={currentOrgId} transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}

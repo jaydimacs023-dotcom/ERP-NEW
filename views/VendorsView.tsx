@@ -8,7 +8,7 @@ import {
   Search, Plus, Truck, Mail, Phone, Trash2, X, 
   Edit, AlertCircle, MapPin, Building, Link as LinkIcon,
   CreditCard, Globe, Calendar, Banknote, FileText, ChevronDown,
-  CheckCircle, XCircle, Archive, Eye, RotateCcw
+  CheckCircle, XCircle, Archive, Eye, RotateCcw, ArrowLeft, Save
 } from 'lucide-react';
 
 interface VendorsViewProps {
@@ -16,8 +16,8 @@ interface VendorsViewProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
   lines: JournalLine[];
-  onAddVendor?: (vendor: Vendor) => void;
-  onUpdateVendor?: (id: string, updates: Partial<Vendor>) => void;
+  onAddVendor?: (vendor: Vendor) => Vendor | Promise<Vendor>;
+  onUpdateVendor?: (id: string, updates: Partial<Vendor>) => Vendor | Promise<Vendor>;
   onDeleteVendor?: (id: string) => void;
   onNotify?: (type: 'success' | 'error', message: string) => void;
 }
@@ -40,7 +40,7 @@ const PAYMENT_TERMS = [
 ];
 
 const PAGE_SIZE = 10;
-const VENDOR_COLUMNS = 'id,org_id,name,category,email,contact_number,address,ap_account_id,created_at,updated_at';
+const VENDOR_COLUMNS = 'id,org_id,name,category,email,contact_number,address,ap_account_id,payment_terms_days,created_at,updated_at';
 
 const STATUS_CONFIG: Record<VendorStatus, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
   active: { label: 'Active', color: 'text-brand', bgColor: 'bg-brand/10', icon: CheckCircle },
@@ -248,7 +248,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
     return { total, active, blocked, totalPayables };
   }, [vendors, vendorApBalances]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.apAccountId) {
       onNotify?.('error', 'Validation Error: Name, email, and AP account are required.');
@@ -275,14 +275,20 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       createdAt: new Date().toISOString()
     };
 
-    onAddVendor?.(newVendor);
+    if (!onAddVendor) return;
+
+    const createdVendor = await onAddVendor(newVendor);
+    setServerVendors(current => [
+      createdVendor,
+      ...current.filter(vendor => vendor.id !== createdVendor.id)
+    ].slice(0, PAGE_SIZE));
+    setServerTotal(total => total + 1);
     setRefreshKey(key => key + 1);
     setShowModal(false);
     resetForm();
-    onNotify?.('success', 'Vendor created successfully.');
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVendor || !onUpdateVendor) return;
     if (!editingVendor.name || !editingVendor.email || !editingVendor.apAccountId) {
@@ -290,7 +296,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       return;
     }
 
-    onUpdateVendor(editingVendor.id!, {
+    const updatedVendor = await onUpdateVendor(editingVendor.id!, {
       name: editingVendor.name,
       category: editingVendor.category,
       email: editingVendor.email,
@@ -307,6 +313,9 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       bankBranch: editingVendor.bankBranch,
       updatedAt: new Date().toISOString()
     });
+    setServerVendors(current => current.map(vendor =>
+      vendor.id === updatedVendor.id ? updatedVendor : vendor
+    ));
     setRefreshKey(key => key + 1);
     setShowEditModal(false);
     setEditingVendor(null);
@@ -340,7 +349,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
 
   // Vendor Form Component (used for both Create and Edit)
   const VendorFormFields = ({ data, setData }: { data: Partial<Vendor>; setData: (d: Partial<Vendor>) => void }) => (
-    <div className="space-y-5 max-h-[65vh] overflow-y-auto pr-2">
+    <div className="space-y-8">
       {/* Basic Info Section */}
       <div className="space-y-4">
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide border-b pb-2">Basic Information</p>
@@ -356,7 +365,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
               <FileText size={12} /> TIN (Tax ID)
             </label>
-            <input placeholder="000-000-000-000" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-mono"
+            <input inputMode="numeric" autoComplete="off" placeholder="000-000-000-000" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-mono"
               value={data.tin || ''} onChange={e => setData({...data, tin: e.target.value})} />
           </div>
           <div className="space-y-1.5">
@@ -418,7 +427,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
               <Phone size={12} /> Contact Number
             </label>
-            <input placeholder="Official Phone" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+            <input type="tel" inputMode="tel" autoComplete="tel" placeholder="Official Phone" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
               value={data.contactNumber || ''} onChange={e => setData({...data, contactNumber: e.target.value})} />
           </div>
         </div>
@@ -489,12 +498,101 @@ const VendorsView: React.FC<VendorsViewProps> = ({
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
             <CreditCard size={12} /> Account Number
           </label>
-          <input placeholder="Bank Account Number" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-mono"
+          <input inputMode="numeric" autoComplete="off" placeholder="Bank Account Number" className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-mono"
             value={data.bankAccountNumber || ''} onChange={e => setData({...data, bankAccountNumber: e.target.value})} />
         </div>
       </div>
     </div>
   );
+
+  if (showModal || (showEditModal && editingVendor)) {
+    const isEditing = showEditModal && !!editingVendor;
+    const activeData = isEditing ? editingVendor : formData;
+    const setActiveData = isEditing ? setEditingVendor : setFormData;
+    const closeFormPage = () => {
+      setShowModal(false);
+      setShowEditModal(false);
+      setEditingVendor(null);
+      resetForm();
+    };
+
+    return (
+      <div className="min-h-full pb-20 animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <button
+            type="button"
+            onClick={closeFormPage}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-brand transition-colors group"
+          >
+            <ArrowLeft size={17} className="transition-transform group-hover:-translate-x-1" />
+            Back to Vendor Registry
+          </button>
+
+          <header className="relative overflow-hidden rounded-lg border border-gray-200 bg-gray-900 px-7 py-8 text-white shadow-sm">
+            <div className="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-l from-brand/30 to-transparent" />
+            <div className="absolute -right-10 -top-20 h-56 w-56 rounded-full border border-white/10" />
+            <div className="relative max-w-2xl">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">
+                Vendor Master Data
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                {isEditing ? `Edit ${activeData.name || 'Vendor'}` : 'Onboard a New Supplier'}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-300">
+                Maintain the supplier identity, payment defaults, and banking details used throughout accounts payable.
+              </p>
+            </div>
+          </header>
+
+          <form onSubmit={isEditing ? handleEditSubmit : handleSubmit}>
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <main className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+                {VendorFormFields({ data: activeData, setData: setActiveData })}
+              </main>
+
+              <aside className="space-y-4 lg:sticky lg:top-6">
+                <div className="rounded-lg border border-brand/20 bg-brand/5 p-5">
+                  <div className="mb-3 flex h-9 w-9 items-center justify-center rounded bg-brand text-white">
+                    <AlertCircle size={18} />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-800">Before you save</h3>
+                  <p className="mt-2 text-xs leading-5 text-gray-600">
+                    Confirm the legal name, billing email, AP account, and payment terms. These values flow into payable transactions.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Required fields</p>
+                  <ul className="mt-3 space-y-2 text-xs text-gray-600">
+                    <li>Business name</li>
+                    <li>Billing email</li>
+                    <li>Default G/L payables account</li>
+                  </ul>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded bg-brand px-5 py-3 text-sm font-bold text-white shadow-md shadow-brand/20 transition-all hover:bg-brand-hover active:scale-[0.98]"
+                  >
+                    <Save size={17} />
+                    {isEditing ? 'Save Changes' : 'Create Vendor'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeFormPage}
+                    className="w-full rounded px-5 py-3 text-sm font-semibold text-gray-500 transition-colors hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </aside>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -679,7 +777,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
                       <span className="text-xs text-gray-600">
-                        {PAYMENT_TERMS.find(t => t.value === vendor.paymentTermsDays)?.label || `Net ${vendor.paymentTermsDays || 30}`}
+                        {PAYMENT_TERMS.find(t => t.value === vendor.paymentTermsDays)?.label || `Net ${vendor.paymentTermsDays ?? 30}`}
                       </span>
                       <span className="text-xs font-bold text-gray-400">{vendor.currency || 'PHP'}</span>
                     </div>
@@ -764,7 +862,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="p-6">
-              <VendorFormFields data={formData} setData={setFormData} />
+              {VendorFormFields({ data: formData, setData: setFormData })}
 
               <div className="bg-amber-50 p-4 rounded border border-amber-100 flex gap-3 mt-5">
                  <AlertCircle className="text-amber-600 shrink-0" size={20} />
@@ -797,7 +895,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-6">
-              <VendorFormFields data={editingVendor} setData={setEditingVendor} />
+              {VendorFormFields({ data: editingVendor, setData: setEditingVendor })}
 
               <div className="pt-4 flex gap-3 mt-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3.5 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded transition-colors">Cancel</button>
@@ -850,7 +948,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
                 )}
                 <div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Payment Terms</p>
-                  <p className="text-gray-700">{PAYMENT_TERMS.find(t => t.value === viewingVendor.paymentTermsDays)?.label || `Net ${viewingVendor.paymentTermsDays || 30}`}</p>
+                  <p className="text-gray-700">{PAYMENT_TERMS.find(t => t.value === viewingVendor.paymentTermsDays)?.label || `Net ${viewingVendor.paymentTermsDays ?? 30}`}</p>
                 </div>
                 <div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Currency</p>

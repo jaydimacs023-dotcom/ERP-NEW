@@ -2,7 +2,7 @@
 import { FetchPageOptions, IDataService, InitialData, PaginatedResult } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
-import { FeedbackTicket, Invoice, TaxCategoryEntry } from '../types';
+import { FeedbackTicket, InventoryClass, Invoice, OpeningInventoryDocument, TaxCategoryEntry } from '../types';
 import { normalizeStudentDocuments } from './StudentDocumentService';
 
 /**
@@ -266,7 +266,20 @@ export class SupabaseDataService implements IDataService {
         'enrollments', 'assessment_registrations', 'invoices', 'invoice_lines', 'tax_categories'
       ];
 
-      const fetchers = tablesToFetch.map(table => () => this.fetchFromSupabase(table));
+      const fetchers = tablesToFetch.map(table => ['warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions', 'stock_adjustments'].includes(table)
+        ? () => (table === 'warehouse_locations'
+          ? this.listWarehouseLocationsViaEdgeFunction()
+          : table === 'stock_items'
+            ? this.listStockItemsViaEdgeFunction()
+            : table === 'inventory_levels'
+              ? this.listInventoryLevelsViaEdgeFunction()
+              : table === 'inventory_transactions'
+                ? this.inventoryAccountingRequest<any[]>('list_transactions')
+            : this.listStockAdjustmentsViaEdgeFunction()).catch(error => {
+          console.error(`[Supabase] Failed to load ${table} through Edge Function:`, error);
+          return [];
+        })
+        : () => this.fetchFromSupabase(table));
 
       const results = await this.fetchInBatches(fetchers, 8);
 
@@ -759,11 +772,11 @@ export class SupabaseDataService implements IDataService {
       trainer_schedules: ['id', 'org_id', 'trainer_id', 'location_id', 'slots', 'is_deleted', 'deleted_at', 'deleted_by', 'created_at', 'updated_at'],
       sponsors: [
         'id', 'org_id', 'sponsor_code', 'name', 'contact_person', 'email', 'phone', 'address',
-        'tin', 'tax_type', 'ewt_rate', 'ar_account_id', 'created_at', 'updated_at',
+        'tin', 'tax_type', 'ewt_rate', 'ar_account_id', 'course_fee_type', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
       ],
       batches: ['id', 'org_id', 'batch_code', 'name', 'year', 'qualification_id', 'trainer_id', 'sponsor_id', 'location_id', 'student_ids', 'status', 'start_date', 'end_date', 'training_schedule_slots', 'max_students', 'current_students', 'created_at', 'updated_at'],
-      vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'created_at', 'updated_at'],
+      vendors: ['id', 'org_id', 'name', 'category', 'email', 'contact_number', 'address', 'ap_account_id', 'payment_terms_days', 'created_at', 'updated_at'],
       atc_categories: ['id', 'code', 'name', 'created_at', 'updated_at'],
       atc_items: ['id', 'category_id', 'atc_code', 'description', 'taxpayer_type', 'created_at', 'updated_at'],
       atc_rates: ['id', 'atc_item_id', 'rate', 'rate_label', 'created_at', 'updated_at'],
@@ -787,7 +800,7 @@ export class SupabaseDataService implements IDataService {
         'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'
       ],
       course_fees: [
-        'id', 'org_id', 'fee_code', 'qualification_id', 'fee_name', 'amount',
+        'id', 'org_id', 'fee_code', 'qualification_id', 'funding_type', 'fee_name', 'amount',
         'gl_account_id', 'tax_category_id', 'is_subject_to_ewt', 'ewt_rate',
         'category', 'description', 'is_active', 'created_at', 'updated_at',
         'is_deleted', 'deleted_at', 'deleted_by'
@@ -2011,8 +2024,22 @@ export class SupabaseDataService implements IDataService {
       enrolledQty
     });
 
+    let fundingType = 'PRIVATE';
+    if (batch.sponsor_id) {
+      const sponsorResponse = await fetch(
+        `${this.baseUrl}/sponsors?id=eq.${batch.sponsor_id}&select=course_fee_type`,
+        { headers }
+      );
+      if (!sponsorResponse.ok) {
+        throw new Error(`Failed to load batch sponsor pricing classification: ${sponsorResponse.status} ${await sponsorResponse.text()}`);
+      }
+      const sponsorRows = await sponsorResponse.json();
+      fundingType = sponsorRows?.[0]?.course_fee_type === 'TESDA_SCHOLARSHIP'
+        ? 'TESDA_SCHOLARSHIP'
+        : 'SPONSORED';
+    }
     const feesResponse = await fetch(
-      `${this.baseUrl}/course_fees?qualification_id=eq.${batch.qualification_id}&is_active=eq.true&select=id,fee_name,amount,gl_account_id,tax_category_id,is_deleted`,
+      `${this.baseUrl}/course_fees?qualification_id=eq.${batch.qualification_id}&funding_type=eq.${fundingType}&is_active=eq.true&order=category.asc,fee_name.asc&select=id,fee_name,amount,gl_account_id,tax_category_id,is_deleted`,
       { headers }
     );
     if (!feesResponse.ok) {
@@ -2041,6 +2068,65 @@ export class SupabaseDataService implements IDataService {
 
     const page = Math.max(1, options.page || 1);
     const pageSize = Math.min(Math.max(1, options.pageSize || 25), 200);
+
+    if (table === 'warehouse_locations') {
+      const orgId = String(options.filters?.find(filter => filter.column === 'org_id')?.value || '');
+      let rows = await this.listWarehouseLocationsViaEdgeFunction(orgId);
+      for (const filter of options.filters || []) {
+        if (filter.column === 'org_id') continue;
+        const camelColumn = filter.column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+        if ((filter.operator || 'eq') === 'eq') {
+          rows = rows.filter((row: any) => String(row[camelColumn]) === String(filter.value));
+        }
+      }
+      const searchTerm = options.search?.term?.trim().toLowerCase();
+      if (searchTerm && options.search?.columns.length) {
+        rows = rows.filter((row: any) => options.search!.columns.some(column => {
+          const camelColumn = column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+          return String(row[camelColumn] || '').toLowerCase().includes(searchTerm);
+        }));
+      }
+      rows.sort((left: any, right: any) => String(left.code || '').localeCompare(String(right.code || '')));
+      const total = rows.length;
+      const from = (page - 1) * pageSize;
+      return {
+        rows: rows.slice(from, from + pageSize) as T[],
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+    }
+
+    if (table === 'stock_items') {
+      const orgId = String(options.filters?.find(filter => filter.column === 'org_id')?.value || '');
+      let rows = await this.listStockItemsViaEdgeFunction(orgId);
+      for (const filter of options.filters || []) {
+        if (filter.column === 'org_id') continue;
+        const camelColumn = filter.column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+        if ((filter.operator || 'eq') === 'eq') {
+          rows = rows.filter((row: any) => String(row[camelColumn]) === String(filter.value));
+        }
+      }
+      const searchTerm = options.search?.term?.trim().toLowerCase();
+      if (searchTerm && options.search?.columns.length) {
+        rows = rows.filter((row: any) => options.search!.columns.some(column => {
+          const camelColumn = column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+          return String(row[camelColumn] || '').toLowerCase().includes(searchTerm);
+        }));
+      }
+      rows.sort((left: any, right: any) => String(left.code || '').localeCompare(String(right.code || '')));
+      const total = rows.length;
+      const from = (page - 1) * pageSize;
+      return {
+        rows: rows.slice(from, from + pageSize) as T[],
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+    }
+
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     const url = new URL(`${this.baseUrl}/${table}`);
@@ -2077,7 +2163,7 @@ export class SupabaseDataService implements IDataService {
 
     const response = await fetch(url.toString(), {
       headers: {
-        ...(await this.getHeaders()),
+        ...(await this.getHeaders(table === 'warehouse_locations')),
         Prefer: 'count=exact',
         Range: `${from}-${to}`,
       },
@@ -3144,161 +3230,127 @@ export class SupabaseDataService implements IDataService {
   // ============================================================================
 
   // Warehouse Location CRUD
+  private async warehouseLocationRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    // The function has verify_jwt disabled at the Supabase gateway and validates
+    // the application's HS256 token itself using AT_ERP_JWT_SECRET.
+    const tokenToSend = await this.getAuthToken();
+
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/warehouse-locations-write`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenToSend}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message =
+        result?.error ||
+        result?.message ||
+        (typeof result === 'string' ? result : '') ||
+        `Warehouse location request failed (${response.status})`;
+
+      if (response.status === 401 && /Invalid or expired application token/i.test(message)) {
+        throw new Error('Your application session has expired. Please sign in again.');
+      }
+
+      throw new Error(message);
+    }
+
+    return result;
+  }
+
+  private async listWarehouseLocationsViaEdgeFunction(orgId?: string): Promise<any[]> {
+    const result = await this.warehouseLocationRequest('list', orgId ? { orgId } : {});
+    return this.snakeToCamel(result.locations || []);
+  }
+
   async createWarehouseLocation(location: any): Promise<any> {
     console.debug('[Supabase] createWarehouseLocation called with:', location);
-    try {
-      const payload = this.camelToSnake(location);
-      delete payload.id;
-      const url = `${this.baseUrl}/warehouse_locations`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create warehouse location: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error creating warehouse location:', error);
-      throw error;
-    }
+    const result = await this.warehouseLocationRequest('create', {
+      orgId: location.orgId,
+      org_id: location.orgId,
+      location,
+    });
+    return this.snakeToCamel(result.location);
   }
 
   async updateWarehouseLocation(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateWarehouseLocation called with id:', id);
-    try {
-      const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) throw new Error('Failed to update warehouse location');
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error updating warehouse location:', error);
-      throw error;
-    }
+    const result = await this.warehouseLocationRequest('update', { id, updates });
+    return this.snakeToCamel(result.location);
   }
 
   async deleteWarehouseLocation(id: string): Promise<void> {
     console.debug('[Supabase] deleteWarehouseLocation called with id:', id);
-    try {
-      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
-      await fetch(url, {
-        method: 'PATCH',
-        headers: (await this.getHeaders()),
-        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
-      });
-    } catch (error) {
-      console.error('[Supabase] Error deleting warehouse location:', error);
-      throw error;
-    }
+    await this.warehouseLocationRequest('delete', { id });
   }
 
   async getWarehouseLocationsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getWarehouseLocationsByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/warehouse_locations?org_id=eq.${orgId}&is_deleted=eq.false&order=name.asc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching warehouse locations:', error);
-      return [];
-    }
+    return this.listWarehouseLocationsViaEdgeFunction(orgId);
   }
 
   async getWarehouseLocationById(id: string): Promise<any | null> {
-    console.debug('[Supabase] getWarehouseLocationById called with id:', id);
-    try {
-      const url = `${this.baseUrl}/warehouse_locations?id=eq.${id}`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
-    } catch (error) {
-      console.error('[Supabase] Error fetching warehouse location:', error);
-      return null;
-    }
+    const locations = await this.listWarehouseLocationsViaEdgeFunction();
+    return locations.find(location => location.id === id) || null;
   }
 
   // Stock Item CRUD
+  private async stockItemRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/stock-items-write`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        `Stock item request failed (${response.status})`
+      );
+    }
+    return result;
+  }
+
+  private async listStockItemsViaEdgeFunction(orgId?: string): Promise<any[]> {
+    const result = await this.stockItemRequest('list', orgId ? { orgId } : {});
+    return this.snakeToCamel(result.items || []);
+  }
+
   async createStockItem(item: any): Promise<any> {
     console.debug('[Supabase] createStockItem called with:', item);
-    try {
-      const payload = this.camelToSnake(item);
-      delete payload.id;
-      const url = `${this.baseUrl}/stock_items`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create stock item: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error creating stock item:', error);
-      throw error;
-    }
+    const result = await this.stockItemRequest('create', {
+      orgId: item.orgId,
+      item,
+    });
+    return this.snakeToCamel(result.item);
   }
 
   async updateStockItem(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateStockItem called with id:', id);
-    try {
-      const payload = this.camelToSnake(updates);
-      const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) throw new Error('Failed to update stock item');
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error updating stock item:', error);
-      throw error;
-    }
+    const result = await this.stockItemRequest('update', { id, updates });
+    return this.snakeToCamel(result.item);
   }
 
   async deleteStockItem(id: string): Promise<void> {
     console.debug('[Supabase] deleteStockItem called with id:', id);
-    try {
-      const url = `${this.baseUrl}/stock_items?id=eq.${id}`;
-      await fetch(url, {
-        method: 'PATCH',
-        headers: (await this.getHeaders()),
-        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
-      });
-    } catch (error) {
-      console.error('[Supabase] Error deleting stock item:', error);
-      throw error;
-    }
+    await this.stockItemRequest('delete', { id });
   }
 
   async getStockItemsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getStockItemsByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching stock items:', error);
-      return [];
-    }
+    return this.listStockItemsViaEdgeFunction(orgId);
   }
 
   async getStockItemById(id: string): Promise<any | null> {
@@ -3399,16 +3451,7 @@ export class SupabaseDataService implements IDataService {
 
   async getInventoryLevelsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getInventoryLevelsByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/inventory_levels?org_id=eq.${orgId}&is_deleted=eq.false&order=updated_at.desc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching inventory levels:', error);
-      return [];
-    }
+    return this.listInventoryLevelsViaEdgeFunction(orgId);
   }
 
   async getInventoryLevelByItemAndLocation(orgId: string, stockItemId: string, locationId: string): Promise<any | null> {
@@ -3509,16 +3552,7 @@ export class SupabaseDataService implements IDataService {
 
   async getInventoryTransactionsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getInventoryTransactionsByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/inventory_transactions?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching inventory transactions:', error);
-      return [];
-    }
+    return this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
   }
 
   async getInventoryTransactionById(id: string): Promise<any | null> {
@@ -3550,113 +3584,126 @@ export class SupabaseDataService implements IDataService {
   }
 
   // Stock Adjustment CRUD
+  private normalizeStockAdjustment(row: any): any {
+    const adjustment = this.snakeToCamel(row);
+    return {
+      ...adjustment,
+      quantity: Math.abs(Number(adjustment.quantityChange || 0)),
+      isApproved: Boolean(adjustment.approvalDate),
+      adjustmentType: adjustment.adjustmentType || 'ADJUSTMENT',
+    };
+  }
+
+  private async stockAdjustmentRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/stock-adjustments-write`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || result?.message || `Stock adjustment request failed (${response.status})`);
+    }
+    return result;
+  }
+
+  private async listStockAdjustmentsViaEdgeFunction(orgId?: string): Promise<any[]> {
+    const result = await this.stockAdjustmentRequest('list', orgId ? { orgId } : {});
+    return (result.adjustments || []).map((row: any) => this.normalizeStockAdjustment(row));
+  }
+
+  private async listInventoryLevelsViaEdgeFunction(orgId?: string): Promise<any[]> {
+    const result = await this.stockAdjustmentRequest('list_levels', orgId ? { orgId } : {});
+    return this.snakeToCamel(result.levels || []);
+  }
+
+  private async inventoryAccountingRequest<T>(
+    action: string,
+    payload: Record<string, any> = {}
+  ): Promise<T> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/inventory-accounting`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body?.error || `Inventory accounting request failed (${response.status})`);
+    }
+    return this.snakeToCamel(body.result) as T;
+  }
+
+  async getInventoryClasses(orgId: string): Promise<InventoryClass[]> {
+    return this.inventoryAccountingRequest<InventoryClass[]>('list_classes', { orgId });
+  }
+
+  async saveInventoryClass(
+    inventoryClass: Partial<InventoryClass> & { orgId: string }
+  ): Promise<InventoryClass> {
+    return this.inventoryAccountingRequest<InventoryClass>('save_class', {
+      orgId: inventoryClass.orgId,
+      inventoryClass,
+    });
+  }
+
+  async getOpeningInventory(orgId: string): Promise<OpeningInventoryDocument[]> {
+    return this.inventoryAccountingRequest<OpeningInventoryDocument[]>('list_opening', { orgId });
+  }
+
+  async postOpeningInventory(
+    document: Partial<OpeningInventoryDocument> & { orgId: string }
+  ): Promise<any> {
+    return this.inventoryAccountingRequest('post_opening', {
+      orgId: document.orgId,
+      document,
+    });
+  }
+
   async createStockAdjustment(adjustment: any): Promise<any> {
     console.debug('[Supabase] createStockAdjustment called with:', adjustment);
-    try {
-      const payload = this.camelToSnake(adjustment);
-
-      // Convert empty strings to null for UUID columns
-      if (payload.stock_item_id === '') payload.stock_item_id = null;
-      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
-
-      delete payload.id;
-      const url = `${this.baseUrl}/stock_adjustments`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create stock adjustment: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error creating stock adjustment:', error);
-      throw error;
-    }
+    const result = await this.stockAdjustmentRequest('create', {
+      orgId: adjustment.orgId,
+      adjustment,
+    });
+    return this.normalizeStockAdjustment(result.adjustment);
   }
 
   async updateStockAdjustment(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateStockAdjustment called with id:', id);
-    try {
-      const payload = this.camelToSnake(updates);
-
-      // Convert empty strings to null for UUID columns
-      if (payload.stock_item_id === '') payload.stock_item_id = null;
-      if (payload.warehouse_location_id === '') payload.warehouse_location_id = null;
-
-      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) throw new Error('Failed to update stock adjustment');
-      const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
-    } catch (error) {
-      console.error('[Supabase] Error updating stock adjustment:', error);
-      throw error;
-    }
+    const result = await this.stockAdjustmentRequest('update', { id, updates });
+    return this.normalizeStockAdjustment(result.adjustment);
   }
 
   async deleteStockAdjustment(id: string): Promise<void> {
     console.debug('[Supabase] deleteStockAdjustment called with id:', id);
-    try {
-      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
-      await fetch(url, {
-        method: 'PATCH',
-        headers: (await this.getHeaders()),
-        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
-      });
-    } catch (error) {
-      console.error('[Supabase] Error deleting stock adjustment:', error);
-      throw error;
-    }
+    await this.stockAdjustmentRequest('delete', { id });
   }
 
   async getStockAdjustmentsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getStockAdjustmentsByOrg called with orgId:', orgId);
-    try {
-      const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching stock adjustments:', error);
-      return [];
-    }
+    return this.listStockAdjustmentsViaEdgeFunction(orgId);
   }
 
   async getStockAdjustmentById(id: string): Promise<any | null> {
     console.debug('[Supabase] getStockAdjustmentById called with id:', id);
-    try {
-      const url = `${this.baseUrl}/stock_adjustments?id=eq.${id}`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
-    } catch (error) {
-      console.error('[Supabase] Error fetching stock adjustment:', error);
-      return null;
-    }
+    const adjustments = await this.listStockAdjustmentsViaEdgeFunction();
+    return adjustments.find(adjustment => adjustment.id === id) || null;
   }
 
   async getStockAdjustmentsByItem(orgId: string, stockItemId: string): Promise<any[]> {
     console.debug('[Supabase] getStockAdjustmentsByItem called with stockItemId:', stockItemId);
-    try {
-      const url = `${this.baseUrl}/stock_adjustments?org_id=eq.${orgId}&stock_item_id=eq.${stockItemId}&is_deleted=eq.false&order=created_at.desc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
-    } catch (error) {
-      console.error('[Supabase] Error fetching stock adjustments by item:', error);
-      return [];
-    }
+    const adjustments = await this.listStockAdjustmentsViaEdgeFunction(orgId);
+    return adjustments.filter(adjustment => adjustment.stockItemId === stockItemId);
   }
 
   // Reorder Point CRUD

@@ -8,7 +8,7 @@ import {
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
   CourseFee, AlumniEmploymentReport, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
-  FeedbackTicket
+  FeedbackTicket, InventoryClass, OpeningInventoryDocument
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -332,6 +332,12 @@ export interface IDataService {
   getReorderPointsByOrg(orgId: string): Promise<ReorderPoint[]>;
   getReorderPointByItem(orgId: string, stockItemId: string): Promise<ReorderPoint | null>;
   getItemsNeedingReorder(orgId: string): Promise<StockItem[]>;
+
+  // Enterprise Inventory Accounting
+  getInventoryClasses(orgId: string): Promise<InventoryClass[]>;
+  saveInventoryClass(inventoryClass: Partial<InventoryClass> & { orgId: string }): Promise<InventoryClass>;
+  getOpeningInventory(orgId: string): Promise<OpeningInventoryDocument[]>;
+  postOpeningInventory(document: Partial<OpeningInventoryDocument> & { orgId: string }): Promise<any>;
 
   // Revenue Schedule CRUD (Deferred Revenue)
   createRevenueSchedule(schedule: RevenueSchedule): Promise<RevenueSchedule>;

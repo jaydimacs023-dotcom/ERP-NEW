@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Sponsor, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../types';
+import { Sponsor, SponsoredCourseFeeType, ChartOfAccount, TaxType, JournalEntry, JournalLine } from '../types';
 import SponsorSOAView from './SponsorSOAView';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
@@ -31,7 +31,7 @@ interface SponsorsViewProps {
 }
 
 const PAGE_SIZE = 10;
-const SPONSOR_COLUMNS = 'id,org_id,sponsor_code,name,contact_person,email,phone,address,tin,tax_type,ewt_rate,ar_account_id,created_at,updated_at,is_deleted,deleted_at,deleted_by';
+const SPONSOR_COLUMNS = 'id,org_id,sponsor_code,name,contact_person,email,phone,address,tin,tax_type,ewt_rate,ar_account_id,course_fee_type,created_at,updated_at,is_deleted,deleted_at,deleted_by';
 
 const getNextSponsorCode = (sponsorRecords: Sponsor[]) => {
   const highest = sponsorRecords.reduce<{ prefix: string; number: number; width: number } | null>((current, sponsor) => {
@@ -82,7 +82,8 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
     tin: '',
     taxType: undefined,
     ewtRate: undefined,
-    arAccountId: ''
+    arAccountId: '',
+    courseFeeType: 'SPONSORED'
   });
 
   React.useEffect(() => {
@@ -198,13 +199,13 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
   const nextSponsorCode = useMemo(() => getNextSponsorCode([...sponsors, ...serverSponsors]), [serverSponsors, sponsors]);
 
   const resetForm = () => {
-    setFormData({ sponsorCode: '', name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
+    setFormData({ sponsorCode: '', name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '', courseFeeType: 'SPONSORED' });
     setEditingSponsor(null);
   };
 
   const openCreateModal = () => {
     setEditingSponsor(null);
-    setFormData({ sponsorCode: nextSponsorCode, name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '' });
+    setFormData({ sponsorCode: nextSponsorCode, name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: undefined, ewtRate: undefined, arAccountId: '', courseFeeType: 'SPONSORED' });
     setShowModal(true);
   };
 
@@ -240,6 +241,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           taxType: formData.taxType,
           ewtRate: formData.ewtRate,
           arAccountId: formData.arAccountId,
+          courseFeeType: formData.courseFeeType || 'SPONSORED',
           updatedAt: new Date().toISOString()
         };
         await onUpdateSponsor(updatedSponsor);
@@ -260,6 +262,7 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
           taxType: formData.taxType,
           ewtRate: formData.ewtRate,
           arAccountId: formData.arAccountId,
+          courseFeeType: formData.courseFeeType || 'SPONSORED',
           createdAt: new Date().toISOString()
         };
         await onAddSponsor(newSponsor);
@@ -311,7 +314,8 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
       tin: sponsor.tin || '',
       taxType: sponsor.taxType,
       ewtRate: sponsor.ewtRate,
-      arAccountId: sponsor.arAccountId || ''
+      arAccountId: sponsor.arAccountId || '',
+      courseFeeType: sponsor.courseFeeType || 'SPONSORED'
     });
     setShowModal(true);
   };
@@ -682,6 +686,23 @@ const SponsorsView: React.FC<SponsorsViewProps> = ({
                   </div>
                   <p className="text-xs text-gray-500 italic">
                     EWT Rate is used for computing Expanded Withholding Tax on income payments to this sponsor.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-4 bg-brand/10 rounded border border-brand-light">
+                  <label className="text-xs font-semibold text-brand uppercase tracking-wide flex items-center gap-2 mb-2">
+                    <Receipt size={12} /> Course Fee Schedule
+                  </label>
+                  <select
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+                    value={formData.courseFeeType || 'SPONSORED'}
+                    onChange={e => setFormData({ ...formData, courseFeeType: e.target.value as SponsoredCourseFeeType })}
+                  >
+                    <option value="SPONSORED">Sponsored (standard, includes OJT when configured)</option>
+                    <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
+                  </select>
+                  <p className="text-xs text-gray-500 italic mt-2 px-1">
+                    TESDA scholarship batches use their own course-fee schedule. Other sponsors use the standard sponsored schedule.
                   </p>
                 </div>
 

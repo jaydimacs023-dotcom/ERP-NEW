@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Check, Search, ChevronDown, RotateCcw } from 'lucide-react';
-import { WarehouseLocation } from '../types';
+import { WarehouseLocation } from '../../types';
 
 interface WarehouseLocationsViewProps {
   locations: WarehouseLocation[];
@@ -14,14 +14,16 @@ interface WarehouseLocationsViewProps {
 interface FormData {
   code: string;
   name: string;
-  location: string;
+  address: string;
+  description: string;
   isActive: boolean;
 }
 
 const INITIAL_FORM: FormData = {
   code: '',
   name: '',
-  location: '',
+  address: '',
+  description: '',
   isActive: true,
 };
 
@@ -55,7 +57,8 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     setFormData({
       code: location.code,
       name: location.name,
-      location: location.location,
+      address: location.address || '',
+      description: location.description || '',
       isActive: location.isActive,
     });
     setError(null);
@@ -78,7 +81,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       setError('Name is required');
       return false;
     }
-    if (!formData.location.trim()) {
+    if (!formData.address.trim()) {
       setError('Location is required');
       return false;
     }
@@ -108,7 +111,8 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       const payload = {
         code: formData.code.trim(),
         name: formData.name.trim(),
-        location: formData.location.trim(),
+        address: formData.address.trim(),
+        description: formData.description.trim(),
         isActive: formData.isActive,
       };
 
@@ -165,7 +169,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         const searchableText = [
           location.code,
           location.name,
-          location.location,
+          location.address || '',
         ].join(' ').toLowerCase();
 
         const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
@@ -274,11 +278,25 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="e.g., Building A, Floor 2"
                   disabled={submitting}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Warehouse purpose or storage details"
+                  disabled={submitting}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed resize-y"
                 />
               </div>
 
@@ -400,10 +418,13 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                       {location.code}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {location.name}
+                      <div>{location.name}</div>
+                      {location.description && (
+                        <div className="text-xs text-gray-400 mt-0.5">{location.description}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {location.location}
+                      {location.address || '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

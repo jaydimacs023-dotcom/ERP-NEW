@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search, AlertCircle, Package, ShieldCheck, Database, Info, Tag, Zap, Target, ChevronDown, RotateCcw } from 'lucide-react';
-import { StockItem, InventoryValuationMethod, Organization } from '../types';
+import { Plus, Edit2, Trash2, X, Check, Search, AlertCircle, Package, ShieldCheck, Database, Info, Tag, Zap, Target, ChevronDown, RotateCcw, ArrowRight } from 'lucide-react';
+import { StockItem, InventoryClass, InventoryValuationMethod, Organization, WarehouseLocation, InventoryLevel } from '../types';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter } from '../services/IDataService';
@@ -15,6 +15,10 @@ interface StockItemsViewProps {
   currency: string;
   isLoading?: boolean;
   organization?: Organization;
+  onManageQuantity?: () => void;
+  locations: WarehouseLocation[];
+  levels: InventoryLevel[];
+  inventoryClasses: InventoryClass[];
 }
 
 interface FormData {
@@ -24,9 +28,14 @@ interface FormData {
   type: 'STOCK_ITEM' | 'NON_STOCK_ITEM';
   unitOfMeasure: string;
   valuationMethod: InventoryValuationMethod;
-  reorderLevel: number;
-  reorderQuantity: number;
-  safetyStock: number;
+  reorderLevel: string;
+  reorderQuantity: string;
+  safetyStock: string;
+  inventoryClassId: string;
+  standardCost: string;
+  barcode: string;
+  brand: string;
+  category: string;
   isActive: boolean;
 }
 
@@ -42,9 +51,14 @@ const INITIAL_FORM: FormData = {
   type: 'STOCK_ITEM',
   unitOfMeasure: 'PCS',
   valuationMethod: 'FIFO',
-  reorderLevel: 0,
-  reorderQuantity: 0,
-  safetyStock: 0,
+  reorderLevel: '',
+  reorderQuantity: '',
+  safetyStock: '',
+  inventoryClassId: '',
+  standardCost: '',
+  barcode: '',
+  brand: '',
+  category: '',
   isActive: true,
 };
 
@@ -58,6 +72,10 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
   currency,
   isLoading = false,
   organization,
+  onManageQuantity,
+  locations,
+  levels,
+  inventoryClasses,
 }) => {
   const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
@@ -95,9 +113,14 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       type: item.type,
       unitOfMeasure: item.unitOfMeasure,
       valuationMethod: item.valuationMethod,
-      reorderLevel: item.reorderLevel,
-      reorderQuantity: item.reorderQuantity,
-      safetyStock: item.safetyStock,
+      reorderLevel: String(item.reorderLevel ?? ''),
+      reorderQuantity: String(item.reorderQuantity ?? ''),
+      safetyStock: String(item.safetyStock ?? ''),
+      inventoryClassId: item.inventoryClassId || '',
+      standardCost: String(item.standardCost ?? ''),
+      barcode: item.barcode || '',
+      brand: item.brand || '',
+      category: item.category || '',
       isActive: item.isActive,
     });
     setError(null);
@@ -120,6 +143,10 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       setError('Name is required');
       return false;
     }
+    if (formData.type === 'STOCK_ITEM' && !formData.inventoryClassId) {
+      setError('Inventory Class is required for stock items');
+      return false;
+    }
 
     const duplicateCode = items.some(
       (item) => item.code === formData.code.trim() && item.id !== editingId && !item.isDeleted
@@ -129,8 +156,13 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       return false;
     }
 
-    if (formData.reorderLevel < 0 || formData.reorderQuantity < 0 || formData.safetyStock < 0) {
-      setError('Quantities cannot be negative');
+    const numericValues = [
+      formData.reorderLevel,
+      formData.reorderQuantity,
+      formData.safetyStock,
+    ].map(value => value.trim() === '' ? 0 : Number(value));
+    if (numericValues.some(value => !Number.isFinite(value) || value < 0)) {
+      setError('Reorder and safety quantities must be valid numbers of zero or greater');
       return false;
     }
 
@@ -154,9 +186,14 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
         type: formData.type,
         unitOfMeasure: formData.unitOfMeasure,
         valuationMethod: formData.valuationMethod,
-        reorderLevel: formData.reorderLevel,
-        reorderQuantity: formData.reorderQuantity,
-        safetyStock: formData.safetyStock,
+        reorderLevel: Number(formData.reorderLevel || 0),
+        reorderQuantity: Number(formData.reorderQuantity || 0),
+        safetyStock: Number(formData.safetyStock || 0),
+        inventoryClassId: formData.inventoryClassId || undefined,
+        standardCost: Number(formData.standardCost || 0),
+        barcode: formData.barcode.trim(),
+        brand: formData.brand.trim(),
+        category: formData.category.trim(),
         isActive: formData.isActive,
       };
 
@@ -305,6 +342,17 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
   const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
 
   const hasActiveFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || statusFilter !== 'ALL';
+  const availableByItem = useMemo(() => {
+    const totals = new Map<string, number>();
+    levels.filter(level => !level.isDeleted).forEach(level => {
+      const available = Number.isFinite(Number(level.quantityAvailable))
+        ? Number(level.quantityAvailable)
+        : Number(level.quantityOnHand || 0) - Number(level.quantityReserved || 0);
+      totals.set(level.stockItemId, (totals.get(level.stockItemId) || 0) + available);
+    });
+    return totals;
+  }, [levels]);
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -342,9 +390,16 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                </p>
             </div>
           </div>
-          <div className="shrink-0 relative z-10 px-8 py-4 bg-[#F47721]/10 border border-orange-400/20 rounded text-xs font-semibold uppercase tracking-wide text-orange-400 flex items-center gap-3">
-             <span className="w-2 h-2 bg-[#F47721] rounded-full animate-pulse" /> SYSTEM_PROTECTED
-          </div>
+          {onManageQuantity && (
+            <button
+              type="button"
+              onClick={onManageQuantity}
+              className="shrink-0 relative z-10 px-6 py-4 bg-white text-gray-900 rounded text-xs font-semibold uppercase tracking-wide flex items-center gap-3 hover:bg-orange-50 transition-colors"
+            >
+              Enter / Adjust Quantity
+              <ArrowRight size={16} className="text-brand" />
+            </button>
+          )}
         </div>
       )}
 
@@ -494,6 +549,41 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                        </div>
                     </div>
                  </div>
+
+                 <div className="bg-gray-50 p-8 rounded border border-gray-100 space-y-5">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Accounting & Classification</h3>
+                    <label className="block space-y-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Inventory Class *</span>
+                      <select
+                        value={formData.inventoryClassId}
+                        onChange={event => setFormData({ ...formData, inventoryClassId: event.target.value })}
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded"
+                      >
+                        <option value="">Select inventory class...</option>
+                        {inventoryClasses.filter(value => value.isActive).map(value => (
+                          <option key={value.id} value={value.id}>{value.code} — {value.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <label className="space-y-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Standard Cost</span>
+                        <input type="number" min="0" step="0.0001" value={formData.standardCost} onChange={event => setFormData({ ...formData, standardCost: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Barcode</span>
+                        <input value={formData.barcode} onChange={event => setFormData({ ...formData, barcode: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</span>
+                        <input value={formData.brand} onChange={event => setFormData({ ...formData, brand: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</span>
+                        <input value={formData.category} onChange={event => setFormData({ ...formData, category: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                      </label>
+                    </div>
+                 </div>
               </div>
 
               <div className="space-y-8">
@@ -503,20 +593,22 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Reorder Edge</label>
-                          <input type="number" step="0.01" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20"
-                            value={formData.reorderLevel} onChange={e => setFormData({...formData, reorderLevel: parseFloat(e.target.value) || 0})} />
+                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Reorder Level</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                            value={formData.reorderLevel} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, reorderLevel: e.target.value})} />
+                          <p className="text-xs text-gray-400">Create a low-stock alert at this quantity.</p>
                        </div>
                        <div className="space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Standard Lot</label>
-                          <input type="number" step="0.01" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20"
-                            value={formData.reorderQuantity} onChange={e => setFormData({...formData, reorderQuantity: parseFloat(e.target.value) || 0})} />
+                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Reorder Quantity</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                            value={formData.reorderQuantity} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, reorderQuantity: e.target.value})} />
+                          <p className="text-xs text-gray-400">Suggested quantity for the next order.</p>
                        </div>
                        <div className="col-span-2 space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Strategic Safety Buffer</label>
-                          <input type="number" step="0.01" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20"
-                            value={formData.safetyStock} onChange={e => setFormData({...formData, safetyStock: parseFloat(e.target.value) || 0})} />
-                          <p className="text-xs text-gray-500 italic mt-2">This buffer is excluded from ATP (Available-to-Promise) calculations.</p>
+                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Safety Stock</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                            value={formData.safetyStock} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, safetyStock: e.target.value})} />
+                          <p className="text-xs text-gray-400 mt-2">Minimum buffer to keep available for operations.</p>
                        </div>
                     </div>
                  </div>
@@ -555,6 +647,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                 <tr>
                   <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Index / SKU</th>
                   <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Logic & Metrics</th>
+                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Available</th>
                   <th className="px-4 py-3 text-center text-[13px] font-bold text-white">Thresholds</th>
                   <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Status</th>
                   <th className="px-4 py-3 text-right text-[13px] font-bold text-white">System Nodes</th>
@@ -563,14 +656,14 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
               <tbody className="divide-y divide-gray-100">
                 {(isLoading || isLoadingPage) ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                       <div className="mx-auto mb-3 h-8 w-8 rounded-full border-4 border-brand-light border-t-gray-300 animate-spin"></div>
                       Loading stock items...
                     </td>
                   </tr>
                 ) : paginatedItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                        <Package size={40} className="mx-auto mb-2 text-gray-300" />
                        {hasActiveFilters ? 'Try adjusting your search or filters.' : 'The inventory index is currently void for the specified criteria.'}
                     </td>
@@ -589,6 +682,12 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                             <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">SKU_REF: {item.id.substring(0,8)}</p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {(availableByItem.get(item.id) || 0).toLocaleString()}
+                        </p>
+                        <p className="text-xs font-medium text-gray-400">{item.unitOfMeasure}</p>
                       </td>
                       <td className="px-4 py-3">
                          <div className="flex items-center gap-3">

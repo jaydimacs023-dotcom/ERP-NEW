@@ -20,19 +20,21 @@ interface WarehouseLocationsViewProps {
 interface FormData {
   code: string;
   name: string;
-  location: string;
+  address: string;
+  description: string;
   isActive: boolean;
 }
 
 const INITIAL_FORM: FormData = {
   code: '',
   name: '',
-  location: '',
+  address: '',
+  description: '',
   isActive: true,
 };
 
 const PAGE_SIZE = 10;
-const WAREHOUSE_LOCATION_COLUMNS = 'id,org_id,code,name,location,address,description,is_active,is_deleted,created_at,updated_at';
+const WAREHOUSE_LOCATION_COLUMNS = 'id,org_id,code,name,address,description,is_active,is_deleted,created_at,updated_at';
 
 export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
   orgId,
@@ -76,7 +78,8 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
     setFormData({
       code: location.code,
       name: location.name,
-      location: location.location,
+      address: location.address || '',
+      description: location.description || '',
       isActive: location.isActive,
     });
     setError(null);
@@ -99,7 +102,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       setError('Name is required');
       return false;
     }
-    if (!formData.location.trim()) {
+    if (!formData.address.trim()) {
       setError('Location is required');
       return false;
     }
@@ -124,7 +127,8 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       const payload = {
         code: formData.code.trim(),
         name: formData.name.trim(),
-        location: formData.location.trim(),
+        address: formData.address.trim(),
+        description: formData.description.trim(),
         isActive: formData.isActive,
       };
       if (editingId) {
@@ -197,7 +201,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
       columns: WAREHOUSE_LOCATION_COLUMNS,
       filters: locationFilters,
       search: debouncedSearchTerm.trim()
-        ? { columns: ['code', 'name', 'location', 'address', 'description'], term: debouncedSearchTerm }
+        ? { columns: ['code', 'name', 'address', 'description'], term: debouncedSearchTerm }
         : undefined,
       orderBy: [{ column: 'code', ascending: true }],
     })
@@ -232,7 +236,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
         const searchableText = [
           loc.code,
           loc.name,
-          loc.location,
+          loc.address || '',
         ].join(' ').toLowerCase();
 
         const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
@@ -289,7 +293,7 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                 const exportData = filteredLocations.map(loc => ({
                   Code: loc.code,
                   Name: loc.name,
-                  Description: loc.location,
+                  Description: loc.address || '',
                   Status: loc.isActive ? 'Active' : 'Inactive'
                 }));
                 DataExportService.exportToCSV(exportData, `Warehouse_Map_${new Date().toISOString().split('T')[0]}.csv`);
@@ -413,11 +417,11 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                  </div>
 
                  <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Physical Address / Description *</label>
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Physical Address *</label>
                     <input
                       type="text"
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       placeholder="Enter precise physical location details..."
                       style={{
                         borderColor: 'transparent'
@@ -431,6 +435,17 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                         e.currentTarget.style.backgroundColor = '#f9fafb';
                       }}
                       className="w-full px-5 py-3.5 bg-gray-50 border-2 rounded outline-none transition-all text-sm font-semibold text-gray-800"
+                    />
+                 </div>
+
+                 <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Description</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Warehouse purpose or storage details..."
+                      rows={3}
+                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none transition-all text-sm font-semibold text-gray-800 resize-y focus:border-brand/30 focus:bg-white"
                     />
                  </div>
 
@@ -581,11 +596,12 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
                           </div>
                           <div>
                             <div className="text-sm font-semibold text-gray-900">{loc.name}</div>
+                            {loc.description && <div className="text-xs text-gray-500 mt-0.5">{loc.description}</div>}
                             <div className="text-xs text-gray-500 uppercase tracking-wide">{loc.isActive ? 'Operational' : 'Inactive'}</div>
                           </div>
                        </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 font-medium max-w-xs">{loc.location}</td>
+                    <td className="px-4 py-3 text-gray-500 font-medium max-w-xs">{loc.address || '—'}</td>
                     <td className="px-4 py-3 text-center">
                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide border ${
                           loc.isActive ? 'bg-brand/10 text-brand border-brand-light' : 'bg-gray-100 text-gray-500 border-gray-200'
