@@ -1015,9 +1015,11 @@ export interface JournalEntry extends BaseEntity {
   description: string;
   reference: string;
   glEntryNumber?: string; // Generated when POSTED - GL transaction reference (e.g., GL00000001). Stored in db column gl_entry_number.
-  status: 'DRAFT' | 'ON_HOLD' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
+  status: 'DRAFT' | 'ON_HOLD' | 'PENDING_APPROVAL' | 'APPROVED' | 'POSTED' | 'REVERSED' | 'REVISION_REQUESTED';
   createdBy: string;
   createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
   sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT';
   sourceRef?: string; // Unified reference to source document ID (Invoice ID, Payment ID, Deposit ID, etc.)
   // Enhanced audit fields

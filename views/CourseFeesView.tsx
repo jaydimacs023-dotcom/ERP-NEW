@@ -2,6 +2,7 @@
 import { CourseFee, CourseFeeCategory, CourseFeeFundingType, Qualification, ChartOfAccount } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import {
   Search, Plus, DollarSign, Trash2, X, GraduationCap,
   Edit2, Loader2, CheckCircle, AlertCircle, Receipt,
@@ -34,6 +35,23 @@ const CATEGORY_OPTIONS: { value: CourseFeeCategory; label: string; color: string
   { value: 'MISCELLANEOUS', label: 'Miscellaneous', color: 'bg-gray-100 text-gray-700' },
 ];
 
+export const getAvailableFeeCode = (
+  qualificationCode: string | undefined,
+  existingCodes: Iterable<string>
+): string => {
+  const prefix = qualificationCode?.substring(0, 3).toUpperCase() || 'FEE';
+  const usedCodes = new Set(Array.from(existingCodes, code => code.trim().toUpperCase()));
+  let sequence = 1;
+  let candidate = '';
+
+  do {
+    candidate = `${prefix}-FEE-${String(sequence).padStart(3, '0')}`;
+    sequence++;
+  } while (usedCodes.has(candidate));
+
+  return candidate;
+};
+
 const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   courseFees, qualifications, accounts, currency = 'PHP', onAddCourseFee, onUpdateCourseFee, onDeleteCourseFee
 }) => {
@@ -45,6 +63,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [editingFee, setEditingFee] = useState<CourseFee | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -125,6 +144,19 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       .sort((a, b) => a.feeName.localeCompare(b.feeName));
   }, [courseFees, searchTerm, filterQualification, filterFundingType, filterCategory, statusFilter, qualifications, accounts]);
 
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedFees,
+    setCurrentPage,
+  } = usePaginatedRows(
+    filteredFees,
+    [searchTerm, filterQualification, filterFundingType, filterCategory, statusFilter],
+    7
+  );
+
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
     !!filterQualification ||
@@ -138,6 +170,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   );
 
   const resetForm = () => {
+    setFormError(null);
     setFormData({
       feeCode: '',
       qualificationId: '',
@@ -191,26 +224,28 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     let successCount = 0;
     let errorCount = 0;
 
-    // Track fee code counters per qualification to avoid duplicates
-    const qualCounters: Record<string, number> = {};
+    const reservedCodes = new Set(courseFees.map(fee => fee.feeCode.trim().toUpperCase()));
     const getNextFeeCode = (qualificationId: string): string => {
       const qual = qualifications.find(q => q.id === qualificationId);
-      const prefix = qual?.code?.substring(0, 3).toUpperCase() || 'FEE';
-      const existingCount = courseFees.filter(f => f.qualificationId === qualificationId).length;
-      if (!qualCounters[qualificationId]) {
-        qualCounters[qualificationId] = existingCount;
-      }
-      qualCounters[qualificationId]++;
-      return `${prefix}-FEE-${String(qualCounters[qualificationId]).padStart(3, '0')}`;
+      const code = getAvailableFeeCode(qual?.code, reservedCodes);
+      reservedCodes.add(code);
+      return code;
     };
+    const errors: string[] = [];
 
     try {
       for (const row of validRows) {
         try {
+          const feeCode = (row.feeCode || getNextFeeCode(row.qualificationId!)).trim().toUpperCase();
+          if (reservedCodes.has(feeCode) && row.feeCode) {
+            throw new Error(`Fee code "${feeCode}" already exists.`);
+          }
+          reservedCodes.add(feeCode);
+
           const newFee: CourseFee = {
             id: generateUUID(),
             orgId: '',
-            feeCode: row.feeCode || getNextFeeCode(row.qualificationId!),
+            feeCode,
             qualificationId: row.qualificationId!,
             fundingType: row.fundingType!,
             feeName: row.feeName!,
@@ -226,19 +261,20 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
           };
           await onAddCourseFee(newFee);
           successCount++;
-        } catch {
+        } catch (error) {
           errorCount++;
+          errors.push(`${row.feeName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
       if (successCount > 0) {
         showToast(`Successfully created ${successCount} course fee${successCount > 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}.`, errorCount > 0 ? 'info' : 'success');
       }
-      if (errorCount > 0 && successCount === 0) {
-        showToast(`Failed to create any course fees. Please check your data.`, 'error');
+      if (errorCount > 0) {
+        showToast(errors.join(' • '), 'error');
+      } else {
+        setShowBulkModal(false);
       }
-
-      setShowBulkModal(false);
     } catch (error) {
       showToast(`Bulk creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     } finally {
@@ -257,23 +293,43 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
   const generateFeeCode = (qualificationId: string) => {
     const qual = qualifications.find(q => q.id === qualificationId);
-    const prefix = qual?.code?.substring(0, 3).toUpperCase() || 'FEE';
-    const count = courseFees.filter(f => f.qualificationId === qualificationId).length + 1;
-    return `${prefix}-FEE-${String(count).padStart(3, '0')}`;
+    return getAvailableFeeCode(qual?.code, courseFees.map(fee => fee.feeCode));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.feeName || !formData.qualificationId || !formData.fundingType ||
-      !formData.glAccountId || !formData.category || Number(formData.amount) <= 0) return;
+    setFormError(null);
+
+    const missingFields = [
+      !formData.qualificationId && 'course',
+      !formData.fundingType && 'funding type',
+      !formData.feeName?.trim() && 'fee name',
+      Number(formData.amount) <= 0 && 'amount greater than zero',
+      !formData.category && 'category',
+      !formData.glAccountId && 'G/L revenue account',
+    ].filter(Boolean);
+
+    if (missingFields.length > 0) {
+      setFormError(`Please provide: ${missingFields.join(', ')}.`);
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
+      const feeCode = (formData.feeCode || generateFeeCode(formData.qualificationId!)).trim().toUpperCase();
+      const duplicateFee = courseFees.find(fee =>
+        fee.id !== editingFee?.id &&
+        fee.feeCode.trim().toUpperCase() === feeCode
+      );
+      if (duplicateFee) {
+        throw new Error(`Fee code "${feeCode}" is already used by "${duplicateFee.feeName}".`);
+      }
+
       if (editingFee) {
         const updatedFee: CourseFee = {
           ...editingFee,
-          feeCode: formData.feeCode || editingFee.feeCode,
+          feeCode,
           qualificationId: formData.qualificationId!,
           fundingType: formData.fundingType!,
           feeName: formData.feeName!,
@@ -293,7 +349,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
         const newFee: CourseFee = {
           id: generateUUID(),
           orgId: '', // Will be set by App.tsx handler
-          feeCode: formData.feeCode || generateFeeCode(formData.qualificationId!),
+          feeCode,
           qualificationId: formData.qualificationId!,
           fundingType: formData.fundingType!,
           feeName: formData.feeName!,
@@ -315,7 +371,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       resetForm();
     } catch (error) {
       console.error('Error saving course fee:', error);
-      showToast(`Failed to save course fee: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setFormError(message);
+      showToast(`Failed to save course fee: ${message}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -544,7 +602,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredFees.length > 0 ? filteredFees.map(fee => (
+            {paginatedFees.length > 0 ? paginatedFees.map(fee => (
               <tr key={fee.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -632,6 +690,15 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredFees.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="course fees"
+        />
       </div>
 
       {/* Modal */}
@@ -649,7 +716,28 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} noValidate className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+              {formError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="sticky top-0 z-10 flex items-start gap-3 rounded border border-rose-300 bg-rose-50 px-4 py-3 text-rose-800 shadow-sm"
+                >
+                  <AlertCircle size={20} className="mt-0.5 shrink-0 text-rose-600" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">Course fee could not be saved</p>
+                    <p className="mt-0.5 break-words text-sm">{formError}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormError(null)}
+                    className="shrink-0 text-rose-400 hover:text-rose-700"
+                    aria-label="Dismiss error"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
               <div className="space-y-4">
                 {/* Course Selection */}
                 <div className="space-y-1.5">
@@ -852,8 +940,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !formData.feeName || !formData.qualificationId || !formData.fundingType ||
-                    !formData.glAccountId || !formData.category || Number(formData.amount) <= 0}
+                  disabled={isSubmitting}
                   className="flex-1 py-3 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
@@ -953,8 +1040,8 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <tr className="border-b border-gray-200">
                     <th className="py-2 pr-2 text-left text-xs font-semibold text-gray-400 uppercase w-8">#</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Fee Name *</th>
-                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Course *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Funding *</th>
+                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Course *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase w-28">Amount *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Category *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">GL Account *</th>
@@ -1094,11 +1181,12 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
 
       {/* Toast Notifications */}
       {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+        <ModalPortal>
+        <div className="fixed top-4 right-4 z-[200] flex w-[calc(100%-2rem)] max-w-md flex-col gap-2">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`px-4 py-3 rounded shadow-lg border flex items-center gap-2 animate-in slide-in-from-right duration-300 ${toast.type === 'success'
+              className={`px-4 py-3 rounded shadow-lg border flex items-start gap-2 animate-in slide-in-from-right duration-300 ${toast.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : toast.type === 'error'
                   ? 'bg-rose-50 text-rose-800 border-rose-200'
@@ -1112,7 +1200,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
               ) : (
                 <AlertCircle size={18} className="text-brand" />
               )}
-              <span className="text-sm font-semibold">{toast.message}</span>
+              <span className="min-w-0 flex-1 break-words text-sm font-semibold">{toast.message}</span>
               <button
                 onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
                 className="ml-2 text-gray-400 hover:text-gray-600"
@@ -1122,6 +1210,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             </div>
           ))}
         </div>
+        </ModalPortal>
       )}
     </div>
   );

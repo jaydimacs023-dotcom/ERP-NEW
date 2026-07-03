@@ -56,6 +56,7 @@ import PayrollView from './views/PayrollView';
 import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
+import { canTransitionJournal, isManualJournalSource } from './services/JournalWorkflowService';
 import MaintenanceView from './views/MaintenanceView';
 import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
@@ -1890,6 +1891,21 @@ export default function App() {
 
   const handlePostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
     const sourceType = String(entry.sourceType || '').toUpperCase();
+    const isManualJournal = isManualJournalSource(sourceType);
+    const existingManualEntry = isManualJournal && entry.id
+      ? journalEntries.find(candidate => candidate.id === entry.id)
+      : undefined;
+
+    // A manual journal is born once as an ON_HOLD document. Posting is a
+    // transition of that same persisted record, never another INSERT.
+    if (isManualJournal && !existingManualEntry) {
+      return handleSaveJournalDraft({ ...entry, status: 'ON_HOLD' }, lines);
+    }
+    if (existingManualEntry && String(existingManualEntry.status).toUpperCase() !== 'APPROVED') {
+      handleNotify('error', 'Only an approved journal entry can be posted.');
+      return null;
+    }
+
     let resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
     if (!resolvedPeriodId && sourceType === 'INVOICE') {
       resolvedPeriodId = resolveInvoiceFallbackPeriodId(entry.date);
@@ -1923,12 +1939,33 @@ export default function App() {
         return null;
       }
 
-      const savedEntry = await dataService.createJournalEntry(fullEntry);
+      const postingTimestamp = new Date().toISOString();
+      const savedEntry = existingManualEntry
+        ? await dataService.updateJournalEntry(existingManualEntry.id, {
+            status: 'POSTED',
+            periodId: resolvedPeriodId,
+            glEntryNumber: fullEntry.glEntryNumber,
+            reference: fullEntry.reference,
+            postedBy: currentUser?.id || 'system',
+            postedAt: postingTimestamp,
+            updatedBy: currentUser?.id || 'system',
+            updatedAt: postingTimestamp
+          })
+        : await dataService.createJournalEntry({
+            ...fullEntry,
+            postedBy: currentUser?.id || 'system',
+            postedAt: postingTimestamp
+          });
+      // Keep the complete submitted record in local state even when PostgREST or
+      // a compatibility fallback returns only a subset of columns. Fields such
+      // as orgId and sourceType are used by the active-view filters, so dropping
+      // either makes a successful write invisible until the next full reload.
       const normalizedSavedEntry = {
+        ...fullEntry,
         ...savedEntry,
         sourceType: (savedEntry.sourceType === 'MANUAL' && /^JV/i.test(String(savedEntry.reference || '').trim()))
           ? 'JOURNAL'
-          : savedEntry.sourceType
+          : (savedEntry.sourceType || fullEntry.sourceType)
       };
 
       // if the database did not yet have the gl_entry_number column the value
@@ -1945,25 +1982,39 @@ export default function App() {
         orgId: currentOrgId
       }));
 
-      const savedLines = await dataService.createJournalLines(linesWithActualId);
+      // Manual journal lines already belong to the draft. They become GL
+      // transactions by virtue of the parent changing to POSTED.
+      const savedLines = existingManualEntry
+        ? linesWithActualId
+        : await dataService.createJournalLines(linesWithActualId);
       const sourceLineClassMap = new Map(
         normalizedLines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
       );
       const savedLinesWithSourceClass = savedLines.map((savedLine, idx) => {
         const sourceLine = normalizedLines.find(line => line.id === savedLine.id) || normalizedLines[idx];
+        const completeSavedLine = {
+          ...sourceLine,
+          ...savedLine,
+          journalEntryId: normalizedSavedEntry.id,
+          orgId: savedLine.orgId || sourceLine?.orgId || currentOrgId
+        };
         const classificationCode = String(
-          (sourceLine && sourceLineClassMap.get(sourceLine.id)) || (savedLine as any).classificationCode || ''
+          (sourceLine && sourceLineClassMap.get(sourceLine.id)) || (completeSavedLine as any).classificationCode || ''
         ).trim();
         const qualificationId = classificationCode
-          ? (qualifications.find(q => q.code === classificationCode)?.id || (savedLine as any).qualificationId || '')
-          : (savedLine as any).qualificationId || '';
+          ? (qualifications.find(q => q.code === classificationCode)?.id || (completeSavedLine as any).qualificationId || '')
+          : (completeSavedLine as any).qualificationId || '';
         return classificationCode
-          ? ({ ...savedLine, classificationCode, qualificationId } as JournalLine & { classificationCode?: string; qualificationId?: string })
-          : savedLine;
+          ? ({ ...completeSavedLine, classificationCode, qualificationId } as JournalLine & { classificationCode?: string; qualificationId?: string })
+          : completeSavedLine;
       });
 
-      setJournalEntries(prev => [...prev, normalizedSavedEntry]);
-      setJournalLines(prev => [...prev, ...savedLinesWithSourceClass]);
+      setJournalEntries(prev => existingManualEntry
+        ? prev.map(item => item.id === existingManualEntry.id ? normalizedSavedEntry : item)
+        : [...prev, normalizedSavedEntry]);
+      if (!existingManualEntry) {
+        setJournalLines(prev => [...prev, ...savedLinesWithSourceClass]);
+      }
 
       // Audit: Journal entry posted
       AuditService.post(
@@ -2004,6 +2055,11 @@ export default function App() {
   };
 
   const handleSaveJournalDraft = async (entry: Partial<JournalEntry>, lines: JournalLine[]): Promise<JournalEntry | null> => {
+    const existingEntry = entry.id ? journalEntries.find(candidate => candidate.id === entry.id) : undefined;
+    if (existingEntry) {
+      return handleUpdateJournalDraft(existingEntry.id, entry, lines);
+    }
+
     const resolvedPeriodId = resolvePostingPeriodId(entry.periodId, entry.date);
     if (!resolvedPeriodId) {
       handleNotify('error', 'Cannot save journal entry draft: no open accounting period found for this date.');
@@ -2181,13 +2237,72 @@ export default function App() {
     }
   };
 
-  const handleSaveOrPostJournal = (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
+  const handleSaveOrPostJournal = async (entry: Partial<JournalEntry>, lines: JournalLine[]) => {
     const status = (entry.status || 'ON_HOLD').toString().toUpperCase();
+    const existingEntry = entry.id ? journalEntries.find(candidate => candidate.id === entry.id) : undefined;
     if (status === 'ON_HOLD' || status === 'DRAFT') {
-      return handleSaveJournalDraft(entry, lines);
+      return existingEntry
+        ? handleUpdateJournalDraft(existingEntry.id, entry, lines)
+        : handleSaveJournalDraft(entry, lines);
+    }
+    if (existingEntry && status === 'PENDING_APPROVAL') {
+      const updatedDraft = await handleUpdateJournalDraft(existingEntry.id, entry, lines);
+      if (!updatedDraft) return null;
+      return handleTransitionJournal(existingEntry.id, 'PENDING_APPROVAL');
+    }
+    if (existingEntry && status === 'APPROVED') {
+      return handleTransitionJournal(existingEntry.id, status);
     }
     return handlePostJournal(entry, lines);
   };
+
+  async function handleTransitionJournal(
+    entryId: string,
+    nextStatus: 'PENDING_APPROVAL' | 'APPROVED'
+  ): Promise<JournalEntry | null> {
+    const stateEntry = journalEntries.find(item => item.id === entryId);
+    const persistedEntry = await dataService.getJournalEntryById(entryId);
+    const entry = persistedEntry || stateEntry;
+    if (!entry) {
+      handleNotify('error', 'Journal entry not found.');
+      return null;
+    }
+
+    const currentStatus = String(entry.status || '').toUpperCase();
+    if (!canTransitionJournal(currentStatus, nextStatus)) {
+      handleNotify('error', `Cannot change a ${currentStatus} journal to ${nextStatus}.`);
+      return null;
+    }
+
+    const timestamp = new Date().toISOString();
+    const updates: Partial<JournalEntry> = {
+      status: nextStatus,
+      updatedBy: currentUser?.id || 'system',
+      updatedAt: timestamp
+    };
+    if (nextStatus === 'APPROVED') {
+      updates.approvedBy = currentUser?.id || 'system';
+      updates.approvedAt = timestamp;
+    }
+
+    const saved = await dataService.updateJournalEntry(entryId, updates);
+    const transitioned = { ...entry, ...saved, ...updates } as JournalEntry;
+    setJournalEntries(prev => prev.map(item => item.id === entryId ? transitioned : item));
+    AuditService.update(
+      currentOrgId,
+      currentUser?.id || 'system',
+      currentUser?.name || 'System',
+      'JOURNAL_ENTRY',
+      entryId,
+      entry.reference || entryId,
+      entry,
+      transitioned
+    );
+    handleNotify('success', nextStatus === 'APPROVED'
+      ? 'Journal entry approved. It has not yet been posted to the General Ledger.'
+      : 'Journal entry submitted for approval.');
+    return transitioned;
+  }
 
   const handleApproveJournal = async (entryId: string, referenceOverride?: string) => {
     try {
@@ -2195,6 +2310,12 @@ export default function App() {
       const persistedEntry = await dataService.getJournalEntryById(entryId);
       const entry = persistedEntry || stateEntry;
       if (!entry) return;
+
+      const sourceType = String(entry.sourceType || '').toUpperCase();
+      if (isManualJournalSource(sourceType)) {
+        await handleTransitionJournal(entryId, 'APPROVED');
+        return;
+      }
 
       const isCreditDebitMemoEntry =
         String(entry.sourceType || '').toUpperCase() === 'CREDIT_MEMO' ||
@@ -4437,6 +4558,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error updating course fee:', error);
       handleNotify('error', `Failed to update course fee: ${error instanceof Error ? error.message : 'Unknown error'} `);
+      throw error;
     }
   };
 
@@ -4566,6 +4688,7 @@ export default function App() {
     } catch (error) {
       console.error('[App] Error creating assessment registration:', error);
       handleNotify('error', `Failed to create assessment registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
     }
   };
 
@@ -6616,6 +6739,19 @@ export default function App() {
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
                 <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+              </NavSection>
+
+              <NavSection label="Inventory" isOpen={openSections.administration} onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))} compact={!sidebarOpen}>
+                <NavItem icon={<Package size={18} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => navigateTo('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<MapPin size={18} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => navigateTo('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Box size={18} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => navigateTo('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Layers size={18} />} label="Inventory Classes" active={activeTab === 'inventory-classes'} onClick={() => navigateTo('inventory-classes')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<FilePlus2 size={18} />} label="Opening Inventory" active={activeTab === 'opening-inventory'} onClick={() => navigateTo('opening-inventory')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Layers size={18} />} label="Stock Levels" active={activeTab === 'stock-levels'} onClick={() => navigateTo('stock-levels')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<AlertCircle size={18} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => navigateTo('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Zap size={18} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => navigateTo('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<History size={18} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => navigateTo('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<TrendingUp size={18} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => navigateTo('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
             </div>
           )}

@@ -21,6 +21,7 @@ interface JournalFormProps {
   entryToEdit?: JournalEntry;
   linesToEdit?: JournalLine[];
   mode?: 'new' | 'edit' | 'view';
+  canAuthorize?: boolean;
   onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onReverse?: () => void | Promise<void>;
   onClose: () => void;
@@ -56,7 +57,7 @@ const getCreditDebitMemoReferenceNo = (entry: Partial<JournalEntry>): string => 
 };
 
 const JournalForm: React.FC<JournalFormProps> = ({
-  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', onSubmit, onReverse, onClose
+  accounts = [], students = [], trainers = [], sponsors = [], batches = [], items = [], qualifications = [], entries = [], payments = [], entryToEdit, linesToEdit, mode = 'new', canAuthorize = false, onSubmit, onReverse, onClose
 }) => {
   const brandColor = '#F47721';
   const buildEmptyEntry = (): Partial<JournalEntry> => ({
@@ -440,15 +441,17 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
               >
                 <Save size={20} />
               </button>
-              <button
-                title="Approve"
-                onClick={() => finalizeSubmit('POSTED')}
-                type="button"
-                disabled={!canPost}
-                className="p-2 text-gray-500 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <CheckCircle size={20} />
-              </button>
+              {mode === 'edit' && (
+                <button
+                  title="Submit for Approval"
+                  onClick={() => finalizeSubmit('PENDING_APPROVAL')}
+                  type="button"
+                  disabled={!canPost}
+                  className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle size={20} />
+                </button>
+              )}
               <button
                 title="Add New Record"
                 onClick={resetForm}
@@ -458,6 +461,28 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                 <Plus size={20} />
               </button>
             </>
+          )}
+          {isViewMode && canAuthorize && ['DRAFT', 'ON_HOLD', 'PENDING_APPROVAL'].includes(normalizedStatus) && (
+            <button
+              title="Approve Journal Entry"
+              onClick={() => finalizeSubmit('APPROVED')}
+              type="button"
+              disabled={!canPost}
+              className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <CheckCircle size={20} />
+            </button>
+          )}
+          {isViewMode && canAuthorize && normalizedStatus === 'APPROVED' && (
+            <button
+              title="Post Approved Journal to General Ledger"
+              onClick={() => finalizeSubmit('POSTED')}
+              type="button"
+              disabled={!canPost}
+              className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              POST TO GL
+            </button>
           )}
           <button
             title={isViewMode ? 'Close Journal Entry' : 'Cancel'}
@@ -599,8 +624,10 @@ const totalCredit = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.credi
                               className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 text-gray-900"
                               value={(entry.status || 'DRAFT') === 'DRAFT' ? 'ON_HOLD' : (entry.status as string)}
                             >
-                              <option value="POSTED">POSTED</option>
                               <option value="ON_HOLD">ON HOLD</option>
+                              <option value="PENDING_APPROVAL">PENDING APPROVAL</option>
+                              <option value="APPROVED">APPROVED</option>
+                              <option value="POSTED">POSTED</option>
                               <option value="REVERSED">REVERSED</option>
                             </select>
                           </div>

@@ -10,6 +10,7 @@ import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter, PageOrder } from '../services/IDataService';
 import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import JournalForm from '../components/JournalForm';
+import { isEditableJournalStatus } from '../services/JournalWorkflowService';
 
 const JOURNAL_ENTRIES_PER_PAGE = 7;
 const JOURNAL_ENTRY_COLUMNS = 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id';
@@ -71,7 +72,7 @@ const Ledger: React.FC<LedgerProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearchTerm);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ON_HOLD' | 'POSTED' | 'REVERSED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ON_HOLD' | 'PENDING_APPROVAL' | 'APPROVED' | 'POSTED' | 'REVERSED'>('ALL');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('ALL');
   const [postPeriodFilter, setPostPeriodFilter] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
@@ -524,12 +525,15 @@ const Ledger: React.FC<LedgerProps> = ({
     });
   };
 
-  const isLockedJournalEntry = (entry: JournalEntry) => String(entry.status || '').toUpperCase() === 'POSTED';
+  const isLockedJournalEntry = (entry: JournalEntry) =>
+    !isEditableJournalStatus(entry.status);
 
   const getDisplayStatusLabel = (status?: JournalEntry['status']) => {
     const map: Record<JournalEntry['status'], string> = {
       DRAFT: 'ON HOLD',
       ON_HOLD: 'ON HOLD',
+      PENDING_APPROVAL: 'PENDING APPROVAL',
+      APPROVED: 'APPROVED',
       POSTED: 'POSTED',
       REVERSED: 'REVERSED',
       REVISION_REQUESTED: 'REVISION REQUESTED'
@@ -689,6 +693,8 @@ const Ledger: React.FC<LedgerProps> = ({
             >
               <option value="ALL">All</option>
               <option value="ON_HOLD">ON HOLD</option>
+              <option value="PENDING_APPROVAL">PENDING APPROVAL</option>
+              <option value="APPROVED">APPROVED</option>
               <option value="POSTED">POSTED</option>
               <option value="REVERSED">REVERSED</option>
             </select>
@@ -1091,6 +1097,7 @@ const Ledger: React.FC<LedgerProps> = ({
           entryToEdit={editingEntry || undefined}
           linesToEdit={editingLines}
           mode={editingEntry ? entryFormMode : 'new'}
+          canAuthorize={currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN'}
           onReverse={handleReverseOpenedEntry}
           onClose={() => {
             setShowEntryForm(false);
@@ -1119,6 +1126,10 @@ const Ledger: React.FC<LedgerProps> = ({
           hasExistingReversal={reversedOriginalIds.has(selectedEntry.id)}
           onClose={() => setSelectedEntry(null)}
           onApprove={onApproveJournal}
+          onPost={() => onPostEntry?.(
+            selectedEntry,
+            lines.filter(line => line.journalEntryId === selectedEntry.id)
+          )}
           onReverse={onReverseJournal}
           currentUser={currentUser}
         />
@@ -1137,12 +1148,13 @@ interface JournalEntryDetailProps {
   hasExistingReversal?: boolean;
   onClose: () => void;
   onApprove?: (id: string) => void;
+  onPost?: () => void | Promise<void>;
   onReverse?: (id: string) => Promise<JournalEntry | null> | JournalEntry | null | void;
   currentUser?: any;
 }
 
 const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({ 
-  entry, lines, accounts, createdByName, statusLabel, hasExistingReversal = false, onClose, onApprove, onReverse, currentUser 
+  entry, lines, accounts, createdByName, statusLabel, hasExistingReversal = false, onClose, onApprove, onPost, onReverse, currentUser
 }) => {
   const controlTotal = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
   const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
@@ -1276,8 +1288,11 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
                <button className="px-5 py-2.5 text-xs font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-all text-slate-600 uppercase tracking-wide shadow-sm" onClick={() => window.print()}>Print Voucher</button>
             </div>
             <div className="flex gap-4">
-               {(entry.status === 'DRAFT' || entry.status === 'ON_HOLD') && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
-                  <button onClick={() => { onApprove?.(entry.id); onClose(); }} className="px-10 py-3 bg-[#F47721] text-white rounded-2xl text-sm font-bold shadow-xl shadow-orange-100 hover:bg-[#E06610] active:scale-95 transition-all">Authorize Posting</button>
+               {(entry.status === 'DRAFT' || entry.status === 'ON_HOLD' || entry.status === 'PENDING_APPROVAL') && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
+                  <button onClick={() => { onApprove?.(entry.id); onClose(); }} className="px-10 py-3 bg-[#F47721] text-white rounded-2xl text-sm font-bold shadow-xl shadow-orange-100 hover:bg-[#E06610] active:scale-95 transition-all">Approve</button>
+               )}
+               {entry.status === 'APPROVED' && (currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN') && (
+                  <button onClick={() => { void onPost?.(); onClose(); }} className="px-10 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all">Post to GL</button>
                )}
                {canReverse && (
                  <button

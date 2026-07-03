@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AssessmentRegistration, AssessmentRegistrationStatus, AssessmentType, Qualification, Student } from '../types';
 import { generateUUID } from '../utils/uuid';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
-import { ClipboardCheck, Plus, Search, X, User, Award } from 'lucide-react';
+import { downloadAssessmentRegistrationTemplate, parseAssessmentRegistrationWorkbook } from '../services/AssessmentRegistrationImportService';
+import { AlertCircle, Award, CheckCircle, ClipboardCheck, Download, Loader2, Plus, Search, Upload, User, X } from 'lucide-react';
 
 interface AssessmentRegistrationsViewProps {
   registrations: AssessmentRegistration[];
@@ -17,6 +18,7 @@ interface AssessmentRegistrationsViewProps {
 const statusOptions: AssessmentRegistrationStatus[] = ['PENDING', 'ASSESSED', 'COMPLETED', 'COMPETENT', 'NOT_YET_COMPETENT', 'CANCELLED'];
 const assessmentTypes: AssessmentType[] = ['FULL_ASSESSMENT', 'REASSESSMENT', 'COC', 'RPL'];
 const fieldClass = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-semibold text-gray-800 outline-none focus:border-brand disabled:opacity-50';
+const normalizeMatchValue = (value?: string) => (value || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '');
 
 const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = ({
   registrations,
@@ -29,6 +31,10 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingRegistration, setEditingRegistration] = useState<AssessmentRegistration | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Partial<AssessmentRegistration>>({
     assessmentType: 'FULL_ASSESSMENT',
     assessmentDate: '',
@@ -125,13 +131,118 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
       updatedAt: editingRegistration ? new Date().toISOString() : undefined
     };
 
-    if (editingRegistration) {
-      await onUpdateRegistration(registration);
-    } else {
-      await onAddRegistration(registration);
+    try {
+      if (editingRegistration) {
+        await onUpdateRegistration(registration);
+      } else {
+        await onAddRegistration(registration);
+      }
+      setShowModal(false);
+      resetForm();
+    } catch {
+      // The parent notification remains visible while the form stays open for correction.
     }
-    setShowModal(false);
-    resetForm();
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportResult(null);
+    const errors: string[] = [];
+    let imported = 0;
+
+    try {
+      const rows = await parseAssessmentRegistrationWorkbook(file);
+      const usedReferenceNumbers = new Set(
+        registrations
+          .map(registration => normalizeMatchValue(registration.registrationCode))
+          .filter(Boolean)
+      );
+
+      for (const row of rows) {
+        const rowLabel = `Row ${row.rowNumber}`;
+        const referenceNumber = row.referenceNumber.trim();
+        const normalizedReference = normalizeMatchValue(referenceNumber);
+        if (!referenceNumber) {
+          errors.push(`${rowLabel}: Reference Number is required.`);
+          continue;
+        }
+        if (usedReferenceNumbers.has(normalizedReference)) {
+          errors.push(`${rowLabel}: Reference Number "${referenceNumber}" is already registered.`);
+          continue;
+        }
+
+        const normalizedLearnerId = normalizeMatchValue(row.learnerId);
+        const student = students.find(candidate =>
+          normalizeMatchValue(candidate.uli) === normalizedLearnerId
+        );
+        if (!student) {
+          errors.push(`${rowLabel}: Learner ID "${row.learnerId || 'blank'}" was not found (${row.lastName}, ${row.firstName}).`);
+          continue;
+        }
+
+        const normalizedTitle = normalizeMatchValue(row.qualificationTitle);
+        const exactQualification = qualifications.find(qualification =>
+          normalizeMatchValue(qualification.name) === normalizedTitle ||
+          normalizeMatchValue(qualification.code) === normalizedTitle
+        );
+        const partialMatches = qualifications.filter(qualification => {
+          const name = normalizeMatchValue(qualification.name);
+          return normalizedTitle && (name.includes(normalizedTitle) || normalizedTitle.includes(name));
+        });
+        const qualification = exactQualification || (partialMatches.length === 1 ? partialMatches[0] : undefined);
+        if (!qualification) {
+          errors.push(`${rowLabel}: Qualification "${row.qualificationTitle || 'blank'}" could not be matched uniquely.`);
+          continue;
+        }
+
+        const registration: AssessmentRegistration = {
+          id: generateUUID(),
+          orgId: '',
+          registrationCode: referenceNumber,
+          studentId: student.id,
+          qualificationId: qualification.id,
+          billingParty: 'SELF',
+          assessmentType: 'FULL_ASSESSMENT',
+          assessmentDate: row.assessmentDate,
+          status: row.status,
+          billingStatus: 'UNBILLED',
+          totalFees: 0,
+          billedAmount: 0,
+          notes: row.notes,
+          createdAt: new Date().toISOString(),
+        };
+
+        try {
+          await onAddRegistration(registration);
+          usedReferenceNumbers.add(normalizedReference);
+          imported++;
+        } catch (error) {
+          errors.push(`${rowLabel}: ${error instanceof Error ? error.message : 'Registration could not be saved.'}`);
+        }
+      }
+
+      setImportResult({ imported, errors });
+    } catch (error) {
+      setImportResult({
+        imported: 0,
+        errors: [error instanceof Error ? error.message : 'The workbook could not be imported.'],
+      });
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      await downloadAssessmentRegistrationTemplate();
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
   };
 
   return (
@@ -141,10 +252,75 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Assessment Registrations</h2>
           <p className="text-sm text-gray-500 italic">Walk-in candidates must be registered as learners first, then assigned here for assessment only.</p>
         </div>
-        <button onClick={openCreate} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded font-semibold text-sm shadow-sm">
-          <Plus size={18} /> Register Assessment
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImport}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            disabled={isDownloadingTemplate}
+            className="inline-flex items-center gap-2 rounded border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isDownloadingTemplate
+              ? <Loader2 size={18} className="animate-spin" />
+              : <Download size={18} />}
+            Template
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="inline-flex items-center gap-2 rounded border border-brand bg-white px-5 py-2.5 text-sm font-semibold text-brand shadow-sm transition-colors hover:bg-brand/5 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+            {isImporting ? 'Importing...' : 'Import TESDA Excel'}
+          </button>
+          <button onClick={openCreate} className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-white rounded font-semibold text-sm shadow-sm">
+            <Plus size={18} /> Register Assessment
+          </button>
+        </div>
       </div>
+
+      {importResult && (
+        <div
+          role="status"
+          className={`rounded border p-4 shadow-sm ${
+            importResult.errors.length > 0
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {importResult.errors.length > 0
+              ? <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600" />
+              : <CheckCircle size={20} className="mt-0.5 shrink-0 text-emerald-600" />}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                Imported {importResult.imported} assessment registration{importResult.imported === 1 ? '' : 's'}.
+                {importResult.errors.length > 0 && ` ${importResult.errors.length} row${importResult.errors.length === 1 ? '' : 's'} need attention.`}
+              </p>
+              {importResult.errors.length > 0 && (
+                <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
+                  {importResult.errors.map((error, index) => <li key={`${error}-${index}`}>{error}</li>)}
+                </ul>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setImportResult(null)}
+              className="shrink-0 text-current opacity-50 hover:opacity-100"
+              aria-label="Dismiss import result"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
         <div className="relative">

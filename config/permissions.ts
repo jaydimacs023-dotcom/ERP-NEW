@@ -76,6 +76,8 @@ export type ModuleTab =
   | 'inventory'
   | 'warehouse-locations'
   | 'stock-items'
+  | 'inventory-classes'
+  | 'opening-inventory'
   | 'stock-levels'
   | 'stock-adjustments'
   | 'reorder-points'
@@ -180,6 +182,16 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'soa',
     'customer-ledger',
     'collection-receipt',
+    'inventory',
+    'warehouse-locations',
+    'stock-items',
+    'inventory-classes',
+    'opening-inventory',
+    'stock-levels',
+    'stock-adjustments',
+    'reorder-points',
+    'inventory-transactions',
+    'inventory-reports',
     'feedback'
   ],
 
@@ -252,7 +264,7 @@ export const MODULE_GROUPS = {
   AP_MODULES: ['payables', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],
-  INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports'] as ModuleTab[],
+  INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'inventory-classes', 'opening-inventory', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports'] as ModuleTab[],
   OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports'] as ModuleTab[],
   ADMIN: ['employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'] as ModuleTab[],
   SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'] as ModuleTab[],

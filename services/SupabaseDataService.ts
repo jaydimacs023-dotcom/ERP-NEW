@@ -36,7 +36,7 @@ export class SupabaseDataService implements IDataService {
       invoice_lines: 'id,invoice_id,line_number,description,course_fee_id,enrollment_id,quantity,unit_price,amount,tax_category_id,vat_amount,gl_account_id,is_deleted,deleted_at,deleted_by,created_at,updated_at,net_amount,gross_amount,org_id,classification_code,assessment_registration_id,line_type',
       payments: 'id,org_id,payment_no,sponsor_id,student_id,payment_date,status,payment_method,ref_no,bank_account_id,check_number,check_date,amount_received,ewt_amount_certified,total_applied,customer_deposit_balance,journal_entry_id,voided_at,voided_by,void_reason,posted_at,posted_by,notes,created_at,created_by,updated_at,updated_by,is_deleted,deleted_at,deleted_by',
       payment_applications: 'id,payment_id,invoice_id,amount_applied,is_reversed,reversal_reason,reversed_at,reversed_by,created_at,created_by,updated_at',
-      journal_entries: 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id',
+      journal_entries: 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,posted_by,posted_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id',
       journal_lines: 'id,journal_entry_id,account_id,debit,credit,memo,contact_id,contact_type,batch_id,item_id,asset_id,is_cleared,created_at,description,classification_code,tax_category_id',
       audit_logs: 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at',
       enrollments: 'id,org_id,enrollment_code,student_id,batch_id,sponsor_id,billing_status,enrollment_status,enrollment_date,total_fees,billed_amount,notes,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,billing_type',
@@ -629,6 +629,12 @@ export class SupabaseDataService implements IDataService {
         const missingColumn = this.extractMissingColumnFromSchemaError(error)
           || (error.match(/Could not find the '([^']+)' column of '[^']+'/i)?.[1] ?? null);
 
+        if (table === 'course_fees' && missingColumn === 'funding_type') {
+          throw new Error(
+            'Course fee funding type is unavailable in the database. Apply migration 20260627100200_add_sponsor_to_course_fees.sql before creating course fees.'
+          );
+        }
+
         if (missingColumn && retries < 8 && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
           console.warn(`[Supabase] insertToSupabaseRaw retrying without unknown column '${missingColumn}'`);
           delete payload[missingColumn];
@@ -697,6 +703,11 @@ export class SupabaseDataService implements IDataService {
         const error = await response.text();
         const missingColumn = this.extractMissingColumnFromSchemaError(error)
           || (error.match(/Could not find the '([^']+)' column of '[^']+'/i)?.[1] ?? null);
+        if (table === 'course_fees' && missingColumn === 'funding_type') {
+          throw new Error(
+            'Course fee funding type is unavailable in the database. Apply migration 20260627100200_add_sponsor_to_course_fees.sql before updating course fees.'
+          );
+        }
         if (missingColumn && retries < 8 && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
           console.warn(`[Supabase] updateInSupabaseRaw retrying without unknown column '${missingColumn}'`);
           delete payload[missingColumn];
@@ -839,7 +850,8 @@ export class SupabaseDataService implements IDataService {
       journal_entries: [
         'id', 'org_id', 'period_id', 'date', 'description', 'reference', 'gl_entry_number',
         'status', 'created_by', 'created_at', 'source_type', 'source_ref', 'posted_by', 'posted_at',
-        'approved_by', 'approved_at', 'reversed_by', 'reversed_at', 'reversal_reason', 'original_entry_id'
+        'approved_by', 'approved_at', 'reversed_by', 'reversed_at', 'reversal_reason', 'original_entry_id',
+        'review_comments', 'updated_by', 'updated_at'
       ],
       journal_lines: [
         'id', 'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
@@ -4482,13 +4494,15 @@ export class SupabaseDataService implements IDataService {
   async createJournalEntry(entry: any): Promise<any> {
     console.debug('[Supabase] createJournalEntry called with:', entry);
     try {
-      const payload = this.camelToSnake(entry);
+      const payload = this.filterToTableSchema(
+        'journal_entries',
+        this.camelToSnake(entry)
+      );
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
       if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
       // Normalize app-specific statuses/types to DB constraints
-      if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
 
       delete payload.id;
@@ -4513,13 +4527,15 @@ export class SupabaseDataService implements IDataService {
   async updateJournalEntry(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateJournalEntry called with id:', id, 'updates:', updates);
     try {
-      const payload = this.camelToSnake(updates);
+      const payload = this.filterToTableSchema(
+        'journal_entries',
+        this.camelToSnake(updates)
+      );
 
       // Convert empty strings to null for UUID columns
       if (payload.period_id === '') payload.period_id = null;
       if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
       // Normalize app-specific statuses/types to DB constraints
-      if (payload.status === 'ON_HOLD') payload.status = 'DRAFT';
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
 
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;

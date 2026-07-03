@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNotifications } from './NotificationContext';
 
 const typeColors: Record<string, string> = {
@@ -10,11 +10,29 @@ const typeColors: Record<string, string> = {
 
 export const NotificationList: React.FC = () => {
   const { notifications, markRead, clearAll } = useNotifications();
+  const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    if (notifications.length === 0) return;
+
+    setIsExiting(false);
+    const exitTimeoutId = window.setTimeout(() => setIsExiting(true), 1700);
+    const clearTimeoutId = window.setTimeout(clearAll, 2000);
+
+    return () => {
+      window.clearTimeout(exitTimeoutId);
+      window.clearTimeout(clearTimeoutId);
+    };
+  }, [notifications, clearAll]);
 
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-w-full">
+    <div
+      className={`fixed bottom-4 right-4 z-50 w-96 max-w-full transition-all duration-300 ease-in ${
+        isExiting ? 'translate-x-[calc(100%+1rem)] opacity-0' : 'translate-x-0 opacity-100'
+      }`}
+    >
       <div className="flex justify-between items-center mb-2">
         <span className="text-xs font-bold text-slate-400 uppercase">Notifications</span>
         <button onClick={clearAll} className="text-xs text-slate-400 hover:text-red-400">Clear All</button>
