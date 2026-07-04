@@ -7542,19 +7542,24 @@ export default function App() {
               backgroundSize: '120px 120px',
             }}
           />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,rgba(59,130,246,0.24),transparent_34%),radial-gradient(circle_at_50%_70%,rgba(0,0,0,0.8),transparent_58%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,rgba(41,171,226,0.28),transparent_34%),radial-gradient(circle_at_50%_70%,rgba(0,0,0,0.8),transparent_58%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,13,28,0.35)_0%,rgba(4,13,28,0.84)_100%)]" />
-          <div className="absolute left-[12%] top-[20%] h-56 w-56 rounded-full bg-[#F47721]/10 blur-3xl" />
+          <div className="absolute left-[12%] top-[20%] h-56 w-56 rounded-full bg-[#29ABE2]/10 blur-3xl" />
           <div className="absolute right-[14%] bottom-[18%] h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
 
           <div className="modal-panel-graceful relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-3xl md:p-8">
-            <div className="flex items-start gap-4">
-              <div className="modal-icon-graceful flex h-12 w-12 shrink-0 items-center justify-center text-[#F47721]">
-                <LogOut size={32} strokeWidth={1.8} />
-              </div>
+            <div className="flex flex-col items-center text-center gap-4">
+              <img
+                src="/at-erp-logo.svg"
+                alt="AT-ERP logo"
+                className="h-16 w-auto object-contain drop-shadow-[0_8px_24px_rgba(41,171,226,0.4)]"
+              />
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold uppercase tracking-tight text-white">Confirm Logout</h2>
-                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+                <h2 className="text-lg font-semibold uppercase tracking-tight text-white flex items-center justify-center gap-2">
+                  <LogOut size={18} className="text-[#29ABE2]" />
+                  Confirm Logout
+                </h2>
+                <p className="mt-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
                   You are about to end your current ERP session.
                 </p>
               </div>
@@ -7569,14 +7574,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="rounded-full border border-white/10 bg-slate-900/60 px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-300 transition-colors hover:border-[#F47721]/40 hover:text-[#F47721]"
+                  className="rounded-full border border-white/10 bg-slate-900/60 px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-300 transition-colors hover:border-[#29ABE2]/40 hover:text-[#29ABE2]"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-full bg-[#F47721] px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(244,119,33,0.35)] transition-all hover:bg-[#E06610] active:scale-95"
+                  className="rounded-full bg-gradient-to-r from-[#1565C0] to-[#0D47A1] px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(41,171,226,0.35)] transition-all hover:from-[#29ABE2] hover:to-[#1565C0] active:scale-95"
                 >
                   Logout
                 </button>
