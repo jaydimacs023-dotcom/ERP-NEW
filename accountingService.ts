@@ -122,8 +122,14 @@ export class AccountingService {
     return { revenue, expenses, totalRevenue, totalExpenses, netIncome };
   }
 
-  static generateCashFlow(summaries: TransactionSummary[], accounts: ChartOfAccount[], lines: JournalLine[]) {
-    const incomeStatement = this.generateIncomeStatement(summaries, accounts);
+  static generateCashFlow(
+    periodSummaries: TransactionSummary[],
+    accounts: ChartOfAccount[],
+    lines: JournalLine[],
+    openingSummaries: TransactionSummary[] = [],
+    endingSummaries: TransactionSummary[] = periodSummaries
+  ) {
+    const incomeStatement = this.generateIncomeStatement(periodSummaries, accounts);
     const netIncome = incomeStatement.netIncome;
 
     // 1. Operating Activities (Indirect Method)
@@ -134,12 +140,14 @@ export class AccountingService {
       .reduce((sum, l) => sum + (l.credit - l.debit), 0);
 
     const arAccounts = accounts.filter(a => a.name.toLowerCase().includes('receivable') && a.class === AccountClass.ASSET);
-    const arBalance = summaries.filter(s => arAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
-    const changeInAR = -arBalance; 
+    const openingAR = openingSummaries.filter(s => arAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const endingAR = endingSummaries.filter(s => arAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const changeInAR = openingAR - endingAR;
 
     const apAccounts = accounts.filter(a => a.name.toLowerCase().includes('payable') && a.class === AccountClass.LIABILITY);
-    const apBalance = summaries.filter(s => apAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
-    const changeInAP = apBalance;
+    const openingAP = openingSummaries.filter(s => apAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const endingAP = endingSummaries.filter(s => apAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const changeInAP = endingAP - openingAP;
 
     const operatingCashFlow = netIncome + depreciationAdjustment + changeInAR + changeInAP;
 
@@ -160,7 +168,8 @@ export class AccountingService {
     const netCashFlow = operatingCashFlow + investingCashFlow + financingCashFlow;
 
     const cashAccounts = accounts.filter(a => (a.code.startsWith('11') || a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('checking')) && !a.isHeader);
-    const totalCash = summaries.filter(s => cashAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const beginningCash = openingSummaries.filter(s => cashAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
+    const totalCash = endingSummaries.filter(s => cashAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
 
     return {
       netIncome,
@@ -171,6 +180,7 @@ export class AccountingService {
       investingCashFlow,
       financingCashFlow,
       netCashFlow,
+      beginningCash,
       endingCash: totalCash
     };
   }

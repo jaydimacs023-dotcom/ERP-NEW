@@ -2,7 +2,7 @@
 import { FetchPageOptions, IDataService, InitialData, PaginatedResult } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
-import { FeedbackTicket, InventoryClass, Invoice, OpeningInventoryDocument, TaxCategoryEntry } from '../types';
+import { FeedbackTicket, InventoryClass, Invoice, JournalVoucher, JournalVoucherLine, OpeningInventoryDocument, TaxCategoryEntry } from '../types';
 import { normalizeStudentDocuments } from './StudentDocumentService';
 
 /**
@@ -153,6 +153,45 @@ export class SupabaseDataService implements IDataService {
       results.push(...batchResults);
     }
     return results;
+  }
+
+  private async fetchAllPages<T>(url: string, pageSize = 1000): Promise<T[]> {
+    const rows: T[] = [];
+
+    for (let offset = 0; ; offset += pageSize) {
+      const response = await fetch(url, {
+        headers: {
+          ...(await this.getHeaders()),
+          Range: `${offset}-${offset + pageSize - 1}`,
+          'Range-Unit': 'items'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Supabase fetch failed (${response.status}): ${await response.text()}`);
+      }
+
+      const page = await response.json() as T[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+
+    return rows;
+  }
+
+  private async fetchAllPagesWithSoftDeleteFallback<T>(url: string, table: string): Promise<T[]> {
+    try {
+      return await this.fetchAllPages<T>(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/column\s+\S*is_deleted\s+does not exist/i.test(message)) {
+        throw error;
+      }
+
+      const legacyUrl = new URL(url);
+      legacyUrl.searchParams.delete('is_deleted');
+      console.warn(`[Supabase] ${table}.is_deleted is unavailable; loading from the legacy schema.`);
+      return this.fetchAllPages<T>(legacyUrl.toString());
+    }
   }
 
   private extractMissingColumnFromSchemaError(errorText: string): string | null {
@@ -3428,9 +3467,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getStockItemsByLocation called with orgId:', orgId, 'locationId:', locationId);
     try {
       const url = `${this.baseUrl}/stock_items?org_id=eq.${orgId}&warehouse_location_id=eq.${locationId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
+      const data = await this.fetchAllPages<any>(url);
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching stock items by location:', error);
@@ -4463,13 +4500,11 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getAccountsByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/chart_of_accounts?org_id=eq.${orgId}&is_deleted=eq.false&order=code.asc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
+      const data = await this.fetchAllPagesWithSoftDeleteFallback<any>(url, 'chart_of_accounts');
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching accounts:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -4705,13 +4740,11 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getJournalEntriesByOrg called with orgId:', orgId);
     try {
       const url = `${this.baseUrl}/journal_entries?org_id=eq.${orgId}&is_deleted=eq.false&order=date.desc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
+      const data = await this.fetchAllPagesWithSoftDeleteFallback<any>(url, 'journal_entries');
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching journal entries:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -4727,6 +4760,81 @@ export class SupabaseDataService implements IDataService {
       console.error('[Supabase] Error fetching journal entry:', error);
       return null;
     }
+  }
+
+  // ============================================================================
+  // JOURNAL VOUCHERS (the only manual journal source)
+  // ============================================================================
+
+  private async journalVoucherRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/journal-vouchers`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('Your application session has expired. Please sign in again.');
+      throw new Error(result?.error || result?.message || `Journal voucher request failed (${response.status})`);
+    }
+    return result;
+  }
+
+  async getJournalVouchersByOrg(orgId: string): Promise<JournalVoucher[]> {
+    const result = await this.journalVoucherRequest('list', { orgId });
+    return this.snakeToCamel(result.vouchers || []) as JournalVoucher[];
+  }
+
+  async getJournalVoucherLines(voucherId: string): Promise<JournalVoucherLine[]> {
+    const result = await this.journalVoucherRequest('lines', { id: voucherId });
+    return this.snakeToCamel(result.lines || []) as JournalVoucherLine[];
+  }
+
+  async createJournalVoucher(voucher: Omit<JournalVoucher, 'id' | 'jvNumber' | 'createdAt'>): Promise<JournalVoucher> {
+    const payload = this.camelToSnake(voucher);
+    delete payload.id;
+    delete payload.jv_number;
+    delete payload.gl_reference;
+    delete payload.posted_by;
+    delete payload.posted_at;
+    delete payload.created_at;
+    delete payload.updated_at;
+    const result = await this.journalVoucherRequest('create', { voucher: payload });
+    return this.snakeToCamel(result.voucher) as JournalVoucher;
+  }
+
+  async updateJournalVoucher(id: string, updates: Partial<JournalVoucher>): Promise<JournalVoucher> {
+    const payload = this.camelToSnake(updates);
+    for (const locked of ['id', 'org_id', 'jv_number', 'status', 'gl_reference', 'posted_by', 'posted_at', 'created_at']) {
+      delete payload[locked];
+    }
+    const result = await this.journalVoucherRequest('update', { id, updates: payload });
+    return this.snakeToCamel(result.voucher) as JournalVoucher;
+  }
+
+  async replaceJournalVoucherLines(
+    voucherId: string,
+    lines: Omit<JournalVoucherLine, 'id' | 'journalVoucherId'>[]
+  ): Promise<JournalVoucherLine[]> {
+    const result = await this.journalVoucherRequest('replace_lines', {
+      id: voucherId,
+      lines: lines.map(line => this.camelToSnake(line))
+    });
+    return this.snakeToCamel(result.lines || []) as JournalVoucherLine[];
+  }
+
+  async deleteJournalVoucher(id: string): Promise<void> {
+    await this.journalVoucherRequest('delete', { id });
+  }
+
+  async postJournalVoucher(id: string, postedBy: string): Promise<JournalVoucher> {
+    const result = await this.journalVoucherRequest('post', { id, postedBy });
+    return this.snakeToCamel(result.voucher) as JournalVoucher;
   }
 
   // ============================================================================
@@ -4907,13 +5015,11 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] getJournalLinesByEntry called with entryId:', entryId);
     try {
       const url = `${this.baseUrl}/journal_lines?journal_entry_id=eq.${entryId}&order=id.asc`;
-      const response = await fetch(url, { headers: (await this.getHeaders()) });
-      if (!response.ok) return [];
-      const data = await response.json();
+      const data = await this.fetchAllPages<any>(url);
       return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching journal lines:', error);
-      return [];
+      throw error;
     }
   }
 

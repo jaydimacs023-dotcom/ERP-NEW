@@ -15,6 +15,7 @@ import { useNotifications } from './components/NotificationContext';
 // View Imports
 import Dashboard from './views/Dashboard';
 import Ledger from './views/Ledger';
+import JournalVouchersView from './views/JournalVouchersView';
 import Reports from './views/Reports';
 import ChartOfAccounts from './views/ChartOfAccounts';
 import LoginView from './views/LoginView';
@@ -56,7 +57,7 @@ import PayrollView from './views/PayrollView';
 import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
 import JournalForm from './components/JournalForm';
-import { canTransitionJournal, isManualJournalSource } from './services/JournalWorkflowService';
+import { buildJournalApprovalUpdates, canTransitionJournal, isManualJournalSource } from './services/JournalWorkflowService';
 import MaintenanceView from './views/MaintenanceView';
 import PeriodClosingView from './views/PeriodClosingView';
 import CheckPrintingView from './views/CheckPrintingView';
@@ -791,7 +792,7 @@ export default function App() {
         // GL reference (either column missing or reference not matching pattern).
         const missing = normalizedEntries.filter(e => {
           const status = String(e.status || '').toUpperCase();
-          const isDraftLike = status === 'DRAFT' || status === 'ON_HOLD' || status === 'REVISION_REQUESTED' || status === 'PENDING';
+          const isDraftLike = status === 'DRAFT' || status === 'ON_HOLD' || status === 'REVISION_REQUESTED' || status === 'PENDING' || status === 'PENDING_APPROVAL';
           return !e.glEntryNumber && !isDraftLike;
         });
         if (missing.length > 0) {
@@ -2281,8 +2282,15 @@ export default function App() {
       updatedAt: timestamp
     };
     if (nextStatus === 'APPROVED') {
-      updates.approvedBy = currentUser?.id || 'system';
-      updates.approvedAt = timestamp;
+      Object.assign(
+        updates,
+        buildJournalApprovalUpdates(
+          entry,
+          generateNextGlRef(),
+          currentUser?.id || 'system',
+          timestamp
+        )
+      );
     }
 
     const saved = await dataService.updateJournalEntry(entryId, updates);
@@ -2299,7 +2307,7 @@ export default function App() {
       transitioned
     );
     handleNotify('success', nextStatus === 'APPROVED'
-      ? 'Journal entry approved. It has not yet been posted to the General Ledger.'
+      ? `Journal entry approved and posted. GL Reference: ${transitioned.glEntryNumber}.`
       : 'Journal entry submitted for approval.');
     return transitioned;
   }
@@ -6737,6 +6745,7 @@ export default function App() {
               </NavSection>
 
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
+                <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
@@ -6771,6 +6780,7 @@ export default function App() {
               compact={!sidebarOpen}
             >
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
               <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Landmark size={18} />} label="Cash Management" active={activeTab === 'banking'} onClick={() => navigateTo('banking')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -7065,7 +7075,27 @@ export default function App() {
             />
           )}
           {activeTab === 'ledger' && <Ledger orgId={currentOrgId} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
-          {activeTab === 'reports' && <Reports summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
+          {activeTab === 'journal-vouchers' && (
+            <JournalVouchersView
+              orgId={currentOrgId}
+              accounts={filteredAccounts}
+              periods={accountingPeriods}
+              users={users}
+              currentUser={currentUser}
+              brandColor={brandColor}
+              onNotify={handleNotify}
+              onNavigate={target => navigateTo(target)}
+              onPosted={async () => {
+                const refreshedEntries = await dataService.getJournalEntriesByOrg(currentOrgId);
+                const refreshedLineGroups = await Promise.all(
+                  refreshedEntries.map(entry => dataService.getJournalLinesByEntry(entry.id))
+                );
+                setJournalEntries(refreshedEntries);
+                setJournalLines(refreshedLineGroups.flat());
+              }}
+            />
+          )}
+          {activeTab === 'reports' && <Reports orgId={currentOrgId} summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           {activeTab === 'collection-report' && (
             <ARCollectionReportView
               payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}

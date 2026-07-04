@@ -24,3 +24,19 @@ export const canTransitionJournal = (
   }
   return false;
 };
+
+export const buildJournalApprovalUpdates = (
+  entry: JournalEntry,
+  glEntryNumber: string,
+  approvedBy: string,
+  timestamp: string
+): Partial<JournalEntry> => ({
+  status: 'POSTED',
+  glEntryNumber: String(entry.glEntryNumber || '').trim() || glEntryNumber,
+  approvedBy,
+  approvedAt: timestamp,
+  postedBy: approvedBy,
+  postedAt: timestamp,
+  updatedBy: approvedBy,
+  updatedAt: timestamp,
+});

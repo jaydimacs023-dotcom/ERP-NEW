@@ -3,7 +3,7 @@ import {
   Organization, User, Student, Qualification, Trainer, Batch,
   Sponsor, NonStockItem, Vendor, BankAccount, Location,
   TrainerSchedule, Employee, PayrollRun, PayrollLine,
-  JournalEntry, JournalLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
+  JournalEntry, JournalLine, JournalVoucher, JournalVoucherLine, AuditLog, PurchaseOrder, PaymentHistory, FixedAsset, Payable, Bill,
   CheckVoucher, BankReconciliation, RecurringJournalEntry, AccountingPeriod, ExchangeRate,
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
@@ -396,6 +396,15 @@ export interface IDataService {
   deleteJournalLine(id: string): Promise<void>;
   getJournalLinesByEntry(entryId: string): Promise<JournalLine[]>;
   createJournalLines(lines: JournalLine[]): Promise<JournalLine[]>;
+
+  // Manual Journal Voucher CRUD and atomic posting
+  getJournalVouchersByOrg(orgId: string): Promise<JournalVoucher[]>;
+  getJournalVoucherLines(voucherId: string): Promise<JournalVoucherLine[]>;
+  createJournalVoucher(voucher: Omit<JournalVoucher, 'id' | 'jvNumber' | 'createdAt'>): Promise<JournalVoucher>;
+  updateJournalVoucher(id: string, updates: Partial<JournalVoucher>): Promise<JournalVoucher>;
+  replaceJournalVoucherLines(voucherId: string, lines: Omit<JournalVoucherLine, 'id' | 'journalVoucherId'>[]): Promise<JournalVoucherLine[]>;
+  deleteJournalVoucher(id: string): Promise<void>;
+  postJournalVoucher(id: string, postedBy: string): Promise<JournalVoucher>;
 
   // Audit Log CRUD
   createAuditLog(log: AuditLog): Promise<AuditLog>;

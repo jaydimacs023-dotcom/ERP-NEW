@@ -1,8 +1,10 @@
 ﻿import React, { useState, useMemo } from 'react';
+import { useEffect, useCallback } from 'react';
 import { TransactionSummary, ChartOfAccount, JournalEntry, JournalLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
 import { Printer, Download, Clock, Calendar, Award, CheckCircle2, AlertCircle, Info, ChevronRight, TrendingUp, TrendingDown, DollarSign, ShieldCheck, Filter, Building2, BarChart, Wrench } from 'lucide-react';
 import CustomReportBuilder from './CustomReportBuilder';
+import { DataServiceFactory } from '../services/DataServiceFactory';
 
 interface ReportsProps {
   summaries: TransactionSummary[];
@@ -14,6 +16,7 @@ interface ReportsProps {
   orgName?: string;
   currency?: string;
   logoUrl?: string;
+  orgId: string;
 }
 
 type ReportType = 'BS' | 'IS' | 'TB' | 'CFS' | 'CUSTOM';
@@ -25,9 +28,14 @@ interface DetailedFinancialRow {
   hasChildren: boolean;
 }
 
-const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualifications, batches, orgName = 'Institution Ledger', currency = 'USD', logoUrl }) => {
+const Reports: React.FC<ReportsProps> = ({ accounts: initialAccounts, entries: initialEntries, lines: initialLines, qualifications, batches, orgId, orgName = 'Institution Ledger', currency = 'USD', logoUrl }) => {
   const [reportType, setReportType] = useState<ReportType>('BS');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>('');
+  const [accounts, setReportAccounts] = useState(initialAccounts);
+  const [entries, setReportEntries] = useState(initialEntries);
+  const [lines, setReportLines] = useState(initialLines);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
 
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -36,6 +44,46 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+
+  const refreshReportData = useCallback(async () => {
+    if (!orgId) return;
+    setIsRefreshing(true);
+    setRefreshError('');
+
+    try {
+      const service = DataServiceFactory.getService();
+      const [freshAccounts, allEntries] = await Promise.all([
+        service.getAccountsByOrg(orgId),
+        service.getJournalEntriesByOrg(orgId)
+      ]);
+      const postedEntries = allEntries.filter(entry => entry.status === 'POSTED' && !entry.isDeleted);
+      const lineGroups: JournalLine[][] = [];
+
+      for (let index = 0; index < postedEntries.length; index += 25) {
+        const batch = postedEntries.slice(index, index + 25);
+        lineGroups.push(...await Promise.all(batch.map(entry => service.getJournalLinesByEntry(entry.id))));
+      }
+
+      setReportAccounts(freshAccounts);
+      setReportEntries(postedEntries);
+      setReportLines(lineGroups.flat());
+    } catch (error) {
+      console.error('[Reports] Failed to refresh financial report data:', error);
+      setRefreshError('Could not refresh the live ledger. Showing the last loaded data.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    setReportAccounts(initialAccounts);
+    setReportEntries(initialEntries);
+    setReportLines(initialLines);
+  }, [initialAccounts, initialEntries, initialLines, orgId]);
+
+  useEffect(() => {
+    void refreshReportData();
+  }, [refreshReportData]);
 
   const reportSummariesBS = useMemo(() => {
     const filteredEntries = entries.filter(e => e.date <= endDate);
@@ -62,6 +110,14 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
     return AccountingService.getLedgerSummaries(accounts, targetLines);
   }, [accounts, entries, lines, batches, startDate, endDate, selectedQualificationId, reportType]);
+
+  const reportSummariesOpening = useMemo(() => {
+    const openingEntryIds = new Set(entries.filter(entry => entry.date < startDate).map(entry => entry.id));
+    return AccountingService.getLedgerSummaries(
+      accounts,
+      lines.filter(line => openingEntryIds.has(line.journalEntryId))
+    );
+  }, [accounts, entries, lines, startDate]);
 
   const buildDetailedFinancialRows = (sourceSummaries: TransactionSummary[], accountClass: AccountClass) => {
     const summariesByAccountId = new Map(sourceSummaries.map(summary => [summary.accountId, summary]));
@@ -129,8 +185,8 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
       const entry = entries.find(e => e.id === l.journalEntryId);
       return entry && entry.date >= startDate && entry.date <= endDate;
     });
-    return AccountingService.generateCashFlow(reportSummariesIS, accounts, periodLines);
-  }, [reportSummariesIS, accounts, lines, entries, startDate, endDate]);
+    return AccountingService.generateCashFlow(reportSummariesIS, accounts, periodLines, reportSummariesOpening, reportSummariesBS);
+  }, [reportSummariesIS, reportSummariesOpening, reportSummariesBS, accounts, lines, entries, startDate, endDate]);
 
   const formatCurrency = (val: number) => {
     return `\u20B1 ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val)}`;
@@ -704,6 +760,14 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
             <div className="flex items-center gap-3">
               {reportType !== 'CUSTOM' && (
                 <>
+                  <button
+                    onClick={() => void refreshReportData()}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded hover:bg-gray-50 transition-all border border-gray-200 font-bold text-sm disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Clock size={17} className={isRefreshing ? 'animate-spin text-brand' : 'text-brand'} />
+                    {isRefreshing ? 'Syncing ledger…' : 'Refresh data'}
+                  </button>
                   <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all border border-gray-200 font-bold text-sm">
                     <Printer size={18} className="text-brand" /> Print
                   </button>
@@ -717,6 +781,11 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
 
           {reportType !== 'CUSTOM' && (
             <div className="flex flex-wrap items-center gap-5 pt-6 border-t border-gray-100">
+              {refreshError && (
+                <div className="basis-full flex items-center gap-2 text-xs font-semibold text-rose-600">
+                  <AlertCircle size={15} /> {refreshError}
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gray-50 rounded-lg"><Calendar size={18} className="text-gray-400" /></div>
                 <div>
@@ -957,7 +1026,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts, entries, lines, qualificati
                         </div>
                         <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wide">
                           <span>Add: Cash at Beginning of Period</span>
-                          <span className="font-mono">{formatCurrency(0)}</span>
+                          <span className="font-mono">{formatCurrency(cfsReport.beginningCash)}</span>
                         </div>
                         <div className="flex justify-between items-center pt-4 mt-4 border-t-2 border-gray-800 text-lg font-semibold text-gray-900 uppercase tracking-wide">
                           <span>CASH AT END OF PERIOD</span>

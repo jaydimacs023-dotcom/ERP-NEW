@@ -8,7 +8,7 @@ import {
 } from '../types';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter, PageOrder } from '../services/IDataService';
-import { Search, RotateCcw, BookText, Plus, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, RotateCcw, BookText, X, ChevronDown, CheckSquare, Download, FileSpreadsheet, FileText, ArrowUpDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import JournalForm from '../components/JournalForm';
 import { isEditableJournalStatus } from '../services/JournalWorkflowService';
 
@@ -31,8 +31,8 @@ interface LedgerProps {
   qualifications?: Qualification[];
   users?: User[];
   currentUser?: any;
-  onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
-  onApproveJournal?: (entryId: string) => void;
+  onPostEntry?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void | Promise<JournalEntry | null>;
+  onApproveJournal?: (entryId: string) => void | Promise<void>;
   onReverseJournal?: (entryId: string) => Promise<JournalEntry | null> | JournalEntry | null | void;
   initialSearchTerm?: string;
 }
@@ -285,6 +285,23 @@ const Ledger: React.FC<LedgerProps> = ({
       isActive = false;
     };
   }, [currentPage, debouncedSearchTerm, refreshKey, serverFetchEnabled, serverFilters, serverOrderBy]);
+
+  useEffect(() => {
+    if (serverFetchEnabled) {
+      setRefreshKey(key => key + 1);
+    }
+  }, [entries, lines, serverFetchEnabled]);
+
+  useEffect(() => {
+    if (editingEntry) {
+      const liveEntry = entries.find(entry => entry.id === editingEntry.id);
+      if (liveEntry && liveEntry !== editingEntry) setEditingEntry(liveEntry);
+    }
+    if (selectedEntry) {
+      const liveEntry = entries.find(entry => entry.id === selectedEntry.id);
+      if (liveEntry && liveEntry !== selectedEntry) setSelectedEntry(liveEntry);
+    }
+  }, [entries, editingEntry, selectedEntry]);
   const handleReverseOpenedEntry = async (): Promise<void> => {
     if (!editingEntry?.id || !onReverseJournal) return;
 
@@ -390,7 +407,13 @@ const Ledger: React.FC<LedgerProps> = ({
     () => sortedEntries.slice(pageStartIndex, pageStartIndex + JOURNAL_ENTRIES_PER_PAGE),
     [sortedEntries, pageStartIndex]
   );
-  const paginatedEntries = useFallbackRows ? fallbackPaginatedEntries : serverEntries;
+  const liveServerEntries = useMemo(
+    () => serverEntries.map(serverEntry =>
+      entries.find(entry => entry.id === serverEntry.id) || serverEntry
+    ),
+    [serverEntries, entries]
+  );
+  const paginatedEntries = useFallbackRows ? fallbackPaginatedEntries : liveServerEntries;
 
   const serverEntryTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -400,7 +423,14 @@ const Ledger: React.FC<LedgerProps> = ({
     });
     return totals;
   }, [serverEntryLines]);
-  const displayEntryTotals = useFallbackRows ? entryTotals : serverEntryTotals;
+  const displayEntryTotals = useMemo(() => {
+    if (useFallbackRows) return entryTotals;
+    const totals = new Map(serverEntryTotals);
+    liveServerEntries.forEach(entry => {
+      if (entryTotals.has(entry.id)) totals.set(entry.id, entryTotals.get(entry.id)!);
+    });
+    return totals;
+  }, [useFallbackRows, entryTotals, serverEntryTotals, liveServerEntries]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -655,16 +685,9 @@ const Ledger: React.FC<LedgerProps> = ({
           <p className="text-sm italic text-gray-500">Review and manage your financial transactions</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <button
-            onClick={() => {
-              setEditingEntry(null);
-              setEditingLines([]);
-              setShowEntryForm(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300 shrink-0"
-          >
-            <Plus size={20} /> New Entry
-          </button>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
+            Manual entries are prepared in Journal Vouchers
+          </div>
         </div>
       </div>
 
@@ -976,12 +999,6 @@ const Ledger: React.FC<LedgerProps> = ({
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">No Journal Records</h3>
                     <p className="text-sm text-gray-400 mt-2 max-w-xs mx-auto italic font-medium">{isLoadingPage && !useFallbackRows ? 'Loading journal records...' : 'The ledger is currently empty. Manual entries or system-generated records will appear here once posted.'}</p>
-                    <button
-                      onClick={() => setShowEntryForm(true)}
-                      className="mt-6 px-8 py-3 bg-gray-800 text-white rounded text-xs font-semibold uppercase tracking-wide shadow-md active:scale-95 transition-all"
-                    >
-                      Create First Entry
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -1027,7 +1044,7 @@ const Ledger: React.FC<LedgerProps> = ({
                     onClick={() => {
                       setEditingEntry(entry);
                       setEditingLines(resolveJournalDisplayLines(entry));
-                      setEntryFormMode(isLockedJournalEntry(entry) ? 'view' : 'edit');
+                      setEntryFormMode('view');
                       setShowEntryForm(true);
                     }}
                   >
@@ -1105,8 +1122,9 @@ const Ledger: React.FC<LedgerProps> = ({
             setEditingLines([]);
             setEntryFormMode('new');
           }}
-          onSubmit={(entry, lines) => {
-            onPostEntry?.(entry, lines);
+          onSubmit={async (entry, lines) => {
+            const result = await onPostEntry?.(entry, lines);
+            if (result === null) return;
             setRefreshKey(key => key + 1);
             setShowEntryForm(false);
             setEditingEntry(null);

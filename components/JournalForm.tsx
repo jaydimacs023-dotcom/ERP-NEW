@@ -22,7 +22,7 @@ interface JournalFormProps {
   linesToEdit?: JournalLine[];
   mode?: 'new' | 'edit' | 'view';
   canAuthorize?: boolean;
-  onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
+  onSubmit: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void | Promise<JournalEntry | null>;
   onReverse?: () => void | Promise<void>;
   onClose: () => void;
 }

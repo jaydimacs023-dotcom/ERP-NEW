@@ -41,6 +41,7 @@ export type ModuleTab =
   // Financial Core
   | 'dashboard'
   | 'ledger'
+  | 'journal-vouchers'
   | 'reports'
   | 'banking'
   | 'checks'
@@ -114,7 +115,7 @@ export type ModuleTab =
 const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // SYSTEM_ADMIN: Full platform access
   SYSTEM_ADMIN: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks',
+    'dashboard', 'ledger', 'journal-vouchers', 'reports', 'banking', 'checks',
     'ar', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -128,7 +129,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // ADMIN: Full organization access (no system admin modules)
   ADMIN: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks',
+    'dashboard', 'ledger', 'journal-vouchers', 'reports', 'banking', 'checks',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -150,7 +151,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // FINANCE_MANAGER: All finance modules
   FINANCE_MANAGER: [
-    'dashboard', 'ledger', 'reports', 'banking', 'checks',
+    'dashboard', 'ledger', 'journal-vouchers', 'reports', 'banking', 'checks',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
@@ -161,7 +162,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // ACCOUNTANT: General Ledger, Reporting, Journal Entries
   ACCOUNTANT: [
-    'dashboard', 'ledger', 'reports', 'banking',
+    'dashboard', 'ledger', 'journal-vouchers', 'reports', 'banking',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
@@ -172,6 +173,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // AR_SPECIALIST: Accounts Receivable focused
   AR_SPECIALIST: [
     'dashboard',
+    'journal-vouchers',
     'ar-calendar-tasks',
     'customers',
     'invoices',

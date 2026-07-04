@@ -1110,6 +1110,49 @@ export interface JournalLine {
   purchaseOrderLineId?: string;
 }
 
+export type JournalVoucherStatus = 'ON_HOLD' | 'POSTED';
+
+export interface JournalVoucherAttachment {
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
+
+export interface JournalVoucher extends BaseEntity {
+  id: string;
+  orgId: string;
+  companyId?: string;
+  branchId?: string;
+  jvNumber: string;
+  journalDate: string;
+  accountingPeriodId: string;
+  description: string;
+  referenceNo?: string;
+  status: JournalVoucherStatus;
+  glReference?: string;
+  preparedBy: string;
+  postedBy?: string;
+  postedAt?: string;
+  remarks?: string;
+  attachments?: JournalVoucherAttachment[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface JournalVoucherLine {
+  id: string;
+  journalVoucherId: string;
+  coaId: string;
+  debit: number;
+  credit: number;
+  lineDescription?: string;
+  costCenterId?: string;
+  projectId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface TransactionSummary {
   accountId: string;
   accountName: string;

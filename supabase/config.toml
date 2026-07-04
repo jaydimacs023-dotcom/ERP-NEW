@@ -387,6 +387,9 @@ verify_jwt = false
 [functions.inventory-accounting]
 verify_jwt = false
 
+[functions.journal-vouchers]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
