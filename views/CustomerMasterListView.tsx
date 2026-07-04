@@ -231,7 +231,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
             return students.filter(s =>
                 !s.isDeleted && (
                     `${s.firstName} ${s.lastName}`.toLowerCase().includes(lowerSearch) ||
-                    s.uli.toLowerCase().includes(lowerSearch) ||
+                    (s.uli || '').toLowerCase().includes(lowerSearch) ||
                     s.email?.toLowerCase().includes(lowerSearch)
                 ) &&
                 (billingFilter === 'ALL' || getStudentBillingStatus(s.id) === billingFilter)
@@ -968,9 +968,9 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         <form onSubmit={handleStudentSubmit} className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
                             <div className="grid grid-cols-4 gap-6">
                                 <div className="col-span-1 space-y-2">
-                                    <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">ULI (Learner ID) *</label>
+                                    <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">ULI (Learner ID)</label>
                                     <input
-                                        type="text" required
+                                        type="text"
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-slate-900/5 outline-none transition-all"
                                         value={studentFormData.uli}
                                         onChange={(e) => setStudentFormData(prev => ({ ...prev, uli: e.target.value }))}

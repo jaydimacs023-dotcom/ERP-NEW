@@ -6569,33 +6569,43 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white gap-8">
-        <style>{`@keyframes progressBar { 0% { transform: translateX(-100%);} 100% { transform: translateX(100%);} }`}</style>
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-4">
-            <img
-              src="/accountech-logo.png"
-              alt="Accountech logo"
-              className="h-24 w-24 object-contain drop-shadow-[0_10px_24px_rgba(0,0,0,0.45)] md:h-28 md:w-28"
-            />
+      <div className="relative h-screen w-full flex flex-col items-center justify-center bg-[#06162B] text-white gap-10 overflow-hidden">
+        <style>{`
+          @keyframes progressBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+          @keyframes logoGlow { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.06); } }
+        `}</style>
+        {/* Ambient background glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(41,171,226,0.12) 0%, transparent 70%)', animation: 'logoGlow 5s ease-in-out infinite' }} />
+        <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-[#0D47A1]/15 blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-0 w-72 h-72 rounded-full bg-[#29ABE2]/8 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col items-center gap-4 z-10">
+          <div className="flex items-center gap-6">
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-full blur-3xl bg-[#29ABE2]/30" style={{ animation: 'logoGlow 3.5s ease-in-out infinite' }} />
+              <img
+                src="/at-erp-logo.svg"
+                alt="AT-ERP logo"
+                className="relative h-24 w-24 object-contain drop-shadow-[0_8px_32px_rgba(41,171,226,0.45)] md:h-28 md:w-28"
+              />
+            </div>
             <div className="text-center md:text-left">
               <h1 className="text-5xl font-black tracking-tight leading-none">
-                <span className="bg-gradient-to-r from-[#d8b35b] via-[#f5de9e] to-[#b78422] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#29ABE2] via-[#6DD5FA] to-[#1565C0] bg-clip-text text-transparent">
                   Accoun
                 </span>
                 <span className="text-white">Tech.</span>
               </h1>
-              <p className="mt-2 italic text-[10px] font-bold uppercase tracking-[0.32em] text-slate-400">
+              <p className="mt-2 italic text-[10px] font-bold uppercase tracking-[0.32em] text-[#29ABE2]/55">
                 SMART SOLUTIONS FOR THE MODERN ECONOMY
               </p>
             </div>
           </div>
         </div>
-        <div className="w-72">
-          <div className="h-2 rounded-full overflow-hidden bg-slate-800 border border-slate-700">
-            <div className="h-full w-1/3 bg-gradient-to-r from-[#F47721] via-[#FCA311] to-[#F47721] animate-[progressBar_2.5s_linear_infinite]" />
+        <div className="relative z-10 w-72">
+          <div className="h-1.5 rounded-full overflow-hidden bg-white/5 border border-white/10">
+            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-[#0D47A1] via-[#29ABE2] to-[#0D47A1] animate-[progressBar_2.5s_linear_infinite]" style={{ boxShadow: '0 0 14px rgba(41,171,226,0.55)' }} />
           </div>
-          <div className="mt-3 text-center text-xs uppercase font-semibold tracking-[0.2em] text-slate-400">Loading training architecture...</div>
+          <div className="mt-3 text-center text-[10px] uppercase font-semibold tracking-[0.22em] text-white/22">Loading training architecture...</div>
         </div>
       </div>
     );

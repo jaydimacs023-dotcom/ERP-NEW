@@ -820,7 +820,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                           {student.lastName}, {student.firstName}
                         </p>
                         <p className="text-xs font-mono text-gray-400 mt-0.5">
-                          {student.uli.slice(-6)}
+                          {student.uli?.slice(-6) || 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -1330,7 +1330,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                                 {student.lastName}, {student.firstName}
                               </div>
                               <div className="text-xs font-mono mt-0.5 text-gray-400">
-                                ULI: {student.uli.slice(-6)}
+                                ULI: {student.uli?.slice(-6) || 'N/A'}
                               </div>
                             </div>
                             <Plus size={16} className="shrink-0 text-gray-300 group-hover:text-brand" />
@@ -1374,7 +1374,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                                   {student.lastName}, {student.firstName}
                                 </div>
                                 <div className="text-xs font-mono mt-0.5 text-white/80">
-                                  ULI: {student.uli.slice(-6)}
+                                  ULI: {student.uli?.slice(-6) || 'N/A'}
                                 </div>
                               </div>
                               <CheckCircle size={18} className="shrink-0 text-white" />

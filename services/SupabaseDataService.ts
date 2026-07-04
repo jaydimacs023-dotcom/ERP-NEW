@@ -1117,6 +1117,7 @@ export class SupabaseDataService implements IDataService {
     // Convert empty strings to null for UUID columns
     if (snakeCaseStudent.location_id === '') snakeCaseStudent.location_id = null;
     if (snakeCaseStudent.sponsor_id === '') snakeCaseStudent.sponsor_id = null;
+    if (snakeCaseStudent.uli === '') snakeCaseStudent.uli = null;
     console.debug('[Supabase] After camelToSnake():', snakeCaseStudent);
 
     // Ensure org_id is present
@@ -1177,6 +1178,7 @@ export class SupabaseDataService implements IDataService {
     if (snakeCaseUpdates.location_id === '') snakeCaseUpdates.location_id = null;
     if (snakeCaseUpdates.sponsor_id === '') snakeCaseUpdates.sponsor_id = null;
     if (snakeCaseUpdates.date_of_birth === '') snakeCaseUpdates.date_of_birth = null;
+    if (snakeCaseUpdates.uli === '') snakeCaseUpdates.uli = null;
 
     // Always update the updated_at timestamp
     snakeCaseUpdates.updated_at = new Date().toISOString();

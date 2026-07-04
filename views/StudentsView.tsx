@@ -525,7 +525,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
       const lower = debouncedSearchTerm.toLowerCase();
       base = base.filter(s =>
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(lower) ||
-        s.uli.toLowerCase().includes(lower)
+        (s.uli || '').toLowerCase().includes(lower)
       );
     }
 
@@ -1010,7 +1010,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
               <h3 className="text-sm font-semibold text-gray-800">{selectedBatch.name}</h3>
               <p className="text-xs text-gray-500">
                 {qualifications.find(q => q.id === selectedBatch.qualificationId)?.name || 'Unknown'}
-                {' • '}{selectedBatch.studentIds.length} enrolled • {selectedBatch.startDate} to {selectedBatch.endDate}
+                {' ï¿½ '}{selectedBatch.studentIds.length} enrolled ï¿½ {selectedBatch.startDate} to {selectedBatch.endDate}
               </p>
             </div>
           </div>
@@ -1257,7 +1257,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       </td>
                       <td className="px-8 py-5">
                         <p className="text-xs font-bold text-gray-600">{p.dateOfBirth} ({p.age}y)</p>
-                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.sex} • {p.civilStatus}</p>
+                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.sex} ï¿½ {p.civilStatus}</p>
                       </td>
                       <td className="px-8 py-5">
                         <p className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{p.email}</p>
@@ -1459,7 +1459,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                         )}
 
                         {isVerified && (
-                          <div className="text-xs font-semibold text-brand uppercase italic mt-1 text-center">System Validated • Audit Verified</div>
+                          <div className="text-xs font-semibold text-brand uppercase italic mt-1 text-center">System Validated ï¿½ Audit Verified</div>
                         )}
                       </div>
                     )
@@ -1521,7 +1521,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">ULI (Learner ID)</label>
-                      <input required placeholder="24-XXX-XXX-XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-semibold text-brand font-mono" value={formData.uli} onChange={e => setFormData({ ...formData, uli: e.target.value })} />
+                      <input placeholder="24-XXX-XXX-XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-semibold text-brand font-mono" value={formData.uli} onChange={e => setFormData({ ...formData, uli: e.target.value })} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>

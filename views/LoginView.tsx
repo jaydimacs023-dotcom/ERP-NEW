@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useMemo } from 'react';
 import { Database, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, ChevronRight, KeyRound } from 'lucide-react';
 import { InstitutionType, Organization, User } from '../types';
@@ -37,7 +37,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
     weak: 'bg-red-500',
     fair: 'bg-amber-500',
     good: 'bg-emerald-500',
-    strong: 'bg-[#F47721]',
+    strong: 'bg-[#29ABE2]',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -129,9 +129,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
           backgroundSize: '120px 120px',
         }}
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,rgba(59,130,246,0.24),transparent_34%),radial-gradient(circle_at_50%_70%,rgba(0,0,0,0.8),transparent_58%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_32%,rgba(41,171,226,0.28),transparent_34%),radial-gradient(circle_at_50%_70%,rgba(0,0,0,0.8),transparent_58%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,13,28,0.35)_0%,rgba(4,13,28,0.84)_100%)]" />
-      <div className="absolute left-[8%] top-[18%] h-64 w-64 rounded-full bg-[#F47721]/10 blur-3xl" />
+      <div className="absolute left-[8%] top-[18%] h-64 w-64 rounded-full bg-[#29ABE2]/10 blur-3xl" />
       <div className="absolute right-[10%] bottom-[12%] h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-6 py-10">
@@ -140,13 +140,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
             <section className="mx-auto max-w-5xl text-center lg:text-left">
               <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:gap-8">
                 <img
-                  src="/accountech-logo.png"
-                  alt="Accountech logo"
-                  className="h-24 w-24 object-contain drop-shadow-[0_12px_30px_rgba(0,0,0,0.45)] md:h-36 md:w-36"
+                  src="/at-erp-logo.svg"
+                  alt="AT-ERP logo"
+                  className="h-24 w-24 object-contain drop-shadow-[0_12px_36px_rgba(41,171,226,0.55)] md:h-36 md:w-36"
                 />
                 <div className="text-center md:text-left">
                   <h1 className="text-5xl font-black leading-none tracking-tight drop-shadow-[0_12px_30px_rgba(0,0,0,0.45)] md:text-7xl">
-                    <span className="bg-gradient-to-r from-[#d8b35b] via-[#f5de9e] to-[#b78422] bg-clip-text text-transparent">
+                    <span className="bg-gradient-to-r from-[#29ABE2] via-[#6DD5FA] to-[#1565C0] bg-clip-text text-transparent">
                       Accoun
                     </span>
                     <span className="text-white">Tech.</span>
@@ -157,9 +157,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                 </div>
               </div>
 
-             
 
-              
+
+
             </section>
 
             <div className="relative w-full max-w-md justify-self-center rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-3xl md:p-8">
@@ -176,12 +176,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Identity (Email)</label>
                       <div className="relative group">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#F47721] transition-colors" size={18} />
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#29ABE2] transition-colors" size={18} />
                         <input
                           type="email"
                           required
                           placeholder="staff@institution.ph"
-                          className="w-full pl-12 pr-4 py-3.5 bg-slate-900/60 border border-white/10 rounded-xl text-slate-100 text-sm font-medium outline-none focus:ring-4 focus:ring-[#F47721]/20 focus:border-[#F47721] transition-all"
+                          className="w-full pl-12 pr-4 py-3.5 bg-slate-900/60 border border-white/10 rounded-xl text-slate-100 text-sm font-medium outline-none focus:ring-4 focus:ring-[#29ABE2]/20 focus:border-[#29ABE2] transition-all"
                           value={email}
                           onChange={e => setEmail(e.target.value)}
                         />
@@ -191,12 +191,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Access Token (Password)</label>
                       <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#F47721] transition-colors" size={18} />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#29ABE2] transition-colors" size={18} />
                         <input
                           type="password"
                           required
                           placeholder="••••••••"
-                          className="w-full pl-12 pr-4 py-3.5 bg-slate-900/60 border border-white/10 rounded-xl text-slate-100 text-sm font-medium outline-none focus:ring-4 focus:ring-[#F47721]/20 focus:border-[#F47721] transition-all"
+                          className="w-full pl-12 pr-4 py-3.5 bg-slate-900/60 border border-white/10 rounded-xl text-slate-100 text-sm font-medium outline-none focus:ring-4 focus:ring-[#29ABE2]/20 focus:border-[#29ABE2] transition-all"
                           value={password}
                           onChange={e => setPassword(e.target.value)}
                         />
@@ -213,7 +213,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
                   <button
                     disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#F47721] px-8 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(244,119,33,0.35)] transition-all hover:bg-[#E06610] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#1565C0] to-[#0D47A1] px-8 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(41,171,226,0.35)] transition-all hover:from-[#29ABE2] hover:to-[#1565C0] active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -229,7 +229,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <button
                       type="button"
                       onClick={onForgotPassword}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 transition-colors hover:text-[#F47721]"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 transition-colors hover:text-[#29ABE2]"
                     >
                       <KeyRound size={12} /> Forgot Password?
                     </button>
@@ -239,7 +239,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     <button
                       type="button"
                       onClick={() => setIsRegistering(true)}
-                      className="mx-auto inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:text-[#F47721]"
+                      className="mx-auto inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:text-[#29ABE2]"
                     >
                       <Database size={12} /> Provision New Ledger
                     </button>
@@ -267,7 +267,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                       <input
                         required
                         placeholder="e.g. Phoenix Skills Center"
-                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#29ABE2] focus:ring-4 focus:ring-[#29ABE2]/20"
                         value={regOrgName}
                         onChange={e => setRegOrgName(e.target.value)}
                       />
@@ -279,7 +279,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                         type="email"
                         required
                         placeholder="admin@center.ph"
-                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#29ABE2] focus:ring-4 focus:ring-[#29ABE2]/20"
                         value={regEmail}
                         onChange={e => setRegEmail(e.target.value)}
                       />
@@ -289,7 +289,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Currency</label>
                         <select
-                          className="w-full appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                          className="w-full appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#29ABE2] focus:ring-4 focus:ring-[#29ABE2]/20"
                           value={regCurrency}
                           onChange={e => setRegCurrency(e.target.value)}
                         >
@@ -301,7 +301,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-2">Institution</label>
                         <select
-                          className="w-full appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                          className="w-full appearance-none rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#29ABE2] focus:ring-4 focus:ring-[#29ABE2]/20"
                           value={regInstitutionType}
                           onChange={e => setRegInstitutionType(e.target.value as InstitutionType)}
                         >
@@ -317,7 +317,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                           required
                           placeholder="••••••••"
                           minLength={8}
-                          className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#F47721] focus:ring-4 focus:ring-[#F47721]/20"
+                          className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-sm font-medium text-slate-100 outline-none transition-all focus:border-[#29ABE2] focus:ring-4 focus:ring-[#29ABE2]/20"
                           value={regPassword}
                           onChange={e => setRegPassword(e.target.value)}
                         />
@@ -331,15 +331,14 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                             <ShieldCheck size={14} /> Password Strength
                           </span>
                           <span
-                            className={`text-xs font-semibold uppercase tracking-wide ${
-                              passwordStrength.strength === 'weak'
+                            className={`text-xs font-semibold uppercase tracking-wide ${passwordStrength.strength === 'weak'
                                 ? 'text-red-400'
                                 : passwordStrength.strength === 'fair'
                                   ? 'text-amber-400'
                                   : passwordStrength.strength === 'good'
                                     ? 'text-emerald-400'
                                     : 'text-orange-400'
-                            }`}
+                              }`}
                           >
                             {passwordStrength.strength}
                           </span>
@@ -366,7 +365,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
 
                   <button
                     disabled={loading}
-                    className="w-full rounded-full bg-[#F47721] px-8 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(244,119,33,0.35)] transition-all hover:bg-[#E06610] active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-full bg-gradient-to-r from-[#1565C0] to-[#0D47A1] px-8 py-3.5 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_50px_rgba(41,171,226,0.35)] transition-all hover:from-[#29ABE2] hover:to-[#1565C0] active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? 'Initializing...' : 'Launch Professional Instance'}
                   </button>

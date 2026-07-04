@@ -205,7 +205,7 @@ export interface StudentDocument {
 export interface Student extends BaseEntity {
   id: string;
   orgId: string;
-  uli: string;
+  uli?: string;
   lastName: string;
   firstName: string;
   middleName?: string;

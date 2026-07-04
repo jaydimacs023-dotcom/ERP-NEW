@@ -1082,7 +1082,7 @@ CREATE TABLE public.stock_items (
 CREATE TABLE public.students (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   org_id uuid NOT NULL,
-  uli character varying NOT NULL UNIQUE,
+  uli character varying UNIQUE,
   last_name character varying NOT NULL,
   first_name character varying NOT NULL,
   middle_name character varying,

@@ -410,7 +410,7 @@ const AssessmentRegistrationsView: React.FC<AssessmentRegistrationsViewProps> = 
                   <Field label="Candidate">
                     <select required value={formData.studentId || ''} onChange={e => setFormData(prev => ({ ...prev, studentId: e.target.value }))} className={fieldClass}>
                       <option value="">Select learner/candidate...</option>
-                      {students.map(student => <option key={student.id} value={student.id}>{student.lastName}, {student.firstName} ({student.uli})</option>)}
+                      {students.map(student => <option key={student.id} value={student.id}>{student.lastName}, {student.firstName} ({student.uli || 'No ULI'})</option>)}
                     </select>
                   </Field>
                   <Field label="Qualification">
