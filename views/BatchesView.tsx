@@ -401,7 +401,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     if (isCommencing) return;
 
     // Validate minimum 5 students
-    if (batch.studentIds.length < 5) {
+    if ((batch.studentIds?.length || 0) < 5) {
       onNotify?.('error', 'Cannot commence training. Minimum 5 students required.');
       return;
     }
@@ -1006,24 +1006,6 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     </td>
                     <td className="px-6 py-5 text-center">
                       {getStatusBadge(batch.status)}
-                      {batch.status === 'PLANNED' && batch.currentStudents >= 5 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCommenceTraining(batch);
-                          }}
-                          disabled={isCommencing === batch.id}
-                          className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-all disabled:opacity-50"
-                          title="Start Training"
-                        >
-                          {isCommencing === batch.id ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Play size={12} />
-                          )}
-                          Commence
-                        </button>
-                      )}
                       {batch.status === 'ONGOING' && (
                         <span className="ml-2 inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-brand text-xs font-semibold rounded border border-brand-light">
                           <Play size={12} /> In Progress
@@ -1039,6 +1021,22 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       <div className="flex items-center justify-end gap-1">
                         {isBatchEditable(batch) && (
                           <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCommenceTraining(batch);
+                              }}
+                              disabled={isCommencing === batch.id}
+                              className="mr-1 inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors disabled:cursor-wait disabled:opacity-50"
+                              title={(batch.studentIds?.length || 0) < 5 ? 'Minimum 5 students required to commence training' : 'Commence training'}
+                            >
+                              {isCommencing === batch.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Play size={14} />
+                              )}
+                              Commence
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1410,6 +1408,5 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 };
 
 export default BatchesView;
-
 
 

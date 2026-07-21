@@ -16,6 +16,7 @@ import { useNotifications } from './components/NotificationContext';
 import Dashboard from './views/Dashboard';
 import Ledger from './views/Ledger';
 import JournalVouchersView from './views/JournalVouchersView';
+import { APJournalVouchersView, VendorLedgerView } from './views/APLedgerAuditView';
 import Reports from './views/Reports';
 import ChartOfAccounts from './views/ChartOfAccounts';
 import LoginView from './views/LoginView';
@@ -40,6 +41,7 @@ import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
 import ARView from './views/ARView';
 import PayablesView from './views/PayablesView';
+import TimeExpensesView from './views/TimeExpensesView';
 import VendorsView from './views/VendorsView';
 import SchedulesView from './views/SchedulesView';
 import PurchaseOrdersView from './views/PurchaseOrdersView';
@@ -89,11 +91,11 @@ import UserProfileView from './views/UserProfileView';
 
 // Lucide Icons
 import {
-  LayoutDashboard, BookText, PieChart, Landmark, Users,
+  LayoutDashboard, BookOpen, BookText, PieChart, Landmark, Users,
   Award, GraduationCap, Layers, MapPin, Handshake,
   Truck, Box, CalendarClock, ShoppingCart, ShieldCheck,
   History, UserCog, Settings, Palette, CreditCard,
-  Binary, Terminal, Receipt, Calculator, Briefcase,
+  Binary, Terminal, Receipt, ReceiptText, Calculator, Briefcase,
   LogOut, Menu, X, PlusCircle, Building2, Wrench,
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
@@ -174,7 +176,7 @@ export default function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   // Navigation section state
-  const [openSections, setOpenSections] = useState<{ financial: boolean; operations: boolean; registries: boolean; inventory: boolean; administration: boolean }>({ financial: true, operations: true, registries: true, inventory: true, administration: true });
+  const [openSections, setOpenSections] = useState<{ financial: boolean; apReports: boolean; ledgerAudit: boolean; operations: boolean; registries: boolean; purchases: boolean; inventory: boolean; administration: boolean }>({ financial: true, apReports: true, ledgerAudit: true, operations: true, registries: true, purchases: true, inventory: true, administration: true });
 
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -1603,6 +1605,16 @@ export default function App() {
 
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
+
+  useEffect(() => {
+    if (
+      currentUser &&
+      (activeTab === 'sponsors' || activeTab === 'payroll' || activeTab === 'reports') &&
+      !canAccess(currentUser.role, activeTab)
+    ) {
+      setActiveTab(getDefaultTab(currentUser.role));
+    }
+  }, [activeTab, currentUser]);
 
   // ============================================================================
   // PAYMENT DUE NOTIFICATION FOR TENANT ADMIN (5 days before due)
@@ -6790,9 +6802,7 @@ export default function App() {
               compact={!sidebarOpen}
             >
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
-              {userCanAccess('journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
-              <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('reports') && <NavItem icon={<PieChart size={18} />} label="Reports" active={activeTab === 'reports'} onClick={() => navigateTo('reports')} compact={!sidebarOpen} brandColor={brandColor} />}
               <NavItem icon={<Landmark size={18} />} label="Cash Management" active={activeTab === 'banking'} onClick={() => navigateTo('banking')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Printer size={18} />} label="Check Printing" active={activeTab === 'checks'} onClick={() => navigateTo('checks')} compact={!sidebarOpen} brandColor={brandColor} />
               {userCanAccess('ar') && <NavItem icon={<Receipt size={18} />} label="Accounts Receivable" active={activeTab === 'ar'} onClick={() => navigateTo('ar')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -6803,10 +6813,34 @@ export default function App() {
               {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('enrollments') && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => navigateTo('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="Accounts Payable" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('po') && <NavItem icon={<ShoppingCart size={18} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => navigateTo('po')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('goods-receipt') && <NavItem icon={<Package size={18} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => navigateTo('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
-              <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => navigateTo('payroll')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="AP BILLS" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('time-expenses') && <NavItem icon={<ReceiptText size={18} />} label="Time & Expenses" active={activeTab === 'time-expenses'} onClick={() => navigateTo('time-expenses')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('payroll') && <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => navigateTo('payroll')} compact={!sidebarOpen} brandColor={brandColor} />}
+            </NavSection>
+          )}
+
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
+            <NavSection
+              label="Ledger & Audit"
+              isOpen={openSections.ledgerAudit}
+              onToggle={() => setOpenSections(prev => ({ ...prev, ledgerAudit: !prev.ledgerAudit }))}
+              compact={!sidebarOpen}
+            >
+              {userCanAccess('ledger') && <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('ap-journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="AP Journal Vouchers" active={activeTab === 'ap-journal-vouchers'} onClick={() => navigateTo('ap-journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('vendor-ledger') && <NavItem icon={<BookOpen size={18} />} label="Vendor Ledger" active={activeTab === 'vendor-ledger'} onClick={() => navigateTo('vendor-ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
+            </NavSection>
+          )}
+
+          {isAP && userCanAccess('ap-aging-report') && (
+            <NavSection
+              label="AP Reports"
+              isOpen={openSections.apReports}
+              onToggle={() => setOpenSections(prev => ({ ...prev, apReports: !prev.apReports }))}
+              compact={!sidebarOpen}
+            >
+              <NavItem icon={<BarChart2 size={18} />} label="AP AGING REPORT" active={activeTab === 'ap-aging-report'} onClick={() => navigateTo('ap-aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -6836,10 +6870,22 @@ export default function App() {
               onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
               compact={!sidebarOpen}
             >
-              <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => navigateTo('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Truck size={20} />} label="Vendors" active={activeTab === 'vendors'} onClick={() => navigateTo('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Tag size={20} />} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => navigateTo('items')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<Box size={20} />} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => navigateTo('assets')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('sponsors') && <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => navigateTo('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />}
+              <NavItem icon={<Truck size={20} />} label="VENDORS LIST" active={activeTab === 'vendors'} onClick={() => navigateTo('vendors')} compact={!sidebarOpen} brandColor={brandColor} />
+            </NavSection>
+          )}
+
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
+            <NavSection
+              label="Purchases"
+              isOpen={openSections.purchases}
+              onToggle={() => setOpenSections(prev => ({ ...prev, purchases: !prev.purchases }))}
+              compact={!sidebarOpen}
+            >
+              {userCanAccess('po') && <NavItem icon={<ShoppingCart size={20} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => navigateTo('po')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('goods-receipt') && <NavItem icon={<Package size={20} />} label="Goods Receipt" active={activeTab === 'goods-receipt'} onClick={() => navigateTo('goods-receipt')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('items') && <NavItem icon={<Tag size={20} />} label="Item Catalog (Non-Stock)" active={activeTab === 'items'} onClick={() => navigateTo('items')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('assets') && <NavItem icon={<Box size={20} />} label="Fixed Assets" active={activeTab === 'assets'} onClick={() => navigateTo('assets')} compact={!sidebarOpen} brandColor={brandColor} />}
             </NavSection>
           )}
 
@@ -7105,7 +7151,25 @@ export default function App() {
               }}
             />
           )}
-          {activeTab === 'reports' && <Reports orgId={currentOrgId} summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
+          {activeTab === 'ap-journal-vouchers' && userCanAccess('ap-journal-vouchers') && (
+            <APJournalVouchersView
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency}
+            />
+          )}
+          {activeTab === 'vendor-ledger' && userCanAccess('vendor-ledger') && (
+            <VendorLedgerView
+              entries={activeJournalEntries}
+              lines={filteredLines}
+              vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)}
+              accounts={filteredAccounts}
+              currency={currentOrg?.currency}
+            />
+          )}
+          {activeTab === 'reports' && userCanAccess('reports') && <Reports orgId={currentOrgId} summaries={summaries} accounts={filteredAccounts} entries={postedJournalEntries} lines={postedLines} qualifications={qualifications} batches={batches} orgName={currentOrg?.name} currency={currentOrg?.currency} logoUrl={currentOrg?.logoUrl} />}
           {activeTab === 'collection-report' && (
             <ARCollectionReportView
               payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
@@ -7123,14 +7187,16 @@ export default function App() {
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
-          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentOrgId} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
+          {activeTab === 'ap-aging-report' && userCanAccess('ap-aging-report') && <PayablesView view="aging" orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView orgId={currentOrgId} purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
           {activeTab === 'coa' && <ChartOfAccounts accounts={filteredAccounts} lines={postedLines} qualifications={qualifications} onAddAccount={handleAddAccount} onUpdateAccount={handleUpdateAccount} onDeleteAccount={handleDeleteAccount} />}
           {activeTab === 'periods' && <PeriodClosingView orgId={currentOrgId} periods={accountingPeriods} payables={payables} entries={activeJournalEntries} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreatePeriod={async (p) => { try { const service = DataServiceFactory.getService(); const periodWithOrgAndUser = { ...p, orgId: currentOrgId, createdBy: currentUser?.id }; const created = await service.createAccountingPeriod(periodWithOrgAndUser); setAccountingPeriods(prev => [...prev, created]); handleNotify('success', 'Period created successfully'); } catch (error) { console.error('Error creating period:', error); handleNotify('error', 'Failed to create period'); } }} onUpdatePeriod={async (id, u) => { try { const service = DataServiceFactory.getService(); const updated = await service.updateAccountingPeriod(id, u); setAccountingPeriods(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p)); handleNotify('success', 'Period updated successfully'); } catch (error) { console.error('Error updating period:', error); handleNotify('error', 'Failed to update period'); } }} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'items' && <ItemsView items={items.filter(i => i.orgId === currentOrgId && !i.isDeleted)} accounts={filteredAccounts} onAddItem={handleAddItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} />}
-          {activeTab === 'sponsors' && (
+          {activeTab === 'sponsors' && userCanAccess('sponsors') && (
             <SponsorsView
               orgId={currentOrgId}
               sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
@@ -7168,7 +7234,7 @@ export default function App() {
           )}
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} organization={currentOrg} />}
 
-          {activeTab === 'payroll' && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
+          {activeTab === 'payroll' && userCanAccess('payroll') && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
           {activeTab === 'students' && <StudentsView orgId={currentOrgId} students={students.filter(s => s.orgId === currentOrgId)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
           {activeTab === 'trainers' && <TrainersView organization={currentOrg} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView organization={currentOrg} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}

@@ -8,7 +8,7 @@ import {
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
   CourseFee, AlumniEmploymentReport, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
-  FeedbackTicket, InventoryClass, OpeningInventoryDocument
+  FeedbackTicket, InventoryClass, OpeningInventoryDocument, TimeExpense
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -264,6 +264,12 @@ export interface IDataService {
   createPayable(payable: Payable): Promise<Payable>;
   updatePayable(id: string, updates: Partial<Payable>): Promise<Payable>;
   deletePayable(id: string): Promise<void>;
+
+  // Time & Expenses CRUD
+  getTimeExpensesByOrg(orgId: string): Promise<TimeExpense[]>;
+  createTimeExpense(expense: TimeExpense): Promise<TimeExpense>;
+  updateTimeExpense(id: string, updates: Partial<TimeExpense>): Promise<TimeExpense>;
+  deleteTimeExpense(id: string): Promise<void>;
 
   // Check Voucher CRUD
   createCheckVoucher(check: CheckVoucher): Promise<CheckVoucher>;

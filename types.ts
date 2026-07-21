@@ -439,6 +439,7 @@ export interface Payable extends BaseEntity {
   purchaseOrderId?: string;
   goodsReceiptId?: string;
   expenseAccountId?: string;
+  qualificationId?: string;
   inputVatAmount?: number;
   inputVatAccountId?: string;
   departmentId?: string;
@@ -459,6 +460,24 @@ export interface Payable extends BaseEntity {
   reversalJournalId?: string;
   // Period control
   periodId?: string;
+}
+
+export type TimeExpenseStatus = 'open' | 'billed';
+
+export interface TimeExpense extends BaseEntity {
+  id: string;
+  orgId: string;
+  rfqCode: string;
+  transactionDate: string;
+  description: string;
+  amount: number;
+  supplierId: string;
+  claimedBy: string;
+  status: TimeExpenseStatus;
+  payableId?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface FixedAsset extends BaseEntity {

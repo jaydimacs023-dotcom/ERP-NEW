@@ -600,7 +600,7 @@ const VendorsView: React.FC<VendorsViewProps> = ({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">
-            Vendor Master Registry
+            VENDORS LIST
           </h2>
           <p className="text-sm text-gray-500 font-normal italic">Manage procurement partners, payment terms, and track outstanding payables.</p>
         </div>

@@ -442,7 +442,7 @@ export class SupabaseDataService implements IDataService {
       'rate', 'total', 'subtotal', 'tax', 'vat', 'discount', 'net', 'gross', 'fee', 'charge',
       'cost', 'value', 'salary', 'hours', 'overtime', 'deductions', 'contributions', 'netPay', 'net_pay',
       'withholding_amount', 'withholdingAmount', 'applied_rate_percent', 'appliedRatePercent',
-      'net_payable', 'netPayable', 'capacity', 'limit', 'ewt_rate', 'ewtRate',
+      'net_payable', 'netPayable', 'paid_amount', 'paidAmount', 'capacity', 'limit', 'ewt_rate', 'ewtRate',
       'net_amount', 'netAmount', 'vat_amount', 'vatAmount', 'gross_amount', 'grossAmount'
     ]);
 
@@ -835,12 +835,17 @@ export class SupabaseDataService implements IDataService {
       fixed_assets: ['id', 'org_id', 'code', 'name', 'description', 'category', 'purchase_date', 'purchase_cost', 'accumulated_depreciation', 'depreciation_method', 'useful_life_years', 'gl_account_id', 'created_at', 'updated_at'],
       items: ['id', 'org_id', 'code', 'name', 'description', 'unit_price', 'income_account_id', 'expense_account_id', 'tax_category_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at', 'deleted_by'],
       payables: [
-        'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'description', 'amount',
+        'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'qualification_id', 'description', 'amount',
         'bill_date', 'due_date', 'payment_date', 'currency', 'status', 'reference_document',
-        'journal_entry_id', 'gl_account_id', 'notes', 'withholding_type', 'atc_item_id',
-        'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable',
+        'journal_entry_id', 'gl_account_id', 'expense_account_id', 'notes', 'withholding_type', 'atc_item_id',
+        'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable', 'paid_amount',
         'created_by', 'approved_by', 'paid_by', 'created_at', 'updated_at', 'approved_at',
         'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
+      time_expenses: [
+        'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'amount',
+        'supplier_id', 'claimed_by', 'status', 'payable_id', 'created_by',
+        'created_at', 'updated_at'
       ],
       check_vouchers: [
         'id', 'org_id', 'check_number', 'bank_account_id', 'payee_id', 'payee_type', 'payee_name',
@@ -930,6 +935,7 @@ export class SupabaseDataService implements IDataService {
       fixed_assets: ['net_book_value', 'created_at', 'updated_at'],
       items: ['created_at', 'updated_at'],
       payables: ['id', 'created_at', 'updated_at', 'approved_at', 'paid_at'],
+      time_expenses: ['id', 'created_at', 'updated_at'],
       check_vouchers: ['id', 'created_at', 'updated_at'],
       course_fees: ['id', 'created_at', 'updated_at'],
       assessment_registrations: ['id', 'created_at', 'updated_at'],
@@ -2717,6 +2723,7 @@ export class SupabaseDataService implements IDataService {
     // Convert empty strings to null for UUID columns
     if (snake.vendor_id === '') snake.vendor_id = null;
     if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.expense_account_id === '') snake.expense_account_id = null;
     if (snake.journal_entry_id === '') snake.journal_entry_id = null;
     if (snake.atc_item_id === '') snake.atc_item_id = null;
     if (snake.atc_rate_id === '') snake.atc_rate_id = null;
@@ -2735,6 +2742,7 @@ export class SupabaseDataService implements IDataService {
     // Convert empty strings to null for UUID columns
     if (snake.vendor_id === '') snake.vendor_id = null;
     if (snake.gl_account_id === '') snake.gl_account_id = null;
+    if (snake.expense_account_id === '') snake.expense_account_id = null;
     if (snake.journal_entry_id === '') snake.journal_entry_id = null;
     if (snake.atc_item_id === '') snake.atc_item_id = null;
     if (snake.atc_rate_id === '') snake.atc_rate_id = null;
@@ -2745,6 +2753,25 @@ export class SupabaseDataService implements IDataService {
 
   async deletePayable(id: string): Promise<void> {
     return this.deleteFromSupabase('payables', id);
+  }
+
+  async getTimeExpensesByOrg(orgId: string): Promise<any[]> {
+    const rows = await this.fetchFromSupabase<any>('time_expenses');
+    return rows.map(row => this.snakeToCamel(row)).filter(row => row.orgId === orgId);
+  }
+
+  async createTimeExpense(expense: any): Promise<any> {
+    const filtered = this.filterToTableSchema('time_expenses', this.camelToSnake(expense), true);
+    return this.snakeToCamel(await this.insertToSupabaseRaw<any>('time_expenses', filtered));
+  }
+
+  async updateTimeExpense(id: string, updates: any): Promise<any> {
+    const filtered = this.filterToTableSchema('time_expenses', this.camelToSnake(updates));
+    return this.snakeToCamel(await this.updateInSupabaseRaw<any>('time_expenses', id, filtered));
+  }
+
+  async deleteTimeExpense(id: string): Promise<void> {
+    return this.deleteFromSupabase('time_expenses', id);
   }
 
   // ============================================================================
