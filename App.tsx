@@ -2637,7 +2637,7 @@ export default function App() {
     try {
       console.info('[App] Deleting payable:', id);
       const existing = payables.find(p => p.id === id);
-      await dataService.deletePayable(id);
+      await dataService.deletePayable(id, currentUser?.id);
       setPayables(prev => prev.filter(p => p.id !== id));
 
       // Audit: Payable deleted
@@ -2646,9 +2646,8 @@ export default function App() {
       handleNotify('success', 'Payable deleted successfully');
     } catch (error) {
       console.error('[App] Error deleting payable:', error);
-      handleNotify('error', 'Failed to delete payable. Falling back to memory storage.');
-      // Fallback to memory storage (soft delete)
-      setPayables(prev => prev.map(p => p.id === id ? { ...p, isDeleted: true, deletedAt: new Date().toISOString(), deletedBy: currentUser?.id } : p));
+      handleNotify('error', 'Failed to delete payable.');
+      throw error;
     }
   };
 

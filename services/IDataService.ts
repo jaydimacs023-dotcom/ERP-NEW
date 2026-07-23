@@ -263,7 +263,7 @@ export interface IDataService {
   // Payables CRUD
   createPayable(payable: Payable): Promise<Payable>;
   updatePayable(id: string, updates: Partial<Payable>): Promise<Payable>;
-  deletePayable(id: string): Promise<void>;
+  deletePayable(id: string, deletedBy?: string): Promise<void>;
 
   // Time & Expenses CRUD
   getTimeExpensesByOrg(orgId: string): Promise<TimeExpense[]>;

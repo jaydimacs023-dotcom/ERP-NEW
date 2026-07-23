@@ -2751,8 +2751,12 @@ export class SupabaseDataService implements IDataService {
     return this.updateInSupabaseRaw('payables', id, filtered);
   }
 
-  async deletePayable(id: string): Promise<void> {
-    return this.deleteFromSupabase('payables', id);
+  async deletePayable(id: string, deletedBy?: string): Promise<void> {
+    await this.updateInSupabaseRaw('payables', id, {
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: deletedBy || null,
+    });
   }
 
   async getTimeExpensesByOrg(orgId: string): Promise<any[]> {

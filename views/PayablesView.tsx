@@ -33,7 +33,7 @@ interface PayablesViewProps {
   currentUserId?: string;
   onCreatePayable: (payable: Payable) => Payable | Promise<Payable>;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
-  onDeletePayable: (id: string) => void;
+  onDeletePayable: (id: string) => void | Promise<void>;
   onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => JournalEntry | null | Promise<JournalEntry | null>;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
@@ -915,7 +915,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const payable = [...serverPayables, ...orgPayables].find(p => p.id === id);
     if (payable?.status === 'paid') {
       onNotify('error', 'Cannot delete a paid payable.');
@@ -926,10 +926,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       return;
     }
 
-    onDeletePayable(id);
-    setRefreshKey(key => key + 1);
-    onNotify('success', 'Payable deleted successfully.');
-    setConfirmDelete(null);
+    try {
+      await onDeletePayable(id);
+      setServerPayables(current => current.filter(item => item.id !== id));
+      setServerTotal(current => Math.max(0, current - 1));
+      setRefreshKey(key => key + 1);
+      setConfirmDelete(null);
+    } catch {
+      // App-level handler reports the persistence error.
+    }
   };
 
   const handleStatusChange = (id: string, newStatus: PayableStatus) => {

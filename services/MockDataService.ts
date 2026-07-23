@@ -355,7 +355,7 @@ export class MockDataService implements IDataService {
     console.warn('[MockDataService] updatePayable is memory-only.');
     return { id, ...updates };
   }
-  async deletePayable(id: string): Promise<void> {
+  async deletePayable(id: string, _deletedBy?: string): Promise<void> {
     console.warn('[MockDataService] deletePayable is memory-only.');
   }
 
