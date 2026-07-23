@@ -396,7 +396,7 @@ export interface Bill extends BaseEntity {
   updatedAt?: string;
 }
 
-export type PayableCategory = 'utilities' | 'supplies' | 'training_materials' | 'contractor_services' | 'assessments' | 'insurance' | 'government_obligations' | 'scholarship_advances' | 'employee_reimbursements' | 'general' | 'other';
+export type PayableCategory = 'utilities' | 'supplies' | 'training_materials' | 'contractor_services' | 'assessments' | 'insurance' | 'government_obligations' | 'scholarship_advances' | 'employee_reimbursements' | 'other';
 
 export type PayableStatus = 'for_approval' | 'approved' | 'paid' | 'partially_paid' | 'cancelled';
 
@@ -470,7 +470,10 @@ export interface TimeExpense extends BaseEntity {
   rfqCode: string;
   transactionDate: string;
   description: string;
+  quantity: number;
+  unitCost: number;
   amount: number;
+  expenseAccountId?: string;
   supplierId: string;
   claimedBy: string;
   status: TimeExpenseStatus;

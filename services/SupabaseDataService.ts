@@ -843,7 +843,7 @@ export class SupabaseDataService implements IDataService {
         'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
       ],
       time_expenses: [
-        'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'amount',
+        'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'quantity', 'unit_cost', 'amount', 'expense_account_id',
         'supplier_id', 'claimed_by', 'status', 'payable_id', 'created_by',
         'created_at', 'updated_at'
       ],
@@ -2756,22 +2756,42 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getTimeExpensesByOrg(orgId: string): Promise<any[]> {
-    const rows = await this.fetchFromSupabase<any>('time_expenses');
-    return rows.map(row => this.snakeToCamel(row)).filter(row => row.orgId === orgId);
+    const result = await this.timeExpenseRequest('list', { orgId });
+    return this.snakeToCamel(result.expenses || []);
   }
 
   async createTimeExpense(expense: any): Promise<any> {
     const filtered = this.filterToTableSchema('time_expenses', this.camelToSnake(expense), true);
-    return this.snakeToCamel(await this.insertToSupabaseRaw<any>('time_expenses', filtered));
+    if (!filtered.org_id) {
+      throw new Error('An organization is required to create an expense.');
+    }
+    const result = await this.timeExpenseRequest('create', { orgId: filtered.org_id, expense });
+    return this.snakeToCamel(result.expense);
   }
 
   async updateTimeExpense(id: string, updates: any): Promise<any> {
-    const filtered = this.filterToTableSchema('time_expenses', this.camelToSnake(updates));
-    return this.snakeToCamel(await this.updateInSupabaseRaw<any>('time_expenses', id, filtered));
+    const result = await this.timeExpenseRequest('update', { id, updates });
+    return this.snakeToCamel(result.expense);
   }
 
   async deleteTimeExpense(id: string): Promise<void> {
-    return this.deleteFromSupabase('time_expenses', id);
+    await this.timeExpenseRequest('delete', { id });
+  }
+
+  private async timeExpenseRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/time-expenses-write`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Time expense request failed');
+    return result;
   }
 
   // ============================================================================

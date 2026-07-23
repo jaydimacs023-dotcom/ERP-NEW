@@ -390,6 +390,9 @@ verify_jwt = false
 [functions.journal-vouchers]
 verify_jwt = false
 
+[functions.time-expenses-write]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

@@ -50,7 +50,6 @@ const PAYABLE_CATEGORIES: { value: PayableCategory; label: string }[] = [
   { value: 'government_obligations', label: 'Government Obligations' },
   { value: 'scholarship_advances', label: 'Scholarship Advances' },
   { value: 'employee_reimbursements', label: 'Employee Reimbursements' },
-  { value: 'general', label: 'General' },
   { value: 'other', label: 'Other' },
 ];
 

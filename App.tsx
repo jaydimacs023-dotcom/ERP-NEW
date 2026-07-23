@@ -420,10 +420,14 @@ export default function App() {
     const session = authService.getSession();
     if (session) {
       setCurrentUser(session.user);
-      setCurrentOrgId(session.user.orgId);
+      const restoredOrgId = session.user.orgId
+        || (session.user.role === 'SYSTEM_ADMIN'
+          ? organizations.find(org => !org.isDeleted)?.id || ''
+          : '');
+      setCurrentOrgId(current => current || restoredOrgId);
       console.info('[App] Restored user session:', session.user.email);
     }
-  }, []);
+  }, [organizations]);
 
   // Logout handler
   const handleLogout = async () => {
@@ -1661,7 +1665,9 @@ export default function App() {
 
     setSuspensionBanner(null);
     setCurrentUser(user);
-    setCurrentOrgId(user.orgId || ''); // Empty string for system admin if no org
+    const loginOrgId = user.orgId
+      || (isSystemAdmin ? organizations.find(organization => !organization.isDeleted)?.id || '' : '');
+    setCurrentOrgId(loginOrgId);
     // Store session for persistence
     const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
     localStorage.setItem('at_erp_session', JSON.stringify(session));
@@ -7188,7 +7194,7 @@ export default function App() {
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentOrgId} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
+          {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId || ''} vendors={vendors.filter(v => v.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !v.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
           {activeTab === 'ap-aging-report' && userCanAccess('ap-aging-report') && <PayablesView view="aging" orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView orgId={currentOrgId} purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
