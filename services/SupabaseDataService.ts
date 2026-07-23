@@ -2724,6 +2724,7 @@ export class SupabaseDataService implements IDataService {
     if (snake.vendor_id === '') snake.vendor_id = null;
     if (snake.gl_account_id === '') snake.gl_account_id = null;
     if (snake.expense_account_id === '') snake.expense_account_id = null;
+    if (snake.qualification_id === '') snake.qualification_id = null;
     if (snake.journal_entry_id === '') snake.journal_entry_id = null;
     if (snake.atc_item_id === '') snake.atc_item_id = null;
     if (snake.atc_rate_id === '') snake.atc_rate_id = null;
@@ -2743,6 +2744,7 @@ export class SupabaseDataService implements IDataService {
     if (snake.vendor_id === '') snake.vendor_id = null;
     if (snake.gl_account_id === '') snake.gl_account_id = null;
     if (snake.expense_account_id === '') snake.expense_account_id = null;
+    if (snake.qualification_id === '') snake.qualification_id = null;
     if (snake.journal_entry_id === '') snake.journal_entry_id = null;
     if (snake.atc_item_id === '') snake.atc_item_id = null;
     if (snake.atc_rate_id === '') snake.atc_rate_id = null;
