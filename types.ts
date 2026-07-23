@@ -439,6 +439,14 @@ export interface Payable extends BaseEntity {
   purchaseOrderId?: string;
   goodsReceiptId?: string;
   expenseAccountId?: string;
+  claimedBy?: string;
+  expenseAllocations?: Array<{
+    expenseAccountId: string;
+    qualificationId?: string;
+    amount: number;
+    description?: string;
+    sourceExpenseId?: string;
+  }>;
   qualificationId?: string;
   inputVatAmount?: number;
   inputVatAccountId?: string;
@@ -474,7 +482,8 @@ export interface TimeExpense extends BaseEntity {
   unitCost: number;
   amount: number;
   expenseAccountId?: string;
-  supplierId: string;
+  supplierId?: string;
+  supplierName: string;
   claimedBy: string;
   status: TimeExpenseStatus;
   payableId?: string;

@@ -837,14 +837,14 @@ export class SupabaseDataService implements IDataService {
       payables: [
         'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'qualification_id', 'description', 'amount',
         'bill_date', 'due_date', 'payment_date', 'currency', 'status', 'reference_document',
-        'journal_entry_id', 'gl_account_id', 'expense_account_id', 'notes', 'withholding_type', 'atc_item_id',
+        'journal_entry_id', 'gl_account_id', 'expense_account_id', 'expense_allocations', 'claimed_by', 'notes', 'withholding_type', 'atc_item_id',
         'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable', 'paid_amount',
         'created_by', 'approved_by', 'paid_by', 'created_at', 'updated_at', 'approved_at',
         'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
       ],
       time_expenses: [
         'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'quantity', 'unit_cost', 'amount', 'expense_account_id',
-        'supplier_id', 'claimed_by', 'status', 'payable_id', 'created_by',
+        'supplier_id', 'supplier_name', 'claimed_by', 'status', 'payable_id', 'created_by',
         'created_at', 'updated_at'
       ],
       check_vouchers: [

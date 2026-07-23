@@ -90,9 +90,14 @@ const formatPayableDate = (value?: string) => {
 };
 
 const PAGE_SIZE = 10;
-const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualification_id,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,expense_account_id,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,paid_amount,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
+const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualification_id,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,expense_account_id,expense_allocations,claimed_by,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,paid_amount,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
 
 const getPayableOutstanding = (payable: Payable) => Math.max(0, (payable.netPayable || payable.amount) - (payable.paidAmount || 0));
+const getPayableClaimant = (payable: Payable) => {
+  if (payable.claimedBy?.trim()) return payable.claimedBy.trim();
+  const claimant = payable.notes?.match(/(?:Reimburse|Claimed by):\s*([^\r\n]+)/i)?.[1]?.trim();
+  return claimant || '—';
+};
 
 const PayablesView: React.FC<PayablesViewProps> = ({
   view = 'bills',
@@ -158,6 +163,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     referenceDocument: '',
     glAccountId: '',
     expenseAccountId: '',
+    claimedBy: '',
     notes: '',
     withholdingType: undefined,
     appliedRatePercent: 0,
@@ -605,6 +611,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       referenceDocument: '',
       glAccountId: '',
       expenseAccountId: '',
+      claimedBy: '',
       notes: '',
       withholdingType: undefined,
       appliedRatePercent: 0,
@@ -643,6 +650,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       referenceDocument: payable.referenceDocument || '',
       glAccountId: payable.glAccountId || '',
       expenseAccountId: payable.expenseAccountId || '',
+      expenseAllocations: payable.expenseAllocations || [],
+      claimedBy: payable.claimedBy || getPayableClaimant(payable).replace(/^—$/, ''),
       notes: payable.notes || '',
       withholdingType: payable.withholdingType,
       appliedRatePercent: payable.appliedRatePercent || 0,
@@ -803,8 +812,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       onNotify('error', 'Please select an expense account.');
       return;
     }
-    if (!formData.qualificationId) {
+    if (!formData.qualificationId && !formData.expenseAllocations?.length) {
       onNotify('error', 'Please select a class.');
+      return;
+    }
+    const allocationTotal = (formData.expenseAllocations || []).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+    if (formData.expenseAllocations?.some(allocation => !allocation.expenseAccountId || !allocation.qualificationId || !(Number(allocation.amount) > 0))) {
+      onNotify('error', 'Every consolidated expense line requires an expense account, class, and amount greater than zero.');
       return;
     }
 
@@ -834,13 +848,15 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       journalEntryId: undefined,
       glAccountId: apAccountId,
       expenseAccountId: formData.expenseAccountId,
+      expenseAllocations: formData.expenseAllocations,
+      claimedBy: formData.claimedBy?.trim() || undefined,
       notes: formData.notes,
       withholdingType: formData.withholdingType,
       atcItemId: undefined,
       atcRateId: undefined,
       appliedRatePercent: formData.appliedRatePercent,
       withholdingAmount: formData.withholdingAmount,
-      netPayable: formData.netPayable,
+      netPayable: formData.expenseAllocations?.length ? allocationTotal : formData.netPayable,
       invoiceType: formData.invoiceType,
       inputVatAmount: formData.inputVatAmount,
       createdBy: currentUserId,
@@ -878,8 +894,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       onNotify('error', 'Please enter a valid amount.');
       return;
     }
-    if (!formData.qualificationId) {
+    if (!formData.qualificationId && !formData.expenseAllocations?.length) {
       onNotify('error', 'Please select a class.');
+      return;
+    }
+    const allocationTotal = (formData.expenseAllocations || []).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+    if (formData.expenseAllocations?.some(allocation => !allocation.expenseAccountId || !allocation.qualificationId || !(Number(allocation.amount) > 0))) {
+      onNotify('error', 'Every consolidated expense line requires an expense account, class, and amount greater than zero.');
       return;
     }
 
@@ -889,7 +910,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       category: formData.category as PayableCategory,
       qualificationId: formData.qualificationId,
       description: formData.description,
-      amount: formData.amount,
+      amount: formData.expenseAllocations?.length ? allocationTotal : formData.amount,
       billDate: formData.billDate,
       dueDate: formData.dueDate,
       currency: formData.currency,
@@ -897,11 +918,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       referenceDocument: formData.referenceDocument,
       glAccountId: formData.glAccountId,
       expenseAccountId: formData.expenseAccountId,
+      expenseAllocations: formData.expenseAllocations,
+      claimedBy: formData.claimedBy?.trim() || undefined,
       notes: formData.notes,
       withholdingType: formData.withholdingType,
       appliedRatePercent: formData.appliedRatePercent,
       withholdingAmount: formData.withholdingAmount,
-      netPayable: formData.netPayable,
+      netPayable: formData.expenseAllocations?.length ? allocationTotal : formData.netPayable,
       invoiceType: formData.invoiceType,
       inputVatAmount: formData.inputVatAmount,
       updatedAt: new Date().toISOString(),
@@ -971,13 +994,29 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
     const vendor = orgVendors.find(v => v.id === payableToPost.vendorId);
     const expenseAccount = orgAccounts.find(a => a.id === payableToPost.expenseAccountId);
+    const expenseAllocations = payableToPost.expenseAllocations || [];
+    const allocatedTotal = expenseAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+    const invalidAllocation = expenseAllocations.find(allocation =>
+      !allocation.expenseAccountId
+      || !allocation.qualificationId
+      || !(Number(allocation.amount) > 0)
+      || !orgAccounts.some(account => account.id === allocation.expenseAccountId && account.class === 'EXPENSE' && !account.isHeader)
+    );
     const apAccount = orgAccounts.find(a => a.id === payableToPost.glAccountId) || apControlAccount;
 
     if (!apAccount) {
       onNotify('error', 'AP Control Account not found. Please set up your chart of accounts.');
       return;
     }
-    if (!expenseAccount && payableToPost.invoiceType === 'standard') {
+    if (invalidAllocation) {
+      onNotify('error', 'One or more expense allocations use an invalid expense account or amount.');
+      return;
+    }
+    if (expenseAllocations.length && Math.abs(allocatedTotal - Number(payableToPost.amount)) > 0.01) {
+      onNotify('error', 'The consolidated expense allocations do not equal the AP Bill amount.');
+      return;
+    }
+    if (!expenseAllocations.length && !expenseAccount && payableToPost.invoiceType === 'standard') {
       onNotify('error', 'Expense Account not selected.');
       return;
     }
@@ -1005,7 +1044,22 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         contactType: 'VENDOR',
       });
 
-      if (expenseAccount) {
+      if (expenseAllocations.length) {
+        expenseAllocations.forEach((allocation, index) => {
+          lines.push({
+            id: `jl-${Date.now()}-expense-${index}`,
+            journalEntryId: '',
+            orgId,
+            accountId: allocation.expenseAccountId,
+            description: allocation.description || payableToPost.description,
+            debit: 0,
+            credit: Number(allocation.amount),
+            contactId: payableToPost.vendorId,
+            contactType: 'VENDOR',
+            classificationCode: qualifications.find(q => q.id === allocation.qualificationId)?.code,
+          });
+        });
+      } else if (expenseAccount) {
         lines.push({
           id: `jl-${Date.now()}-2`,
           journalEntryId: '',
@@ -1022,7 +1076,22 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     } else {
       // Standard Invoice Entry:
       // DR Expense
-      if (expenseAccount) {
+      if (expenseAllocations.length) {
+        expenseAllocations.forEach((allocation, index) => {
+          lines.push({
+            id: `jl-${Date.now()}-expense-${index}`,
+            journalEntryId: '',
+            orgId,
+            accountId: allocation.expenseAccountId,
+            description: allocation.description || payableToPost.description,
+            debit: Number(allocation.amount),
+            credit: 0,
+            contactId: payableToPost.vendorId,
+            contactType: 'VENDOR',
+            classificationCode: qualifications.find(q => q.id === allocation.qualificationId)?.code,
+          });
+        });
+      } else if (expenseAccount) {
         lines.push({
           id: `jl-${Date.now()}-1`,
           journalEntryId: '',
@@ -1349,7 +1418,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
               </th>
               <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Date / Due</th>
               <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Doc # / Type</th>
-              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Vendor</th>
+              <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Claimed By</th>
               <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Description</th>
               <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Amount</th>
               <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Balance</th>
@@ -1372,6 +1441,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
                   const remainingBalance = getPayableOutstanding(payable);
                   const isPosted = !!payable.journalEntryId;
+                  const claimant = getPayableClaimant(payable);
 
                   return (
                     <tr key={payable.id} className="hover:bg-gray-50 transition-colors group">
@@ -1407,11 +1477,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand border border-brand-light flex items-center justify-center font-bold text-xs">
-                            {getVendorName(payable.vendorId).charAt(0)}
+                            {claimant === '—' ? '—' : claimant.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">{getVendorName(payable.vendorId)}</p>
-                            <p className="text-xs text-gray-500">{getCategoryLabel(payable)}</p>
+                            <p className="text-sm font-semibold text-gray-800">{claimant}</p>
+                            <p className="text-xs text-gray-500">{payable.expenseAllocations?.length ? `${payable.expenseAllocations.length} consolidated expense${payable.expenseAllocations.length === 1 ? '' : 's'}` : 'No claimant specified'}</p>
                           </div>
                         </div>
                       </td>
@@ -1477,9 +1547,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               )}
                               {payable.status === 'for_approval' && (
                                 <button
-                                  onClick={() => handleStatusChange(payable.id, 'approved')}
+                                  onClick={() => void handleApprovePayable(payable)}
                                   className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
-                                  title="Approve"
+                                  title={payable.expenseAllocations?.length ? `Approve ${payable.expenseAllocations.length} consolidated expenses` : 'Approve'}
                                 >
                                   <CheckCircle size={16} />
                                 </button>
@@ -2135,7 +2205,8 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
             </div>
           </div>
 
-          {/* Vendor Selection */}
+          {/* Vendor and claimant */}
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
               <Building size={12} /> Vendor *
@@ -2152,6 +2223,18 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
                 <option key={v.id} value={v.id}>{v.name} {v.tin ? `(${v.tin})` : ''}</option>
               ))}
             </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Claimed By</label>
+            <input
+              type="text"
+              required={!!formData.expenseAllocations?.length}
+              placeholder="Employee being reimbursed"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+              value={formData.claimedBy || ''}
+              onChange={e => setFormData(prev => ({ ...prev, claimedBy: e.target.value }))}
+            />
+          </div>
           </div>
 
           {/* Reference & Date Row */}
@@ -2193,6 +2276,7 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
           </div>
 
           {/* Expense Account & Class */}
+          {!formData.expenseAllocations?.length && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-brand uppercase tracking-wide">Expense Account *</label>
@@ -2211,7 +2295,7 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Class *</label>
               <select
-                required
+                required={!formData.expenseAllocations?.length}
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium appearance-none"
                 value={formData.qualificationId || ''}
                 onChange={e => setFormData(prev => ({ ...prev, qualificationId: e.target.value }))}
@@ -2225,6 +2309,84 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
               </select>
             </div>
           </div>
+          )}
+
+          {!!formData.expenseAllocations?.length && (
+            <div className="space-y-3 rounded-xl border border-brand-light bg-brand/5 p-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-brand">Consolidated expense lines</p>
+                <p className="text-xs text-gray-500">Each line keeps its own expense account and class, and can be adjusted before approval.</p>
+              </div>
+              <div className="space-y-2">
+                {formData.expenseAllocations.map((allocation, index) => (
+                  <div key={allocation.sourceExpenseId || index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 md:grid-cols-[1fr_1.25fr_1.1fr_8rem]">
+                    <input
+                      value={allocation.description || ''}
+                      onChange={e => setFormData(previous => ({
+                        ...previous,
+                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
+                          lineIndex === index ? { ...line, description: e.target.value } : line
+                        ),
+                      }))}
+                      className="rounded border border-gray-200 px-3 py-2 text-sm"
+                      aria-label={`Expense line ${index + 1} description`}
+                    />
+                    <select
+                      required
+                      value={allocation.expenseAccountId}
+                      onChange={e => setFormData(previous => ({
+                        ...previous,
+                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
+                          lineIndex === index ? { ...line, expenseAccountId: e.target.value } : line
+                        ),
+                      }))}
+                      className="rounded border border-brand-light bg-brand/5 px-3 py-2 text-sm font-medium"
+                      aria-label={`Expense line ${index + 1} account`}
+                    >
+                      <option value="">Select expense account</option>
+                      {expenseAccounts.map(account => <option key={account.id} value={account.id}>{account.code} - {account.name}</option>)}
+                    </select>
+                    <select
+                      required
+                      value={allocation.qualificationId || ''}
+                      onChange={e => setFormData(previous => ({
+                        ...previous,
+                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
+                          lineIndex === index ? { ...line, qualificationId: e.target.value } : line
+                        ),
+                      }))}
+                      className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium"
+                      aria-label={`Expense line ${index + 1} class`}
+                    >
+                      <option value="">Select class</option>
+                      {qualifications.map(qualification => (
+                        <option key={qualification.id} value={qualification.id}>{qualification.code} - {qualification.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      required
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={allocation.amount}
+                      onChange={e => {
+                        const amount = Number(e.target.value);
+                        setFormData(previous => {
+                          const expenseAllocations = previous.expenseAllocations?.map((line, lineIndex) =>
+                            lineIndex === index ? { ...line, amount } : line
+                          ) || [];
+                          const total = expenseAllocations.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+                          return { ...previous, expenseAllocations, amount: total, netPayable: total };
+                        });
+                      }}
+                      className="rounded border border-gray-200 px-3 py-2 text-right font-mono text-sm"
+                      aria-label={`Expense line ${index + 1} amount`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -2247,7 +2409,8 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
                 step="0.01"
                 min="0"
                 required
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
+                readOnly={!!formData.expenseAllocations?.length}
+                className={`w-full px-4 py-2.5 border border-gray-200 rounded outline-none font-mono text-sm ${formData.expenseAllocations?.length ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50'}`}
                 value={formData.amount || ''}
                 onChange={e => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
               />

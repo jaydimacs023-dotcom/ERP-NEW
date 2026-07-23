@@ -77,8 +77,8 @@ function expenseValues(input: any) {
     unit_cost: unitCost,
     amount: Math.round(quantity * unitCost * 100) / 100,
     expense_account_id: String(input.expenseAccountId ?? input.expense_account_id ?? ""),
-    supplier_id: String(input.supplierId ?? input.supplier_id ?? ""),
-    claimed_by: "Not specified",
+    supplier_name: String(input.supplierName ?? input.supplier_name ?? "").trim(),
+    claimed_by: String(input.claimedBy ?? input.claimed_by ?? "").trim(),
   };
 }
 
@@ -120,15 +120,12 @@ Deno.serve(async (request) => {
 
   if (body.action === "create") {
     const values = expenseValues(body.expense || {});
-    if (!values.rfq_code || !values.transaction_date || !values.description || !values.supplier_id || !values.expense_account_id) {
-      return json(400, { error: "RFQ code, date, description, supplier, and expense account are required" });
+    if (!values.rfq_code || !values.transaction_date || !values.description || !values.supplier_name || !values.claimed_by || !values.expense_account_id) {
+      return json(400, { error: "RFQ code, date, description, supplier, claimed by, and expense account are required" });
     }
     if (!(values.quantity > 0) || !(values.unit_cost > 0)) {
       return json(400, { error: "Quantity and unit cost must be greater than zero" });
     }
-    const { data: supplier } = await admin.from("vendors").select("id")
-      .eq("id", values.supplier_id).eq("org_id", orgId).maybeSingle();
-    if (!supplier) return json(403, { error: "Supplier is outside this organization" });
     const { data: expenseAccount } = await admin.from("chart_of_accounts")
       .select("id").eq("id", values.expense_account_id).eq("org_id", orgId)
       .eq("class", "EXPENSE").eq("is_header", false).maybeSingle();
@@ -158,15 +155,12 @@ Deno.serve(async (request) => {
       };
     } else {
       const values = expenseValues(body.updates || {});
-      if (!values.rfq_code || !values.transaction_date || !values.description || !values.supplier_id || !values.expense_account_id) {
-        return json(400, { error: "RFQ code, date, description, supplier, and expense account are required" });
+      if (!values.rfq_code || !values.transaction_date || !values.description || !values.supplier_name || !values.claimed_by || !values.expense_account_id) {
+        return json(400, { error: "RFQ code, date, description, supplier, claimed by, and expense account are required" });
       }
       if (!(values.quantity > 0) || !(values.unit_cost > 0)) {
         return json(400, { error: "Quantity and unit cost must be greater than zero" });
       }
-      const { data: supplier } = await admin.from("vendors").select("id")
-        .eq("id", values.supplier_id).eq("org_id", orgId).maybeSingle();
-      if (!supplier) return json(403, { error: "Supplier is outside this organization" });
       const { data: expenseAccount } = await admin.from("chart_of_accounts")
         .select("id").eq("id", values.expense_account_id).eq("org_id", orgId)
         .eq("class", "EXPENSE").eq("is_header", false).maybeSingle();
