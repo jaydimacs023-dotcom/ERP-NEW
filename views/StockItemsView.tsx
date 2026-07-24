@@ -191,9 +191,9 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
         safetyStock: Number(formData.safetyStock || 0),
         inventoryClassId: formData.inventoryClassId || undefined,
         standardCost: Number(formData.standardCost || 0),
-        barcode: formData.barcode.trim(),
-        brand: formData.brand.trim(),
-        category: formData.category.trim(),
+        barcode: formData.barcode.trim() || undefined,
+        brand: formData.brand.trim() || undefined,
+        category: formData.category.trim() || undefined,
         isActive: formData.isActive,
       };
 
@@ -375,17 +375,17 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
 
       {/* Constraints & Policy Banner */}
       {!showForm && (
-        <div className="bg-gray-800 rounded-md p-5 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-md relative overflow-hidden no-print border border-gray-700">
-          <div className="absolute top-0 right-0 p-12 opacity-5 translate-x-1/4 -translate-y-1/4">
+        <div className="bg-white rounded-md p-5 text-gray-800 flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm relative overflow-hidden no-print border border-gray-200">
+          <div className="absolute top-0 right-0 p-12 text-gray-200 opacity-40 translate-x-1/4 -translate-y-1/4">
             <ShieldCheck size={240} />
           </div>
           <div className="flex items-center gap-8 relative z-10">
-            <div style={{ backgroundColor: `${brandColor}10`, borderColor: `${brandColor}40` }} className="p-6 rounded-md border text-orange-400">
+            <div style={{ backgroundColor: `${brandColor}10`, borderColor: `${brandColor}40`, color: brandColor }} className="p-6 rounded-md border">
                <Package size={40} />
             </div>
             <div>
                <h4 className="text-xl font-semibold uppercase tracking-tight">Valuation Control Active</h4>
-               <p className="text-sm text-gray-400 font-medium leading-relaxed max-w-2xl italic">
+               <p className="text-sm text-gray-500 font-normal leading-relaxed max-w-2xl">
                   Inventory units are valuated using precise algorithmic models. Calibrate unit measurements and safety levels to maintain operational integrity in the production pipeline.
                </p>
             </div>
@@ -394,7 +394,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
             <button
               type="button"
               onClick={onManageQuantity}
-              className="shrink-0 relative z-10 px-6 py-4 bg-white text-gray-900 rounded text-xs font-semibold uppercase tracking-wide flex items-center gap-3 hover:bg-orange-50 transition-colors"
+              className="shrink-0 relative z-10 px-6 py-4 bg-white text-gray-700 border border-gray-200 rounded text-xs font-semibold uppercase tracking-wide flex items-center gap-3 hover:bg-gray-50 transition-colors"
             >
               Enter / Adjust Quantity
               <ArrowRight size={16} className="text-brand" />
@@ -571,42 +571,42 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                         <input type="number" min="0" step="0.0001" value={formData.standardCost} onChange={event => setFormData({ ...formData, standardCost: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
                       </label>
                       <label className="space-y-2">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Barcode</span>
-                        <input value={formData.barcode} onChange={event => setFormData({ ...formData, barcode: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Barcode <span className="font-normal normal-case text-gray-400">(Optional)</span></span>
+                        <input value={formData.barcode} onChange={event => setFormData({ ...formData, barcode: event.target.value })} placeholder="Leave blank if unavailable" className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
                       </label>
                       <label className="space-y-2">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</span>
-                        <input value={formData.brand} onChange={event => setFormData({ ...formData, brand: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand <span className="font-normal normal-case text-gray-400">(Optional)</span></span>
+                        <input value={formData.brand} onChange={event => setFormData({ ...formData, brand: event.target.value })} placeholder="Leave blank if not applicable" className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
                       </label>
                       <label className="space-y-2">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</span>
-                        <input value={formData.category} onChange={event => setFormData({ ...formData, category: event.target.value })} className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category <span className="font-normal normal-case text-gray-400">(Optional)</span></span>
+                        <input value={formData.category} onChange={event => setFormData({ ...formData, category: event.target.value })} placeholder="Leave blank if not applicable" className="w-full px-4 py-3 bg-white border border-gray-200 rounded" />
                       </label>
                     </div>
                  </div>
               </div>
 
               <div className="space-y-8">
-                 <div className="bg-gray-800 p-8 rounded border border-gray-700 shadow-sm space-y-6">
-                    <h3 className="text-xs font-semibold text-orange-400 uppercase tracking-wide flex items-center gap-2">
+                 <div className="bg-white p-8 rounded border border-gray-200 shadow-sm space-y-6">
+                    <h3 className="text-xs font-semibold text-brand uppercase tracking-wide flex items-center gap-2">
                        <Target size={14} /> Threshold Surveillance
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Reorder Level</label>
-                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                       <div className="space-y-2 text-gray-700">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Reorder Level</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800 focus:border-brand focus:ring-4 focus:ring-brand/10 placeholder:text-gray-400"
                             value={formData.reorderLevel} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, reorderLevel: e.target.value})} />
                           <p className="text-xs text-gray-400">Create a low-stock alert at this quantity.</p>
                        </div>
-                       <div className="space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Reorder Quantity</label>
-                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                       <div className="space-y-2 text-gray-700">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Reorder Quantity</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800 focus:border-brand focus:ring-4 focus:ring-brand/10 placeholder:text-gray-400"
                             value={formData.reorderQuantity} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, reorderQuantity: e.target.value})} />
                           <p className="text-xs text-gray-400">Suggested quantity for the next order.</p>
                        </div>
-                       <div className="col-span-2 space-y-2 text-white">
-                          <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide ml-1">Safety Stock</label>
-                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-gray-700 border border-gray-600 rounded outline-none font-semibold text-white focus:ring-4 focus:ring-orange-400/20 placeholder:text-gray-500"
+                       <div className="col-span-2 space-y-2 text-gray-700">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Safety Stock</label>
+                          <input type="number" min="0" step="any" inputMode="decimal" placeholder="0" className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800 focus:border-brand focus:ring-4 focus:ring-brand/10 placeholder:text-gray-400"
                             value={formData.safetyStock} onFocus={e => e.currentTarget.select()} onChange={e => setFormData({...formData, safetyStock: e.target.value})} />
                           <p className="text-xs text-gray-400 mt-2">Minimum buffer to keep available for operations.</p>
                        </div>

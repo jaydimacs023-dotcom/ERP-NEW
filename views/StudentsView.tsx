@@ -53,10 +53,10 @@ interface StudentsViewProps {
 const MANDATORY_DOCS = REQUIRED_STUDENT_DOCUMENTS;
 
 const CSV_HEADERS = [
-  'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'Contact Number',
+  'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'ULI', 'Contact Number',
   'E-mail Address', 'Street Address', 'Barangay', 'Municipality/City', 'District',
   'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status',
-  'Highest Educational Attainment', 'Nationality', 'ULI'
+  'Highest Educational Attainment', 'Nationality'
 ];
 
 const PAGE_SIZE = 7;
@@ -599,14 +599,15 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
         const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
 
         // Mapping based on MIS file format:
-        // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: Contact Number,
-        // 5: E-mail Address, 6: Street Address, 7: Barangay, 8: Municipality/City, 9: District,
-        // 10: Province, 11: Sex, 12: Date of Birth, 13: Age, 14: Civil Status, 
-        // 15: Educational Attainment, 16: Nationality, 17: ULI
+        // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: ULI,
+        // 5: Contact Number, 6: E-mail Address, 7: Street Address, 8: Barangay,
+        // 9: Municipality/City, 10: District, 11: Province, 12: Sex,
+        // 13: Date of Birth, 14: Age, 15: Civil Status, 16: Educational Attainment,
+        // 17: Nationality
         const getVal = (idx: number) => cols[idx] || '';
 
         // Parse date - handle mm-dd-yy or mm/dd/yyyy format
-        const dobRaw = getVal(12);
+        const dobRaw = getVal(13);
         let dob = '';
         if (dobRaw) {
           const dateParts = dobRaw.split(/[\/\-]/);
@@ -620,32 +621,32 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
             dob = `${year}-${month}-${day}`;
           }
         }
-        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : parseInt(getVal(13)) || 0;
+        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : parseInt(getVal(14)) || 0;
 
         studentData.push({
           id: `batch-${Date.now()}-${i}`,
           orgId: 'temp',
-          uli: getVal(17),
+          uli: getVal(4),
           lastName: getVal(0),
           firstName: getVal(1),
           middleName: getVal(2),
           extension: getVal(3),
-          sex: (getVal(11) as any) || 'Male',
+          sex: (getVal(12) as any) || 'Male',
           dateOfBirth: dob,
           age: Math.max(0, age),
           birthRegion: '',
           birthProvince: '',
           birthCity: '',
-          civilStatus: getVal(14) || 'Single',
-          educationalAttainment: getVal(15),
-          nationality: getVal(16) || 'Filipino',
-          email: getVal(5),
-          contactNumber: getVal(4),
-          street: getVal(6),
-          barangay: getVal(7),
-          city: getVal(8),
-          district: getVal(9),
-          province: getVal(10),
+          civilStatus: getVal(15) || 'Single',
+          educationalAttainment: getVal(16),
+          nationality: getVal(17) || 'Filipino',
+          email: getVal(6),
+          contactNumber: getVal(5),
+          street: getVal(7),
+          barangay: getVal(8),
+          city: getVal(9),
+          district: getVal(10),
+          province: getVal(11),
           guardian: '',
           locationId: undefined,
           sponsorId: undefined,
@@ -1511,6 +1512,21 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-5">
               <form onSubmit={handleSubmit} className="space-y-7 pb-4 [&_input]:px-3 [&_input]:py-2.5 [&_select]:px-3 [&_select]:py-2.5 [&_input]:text-sm [&_select]:text-sm">
+                <div
+                  className="flex items-start gap-3 rounded border px-4 py-3"
+                  style={{ borderColor: withAlpha(brandColor, 0.22), backgroundColor: withAlpha(brandColor, 0.055) }}
+                  role="note"
+                  aria-label="Required fields information"
+                >
+                  <AlertCircle size={17} className="mt-0.5 shrink-0" style={{ color: brandColor }} />
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      Fields marked with <span className="text-red-500" aria-hidden="true">*</span> are required
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-gray-500">Complete the required information before registering the learner.</p>
+                  </div>
+                </div>
+
                 {/* 1. Personal Identity */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-3">
@@ -1524,11 +1540,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       <input placeholder="24-XXX-XXX-XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-semibold text-brand font-mono" value={formData.uli} onChange={e => setFormData({ ...formData, uli: e.target.value })} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name <span className="text-red-500">*</span></label>
                       <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
                     </div>
                     <div className="md:col-span-3 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name <span className="text-red-500">*</span></label>
                       <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
                     </div>
                     <div className="md:col-span-2 space-y-1">
@@ -1543,7 +1559,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date <span className="text-red-500">*</span></label>
                       <input type="date" required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
                     </div>
                     <div className="space-y-1">
@@ -1578,22 +1594,22 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email <span className="text-red-500">*</span></label>
                       <input required type="email" placeholder="learner@manila.edu.ph" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number <span className="text-red-500">*</span></label>
                       <input required placeholder="09XX XXX XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <div className="md:col-span-6 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street <span className="text-red-500">*</span></label>
                       <input required placeholder="Kalsada St. / Bldg 123" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
                     </div>
                     <div className="md:col-span-6 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Region</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Region <span className="text-red-500">*</span></label>
                       {PSGC_TOKEN ? (
                         <select
                           required
@@ -1620,7 +1636,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province <span className="text-red-500">*</span></label>
                       {PSGC_TOKEN ? (
                         <select required disabled={!selectedPsgcRegion || psgcProvinces.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcProvince} onChange={e => {
                           const province = psgcProvinces.find(area => area.psgc_code === e.target.value);
@@ -1635,7 +1651,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality <span className="text-red-500">*</span></label>
                       {PSGC_TOKEN ? (
                         <select required disabled={!selectedPsgcRegion || psgcCities.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcCity} onChange={e => {
                           const city = psgcCities.find(area => area.psgc_code === e.target.value);
@@ -1650,7 +1666,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay <span className="text-red-500">*</span></label>
                       {PSGC_TOKEN ? (
                         <select required disabled={!selectedPsgcCity || psgcBarangays.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={formData.barangay || ''} onChange={e => {
                           const barangay = psgcBarangays.find(area => area.area_name === e.target.value);
@@ -1675,7 +1691,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment <span className="text-red-500">*</span></label>
                       <select required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
                         <option value="Elementary Graduate">Elementary Graduate</option>
                         <option value="High School Graduate">High School Graduate</option>
@@ -1686,11 +1702,11 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality <span className="text-red-500">*</span></label>
                       <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian <span className="text-red-500">*</span></label>
                       <input required placeholder="Name of parent or guardian" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.guardian} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
                     </div>
                   </div>

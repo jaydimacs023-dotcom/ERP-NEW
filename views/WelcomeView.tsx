@@ -38,7 +38,7 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onLoginClick }) => {
                   <span className="text-white">Tech.</span>
                 </h1>
                 <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-300 md:text-xl md:tracking-[0.34em]">
-                  SMART SOLUTIONS FOR THE MODERN ECONOMY
+                  Integrated School Management Solution
                 </p>
               </div>
             </div>

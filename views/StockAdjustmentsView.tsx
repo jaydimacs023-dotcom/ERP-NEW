@@ -336,9 +336,9 @@ export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
              {activeAdjustments.filter(a => !a.journalEntryId).length}
            </p>
         </div>
-        <div className="bg-gray-800 p-6 rounded border border-gray-700 shadow-sm">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Units (Net Change)</p>
-          <p className="text-xl font-semibold text-white tracking-tight leading-none pt-1">
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Units (Net Change)</p>
+          <p className="text-xl font-semibold text-gray-800 tracking-tight leading-none pt-1">
             {activeAdjustments.reduce((sum, a) => sum + (a.adjustmentType === 'RECEIPT' || (a.adjustmentType === 'CORRECTION' && a.quantity > 0) ? a.quantity : -a.quantity), 0).toFixed(0)}
           </p>
         </div>

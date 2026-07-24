@@ -41,7 +41,7 @@ const getSlotHours = (start: string, end: string) => {
 };
 
 const PAGE_SIZE = 7;
-const BATCH_COLUMNS = 'id,org_id,batch_code,name,year,qualification_id,trainer_id,sponsor_id,location_id,student_ids,status,start_date,end_date,training_schedule_slots,max_students,current_students,created_at,updated_at';
+const BATCH_COLUMNS = 'id,org_id,batch_code,name,year,qualification_id,trainer_id,sponsor_id,location_id,student_ids,status,start_date,end_date,max_students,current_students,created_at,updated_at';
 
 const calculateProjectedEndDate = (
   startDateStr: string,
@@ -848,7 +848,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">
             Training Batches
           </h2>
-          <p className="text-sm text-gray-500 font-normal italic">Institutional program monitoring with hour-based compliance tracking.</p>
+          <p className="text-sm text-gray-500 font-normal">Institutional program monitoring with hour-based compliance tracking.</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -935,8 +935,47 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 </tr>
               ) : totalItems === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-sm font-semibold text-gray-400">
-                    {pageLoadError ? 'Unable to load batches from Supabase.' : 'No batches found matching your criteria.'}
+                  <td colSpan={9} className="px-6 py-14">
+                    <div
+                      className="mx-auto max-w-lg rounded-lg border border-dashed px-7 py-9 text-center"
+                      style={{ borderColor: `${brandColor}45`, backgroundColor: `${brandColor}08` }}
+                    >
+                      <span
+                        className="mx-auto flex h-12 w-12 items-center justify-center rounded-full"
+                        style={{ color: pageLoadError ? '#dc2626' : brandColor, backgroundColor: pageLoadError ? '#fef2f2' : `${brandColor}16` }}
+                      >
+                        {pageLoadError ? <AlertCircle size={25} /> : <Layers size={25} />}
+                      </span>
+                      <h3 className="mt-4 text-sm font-semibold text-gray-800">
+                        {pageLoadError ? 'Unable to load training batches' : hasActiveFilters ? 'No matching training batches' : 'No training batches yet'}
+                      </h3>
+                      <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-gray-500">
+                        {pageLoadError
+                          ? 'The batch records could not be retrieved. Check the connection and try again.'
+                          : hasActiveFilters
+                            ? 'Adjust or clear the active filters to see other batch records.'
+                            : 'Initialize the first training batch to begin assigning learners, trainers, and schedules.'}
+                      </p>
+                      {!pageLoadError && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (hasActiveFilters) {
+                              setSearchTerm('');
+                              setStatusFilter('ALL');
+                            } else {
+                              resetForm();
+                              setShowModal(true);
+                            }
+                          }}
+                          className="mt-5 inline-flex items-center gap-2 rounded px-4 py-2.5 text-xs font-semibold text-white shadow-sm"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          {hasActiveFilters ? <Filter size={15} /> : <Plus size={15} />}
+                          {hasActiveFilters ? 'Clear filters' : 'Initialize first batch'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : paginatedBatches.map(batch => {
@@ -1408,5 +1447,3 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 };
 
 export default BatchesView;
-
-

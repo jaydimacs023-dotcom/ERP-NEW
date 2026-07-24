@@ -10,14 +10,14 @@ interface BaseProps {
   currency?: string;
 }
 
-const AP_SOURCE_TYPES = new Set(['BILL', 'PAYMENT', 'CREDIT_MEMO', 'GR_IR', 'PURCHASE_ORDER']);
+const AP_SOURCE_TYPES = new Set(['BILL', 'PAYMENT', 'CREDIT_MEMO', 'DEBIT_MEMO', 'REVERSAL', 'GR_IR', 'PURCHASE_ORDER']);
 const money = (value: number, currency = 'PHP') => new Intl.NumberFormat('en-PH', { style: 'currency', currency }).format(value || 0);
 const entryReference = (entry: JournalEntry) => entry.glEntryNumber || entry.reference || entry.id;
 
 export const APJournalVouchersView: React.FC<BaseProps> = ({ entries, lines, vendors, currency = 'PHP' }) => {
   const [search, setSearch] = useState('');
   const rows = useMemo(() => entries
-    .filter(entry => entry.status === 'POSTED' && (
+    .filter(entry => (entry.status === 'POSTED' || entry.status === 'REVERSED') && (
       AP_SOURCE_TYPES.has(String(entry.sourceType).toUpperCase()) ||
       lines.some(line => line.journalEntryId === entry.id && line.contactType === 'VENDOR')
     ))
@@ -69,7 +69,7 @@ export const VendorLedgerView: React.FC<BaseProps> = ({ entries, lines, vendors,
   const rows = useMemo(() => {
     let balance = 0;
     return entries
-      .filter(entry => entry.status === 'POSTED')
+      .filter(entry => entry.status === 'POSTED' || entry.status === 'REVERSED')
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
       .flatMap(entry => {
         const apLines = lines.filter(line => line.journalEntryId === entry.id && line.contactType === 'VENDOR' && line.contactId === vendorId)

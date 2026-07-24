@@ -407,7 +407,7 @@ export type PayablePaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'auto_de
 export interface Payable extends BaseEntity {
   id: string;
   orgId: string;
-  vendorId: string;
+  vendorId?: string;
   payableNumber: string;
   category: PayableCategory;
   description: string;
@@ -440,6 +440,7 @@ export interface Payable extends BaseEntity {
   goodsReceiptId?: string;
   expenseAccountId?: string;
   claimedBy?: string;
+  employeeId?: string;
   expenseAllocations?: Array<{
     expenseAccountId: string;
     qualificationId?: string;
@@ -453,6 +454,7 @@ export interface Payable extends BaseEntity {
   departmentId?: string;
   costCenterId?: string;
   paidAmount?: number;
+  memoAdjustmentTotal?: number;
   // Payment tracking
   paymentMethod?: PayablePaymentMethod;
   paymentBankAccountId?: string;
@@ -470,7 +472,79 @@ export interface Payable extends BaseEntity {
   periodId?: string;
 }
 
-export type TimeExpenseStatus = 'open' | 'billed';
+export type APMemoType = 'CREDIT' | 'DEBIT';
+export type APMemoStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'POSTED' | 'CANCELLED' | 'REVERSED';
+
+export interface APMemo extends BaseEntity {
+  id: string;
+  orgId: string;
+  memoNumber: string;
+  memoType: APMemoType;
+  status: APMemoStatus;
+  payableId: string;
+  vendorId: string;
+  memoDate: string;
+  amount: number;
+  reason: string;
+  reference?: string;
+  adjustmentAccountId: string;
+  journalEntryId?: string;
+  reversalJournalId?: string;
+  legacyPayableId?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  postedBy?: string;
+  postedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  reversedBy?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+}
+
+export type APReclassificationStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'POSTED' | 'CANCELLED' | 'REVERSED';
+
+export interface APReclassification extends BaseEntity {
+  id: string;
+  orgId: string;
+  reclassificationNumber: string;
+  status: APReclassificationStatus;
+  payableId: string;
+  vendorId?: string;
+  reclassificationDate: string;
+  originalAccountId: string;
+  targetAccountId: string;
+  amount: number;
+  reason: string;
+  reference?: string;
+  departmentCode?: string;
+  costCenterCode?: string;
+  projectCode?: string;
+  branchCode?: string;
+  journalEntryId?: string;
+  reversalJournalId?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  postedBy?: string;
+  postedAt?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  reversedBy?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+}
+
+export type TimeExpenseStatus = 'open' | 'released' | 'billed';
 
 export interface TimeExpense extends BaseEntity {
   id: string;
@@ -482,9 +556,12 @@ export interface TimeExpense extends BaseEntity {
   unitCost: number;
   amount: number;
   expenseAccountId?: string;
+  qualificationId?: string;
+  taxCategoryId?: string;
   supplierId?: string;
   supplierName: string;
   claimedBy: string;
+  employeeId?: string;
   status: TimeExpenseStatus;
   payableId?: string;
   createdBy?: string;
@@ -755,6 +832,34 @@ export interface Enrollment extends BaseEntity {
   billedAmount?: number;        // Amount already billed
   notes?: string;               // Optional notes
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TranscriptRecord extends BaseEntity {
+  id: string;
+  orgId: string;
+  enrollmentId?: string;
+  studentId: string;
+  batchId: string;
+  objectPath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: 'application/pdf';
+  uploadedBy?: string;
+  uploadedAt: string;
+  updatedAt?: string;
+}
+
+export interface BatchTranscriptRecord extends BaseEntity {
+  id: string;
+  orgId: string;
+  batchId: string;
+  objectPath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: 'application/pdf';
+  uploadedBy?: string;
+  uploadedAt: string;
   updatedAt?: string;
 }
 
@@ -1051,7 +1156,7 @@ export interface JournalEntry extends BaseEntity {
   createdAt: string;
   updatedBy?: string;
   updatedAt?: string;
-  sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT';
+  sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'DEBIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT' | 'INVENTORY' | 'AP_RECLASSIFICATION';
   sourceRef?: string; // Unified reference to source document ID (Invoice ID, Payment ID, Deposit ID, etc.)
   // Enhanced audit fields
   postedBy?: string;

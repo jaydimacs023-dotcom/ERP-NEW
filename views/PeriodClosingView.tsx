@@ -138,7 +138,8 @@ const PeriodClosingView: React.FC<PeriodClosingViewProps> = ({
     return {
       totalPayables: periodPayables.length,
       unpaidCount: unpaidPayables.length,
-      unpaidAmount: unpaidPayables.reduce((sum, p) => sum + (p.netPayable || p.amount), 0),
+      unpaidAmount: unpaidPayables.reduce((sum, p) =>
+        sum + Math.max(0, (p.netPayable || p.amount) + (p.memoAdjustmentTotal || 0) - (p.paidAmount || 0)), 0),
       unpostedCount: unpostedPayables.length,
       journalCount: periodEntries.length,
       draftEntries: periodEntries.filter(e => e.status === 'DRAFT' || e.status === 'ON_HOLD').length,

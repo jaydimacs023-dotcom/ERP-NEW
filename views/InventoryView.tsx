@@ -149,11 +149,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gray-800 p-6 rounded shadow-sm shadow-gray-300/20 group hover:-translate-y-1 transition-all">
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm group transition-colors hover:border-brand-light">
           <p className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Total Stock Keeping Units (SKU)</p>
           <div className="flex items-end justify-between">
-            <p className="text-xl font-semibold text-white tracking-tight">{summaries.totalItems}</p>
-            <Package className="text-white/20 group-hover:text-brand/30 transition-colors" size={40} />
+            <p className="text-xl font-semibold text-gray-800 tracking-tight">{summaries.totalItems}</p>
+            <Package className="text-gray-200 group-hover:text-brand/30 transition-colors" size={40} />
           </div>
         </div>
 

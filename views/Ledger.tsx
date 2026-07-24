@@ -43,6 +43,7 @@ const getJournalEntryReferenceNo = (entry: JournalEntry): string => {
   const glReference = String(entry.glEntryNumber || '').trim();
   const isCreditDebitMemo =
     sourceType === 'CREDIT_MEMO' ||
+    sourceType === 'DEBIT_MEMO' ||
     /^((CM|DM)-\d{4}-\d+|(CDM|DBM)-)/i.test(sourceReference) ||
     String(entry.description || '').toUpperCase().includes('CREDIT MEMO') ||
     String(entry.description || '').toUpperCase().includes('DEBIT MEMO');
@@ -259,7 +260,7 @@ const Ledger: React.FC<LedgerProps> = ({
           page: 1,
           pageSize: 200,
           columns: JOURNAL_LINE_COLUMNS,
-          filters: [{ column: 'journal_entry_id', operator: 'in', value: `(${entryIds.join(',')})` }],
+          filters: [{ column: 'journal_entry_id', operator: 'in', value: entryIds }],
           orderBy: [{ column: 'journal_entry_id', ascending: true }]
         });
         if (isActive) {

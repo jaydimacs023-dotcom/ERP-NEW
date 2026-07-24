@@ -348,13 +348,13 @@ export const WarehouseLocationsView: React.FC<WarehouseLocationsViewProps> = ({
              {activeLocations.filter(l => l.isActive).length}
            </p>
         </div>
-        <div className="bg-gray-800 p-6 rounded border border-gray-700 shadow-sm md:col-span-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Logistics Integrity</p>
+        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm md:col-span-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Logistics Integrity</p>
           <div className="flex items-center gap-4 mt-2">
-             <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden">
+             <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: '100%', backgroundColor: brandColor }}></div>
              </div>
-             <span className="text-xs font-semibold text-white uppercase tracking-wide">Verified</span>
+             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Verified</span>
           </div>
         </div>
       </div>

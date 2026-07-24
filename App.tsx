@@ -26,6 +26,7 @@ import StudentsView from './views/StudentsView';
 import QualificationsView from './views/QualificationsView';
 import TrainersView from './views/TrainersView';
 import BatchesView from './views/BatchesView';
+import TranscriptRecordsView from './views/TranscriptRecordsView';
 import LocationsView from './views/LocationsView';
 import SponsorsView from './views/SponsorsView';
 import SOAView from './views/SOAView';
@@ -41,6 +42,8 @@ import BankingView from './views/BankingView';
 import AssetsView from './views/AssetsView';
 import ARView from './views/ARView';
 import PayablesView from './views/PayablesView';
+import APMemosView from './views/APMemosView';
+import APReclassificationsView from './views/APReclassificationsView';
 import TimeExpensesView from './views/TimeExpensesView';
 import VendorsView from './views/VendorsView';
 import SchedulesView from './views/SchedulesView';
@@ -55,6 +58,7 @@ import StudentPortalView from './views/StudentPortalView';
 import TrainerPortalView from './views/TrainerPortalView';
 import BudgetView from './views/BudgetView';
 import EmployeesView from './views/EmployeesView';
+import EmployeeDirectoryView from './views/EmployeeDirectoryView';
 import PayrollView from './views/PayrollView';
 import PaymentHistoryView from './views/PaymentHistoryView';
 import PaymentMonitoringView from './views/PaymentMonitoringView';
@@ -71,7 +75,6 @@ import InventoryView from './views/InventoryView';
 import StockAdjustmentsView from './views/StockAdjustmentsView';
 import ReorderView from './views/ReorderView';
 import InventoryTransactionsView from './views/InventoryTransactionsView';
-import AdvancedInventoryReports from './views/AdvancedInventoryReports';
 import InventoryClassesView from './views/InventoryClassesView';
 import OpeningInventoryView from './views/OpeningInventoryView';
 import BackupRestoreView from './views/BackupRestoreView';
@@ -100,7 +103,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2
+  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2, FilePenLine
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -176,7 +179,7 @@ export default function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'auto'>('auto');
   // Navigation section state
-  const [openSections, setOpenSections] = useState<{ financial: boolean; apReports: boolean; ledgerAudit: boolean; operations: boolean; registries: boolean; purchases: boolean; inventory: boolean; administration: boolean }>({ financial: true, apReports: true, ledgerAudit: true, operations: true, registries: true, purchases: true, inventory: true, administration: true });
+  const [openSections, setOpenSections] = useState<{ financial: boolean; apOperations: boolean; apReports: boolean; ledgerAudit: boolean; operations: boolean; registries: boolean; purchases: boolean; inventory: boolean; administration: boolean }>({ financial: true, apOperations: true, apReports: true, ledgerAudit: true, operations: true, registries: true, purchases: true, inventory: true, administration: true });
 
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -579,19 +582,13 @@ export default function App() {
   const [reorderPoints, setReorderPoints] = useState<ReorderPoint[]>([]);
 
   useEffect(() => {
-    if (!currentOrgId || !['inventory', 'stock-items', 'stock-levels', 'inventory-reports'].includes(activeTab)) return;
+    if (!currentOrgId || !['inventory', 'stock-items', 'stock-levels'].includes(activeTab)) return;
 
     let isActive = true;
-    Promise.all([
-      dataService.getInventoryLevelsByOrg(currentOrgId),
-      activeTab === 'inventory-reports'
-        ? dataService.getInventoryTransactionsByOrg(currentOrgId)
-        : Promise.resolve<InventoryTransaction[] | null>(null),
-    ])
-      .then(([levels, transactions]) => {
+    dataService.getInventoryLevelsByOrg(currentOrgId)
+      .then((levels) => {
         if (!isActive) return;
         setInventoryLevels(levels);
-        if (transactions) setInventoryTransactions(transactions);
       })
       .catch(error => {
         console.error('[App] Failed to refresh inventory analytics data:', error);
@@ -807,6 +804,7 @@ export default function App() {
             const newGl = generateNextGlRef();
             const isCreditDebitMemoEntry =
               String(e.sourceType || '').toUpperCase() === 'CREDIT_MEMO' ||
+              String(e.sourceType || '').toUpperCase() === 'DEBIT_MEMO' ||
               /^(CM|DM|CDM|DBM)-/i.test(String(e.reference || '').trim()) ||
               String(e.description || '').toUpperCase().includes('CREDIT MEMO') ||
               String(e.description || '').toUpperCase().includes('DEBIT MEMO');
@@ -1566,6 +1564,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--acm-primary', brandColor);
+    root.style.setProperty('--brand', brandColor);
     root.style.setProperty('--acm-primary-hover', brandColorHover);
     root.style.setProperty('--acm-primary-light', brandColorLight);
     root.style.setProperty('--acm-primary-rgb', brandColorRgb);
@@ -1609,6 +1608,12 @@ export default function App() {
 
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
+
+  useEffect(() => {
+    if (currentUser && activeTab === 'ledger' && !canAccess(currentUser.role, 'ledger')) {
+      setActiveTab(getDefaultTab(currentUser.role));
+    }
+  }, [activeTab, currentUser]);
 
   useEffect(() => {
     if (
@@ -2345,6 +2350,7 @@ export default function App() {
 
       const isCreditDebitMemoEntry =
         String(entry.sourceType || '').toUpperCase() === 'CREDIT_MEMO' ||
+        String(entry.sourceType || '').toUpperCase() === 'DEBIT_MEMO' ||
         /^(CM|DM|CDM|DBM)-/i.test(String(referenceOverride || '').trim()) ||
         /^(CM|DM|CDM|DBM)-/i.test(String(entry.reference || '').trim()) ||
         String(entry.description || '').toUpperCase().includes('CREDIT MEMO') ||
@@ -2601,16 +2607,8 @@ export default function App() {
       return savedPayable;
     } catch (error) {
       console.error('[App] Error creating payable:', error);
-      handleNotify('error', 'Failed to create payable. Falling back to memory storage.');
-      // Fallback to memory storage if Supabase fails
-      const fullPayable = {
-        ...payable,
-        orgId: currentOrgId,
-        createdBy: currentUser?.id || 'system'
-      } as Payable;
-      setPayables(prev => [...prev, fullPayable]);
-      AuditService.create(currentOrgId, currentUser?.id || 'system', currentUser?.name || 'System', 'PAYABLE', fullPayable.id, payable.payableNumber);
-      return fullPayable;
+      handleNotify('error', 'Failed to create payable. No accounting record was saved.');
+      throw error;
     }
   };
 
@@ -2627,9 +2625,8 @@ export default function App() {
       handleNotify('success', 'Payable updated successfully');
     } catch (error) {
       console.error('[App] Error updating payable:', error);
-      handleNotify('error', 'Failed to update payable. Falling back to memory storage.');
-      // Fallback to memory storage
-      setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      handleNotify('error', 'Failed to update payable. The existing record was left unchanged.');
+      throw error;
     }
   };
 
@@ -6612,8 +6609,8 @@ export default function App() {
                 </span>
                 <span className="text-white">Tech.</span>
               </h1>
-              <p className="mt-2 italic text-[10px] font-bold uppercase tracking-[0.32em] text-[#29ABE2]/55">
-                SMART SOLUTIONS FOR THE MODERN ECONOMY
+              <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.32em] text-[#29ABE2]/55">
+                Integrated School Management Solution
               </p>
             </div>
           </div>
@@ -6787,7 +6784,6 @@ export default function App() {
                 <NavItem icon={<AlertCircle size={18} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => navigateTo('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Zap size={18} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => navigateTo('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<History size={18} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => navigateTo('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<TrendingUp size={18} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => navigateTo('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
             </div>
           )}
@@ -6818,9 +6814,21 @@ export default function App() {
               {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('enrollments') && <NavItem icon={<UserCheck size={18} />} label="Enrollments" active={activeTab === 'enrollments'} onClick={() => navigateTo('enrollments')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="AP BILLS" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
-              {userCanAccess('time-expenses') && <NavItem icon={<ReceiptText size={18} />} label="Time & Expenses" active={activeTab === 'time-expenses'} onClick={() => navigateTo('time-expenses')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('payroll') && <NavItem icon={<Briefcase size={18} />} label="Payroll" active={activeTab === 'payroll'} onClick={() => navigateTo('payroll')} compact={!sidebarOpen} brandColor={brandColor} />}
+            </NavSection>
+          )}
+
+          {isAP && (
+            <NavSection
+              label="Accounts Payable"
+              isOpen={openSections.apOperations}
+              onToggle={() => setOpenSections(prev => ({ ...prev, apOperations: !prev.apOperations }))}
+              compact={!sidebarOpen}
+            >
+              {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="Bills & Payments" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('ap-memos') && <NavItem icon={<FilePenLine size={18} />} label="Credit/Debit Memos" active={activeTab === 'ap-memos'} onClick={() => navigateTo('ap-memos')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('ap-reclassifications') && <NavItem icon={<RefreshCw size={18} />} label="AP Reclassifications" active={activeTab === 'ap-reclassifications'} onClick={() => navigateTo('ap-reclassifications')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('time-expenses') && <NavItem icon={<ReceiptText size={18} />} label="Time & Expenses" active={activeTab === 'time-expenses'} onClick={() => navigateTo('time-expenses')} compact={!sidebarOpen} brandColor={brandColor} />}
             </NavSection>
           )}
 
@@ -6865,6 +6873,7 @@ export default function App() {
               <NavItem icon={<MapPin size={20} />} label="Locations" active={activeTab === 'locations'} onClick={() => navigateTo('locations')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<CalendarClock size={20} />} label="Scheduling" active={activeTab === 'schedules'} onClick={() => navigateTo('schedules')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<UserCheck size={20} />} label="Alumni Reports" active={activeTab === 'alumni-reports'} onClick={() => navigateTo('alumni-reports')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('transcripts') && <NavItem icon={<FileText size={20} />} label="Transcript of Records" active={activeTab === 'transcripts'} onClick={() => navigateTo('transcripts')} compact={!sidebarOpen} brandColor={brandColor} />}
             </NavSection>
           )}
 
@@ -6910,7 +6919,6 @@ export default function App() {
               <NavItem icon={<AlertCircle size={20} />} label="Stock Adjustments" active={activeTab === 'stock-adjustments'} onClick={() => navigateTo('stock-adjustments')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Zap size={20} />} label="Reorder Points" active={activeTab === 'reorder-points'} onClick={() => navigateTo('reorder-points')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<History size={20} />} label="Transactions" active={activeTab === 'inventory-transactions'} onClick={() => navigateTo('inventory-transactions')} compact={!sidebarOpen} brandColor={brandColor} />
-              <NavItem icon={<TrendingUp size={20} />} label="Analytics" active={activeTab === 'inventory-reports'} onClick={() => navigateTo('inventory-reports')} compact={!sidebarOpen} brandColor={brandColor} />
             </NavSection>
           )}
 
@@ -6922,6 +6930,7 @@ export default function App() {
               compact={!sidebarOpen}
             >
               <NavItem icon={<Users size={20} />} label="Employees" active={activeTab === 'employees'} onClick={() => navigateTo('employees')} compact={!sidebarOpen} brandColor={brandColor} />
+              {userCanAccess('employee-directory') && <NavItem icon={<UserCheck size={20} />} label="Employee Directory" active={activeTab === 'employee-directory'} onClick={() => navigateTo('employee-directory')} compact={!sidebarOpen} brandColor={brandColor} />}
               <NavItem icon={<Settings size={20} />} label="G/L Setup (COA)" active={activeTab === 'coa'} onClick={() => navigateTo('coa')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<CalendarCheck size={20} />} label="Period Closing" active={activeTab === 'periods'} onClick={() => navigateTo('periods')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<Palette size={20} />} label="Branding & Motif" active={activeTab === 'branding'} onClick={() => navigateTo('branding')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -7135,7 +7144,7 @@ export default function App() {
               onNotify={handleNotify}
             />
           )}
-          {activeTab === 'ledger' && <Ledger orgId={currentOrgId} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
+          {activeTab === 'ledger' && userCanAccess('ledger') && <Ledger orgId={currentOrgId} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)} payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)} students={students} sponsors={sponsors} trainers={trainers} batches={batches} items={items} qualifications={qualifications} users={users} onPostEntry={handleSaveOrPostJournal} onApproveJournal={handleApproveJournal} onReverseJournal={reverseJournalEntry} currentUser={currentUser} initialSearchTerm={ledgerSearchTerm} />}
           {activeTab === 'journal-vouchers' && (
             <JournalVouchersView
               orgId={currentOrgId}
@@ -7192,8 +7201,15 @@ export default function App() {
           {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
-          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
-          {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId || ''} payables={payables} vendors={vendors.filter(v => v.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !v.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
+          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} employees={users.filter(user => user.orgId === currentOrgId && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ap-memos' && userCanAccess('ap-memos') && currentUser?.id && <APMemosView orgId={currentOrgId} payables={payables} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} currentUserId={currentUser.id} currentUserName={currentUser.name || currentUser.email} currentUserRole={currentUser.role} currency={currentOrg?.currency || 'PHP'} brandColor={brandColor} onNotify={handleNotify} />}
+          {activeTab === 'ap-reclassifications' && userCanAccess('ap-reclassifications') && currentUser?.id && <APReclassificationsView orgId={currentOrgId} payables={payables} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} entries={activeJournalEntries} lines={filteredLines} currentUserId={currentUser.id} currentUserRole={currentUser.role} currency={currentOrg?.currency || 'PHP'} onNotify={handleNotify} onJournalChanged={async () => {
+            const refreshedEntries = await dataService.getJournalEntriesByOrg(currentOrgId);
+            const refreshedLineGroups = await Promise.all(refreshedEntries.map(entry => dataService.getJournalLinesByEntry(entry.id)));
+            setJournalEntries(refreshedEntries);
+            setJournalLines(refreshedLineGroups.flat());
+          }} />}
+          {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId || ''} payables={payables} vendors={vendors.filter(v => v.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !v.isDeleted)} accounts={filteredAccounts} qualifications={qualifications.filter(q => q.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !q.isDeleted)} taxCategories={taxCategories.filter(tc => tc.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !tc.isDeleted)} employees={users.filter(user => user.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
           {activeTab === 'ap-aging-report' && userCanAccess('ap-aging-report') && <PayablesView view="aging" orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView orgId={currentOrgId} purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
@@ -7227,7 +7243,6 @@ export default function App() {
           {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-transactions' && <InventoryTransactionsView orgId={currentOrgId} transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'inventory-reports' && <AdvancedInventoryReports items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} lines={filteredLines} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? { ...l, isCleared: !l.isCleared } : l))} onNotify={handleNotify} />}
           {activeTab === 'checks' && <CheckPrintingView orgId={currentOrgId} checks={checkVouchers} bankAccounts={bankAccounts} vendors={vendors} payables={payables} accounts={filteredAccounts} entries={activeJournalEntries} currentUserId={currentUser?.id} onCreateCheck={handleAddCheckVoucher} onUpdateCheck={handleUpdateCheckVoucher} onDeleteCheck={handleDeleteCheckVoucher} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
@@ -7245,6 +7260,7 @@ export default function App() {
           {activeTab === 'qualifications' && <QualificationsView organization={currentOrg} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
           {activeTab === 'batches' && <BatchesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
+          {activeTab === 'transcripts' && <TranscriptRecordsView orgId={currentOrgId} currentUserId={currentUser?.id} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onNotify={handleNotify} />}
           {activeTab === 'alumni-reports' && (
             <AlumniEmploymentView
               organization={currentOrg}
@@ -7405,6 +7421,10 @@ export default function App() {
             onAddEmployee={handleAddEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             onDeleteEmployee={handleDeleteEmployee}
+          />}
+          {activeTab === 'employee-directory' && userCanAccess('employee-directory') && <EmployeeDirectoryView
+            organization={currentOrg}
+            users={users.filter(user => user.orgId === currentOrgId)}
           />}
           {activeTab === 'users' && <UsersManagementView
             users={users.filter(u => u.orgId === currentOrgId)}

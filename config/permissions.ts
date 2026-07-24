@@ -64,6 +64,8 @@ export type ModuleTab =
   | 'revenue-recognition'
   // AP Modules
   | 'payables'
+  | 'ap-memos'
+  | 'ap-reclassifications'
   | 'ap-aging-report'
   | 'time-expenses'
   | 'po'
@@ -93,10 +95,12 @@ export type ModuleTab =
   | 'trainers'
   | 'qualifications'
   | 'batches'
+  | 'transcripts'
   | 'locations'
   | 'schedules'
   // Admin
   | 'employees'
+  | 'employee-directory'
   | 'coa'
   | 'periods'
   | 'branding'
@@ -121,13 +125,13 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   SYSTEM_ADMIN: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
     'ar', 'recurring-invoices', 'revenue-recognition',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
-    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
-    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules',
+    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions',
+    'students', 'trainers', 'qualifications', 'batches', 'transcripts', 'locations', 'schedules',
     'enrollments', 'course-fees', 'alumni-reports',
-    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
+    'employees', 'employee-directory', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit',
     'maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'
   ],
 
@@ -135,19 +139,19 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   ADMIN: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
-    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
-    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
+    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions',
+    'students', 'trainers', 'qualifications', 'batches', 'transcripts', 'locations', 'schedules', 'alumni-reports',
     'enrollments', 'course-fees',
-    'employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'
+    'employees', 'employee-directory', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'
   ],
 
   // PRESIDENT: Executive view - dashboards, reports, approvals
   PRESIDENT: [
     'dashboard', 'ledger', 'reports', 'banking',
-    'ar', 'payables', 'ap-aging-report', 'time-expenses',
+    'ar', 'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses',
     'payroll', 'budgets',
     'students', 'trainers', 'qualifications', 'batches',
     'employees', 'feedback'
@@ -157,10 +161,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   FINANCE_MANAGER: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
-    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports',
+    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions',
     'employees', 'coa', 'periods', 'feedback'
   ],
 
@@ -168,7 +172,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   ACCOUNTANT: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking',
     'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
     'sponsors', 'vendors', 'items', 'assets',
     'coa', 'periods', 'feedback'
@@ -197,14 +201,13 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'stock-adjustments',
     'reorder-points',
     'inventory-transactions',
-    'inventory-reports',
     'feedback'
   ],
 
   // AP_SPECIALIST: Accounts Payable focused
   AP_SPECIALIST: [
-    'dashboard', 'ledger', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'dashboard', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
     'feedback'
@@ -212,14 +215,14 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AP_CLERK: Limited AP data entry
   AP_CLERK: [
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
     'vendors', 'items', 'feedback'
   ],
 
   // AP_SUPERVISOR: AP with approvals
   AP_SUPERVISOR: [
-    'dashboard', 'ledger', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
+    'dashboard', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
     'feedback'
@@ -229,7 +232,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   TREASURY: [
     'dashboard', 'reports', 'banking', 'checks',
     'ar', // View receivables for cash forecasting
-    'payables', 'ap-aging-report', 'time-expenses', // View payables for cash forecasting
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', // View payables for cash forecasting
     'feedback'
   ],
 
@@ -237,17 +240,17 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   AUDITOR: [
     'dashboard', 'ledger', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking',
     'ar', 'recurring-invoices', 'revenue-recognition',
-    'payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
+    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
     'payroll',
     'sponsors', 'vendors', 'items', 'assets',
-    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'inventory-transactions', 'inventory-reports',
+    'inventory', 'warehouse-locations', 'stock-items', 'stock-levels', 'stock-adjustments', 'inventory-transactions',
     'coa', 'periods', 'feedback'
   ],
 
   // REGISTRAR: Training/Student management
   REGISTRAR: [
     'dashboard',
-    'students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports',
+    'students', 'trainers', 'qualifications', 'batches', 'transcripts', 'locations', 'schedules', 'alumni-reports',
     'sponsors', // For scholarship management
     'feedback'
   ],
@@ -267,12 +270,12 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 export const MODULE_GROUPS = {
   FINANCIAL_CORE: ['dashboard', 'ledger', 'reports', 'banking', 'checks'] as ModuleTab[],
   AR_MODULES: ['ar', 'ar-calendar-tasks', 'recurring-invoices', 'revenue-recognition', 'enrollments', 'course-fees'] as ModuleTab[],
-  AP_MODULES: ['payables', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
+  AP_MODULES: ['payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills'] as ModuleTab[],
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],
-  INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'inventory-classes', 'opening-inventory', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions', 'inventory-reports'] as ModuleTab[],
+  INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'inventory-classes', 'opening-inventory', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions'] as ModuleTab[],
   OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports'] as ModuleTab[],
-  ADMIN: ['employees', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'] as ModuleTab[],
+  ADMIN: ['employees', 'employee-directory', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'] as ModuleTab[],
   SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'] as ModuleTab[],
   PORTALS: ['student-portal', 'trainer-portal', 'feedback'] as ModuleTab[],
 };
@@ -419,6 +422,12 @@ export function getRoleDisplayName(role: UserRole | string | undefined): string 
 export type ActionPermission = 'view' | 'create' | 'edit' | 'delete' | 'approve' | 'post' | 'void';
 
 const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPermission[]>>>> = {
+  PRESIDENT: {
+    'ap-reclassifications': ['view'],
+  },
+  TREASURY: {
+    'ap-reclassifications': ['view'],
+  },
   // AUDITOR can only view
   AUDITOR: {
     'dashboard': ['view'],
@@ -426,12 +435,16 @@ const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPer
     'reports': ['view'],
     'ar': ['view'],
     'payables': ['view'],
+    'ap-memos': ['view'],
+    'ap-reclassifications': ['view'],
     'audit': ['view'],
     // ... etc
   },
   // AP_CLERK can view and create, but not approve
   AP_CLERK: {
     'payables': ['view', 'create', 'edit'],
+    'ap-memos': ['view', 'create', 'edit'],
+    'ap-reclassifications': ['view', 'create', 'edit'],
     'po': ['view', 'create', 'edit'],
     'goods-receipt': ['view', 'create', 'edit'],
     'vendors': ['view'],

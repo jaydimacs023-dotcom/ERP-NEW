@@ -151,8 +151,8 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onRegister, onForgotPass
                     </span>
                     <span className="text-white">Tech.</span>
                   </h1>
-                  <p className="mt-2 italic text-[10px] font-semibold uppercase tracking-[0.26em] text-slate-300 md:text-xl md:tracking-[0.34em]">
-                    SMART SOLUTIONS FOR THE MODERN ECONOMY
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-slate-300 md:text-xl md:tracking-[0.34em]">
+                    Integrated School Management Solution
                   </p>
                 </div>
               </div>

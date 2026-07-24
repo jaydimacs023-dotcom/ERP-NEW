@@ -8,7 +8,7 @@ import {
   StockItem, InventoryTransaction, InventoryLevel, WarehouseLocation, StockAdjustment, ReorderPoint,
   RecurringInvoice, RevenueSchedule, RevenueRecognitionEntry, ChartOfAccount, GoodsReceipt, RecurringBill,
   CourseFee, AlumniEmploymentReport, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, TaxCategoryEntry, Payment, PaymentApplication,
-  FeedbackTicket, InventoryClass, OpeningInventoryDocument, TimeExpense
+  FeedbackTicket, InventoryClass, OpeningInventoryDocument, TimeExpense, APMemo, APReclassification, TranscriptRecord, BatchTranscriptRecord
 } from '../types';
 
 export interface TrainerUsageCheck {
@@ -155,6 +155,23 @@ export interface IDataService {
   updateStudent(id: string, updates: Partial<Student>): Promise<Student>;
   deleteStudent(id: string): Promise<void>;
   checkStudentUsage(studentId: string): Promise<{ isUsed: boolean; usedIn: string[] }>;
+  getTranscriptRecords(orgId: string): Promise<TranscriptRecord[]>;
+  getBatchTranscriptRecords(orgId: string): Promise<BatchTranscriptRecord[]>;
+  uploadTranscriptPdf(input: {
+    orgId: string;
+    enrollmentId?: string;
+    studentId: string;
+    batchId: string;
+    uploadedBy?: string;
+    file: File;
+  }): Promise<TranscriptRecord>;
+  downloadTranscriptPdf(objectPath: string): Promise<Blob>;
+  uploadBatchTranscriptPdf(input: {
+    orgId: string;
+    batchId: string;
+    file: File;
+  }): Promise<BatchTranscriptRecord>;
+  downloadBatchTranscriptPdf(objectPath: string, orgId: string): Promise<Blob>;
 
   // Trainer CRUD
   createTrainer(trainer: Trainer): Promise<Trainer>;
@@ -264,6 +281,38 @@ export interface IDataService {
   createPayable(payable: Payable): Promise<Payable>;
   updatePayable(id: string, updates: Partial<Payable>): Promise<Payable>;
   deletePayable(id: string, deletedBy?: string): Promise<void>;
+  postPayableBill(id: string, actorId: string): Promise<{ journalEntryId: string; payableId: string; idempotent: boolean }>;
+  postPayablePayment(input: {
+    paymentEventId: string;
+    payableIds: string[];
+    amounts: number[];
+    cashAccountId: string;
+    paymentDate: string;
+    paymentMethod: string;
+    actorId: string;
+  }): Promise<{ journalEntryId: string; paymentEventId: string; total: number; idempotent: boolean }>;
+  cancelPayable(id: string, actorId: string, reason: string): Promise<{ payableId: string; journalEntryId?: string; idempotent: boolean }>;
+
+  // AP Credit / Debit Memos
+  getAPMemosByOrg(orgId: string): Promise<APMemo[]>;
+  createAPMemo(memo: APMemo): Promise<APMemo>;
+  updateAPMemo(id: string, updates: Partial<APMemo>): Promise<APMemo>;
+  deleteAPMemo(id: string, actorId: string): Promise<void>;
+  getNextAPMemoNumber(orgId: string, memoType: 'CREDIT' | 'DEBIT', memoDate: string, actorId: string): Promise<string>;
+  submitAPMemo(id: string, actorId: string): Promise<{ memoId: string; status: string; idempotent: boolean }>;
+  postAPMemo(id: string, actorId: string): Promise<{ memoId: string; journalEntryId: string; status: string; idempotent: boolean }>;
+  reverseAPMemo(id: string, actorId: string, reason: string): Promise<{ memoId: string; journalEntryId: string; status: string; idempotent: boolean }>;
+  cancelAPMemo(id: string, actorId: string, reason: string): Promise<{ memoId: string; status: string; idempotent: boolean }>;
+
+  // AP Reclassifications
+  getAPReclassificationsByOrg(orgId: string): Promise<APReclassification[]>;
+  createAPReclassification(record: APReclassification): Promise<APReclassification>;
+  updateAPReclassification(id: string, updates: Partial<APReclassification>): Promise<APReclassification>;
+  deleteAPReclassification(id: string, actorId: string): Promise<void>;
+  submitAPReclassification(id: string, actorId: string): Promise<any>;
+  postAPReclassification(id: string, actorId: string): Promise<any>;
+  reverseAPReclassification(id: string, actorId: string, reason: string): Promise<any>;
+  cancelAPReclassification(id: string, actorId: string, reason: string): Promise<any>;
 
   // Time & Expenses CRUD
   getTimeExpensesByOrg(orgId: string): Promise<TimeExpense[]>;

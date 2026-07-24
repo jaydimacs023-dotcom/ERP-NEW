@@ -2,7 +2,7 @@
 import { FetchPageOptions, IDataService, InitialData, PaginatedResult } from './IDataService';
 import { config } from '../config/app';
 import { TokenManager } from './TokenManager';
-import { FeedbackTicket, InventoryClass, Invoice, JournalVoucher, JournalVoucherLine, OpeningInventoryDocument, TaxCategoryEntry } from '../types';
+import { BatchTranscriptRecord, FeedbackTicket, InventoryClass, Invoice, JournalVoucher, JournalVoucherLine, OpeningInventoryDocument, TaxCategoryEntry, TranscriptRecord } from '../types';
 import { normalizeStudentDocuments } from './StudentDocumentService';
 
 /**
@@ -36,7 +36,7 @@ export class SupabaseDataService implements IDataService {
       invoice_lines: 'id,invoice_id,line_number,description,course_fee_id,enrollment_id,quantity,unit_price,amount,tax_category_id,vat_amount,gl_account_id,is_deleted,deleted_at,deleted_by,created_at,updated_at,net_amount,gross_amount,org_id,classification_code,assessment_registration_id,line_type',
       payments: 'id,org_id,payment_no,sponsor_id,student_id,payment_date,status,payment_method,ref_no,bank_account_id,check_number,check_date,amount_received,ewt_amount_certified,total_applied,customer_deposit_balance,journal_entry_id,voided_at,voided_by,void_reason,posted_at,posted_by,notes,created_at,created_by,updated_at,updated_by,is_deleted,deleted_at,deleted_by',
       payment_applications: 'id,payment_id,invoice_id,amount_applied,is_reversed,reversal_reason,reversed_at,reversed_by,created_at,created_by,updated_at',
-      journal_entries: 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,posted_by,posted_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id',
+      journal_entries: 'id,org_id,period_id,date,description,reference,status,created_by,source_type,created_at,updated_at,approved_by,approved_at,gl_entry_number,review_comments,updated_by,source_ref,deposit_id,reversed_by,reversed_at,reversal_reason,original_entry_id',
       journal_lines: 'id,journal_entry_id,account_id,debit,credit,memo,contact_id,contact_type,batch_id,item_id,asset_id,is_cleared,created_at,description,classification_code,tax_category_id',
       audit_logs: 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at',
       enrollments: 'id,org_id,enrollment_code,student_id,batch_id,sponsor_id,billing_status,enrollment_status,enrollment_date,total_fees,billed_amount,notes,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,billing_type',
@@ -837,14 +837,24 @@ export class SupabaseDataService implements IDataService {
       payables: [
         'id', 'org_id', 'vendor_id', 'payable_number', 'category', 'qualification_id', 'description', 'amount',
         'bill_date', 'due_date', 'payment_date', 'currency', 'status', 'reference_document',
-        'journal_entry_id', 'gl_account_id', 'expense_account_id', 'expense_allocations', 'claimed_by', 'notes', 'withholding_type', 'atc_item_id',
+        'journal_entry_id', 'gl_account_id', 'expense_account_id', 'expense_allocations', 'claimed_by', 'employee_id', 'notes', 'withholding_type', 'atc_item_id',
         'atc_rate_id', 'applied_rate_percent', 'withholding_amount', 'net_payable', 'paid_amount',
         'created_by', 'approved_by', 'paid_by', 'created_at', 'updated_at', 'approved_at',
-        'paid_at', 'is_deleted', 'deleted_at', 'deleted_by'
+        'paid_at', 'invoice_type', 'input_vat_amount', 'input_vat_account_id',
+        'payment_method', 'payment_bank_account_id', 'check_number', 'check_date',
+        'reversal_journal_id', 'memo_adjustment_total', 'is_deleted', 'deleted_at', 'deleted_by'
+      ],
+      ap_memos: [
+        'id', 'org_id', 'memo_number', 'memo_type', 'status', 'payable_id', 'vendor_id',
+        'memo_date', 'amount', 'reason', 'reference', 'adjustment_account_id',
+        'journal_entry_id', 'reversal_journal_id', 'legacy_payable_id',
+        'created_by', 'created_at', 'updated_by', 'updated_at', 'submitted_by', 'submitted_at',
+        'posted_by', 'posted_at', 'cancelled_by', 'cancelled_at', 'cancellation_reason',
+        'reversed_by', 'reversed_at', 'reversal_reason', 'is_deleted', 'deleted_by', 'deleted_at'
       ],
       time_expenses: [
-        'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'quantity', 'unit_cost', 'amount', 'expense_account_id',
-        'supplier_id', 'supplier_name', 'claimed_by', 'status', 'payable_id', 'created_by',
+        'id', 'org_id', 'rfq_code', 'transaction_date', 'description', 'quantity', 'unit_cost', 'amount', 'expense_account_id', 'qualification_id', 'tax_category_id',
+        'supplier_id', 'supplier_name', 'claimed_by', 'employee_id', 'status', 'payable_id', 'created_by',
         'created_at', 'updated_at'
       ],
       check_vouchers: [
@@ -893,7 +903,7 @@ export class SupabaseDataService implements IDataService {
       ],
       journal_entries: [
         'id', 'org_id', 'period_id', 'date', 'description', 'reference', 'gl_entry_number',
-        'status', 'created_by', 'created_at', 'source_type', 'source_ref', 'posted_by', 'posted_at',
+        'status', 'created_by', 'created_at', 'source_type', 'source_ref',
         'approved_by', 'approved_at', 'reversed_by', 'reversed_at', 'reversal_reason', 'original_entry_id',
         'review_comments', 'updated_by', 'updated_at'
       ],
@@ -2241,7 +2251,16 @@ export class SupabaseDataService implements IDataService {
 
     for (const filter of options.filters || []) {
       const operator = filter.operator || 'eq';
-      const value = filter.value === null ? 'null' : String(filter.value);
+      let value: string;
+      if (operator === 'in') {
+        const rawText = String(filter.value).trim();
+        const rawValues = Array.isArray(filter.value)
+          ? filter.value
+          : (rawText.startsWith('(') && rawText.endsWith(')') ? rawText.slice(1, -1) : rawText).split(',');
+        value = `(${rawValues.map(item => String(item).trim()).filter(Boolean).join(',')})`;
+      } else {
+        value = filter.value === null ? 'null' : String(filter.value);
+      }
       url.searchParams.set(filter.column, `${operator}.${value}`);
     }
 
@@ -2759,6 +2778,281 @@ export class SupabaseDataService implements IDataService {
       deleted_at: new Date().toISOString(),
       deleted_by: deletedBy || null,
     });
+  }
+
+  async getTranscriptRecords(orgId: string): Promise<TranscriptRecord[]> {
+    const token = await this.getAuthToken();
+    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    url.searchParams.set('action', 'list');
+    url.searchParams.set('orgId', orgId);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: this.supabaseKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: '{}'
+    });
+    if (!response.ok) {
+      throw new Error(`Unable to load transcript records (${response.status}): ${await response.text()}`);
+    }
+    const result = await response.json();
+    return this.snakeToCamel(result.records || []) as TranscriptRecord[];
+  }
+
+  async getBatchTranscriptRecords(orgId: string): Promise<BatchTranscriptRecord[]> {
+    const token = await this.getAuthToken();
+    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    url.searchParams.set('action', 'list');
+    url.searchParams.set('orgId', orgId);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Unable to load batch transcript records.');
+    return this.snakeToCamel(result.batchRecords || []) as BatchTranscriptRecord[];
+  }
+
+  async uploadTranscriptPdf(input: {
+    orgId: string;
+    enrollmentId?: string;
+    studentId: string;
+    batchId: string;
+    uploadedBy?: string;
+    file: File;
+  }): Promise<TranscriptRecord> {
+    if (input.file.type !== 'application/pdf' && !input.file.name.toLowerCase().endsWith('.pdf')) {
+      throw new Error('Only PDF transcript files can be uploaded.');
+    }
+    if (input.file.size > 15 * 1024 * 1024) {
+      throw new Error('The transcript PDF must not exceed 15 MB.');
+    }
+
+    const token = await this.getAuthToken();
+    const uploadUrl = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    uploadUrl.searchParams.set('action', 'upload');
+    uploadUrl.searchParams.set('orgId', input.orgId);
+    if (input.enrollmentId) uploadUrl.searchParams.set('enrollmentId', input.enrollmentId);
+    uploadUrl.searchParams.set('studentId', input.studentId);
+    uploadUrl.searchParams.set('batchId', input.batchId);
+    uploadUrl.searchParams.set('fileName', input.file.name);
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        apikey: this.supabaseKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/pdf'
+      },
+      body: input.file
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `Unable to upload transcript (${response.status})`);
+    }
+    return this.snakeToCamel(result.record) as TranscriptRecord;
+  }
+
+  async downloadTranscriptPdf(objectPath: string): Promise<Blob> {
+    const token = await this.getAuthToken();
+    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    url.searchParams.set('action', 'download');
+    url.searchParams.set('orgId', objectPath.split('/')[0] || '');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: this.supabaseKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ objectPath })
+    });
+    if (!response.ok) {
+      throw new Error(`Unable to download transcript (${response.status}): ${await response.text()}`);
+    }
+    return response.blob();
+  }
+
+  async uploadBatchTranscriptPdf(input: { orgId: string; batchId: string; file: File }): Promise<BatchTranscriptRecord> {
+    if (input.file.type !== 'application/pdf' && !input.file.name.toLowerCase().endsWith('.pdf')) {
+      throw new Error('Only PDF transcript files can be uploaded.');
+    }
+    if (input.file.size > 15 * 1024 * 1024) throw new Error('The batch transcript PDF must not exceed 15 MB.');
+    const token = await this.getAuthToken();
+    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    url.searchParams.set('action', 'upload-batch');
+    url.searchParams.set('orgId', input.orgId);
+    url.searchParams.set('batchId', input.batchId);
+    url.searchParams.set('fileName', input.file.name);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/pdf' },
+      body: input.file
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Unable to upload the consolidated batch TOR.');
+    return this.snakeToCamel(result.record) as BatchTranscriptRecord;
+  }
+
+  async downloadBatchTranscriptPdf(objectPath: string, orgId: string): Promise<Blob> {
+    const token = await this.getAuthToken();
+    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+    url.searchParams.set('action', 'download');
+    url.searchParams.set('orgId', orgId);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectPath, recordType: 'batch' })
+    });
+    if (!response.ok) throw new Error(`Unable to download batch transcript (${response.status}): ${await response.text()}`);
+    return response.blob();
+  }
+
+  private async payableRpc<T>(functionName: string, body: Record<string, unknown>): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/rpc/${functionName}`, {
+      method: 'POST',
+      headers: { ...(await this.getHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error(`AP transaction failed: ${response.status} - ${await response.text()}`);
+    }
+    return this.snakeToCamel(await response.json()) as T;
+  }
+
+  async postPayableBill(id: string, actorId: string): Promise<{ journalEntryId: string; payableId: string; idempotent: boolean }> {
+    return this.payableRpc('post_payable_bill', { p_payable_id: id, p_actor_id: actorId });
+  }
+
+  async postPayablePayment(input: {
+    paymentEventId: string;
+    payableIds: string[];
+    amounts: number[];
+    cashAccountId: string;
+    paymentDate: string;
+    paymentMethod: string;
+    actorId: string;
+  }): Promise<{ journalEntryId: string; paymentEventId: string; total: number; idempotent: boolean }> {
+    return this.payableRpc('post_payable_payment', {
+      p_payment_event_id: input.paymentEventId,
+      p_payable_ids: input.payableIds,
+      p_amounts: input.amounts,
+      p_cash_account_id: input.cashAccountId,
+      p_payment_date: input.paymentDate,
+      p_payment_method: input.paymentMethod,
+      p_actor_id: input.actorId,
+    });
+  }
+
+  async cancelPayable(id: string, actorId: string, reason: string): Promise<{ payableId: string; journalEntryId?: string; idempotent: boolean }> {
+    return this.payableRpc('cancel_payable', { p_payable_id: id, p_actor_id: actorId, p_reason: reason });
+  }
+
+  private async apMemoRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/ap-memos-write`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseKey,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'AP memo request failed');
+    return result;
+  }
+
+  async getAPMemosByOrg(orgId: string): Promise<any[]> {
+    const result = await this.apMemoRequest('list', { orgId });
+    return this.snakeToCamel(result.memos || []);
+  }
+
+  async createAPMemo(memo: any): Promise<any> {
+    const result = await this.apMemoRequest('create', { orgId: memo.orgId, memo });
+    return this.snakeToCamel(result.memo);
+  }
+
+  async updateAPMemo(id: string, updates: Partial<any>): Promise<any> {
+    const result = await this.apMemoRequest('update', { id, updates });
+    return this.snakeToCamel(result.memo);
+  }
+
+  async deleteAPMemo(id: string, actorId: string): Promise<void> {
+    await this.apMemoRequest('delete', { id, actorId });
+  }
+
+  async getNextAPMemoNumber(orgId: string, memoType: 'CREDIT' | 'DEBIT', memoDate: string, actorId: string): Promise<string> {
+    const result = await this.apMemoRequest('next_number', { orgId, memoType, memoDate, actorId });
+    return String(result.memoNumber);
+  }
+
+  async submitAPMemo(id: string, actorId: string): Promise<{ memoId: string; status: string; idempotent: boolean }> {
+    const result = await this.apMemoRequest('submit', { id, actorId });
+    return this.snakeToCamel(result.result);
+  }
+
+  async postAPMemo(id: string, actorId: string): Promise<{ memoId: string; journalEntryId: string; status: string; idempotent: boolean }> {
+    const result = await this.apMemoRequest('post', { id, actorId });
+    return this.snakeToCamel(result.result);
+  }
+
+  async reverseAPMemo(id: string, actorId: string, reason: string): Promise<{ memoId: string; journalEntryId: string; status: string; idempotent: boolean }> {
+    const result = await this.apMemoRequest('reverse', { id, actorId, reason });
+    return this.snakeToCamel(result.result);
+  }
+
+  async cancelAPMemo(id: string, actorId: string, reason: string): Promise<{ memoId: string; status: string; idempotent: boolean }> {
+    const result = await this.apMemoRequest('cancel', { id, actorId, reason });
+    return this.snakeToCamel(result.result);
+  }
+
+  private async apReclassificationRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    let response: Response;
+    try {
+      response = await fetch(`${this.supabaseUrl}/functions/v1/ap-reclassifications-write`, {
+        method: 'POST',
+        headers: { 'apikey': this.supabaseKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload }),
+      });
+    } catch {
+      throw new Error('AP Reclassification backend is unavailable. Deploy the database migration and ap-reclassifications-write Edge Function.');
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'AP reclassification request failed');
+    return result;
+  }
+
+  async getAPReclassificationsByOrg(orgId: string): Promise<any[]> {
+    const result = await this.apReclassificationRequest('list', { orgId });
+    return this.snakeToCamel(result.reclassifications || []);
+  }
+  async createAPReclassification(reclassification: any): Promise<any> {
+    const result = await this.apReclassificationRequest('create', { orgId: reclassification.orgId, reclassification });
+    return this.snakeToCamel(result.reclassification);
+  }
+  async updateAPReclassification(id: string, updates: any): Promise<any> {
+    const result = await this.apReclassificationRequest('update', { id, updates });
+    return this.snakeToCamel(result.reclassification);
+  }
+  async deleteAPReclassification(id: string, actorId: string): Promise<void> {
+    await this.apReclassificationRequest('delete', { id, actorId });
+  }
+  async submitAPReclassification(id: string, actorId: string): Promise<any> {
+    return this.snakeToCamel((await this.apReclassificationRequest('submit', { id, actorId })).result);
+  }
+  async postAPReclassification(id: string, actorId: string): Promise<any> {
+    return this.snakeToCamel((await this.apReclassificationRequest('post', { id, actorId })).result);
+  }
+  async reverseAPReclassification(id: string, actorId: string, reason: string): Promise<any> {
+    return this.snakeToCamel((await this.apReclassificationRequest('reverse', { id, actorId, reason })).result);
+  }
+  async cancelAPReclassification(id: string, actorId: string, reason: string): Promise<any> {
+    return this.snakeToCamel((await this.apReclassificationRequest('cancel', { id, actorId, reason })).result);
   }
 
   async getTimeExpensesByOrg(orgId: string): Promise<any[]> {
@@ -4584,9 +4878,12 @@ export class SupabaseDataService implements IDataService {
   async createJournalEntry(entry: any): Promise<any> {
     console.debug('[Supabase] createJournalEntry called with:', entry);
     try {
+      const snakeEntry = this.camelToSnake(entry);
+      if (!snakeEntry.approved_by && snakeEntry.posted_by) snakeEntry.approved_by = snakeEntry.posted_by;
+      if (!snakeEntry.approved_at && snakeEntry.posted_at) snakeEntry.approved_at = snakeEntry.posted_at;
       const payload = this.filterToTableSchema(
         'journal_entries',
-        this.camelToSnake(entry)
+        snakeEntry
       );
 
       // Convert empty strings to null for UUID columns
@@ -4617,9 +4914,12 @@ export class SupabaseDataService implements IDataService {
   async updateJournalEntry(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updateJournalEntry called with id:', id, 'updates:', updates);
     try {
+      const snakeUpdates = this.camelToSnake(updates);
+      if (!snakeUpdates.approved_by && snakeUpdates.posted_by) snakeUpdates.approved_by = snakeUpdates.posted_by;
+      if (!snakeUpdates.approved_at && snakeUpdates.posted_at) snakeUpdates.approved_at = snakeUpdates.posted_at;
       const payload = this.filterToTableSchema(
         'journal_entries',
-        this.camelToSnake(updates)
+        snakeUpdates
       );
 
       // Convert empty strings to null for UUID columns

@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, useEffect } from 'react';
 import {
   Vendor, Payable, PayableCategory, PayableStatus, InvoiceType, PaymentMethod,
-  PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder, Qualification
+  PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder, Qualification, User
 } from '../types';
 import { AccountingService } from '../accountingService';
 import ModalPortal from '../components/ModalPortal';
@@ -10,7 +10,7 @@ import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter } from '../services/IDataService';
 import {
   Search, Calculator, Building, Coins, AlertCircle, Calendar,
-  X, Plus, FileText, Edit, Trash2, Eye, CheckCircle, Clock,
+  X, Plus, FileText, Edit, Trash2, CheckCircle, Clock,
   DollarSign, ChevronDown, RefreshCw, CreditCard,
   BookOpen, Landmark, Receipt, TrendingUp, ArrowRight,
   Percent, Banknote, BarChart3, PieChart, Download, Printer, RotateCcw
@@ -30,6 +30,7 @@ interface PayablesViewProps {
   atcCategories?: any[];
   atcItems?: any[];
   atcRates?: any[];
+  employees?: User[];
   currentUserId?: string;
   onCreatePayable: (payable: Payable) => Payable | Promise<Payable>;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
@@ -56,8 +57,6 @@ const PAYABLE_CATEGORIES: { value: PayableCategory; label: string }[] = [
 const INVOICE_TYPES: { value: InvoiceType; label: string; color: string }[] = [
   { value: 'standard', label: 'Standard Invoice', color: 'text-gray-600' },
   { value: 'prepayment', label: 'Prepayment/Advance', color: 'text-violet-600' },
-  { value: 'credit_memo', label: 'Credit Memo', color: 'text-brand' },
-  { value: 'debit_memo', label: 'Debit Memo', color: 'text-rose-600' },
 ];
 
 const PAYMENT_METHODS: { value: PayablePaymentMethod; label: string }[] = [
@@ -90,14 +89,20 @@ const formatPayableDate = (value?: string) => {
 };
 
 const PAGE_SIZE = 10;
-const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualification_id,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,expense_account_id,expense_allocations,claimed_by,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,paid_amount,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
+const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualification_id,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,expense_account_id,expense_allocations,claimed_by,employee_id,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,paid_amount,memo_adjustment_total,invoice_type,input_vat_amount,input_vat_account_id,payment_method,payment_bank_account_id,check_number,check_date,reversal_journal_id,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
 
-const getPayableOutstanding = (payable: Payable) => Math.max(0, (payable.netPayable || payable.amount) - (payable.paidAmount || 0));
+const getPayableOutstanding = (payable: Payable) => Math.max(
+  0,
+  (payable.netPayable || payable.amount) + (payable.memoAdjustmentTotal || 0) - (payable.paidAmount || 0)
+);
 const getPayableClaimant = (payable: Payable) => {
   if (payable.claimedBy?.trim()) return payable.claimedBy.trim();
   const claimant = payable.notes?.match(/(?:Reimburse|Claimed by):\s*([^\r\n]+)/i)?.[1]?.trim();
   return claimant || '—';
 };
+const normalizeClaimant = (value?: string) => (value || '').trim().toLocaleLowerCase();
+const getPayeeKey = (payable: Payable) =>
+  payable.vendorId ? `vendor:${payable.vendorId}` : `employee:${payable.employeeId || ''}`;
 
 const PayablesView: React.FC<PayablesViewProps> = ({
   view = 'bills',
@@ -113,6 +118,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   atcCategories = [],
   atcItems = [],
   atcRates = [],
+  employees = [],
   currentUserId,
   onCreatePayable,
   onUpdatePayable,
@@ -147,6 +153,16 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [pageLoadError, setPageLoadError] = useState('');
   const [isSavingPayable, setIsSavingPayable] = useState(false);
+  const claimableEmployees = useMemo(
+    () => employees
+      .filter(employee => employee.role !== 'SYSTEM_ADMIN' && employee.role !== 'STUDENT' && !employee.isDeleted)
+      .sort((a, b) => {
+        if (a.role === 'ADMIN' && b.role !== 'ADMIN') return -1;
+        if (b.role === 'ADMIN' && a.role !== 'ADMIN') return 1;
+        return a.name.localeCompare(b.name);
+      }),
+    [employees],
+  );
 
   // Form state for Create/Edit
   const [formData, setFormData] = useState<Partial<Payable>>({
@@ -164,6 +180,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     glAccountId: '',
     expenseAccountId: '',
     claimedBy: '',
+    employeeId: '',
     notes: '',
     withholdingType: undefined,
     appliedRatePercent: 0,
@@ -289,9 +306,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     };
   }, [activeTab, currentPage, debouncedSearchTerm, orgId, payableFilters, refreshKey]);
 
-  // Get expense and liability accounts for dropdown
+  // Bills may capitalize an asset or recognize an expense.
   const expenseAccounts = useMemo(() =>
-    orgAccounts.filter(a => a.class === AccountClass.EXPENSE && !a.isHeader),
+    orgAccounts.filter(a => (a.class === AccountClass.EXPENSE || a.class === AccountClass.ASSET) && !a.isHeader),
     [orgAccounts]
   );
 
@@ -325,11 +342,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // AUTO-GENERATE REFERENCE NUMBER
   // ============================================================================
   const nextPayableNumber = useMemo(() => {
-    const prefix = formData.invoiceType === 'credit_memo'
-      ? 'CM'
-      : formData.invoiceType === 'debit_memo'
-        ? 'DM'
-        : 'BILL';
+    const prefix = 'BILL';
     const year = new Date().getFullYear();
     const matcher = new RegExp(`^${prefix}-${year}-(\\d+)$`, 'i');
     const highestSequence = payables
@@ -400,8 +413,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     const inputVat = formData.inputVatAmount || 0;
     const withholdingAmount = Number((amount * rate).toFixed(2));
     // For credit memos, net payable is negative
-    const multiplier = formData.invoiceType === 'credit_memo' ? -1 : 1;
-    const netPayable = Number(((amount + inputVat - withholdingAmount) * multiplier).toFixed(2));
+    const netPayable = Number((amount + inputVat - withholdingAmount).toFixed(2));
 
     setFormData(prev => ({
       ...prev,
@@ -471,7 +483,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (currentPage - 1) * PAGE_SIZE;
   const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverPayables.length, serverTotal);
   const handlePageChange = useFallbackRows ? setFallbackCurrentPage : setCurrentPage;
-  const payablePaymentEligible = (payable: Payable) => payable.status === 'approved' || payable.status === 'partially_paid';
+  const payablePaymentEligible = (payable: Payable) =>
+    (payable.status === 'approved' || payable.status === 'partially_paid') && !!payable.journalEntryId;
   const eligiblePagePayables = paginatedPayables.filter(payablePaymentEligible);
   const allEligiblePageSelected = eligiblePagePayables.length > 0 && eligiblePagePayables.every(payable => selectedPaymentIds.includes(payable.id));
 
@@ -612,6 +625,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       glAccountId: '',
       expenseAccountId: '',
       claimedBy: '',
+      employeeId: '',
       notes: '',
       withholdingType: undefined,
       appliedRatePercent: 0,
@@ -635,6 +649,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const populateEditForm = (payable: Payable) => {
+    const recordedClaimant = getPayableClaimant(payable).replace(/^—$/, '');
+    const selectedEmployee = claimableEmployees.find(employee => employee.id === payable.employeeId)
+      || claimableEmployees.find(employee => normalizeClaimant(employee.name) === normalizeClaimant(recordedClaimant));
     setSelectedPayable(payable);
     setFormData({
       vendorId: payable.vendorId,
@@ -651,7 +668,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       glAccountId: payable.glAccountId || '',
       expenseAccountId: payable.expenseAccountId || '',
       expenseAllocations: payable.expenseAllocations || [],
-      claimedBy: payable.claimedBy || getPayableClaimant(payable).replace(/^—$/, ''),
+      claimedBy: selectedEmployee?.name || recordedClaimant,
+      employeeId: selectedEmployee?.id || '',
       notes: payable.notes || '',
       withholdingType: payable.withholdingType,
       appliedRatePercent: payable.appliedRatePercent || 0,
@@ -688,9 +706,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const openPaymentModal = async (payable: Payable) => {
+    const payeeKey = getPayeeKey(payable);
     let vendorPayables = orgPayables.filter(candidate =>
-      candidate.vendorId === payable.vendorId &&
-      (candidate.status === 'approved' || candidate.status === 'partially_paid') &&
+      getPayeeKey(candidate) === payeeKey &&
+      payablePaymentEligible(candidate) &&
       getPayableOutstanding(candidate) > 0
     );
     try {
@@ -700,13 +719,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         columns: PAYABLE_COLUMNS,
         filters: [
           { column: 'org_id', operator: 'eq', value: orgId },
-          { column: 'vendor_id', operator: 'eq', value: payable.vendorId },
+          { column: payable.vendorId ? 'vendor_id' : 'employee_id', operator: 'eq', value: payable.vendorId || payable.employeeId },
           { column: 'status', operator: 'in', value: ['approved', 'partially_paid'] },
           { column: 'is_deleted', operator: 'eq', value: false }
         ],
         orderBy: [{ column: 'due_date', ascending: true }, { column: 'bill_date', ascending: true }]
       });
-      vendorPayables = result.rows.filter(candidate => getPayableOutstanding(candidate) > 0);
+      vendorPayables = result.rows.filter(candidate => payablePaymentEligible(candidate) && getPayableOutstanding(candidate) > 0);
     } catch (error) {
       console.error('[PayablesView] Failed to load vendor payables for payment:', error);
     }
@@ -741,19 +760,20 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const openMultiplePaymentModal = async () => {
     const selected = paginatedPayables.filter(payable =>
       selectedPaymentIds.includes(payable.id) &&
-      (payable.status === 'approved' || payable.status === 'partially_paid')
+      payablePaymentEligible(payable)
     );
     if (selected.length === 0) {
       onNotify('error', 'Select at least one approved payable to process.');
       return;
     }
-    const vendorIds = Array.from(new Set(selected.map(payable => payable.vendorId)));
-    if (vendorIds.length !== 1) {
-      onNotify('error', 'Multiple payments can only be processed for one vendor at a time.');
+    const payeeKeys = Array.from(new Set(selected.map(getPayeeKey)));
+    if (payeeKeys.length !== 1) {
+      onNotify('error', 'Multiple payments can only be processed for one supplier or claimant at a time.');
       return;
     }
+    const selectedPayee = selected[0];
     let vendorPayables = orgPayables.filter(payable =>
-      payable.vendorId === vendorIds[0] && payablePaymentEligible(payable) && getPayableOutstanding(payable) > 0
+      getPayeeKey(payable) === payeeKeys[0] && payablePaymentEligible(payable) && getPayableOutstanding(payable) > 0
     );
     try {
       const result = await DataServiceFactory.getService().fetchPage<Payable>('payables', {
@@ -762,13 +782,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
         columns: PAYABLE_COLUMNS,
         filters: [
           { column: 'org_id', operator: 'eq', value: orgId },
-          { column: 'vendor_id', operator: 'eq', value: vendorIds[0] },
+          { column: selectedPayee.vendorId ? 'vendor_id' : 'employee_id', operator: 'eq', value: selectedPayee.vendorId || selectedPayee.employeeId },
           { column: 'status', operator: 'in', value: ['approved', 'partially_paid'] },
           { column: 'is_deleted', operator: 'eq', value: false }
         ],
         orderBy: [{ column: 'due_date', ascending: true }, { column: 'bill_date', ascending: true }]
       });
-      vendorPayables = result.rows.filter(payable => getPayableOutstanding(payable) > 0);
+      vendorPayables = result.rows.filter(payable => payablePaymentEligible(payable) && getPayableOutstanding(payable) > 0);
     } catch (error) {
       console.error('[PayablesView] Failed to load vendor payables for allocation:', error);
     }
@@ -800,7 +820,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.vendorId) {
+    const isEmployeeReimbursement = formData.category === 'employee_reimbursements' && !!formData.expenseAllocations?.length;
+    if (!formData.vendorId && !isEmployeeReimbursement) {
       onNotify('error', 'Please select a vendor.');
       return;
     }
@@ -814,6 +835,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
     if (!formData.qualificationId && !formData.expenseAllocations?.length) {
       onNotify('error', 'Please select a class.');
+      return;
+    }
+    const selectedEmployee = claimableEmployees.find(employee => employee.id === formData.employeeId);
+    if (formData.expenseAllocations?.length && !selectedEmployee) {
+      onNotify('error', 'Please select the employee who claimed the consolidated expenses.');
       return;
     }
     const allocationTotal = (formData.expenseAllocations || []).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
@@ -849,7 +875,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       glAccountId: apAccountId,
       expenseAccountId: formData.expenseAccountId,
       expenseAllocations: formData.expenseAllocations,
-      claimedBy: formData.claimedBy?.trim() || undefined,
+      claimedBy: selectedEmployee?.name || undefined,
+      employeeId: selectedEmployee?.id || undefined,
       notes: formData.notes,
       withholdingType: formData.withholdingType,
       atcItemId: undefined,
@@ -886,7 +913,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
     if (!selectedPayable) return;
 
-    if (!formData.vendorId) {
+    const isEmployeeReimbursement = formData.category === 'employee_reimbursements' && !!formData.expenseAllocations?.length;
+    if (!formData.vendorId && !isEmployeeReimbursement) {
       onNotify('error', 'Please select a vendor.');
       return;
     }
@@ -898,6 +926,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       onNotify('error', 'Please select a class.');
       return;
     }
+    const selectedEmployee = claimableEmployees.find(employee => employee.id === formData.employeeId);
+    if (formData.expenseAllocations?.length && !selectedEmployee) {
+      onNotify('error', 'Please select the employee who claimed the consolidated expenses.');
+      return;
+    }
     const allocationTotal = (formData.expenseAllocations || []).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
     if (formData.expenseAllocations?.some(allocation => !allocation.expenseAccountId || !allocation.qualificationId || !(Number(allocation.amount) > 0))) {
       onNotify('error', 'Every consolidated expense line requires an expense account, class, and amount greater than zero.');
@@ -905,7 +938,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     const updates: Partial<Payable> = {
-      vendorId: formData.vendorId,
+      vendorId: formData.vendorId || undefined,
       payableNumber: formData.payableNumber,
       category: formData.category as PayableCategory,
       qualificationId: formData.qualificationId,
@@ -919,7 +952,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       glAccountId: formData.glAccountId,
       expenseAccountId: formData.expenseAccountId,
       expenseAllocations: formData.expenseAllocations,
-      claimedBy: formData.claimedBy?.trim() || undefined,
+      claimedBy: selectedEmployee?.name || undefined,
+      employeeId: selectedEmployee?.id || undefined,
       notes: formData.notes,
       withholdingType: formData.withholdingType,
       appliedRatePercent: formData.appliedRatePercent,
@@ -987,20 +1021,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // POST TO GL HANDLER
   // ============================================================================
   const handleApprovePayable = async (payableToPost: Payable) => {
-    if (!onPostJournal) {
-      onNotify('error', 'Cannot approve this payable because GL posting is unavailable.');
-      return;
-    }
-
-    const vendor = orgVendors.find(v => v.id === payableToPost.vendorId);
-    const expenseAccount = orgAccounts.find(a => a.id === payableToPost.expenseAccountId);
     const expenseAllocations = payableToPost.expenseAllocations || [];
     const allocatedTotal = expenseAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
     const invalidAllocation = expenseAllocations.find(allocation =>
       !allocation.expenseAccountId
       || !allocation.qualificationId
       || !(Number(allocation.amount) > 0)
-      || !orgAccounts.some(account => account.id === allocation.expenseAccountId && account.class === 'EXPENSE' && !account.isHeader)
+      || !orgAccounts.some(account => account.id === allocation.expenseAccountId && (account.class === 'EXPENSE' || account.class === 'ASSET') && !account.isHeader)
     );
     const apAccount = orgAccounts.find(a => a.id === payableToPost.glAccountId) || apControlAccount;
 
@@ -1009,177 +1036,60 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       return;
     }
     if (invalidAllocation) {
-      onNotify('error', 'One or more expense allocations use an invalid expense account or amount.');
+      onNotify('error', 'One or more allocations use an invalid Expense or Asset account or amount.');
       return;
     }
     if (expenseAllocations.length && Math.abs(allocatedTotal - Number(payableToPost.amount)) > 0.01) {
       onNotify('error', 'The consolidated expense allocations do not equal the AP Bill amount.');
       return;
     }
-    if (!expenseAllocations.length && !expenseAccount && payableToPost.invoiceType === 'standard') {
-      onNotify('error', 'Expense Account not selected.');
+    if (!expenseAllocations.length && !orgAccounts.some(account =>
+      account.id === payableToPost.expenseAccountId
+      && (account.class === 'EXPENSE' || account.class === 'ASSET')
+      && !account.isHeader
+    )) {
+      onNotify('error', 'Select a valid Expense or Asset account.');
       return;
     }
-
-    const lines: JournalLine[] = [];
-    const amount = payableToPost.amount;
-    const withholdingAmount = payableToPost.withholdingAmount || 0;
-    const inputVat = payableToPost.inputVatAmount || 0;
-    const netPayable = payableToPost.netPayable || amount;
-    const isCreditMemo = payableToPost.invoiceType === 'credit_memo';
-
-    if (isCreditMemo) {
-      // Credit Memo Entry (reverse of standard):
-      // DR Accounts Payable
-      // CR Expense
-      lines.push({
-        id: `jl-${Date.now()}-1`,
-        journalEntryId: '',
-        orgId,
-        accountId: apAccount.id,
-        description: `Credit Memo from ${vendor?.name}`,
-        debit: Math.abs(netPayable),
-        credit: 0,
-        contactId: payableToPost.vendorId,
-        contactType: 'VENDOR',
-      });
-
-      if (expenseAllocations.length) {
-        expenseAllocations.forEach((allocation, index) => {
-          lines.push({
-            id: `jl-${Date.now()}-expense-${index}`,
-            journalEntryId: '',
-            orgId,
-            accountId: allocation.expenseAccountId,
-            description: allocation.description || payableToPost.description,
-            debit: 0,
-            credit: Number(allocation.amount),
-            contactId: payableToPost.vendorId,
-            contactType: 'VENDOR',
-            classificationCode: qualifications.find(q => q.id === allocation.qualificationId)?.code,
-          });
-        });
-      } else if (expenseAccount) {
-        lines.push({
-          id: `jl-${Date.now()}-2`,
-          journalEntryId: '',
-          orgId,
-          accountId: expenseAccount.id,
-          description: `Credit Memo - ${payableToPost.description}`,
-          debit: 0,
-          credit: amount,
-          contactId: payableToPost.vendorId,
-          contactType: 'VENDOR',
-          classificationCode: qualifications.find(q => q.id === payableToPost.qualificationId)?.code,
-        });
-      }
-    } else {
-      // Standard Invoice Entry:
-      // DR Expense
-      if (expenseAllocations.length) {
-        expenseAllocations.forEach((allocation, index) => {
-          lines.push({
-            id: `jl-${Date.now()}-expense-${index}`,
-            journalEntryId: '',
-            orgId,
-            accountId: allocation.expenseAccountId,
-            description: allocation.description || payableToPost.description,
-            debit: Number(allocation.amount),
-            credit: 0,
-            contactId: payableToPost.vendorId,
-            contactType: 'VENDOR',
-            classificationCode: qualifications.find(q => q.id === allocation.qualificationId)?.code,
-          });
-        });
-      } else if (expenseAccount) {
-        lines.push({
-          id: `jl-${Date.now()}-1`,
-          journalEntryId: '',
-          orgId,
-          accountId: expenseAccount.id,
-          description: `${payableToPost.description}`,
-          debit: amount,
-          credit: 0,
-          contactId: payableToPost.vendorId,
-          contactType: 'VENDOR',
-          classificationCode: qualifications.find(q => q.id === payableToPost.qualificationId)?.code,
-        });
-      }
-
-      // DR Input VAT (if applicable)
-      if (inputVat > 0 && inputVatAccount) {
-        lines.push({
-          id: `jl-${Date.now()}-2`,
-          journalEntryId: '',
-          orgId,
-          accountId: inputVatAccount.id,
-          description: `Input VAT - ${payableToPost.payableNumber}`,
-          debit: inputVat,
-          credit: 0,
-        });
-      }
-
-      // CR Withholding Tax Payable (if applicable)
-      if (withholdingAmount > 0 && withholdingTaxAccount) {
-        lines.push({
-          id: `jl-${Date.now()}-3`,
-          journalEntryId: '',
-          orgId,
-          accountId: withholdingTaxAccount.id,
-          description: `Withholding Tax - ${vendor?.name}`,
-          debit: 0,
-          credit: withholdingAmount,
-        });
-      }
-
-      // CR Accounts Payable
-      lines.push({
-        id: `jl-${Date.now()}-4`,
-        journalEntryId: '',
-        orgId,
-        accountId: apAccount.id,
-        description: `Payable to ${vendor?.name}`,
-        debit: 0,
-        credit: netPayable,
-        contactId: payableToPost.vendorId,
-        contactType: 'VENDOR',
-      });
+    if (!currentUserId) return onNotify('error', 'A signed-in user is required to approve a bill.');
+    try {
+      const result = await DataServiceFactory.getService().postPayableBill(payableToPost.id, currentUserId);
+      setRefreshKey(key => key + 1);
+      onNotify('success', result.idempotent
+        ? `${payableToPost.payableNumber} was already posted; no duplicate journal was created.`
+        : `Bill journal posted for ${payableToPost.payableNumber}.`);
+      setShowPostGLModal(false);
+      setShowViewModal(false);
+      setSelectedPayable(null);
+    } catch (error) {
+      console.error('[PayablesView] Bill posting failed:', error);
+      onNotify('error', error instanceof Error ? error.message : 'Bill approval failed.');
     }
+  };
 
-    const journalEntry: Partial<JournalEntry> = {
-      orgId,
-      date: payableToPost.billDate,
-      reference: payableToPost.payableNumber,
-      description: `${isCreditMemo ? 'Credit Memo' : 'Vendor Bill'}: ${payableToPost.description}`,
-      sourceType: isCreditMemo ? 'CREDIT_MEMO' : 'BILL',
-      status: 'POSTED',
-    };
-
-    const postedEntry = await onPostJournal(journalEntry, lines);
-    if (!postedEntry) {
-      onNotify('error', 'Approval stopped because the journal entry could not be posted.');
-      return;
+  const handleCancelPayable = async (payable: Payable) => {
+    if (!currentUserId) return onNotify('error', 'A signed-in user is required to cancel a bill.');
+    const reason = window.prompt(`Reason for cancelling ${payable.payableNumber}:`)?.trim();
+    if (!reason) return;
+    try {
+      await DataServiceFactory.getService().cancelPayable(payable.id, currentUserId, reason);
+      setShowViewModal(false);
+      setSelectedPayable(null);
+      setRefreshKey(key => key + 1);
+      onNotify('success', payable.journalEntryId
+        ? `${payable.payableNumber} was cancelled with a reversing journal.`
+        : `${payable.payableNumber} was cancelled.`);
+    } catch (error) {
+      console.error('[PayablesView] Payable cancellation failed:', error);
+      onNotify('error', error instanceof Error ? error.message : 'Unable to cancel the bill.');
     }
-
-    await onUpdatePayable(payableToPost.id, {
-      journalEntryId: postedEntry.id,
-      status: 'approved',
-      approvedBy: currentUserId,
-      approvedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    setRefreshKey(key => key + 1);
-
-    onNotify('success', `Journal entry posted for ${payableToPost.payableNumber}.`);
-    setShowPostGLModal(false);
-    setSelectedPayable(null);
   };
 
   // ============================================================================
   // PAYMENT HANDLER
   // ============================================================================
   const handleProcessPayment = async () => {
-    if (paymentPayables.length === 0 || !onPostJournal || isProcessingPayment) {
+    if (paymentPayables.length === 0 || isProcessingPayment) {
       onNotify('error', 'Cannot process payment.');
       return;
     }
@@ -1190,11 +1100,14 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     const bankAccount = orgBankAccounts.find(b => b.id === paymentData.bankAccountId);
-    const cashAccount = orgAccounts.find(a => a.id === bankAccount?.glAccountId) ||
-      assetAccounts.find(a => a.name.toLowerCase().includes('cash'));
+    const cashAccount = paymentData.paymentMethod === 'CASH'
+      ? assetAccounts.find(a => !a.isHeader && a.name.toLowerCase().includes('cash'))
+      : orgAccounts.find(a => a.id === bankAccount?.glAccountId && a.class === 'ASSET' && !a.isHeader);
 
     if (!cashAccount) {
-      onNotify('error', 'Cash/Bank account not found.');
+      onNotify('error', paymentData.paymentMethod === 'CASH'
+        ? 'Configure a Cash asset account before paying by cash.'
+        : 'Select a bank account with a valid linked GL asset account.');
       return;
     }
     const payableAmounts = paymentPayables
@@ -1222,63 +1135,19 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       return;
     }
 
-    // Payment Entry:
-    // DR Accounts Payable
-    // CR Cash/Bank
-    const timestamp = Date.now();
-    const lines: JournalLine[] = [
-      ...payableAmounts.map(({ payable, amount, apAccount }, index) => ({
-        id: `jl-${timestamp}-${index + 1}`,
-        journalEntryId: '',
-        orgId,
-        accountId: apAccount!.id,
-        description: `Payment to ${getVendorName(payable.vendorId)} - ${payable.payableNumber}`,
-        debit: amount,
-        credit: 0,
-        contactId: payable.vendorId,
-        contactType: 'VENDOR',
-      } as JournalLine)),
-      {
-        id: `jl-${timestamp}-bank`,
-        journalEntryId: '',
-        orgId,
-        accountId: cashAccount.id,
-        description: `Payment - ${paymentPayables.map(payable => payable.payableNumber).join(', ')}${paymentData.checkNumber ? ` (Check #${paymentData.checkNumber})` : ''}`,
-        debit: 0,
-        credit: totalPayment,
-      },
-    ];
-
-    const journalEntry: Partial<JournalEntry> = {
-      orgId,
-      date: paymentData.paymentDate,
-      reference: AccountingService.getNextReference(orgEntries, 'PV'),
-      description: paymentPayables.length === 1
-        ? `Payment for ${paymentPayables[0].payableNumber}`
-        : `Batch payment for ${paymentPayables.length} bills`,
-      sourceType: 'PAYMENT',
-      status: 'POSTED',
-    };
-
     setIsProcessingPayment(true);
     try {
-      await onPostJournal(journalEntry, lines);
-      await Promise.all(payableAmounts.map(({ payable, amount }) => {
-        const paidAmount = Math.round(((payable.paidAmount || 0) + amount) * 100) / 100;
-        const totalDue = payable.netPayable || payable.amount;
-        const status: PayableStatus = totalDue - paidAmount <= 0.005 ? 'paid' : 'partially_paid';
-        return Promise.resolve(onUpdatePayable(payable.id, {
-        status,
-        paidAmount,
+      if (!currentUserId) throw new Error('A signed-in user is required to post a payment.');
+      const paymentEventId = crypto.randomUUID();
+      await DataServiceFactory.getService().postPayablePayment({
+        paymentEventId,
+        payableIds: payableAmounts.map(item => item.payable.id),
+        amounts: payableAmounts.map(item => item.amount),
+        cashAccountId: cashAccount.id,
         paymentDate: paymentData.paymentDate,
         paymentMethod: paymentData.paymentMethod,
-        paymentBankAccountId: paymentData.bankAccountId,
-        checkNumber: paymentData.checkNumber,
-        checkDate: paymentData.checkDate,
-        paidBy: currentUserId,
-        paidAt: status === 'paid' ? new Date().toISOString() : undefined,
-      }));
-      }));
+        actorId: currentUserId,
+      });
       setRefreshKey(key => key + 1);
       onNotify('success', `Payment of \u20B1${formatCurrency(totalPayment)} allocated across ${payableAmounts.length} bill${payableAmounts.length === 1 ? '' : 's'}.`);
       setShowPaymentModal(false);
@@ -1385,15 +1254,14 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <RotateCcw size={16} />
           </button>
 
-          {selectedPaymentIds.length > 0 && (
-            <button
-              type="button"
-              onClick={openMultiplePaymentModal}
-              className="inline-flex h-9 items-center gap-2 rounded bg-brand px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
-            >
-              <Landmark size={15} /> Process Selected ({selectedPaymentIds.length})
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openMultiplePaymentModal}
+            disabled={selectedPaymentIds.length === 0}
+            className="inline-flex h-9 items-center gap-2 rounded bg-brand px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+          >
+            <Landmark size={15} /> Process Payment{selectedPaymentIds.length > 0 ? ` (${selectedPaymentIds.length})` : ''}
+          </button>
 
           <p className="ml-auto text-xs text-gray-500">
           Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching payable{totalItems !== 1 ? 's' : ''}
@@ -1441,11 +1309,22 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
                   const remainingBalance = getPayableOutstanding(payable);
                   const isPosted = !!payable.journalEntryId;
-                  const claimant = getPayableClaimant(payable);
+                  const claimant = employees.find(employee => employee.id === payable.employeeId)?.name || getPayableClaimant(payable);
 
                   return (
-                    <tr key={payable.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-3 py-3 text-center">
+                    <tr
+                      key={payable.id}
+                      tabIndex={0}
+                      onClick={() => openViewModal(payable)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openViewModal(payable);
+                        }
+                      }}
+                      className="cursor-pointer hover:bg-gray-50 focus:bg-brand/5 focus:outline-none transition-colors group"
+                    >
+                      <td className="px-3 py-3 text-center" onClick={event => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           aria-label={`Select ${payable.payableNumber} for payment`}
@@ -1518,49 +1397,40 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openViewModal(payable)}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
                           {payable.status !== 'paid' && payable.status !== 'cancelled' && (
                             <>
-                              {!isPosted && (
-                                <button
-                                  onClick={() => openEditModal(payable)}
-                                  className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
-                                  title="Edit"
-                                >
-                                  <Edit size={16} />
-                                </button>
-                              )}
-                              {!isPosted && (
-                                <button
-                                  onClick={() => setConfirmDelete(payable.id)}
-                                  className="p-1.5 hover:bg-gray-100 rounded-lg text-rose-500 transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              )}
+                              <button
+                                disabled={isPosted || payable.status === 'approved'}
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  openEditModal(payable);
+                                }}
+                                className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+                                title={payable.status === 'approved' ? 'Approved bills cannot be edited' : 'Edit'}
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                disabled={isPosted || payable.status === 'approved'}
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  setConfirmDelete(payable.id);
+                                }}
+                                className="p-1.5 hover:bg-gray-100 rounded-lg text-rose-500 transition-colors disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+                                title={payable.status === 'approved' ? 'Approved bills cannot be deleted' : 'Delete'}
+                              >
+                                <Trash2 size={16} />
+                              </button>
                               {payable.status === 'for_approval' && (
                                 <button
-                                  onClick={() => void handleApprovePayable(payable)}
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    void handleApprovePayable(payable);
+                                  }}
                                   className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
                                   title={payable.expenseAllocations?.length ? `Approve ${payable.expenseAllocations.length} consolidated expenses` : 'Approve'}
                                 >
                                   <CheckCircle size={16} />
-                                </button>
-                              )}
-                              {(payable.status === 'approved' || payable.status === 'partially_paid') && onPostJournal && (
-                                <button
-                                  onClick={() => openPaymentModal(payable)}
-                                  className="p-1.5 hover:bg-brand-light rounded-lg text-brand transition-colors"
-                                  title="Process Payment"
-                                >
-                                  <Landmark size={16} />
                                 </button>
                               )}
                             </>
@@ -1794,6 +1664,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           expenseAccounts={expenseAccounts}
           liabilityAccounts={liabilityAccounts}
           qualifications={qualifications}
+          claimableEmployees={claimableEmployees}
           onSubmit={showCreateModal ? handleCreate : handleUpdate}
           onClose={() => {
             setShowCreateModal(false);
@@ -1869,11 +1740,12 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           accounts={orgAccounts}
           qualifications={qualifications}
           onClose={() => { setShowViewModal(false); setSelectedPayable(null); }}
-          onApprove={() => { handleStatusChange(selectedPayable.id, 'approved'); setShowViewModal(false); }}
+          onApprove={() => { void handleApprovePayable(selectedPayable); }}
           onProcessPayment={() => { setShowViewModal(false); openPaymentModal(selectedPayable); }}
+          onCancel={() => { void handleCancelPayable(selectedPayable); }}
           onPostGL={() => { setShowViewModal(false); openPostGLModal(selectedPayable); }}
-          canPost={!!onPostJournal && !selectedPayable.journalEntryId && selectedPayable.status === 'for_approval'}
-          canPay={!!onPostJournal && (selectedPayable.status === 'approved' || selectedPayable.status === 'partially_paid')}
+          canPost={!selectedPayable.journalEntryId && selectedPayable.status === 'for_approval'}
+          canPay={payablePaymentEligible(selectedPayable) && getPayableOutstanding(selectedPayable) > 0}
         />
       )}
 
@@ -2147,6 +2019,7 @@ interface PayableFormPageProps {
   expenseAccounts: ChartOfAccount[];
   liabilityAccounts: ChartOfAccount[];
   qualifications: Qualification[];
+  claimableEmployees: User[];
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   submitLabel: string;
@@ -2163,6 +2036,7 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
   expenseAccounts,
   liabilityAccounts,
   qualifications,
+  claimableEmployees,
   onSubmit,
   onClose,
   submitLabel,
@@ -2209,16 +2083,16 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
           <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-              <Building size={12} /> Vendor *
+              <Building size={12} /> Vendor {formData.category === 'employee_reimbursements' ? '(optional)' : '*'}
             </label>
             <select
-              required
+              required={formData.category !== 'employee_reimbursements'}
               disabled={isEdit}
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium appearance-none disabled:opacity-60"
               value={formData.vendorId || ''}
               onChange={e => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
             >
-              <option value="">Select Vendor...</option>
+              <option value="">{formData.category === 'employee_reimbursements' ? 'No vendor — reimburse claimant' : 'Select Vendor...'}</option>
               {vendors.filter(v => v.status !== 'blocked').map(v => (
                 <option key={v.id} value={v.id}>{v.name} {v.tin ? `(${v.tin})` : ''}</option>
               ))}
@@ -2226,14 +2100,26 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Claimed By</label>
-            <input
-              type="text"
+            <select
               required={!!formData.expenseAllocations?.length}
-              placeholder="Employee being reimbursed"
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
-              value={formData.claimedBy || ''}
-              onChange={e => setFormData(prev => ({ ...prev, claimedBy: e.target.value }))}
-            />
+              value={formData.employeeId || ''}
+              onChange={e => {
+                const employee = claimableEmployees.find(item => item.id === e.target.value);
+                setFormData(prev => ({
+                  ...prev,
+                  employeeId: employee?.id || '',
+                  claimedBy: employee?.name || '',
+                }));
+              }}
+            >
+              <option value="">Select employee...</option>
+              {claimableEmployees.map(employee => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name} — {employee.role === 'ADMIN' ? 'Tenant Admin' : employee.role.replaceAll('_', ' ')}
+                </option>
+              ))}
+            </select>
           </div>
           </div>
 
@@ -2279,14 +2165,14 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
           {!formData.expenseAllocations?.length && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-brand uppercase tracking-wide">Expense Account *</label>
+              <label className="text-xs font-semibold text-brand uppercase tracking-wide">Expense / Asset Account *</label>
               <select
                 required={formData.invoiceType === 'standard'}
                 className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded outline-none focus:border-brand text-sm font-medium appearance-none"
                 value={formData.expenseAccountId || ''}
                 onChange={e => setFormData(prev => ({ ...prev, expenseAccountId: e.target.value }))}
               >
-                <option value="">Select Expense Account...</option>
+                <option value="">Select Expense or Asset Account...</option>
                 {expenseAccounts.map(a => (
                   <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                 ))}
@@ -2550,6 +2436,7 @@ interface PayableDetailModalProps {
   onClose: () => void;
   onApprove: () => void;
   onProcessPayment: () => void;
+  onCancel: () => void;
   onPostGL: () => void;
   canPost: boolean;
   canPay: boolean;
@@ -2563,6 +2450,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   onClose,
   onApprove,
   onProcessPayment,
+  onCancel,
   onPostGL,
   canPost,
   canPay,
@@ -2712,6 +2600,14 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
                 className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors flex items-center justify-center gap-2"
               >
                 <Landmark size={16} /> Pay
+              </button>
+            )}
+            {(payable.status === 'for_approval' || (payable.status === 'approved' && !(payable.paidAmount || 0))) && (
+              <button
+                onClick={onCancel}
+                className="flex-1 py-3 border border-rose-200 text-rose-700 rounded text-sm font-bold hover:bg-rose-50 transition-colors"
+              >
+                Cancel Bill
               </button>
             )}
           </div>

@@ -184,15 +184,15 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
           </div>
 
           <div className="space-y-8">
-            <div className="bg-gray-800 p-8 rounded-md shadow-sm shadow-gray-300/20 text-white">
+            <div className="bg-white p-8 rounded-md border border-gray-200 shadow-sm text-gray-800">
                <h4 className="text-xs font-semibold uppercase tracking-wide mb-6" style={{ color: brandColor }}>Inventory Velocity Summary</h4>
                <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                     <p className="text-xs font-bold text-gray-400">Average Retention</p>
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                     <p className="text-xs font-bold text-gray-500">Average Retention</p>
                      <p className="text-xl font-semibold">{agingReport.length ? Math.round(agingReport.reduce((a,b)=>a+b.daysInStock,0)/agingReport.length) : 0} Days</p>
                   </div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                     <p className="text-xs font-bold text-gray-400">Total Asset Value</p>
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                     <p className="text-xs font-bold text-gray-500">Total Asset Value</p>
                      <p className="text-xl font-semibold">{currency} {valuationReport.reduce((a,b)=>a+b.totalValue, 0).toLocaleString()}</p>
                   </div>
                </div>
@@ -227,16 +227,16 @@ const AdvancedInventoryReports: React.FC<AdvancedInventoryReportsProps> = ({
         </div>
       )}
 
-      <footer className="p-8 bg-gray-800 rounded-md flex flex-col md:flex-row justify-between items-center gap-6">
+      <footer className="p-8 bg-white border border-gray-200 shadow-sm rounded-md flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
              <div className="p-3 rounded text-white shadow-lg shadow-gray-300/30" style={{ backgroundColor: brandColor }}><FileText size={20} /></div>
              <div>
-                <p className="text-xs font-semibold text-white uppercase tracking-wide">Logistics Integrity Snapshot</p>
+                <p className="text-xs font-semibold text-gray-800 uppercase tracking-wide">Logistics Integrity Snapshot</p>
                 <p className="text-xs font-bold uppercase" style={{ color: brandColor }}>Computed: {new Date().toLocaleString()}</p>
              </div>
           </div>
           <div className="flex gap-4">
-             <button className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded text-xs font-semibold uppercase tracking-wide transition-all">Report Discrepancy</button>
+             <button className="px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded text-xs font-semibold uppercase tracking-wide transition-all">Report Discrepancy</button>
              <button className="px-6 py-3 text-white rounded text-xs font-semibold uppercase tracking-wide transition-all shadow-lg shadow-gray-300/30" style={{ backgroundColor: brandColor }}>Schedule Audit</button>
           </div>
       </footer>
