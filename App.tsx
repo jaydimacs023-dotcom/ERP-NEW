@@ -3080,23 +3080,35 @@ export default function App() {
   };
 
   const handleBatchAddStudents = async (newStudents: Student[]) => {
+    const savedStudents: Student[] = [];
     try {
       console.info('[App] Batch adding students:', newStudents.length);
       const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
 
-      // Create each student
-      const savedStudents = await Promise.all(
-        studentsWithOrg.map(s => dataService.createStudent(s))
-      );
+      // Insert sequentially so a failure can be identified and prior writes can be rolled back.
+      for (let index = 0; index < studentsWithOrg.length; index += 1) {
+        try {
+          savedStudents.push(await dataService.createStudent(studentsWithOrg[index]));
+        } catch (error) {
+          const learner = studentsWithOrg[index];
+          throw new Error(
+            `Import stopped at record ${index + 1} (${learner.lastName}, ${learner.firstName}): ${error instanceof Error ? error.message : 'database write failed'}`
+          );
+        }
+      }
 
       setStudents(prev => [...prev, ...savedStudents]);
       handleNotify('success', `${newStudents.length} students imported successfully`);
     } catch (error) {
       console.error('[App] Error batch adding students:', error);
-      handleNotify('error', 'Failed to import students. Falling back to memory storage.');
-      // Fallback to memory storage
-      const studentsWithOrg = newStudents.map(s => ({ ...s, orgId: currentOrgId }));
-      setStudents(prev => [...prev, ...studentsWithOrg]);
+      if (savedStudents.length) {
+        const rollbackResults = await Promise.allSettled(savedStudents.map(student => dataService.deleteStudent(student.id)));
+        const rollbackFailures = rollbackResults.filter(result => result.status === 'rejected').length;
+        if (rollbackFailures) {
+          throw new Error(`${error instanceof Error ? error.message : 'Import failed'}. ${rollbackFailures} inserted record(s) could not be rolled back; contact an administrator.`);
+        }
+      }
+      throw error;
     }
   };
 

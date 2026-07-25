@@ -42,6 +42,7 @@ const getSlotHours = (start: string, end: string) => {
 
 const PAGE_SIZE = 7;
 const BATCH_COLUMNS = 'id,org_id,batch_code,name,year,qualification_id,trainer_id,sponsor_id,location_id,student_ids,status,start_date,end_date,max_students,current_students,created_at,updated_at';
+const AVAILABLE_LEARNERS_CHUNK_SIZE = 20;
 
 const calculateProjectedEndDate = (
   startDateStr: string,
@@ -152,6 +153,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [viewingBatch, setViewingBatch] = useState<Batch | null>(null);
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [visibleAvailableStudentCount, setVisibleAvailableStudentCount] = useState(AVAILABLE_LEARNERS_CHUNK_SIZE);
 
   const [formData, setFormData] = useState<Partial<Batch>>({
     name: '',
@@ -530,6 +532,25 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         ].join(' ').toLowerCase().includes(term);
       });
   }, [students, formData.studentIds, studentSearchTerm, formData.qualificationId, batches, editingBatch]);
+
+  const visibleAvailableStudents = useMemo(
+    () => availableStudents.slice(0, visibleAvailableStudentCount),
+    [availableStudents, visibleAvailableStudentCount]
+  );
+
+  useEffect(() => {
+    setVisibleAvailableStudentCount(AVAILABLE_LEARNERS_CHUNK_SIZE);
+  }, [studentSearchTerm, formData.qualificationId, editingBatch?.id, showModal]);
+
+  const handleAvailableStudentsScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const container = event.currentTarget;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+    if (!isNearBottom || visibleAvailableStudentCount >= availableStudents.length) return;
+
+    setVisibleAvailableStudentCount(currentCount =>
+      Math.min(currentCount + AVAILABLE_LEARNERS_CHUNK_SIZE, availableStudents.length)
+    );
+  };
 
   const downloadCsv = () => {
     const headersSummary = ['Batch ID', 'Batch Code', 'Name', 'Year', 'Qualification', 'Trainer', 'Sponsor', 'Location', 'Status', 'Start Date', 'End Date', 'Students', 'Max Students'];
@@ -1342,16 +1363,27 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                         <span className="text-xs font-semibold text-gray-500">{availableStudents.length}</span>
                       </div>
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <Search
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                          size={16}
+                          aria-hidden="true"
+                        />
                         <input
+                          type="search"
                           value={studentSearchTerm}
                           onChange={e => setStudentSearchTerm(e.target.value)}
                           placeholder="Search name, ULI, or email..."
-                          className="w-full pl-9 pr-3 py-3 bg-white border border-gray-200 rounded text-xs font-semibold text-gray-700 outline-none focus:border-brand"
+                          aria-label="Search available learners by name, ULI, or email"
+                          className="w-full pr-3 py-3 bg-white border border-gray-200 rounded text-xs font-semibold text-gray-700 outline-none focus:border-brand"
+                          style={{ paddingLeft: '2.75rem' }}
                         />
                       </div>
-                      <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
-                        {availableStudents.map(student => (
+                      <div
+                        className="max-h-[420px] overflow-y-auto space-y-2 pr-1"
+                        onScroll={handleAvailableStudentsScroll}
+                        aria-label="Available learners"
+                      >
+                        {visibleAvailableStudents.map(student => (
                           <button
                             key={student.id}
                             type="button"
@@ -1384,6 +1416,11 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                             <Search size={28} className="mx-auto text-gray-200 mb-3" />
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">No available learners match the search.</p>
                           </div>
+                        )}
+                        {availableStudents.length > 0 && (
+                          <p className="py-2 text-center text-xs font-medium text-gray-400" aria-live="polite">
+                            Showing {visibleAvailableStudents.length} of {availableStudents.length}
+                          </p>
                         )}
                       </div>
                     </div>

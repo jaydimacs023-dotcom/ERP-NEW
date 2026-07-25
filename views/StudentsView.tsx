@@ -22,6 +22,12 @@ import {
 } from 'lucide-react';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter } from '../services/IDataService';
+import {
+  createLearnerCsvTemplate,
+  LEARNER_CSV_HEADERS,
+  LearnerCsvError,
+  readLearnerCsv,
+} from '../services/LearnerCsvService';
 
 interface Toast {
   id: string;
@@ -47,17 +53,10 @@ interface StudentsViewProps {
   onAddStudent: (student: Student) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
-  onBatchAddStudents: (students: Student[]) => void;
+  onBatchAddStudents: (students: Student[]) => Promise<void>;
 }
 
 const MANDATORY_DOCS = REQUIRED_STUDENT_DOCUMENTS;
-
-const CSV_HEADERS = [
-  'Last Name', 'First Name', 'Middle Name', 'Extension Name', 'ULI', 'Contact Number',
-  'E-mail Address', 'Street Address', 'Barangay', 'Municipality/City', 'District',
-  'Province', 'Sex', 'Date of Birth (mm-dd-yy)', 'Age', 'Civil Status',
-  'Highest Educational Attainment', 'Nationality'
-];
 
 const PAGE_SIZE = 7;
 const STUDENT_COLUMNS = 'id,org_id,uli,last_name,first_name,middle_name,extension,sex,date_of_birth,email,contact_number,street,barangay,city,province,guardian,location_id,sponsor_id,documents,created_at,updated_at,profile_photo,mailing_region,tesda_employment_status,tesda_employment_type,tesda_learner_classifications,tesda_other_classification,tesda_disability_types,tesda_disability_causes,tesda_course_qualification,tesda_scholarship_package,tesda_privacy_consent';
@@ -241,6 +240,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [importPreview, setImportPreview] = useState<Student[]>([]);
+  const [importErrors, setImportErrors] = useState<LearnerCsvError[]>([]);
+  const [importTotalRows, setImportTotalRows] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
+  const importInvalidRows = useMemo(() => {
+    if (importErrors.some(error => error.row === 1)) return importTotalRows;
+    return new Set(importErrors.map(error => error.row).filter(row => row > 1)).size;
+  }, [importErrors, importTotalRows]);
   const [showCamera, setShowCamera] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
@@ -282,8 +288,47 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
   const editCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const importTriggerRef = useRef<HTMLButtonElement>(null);
+  const importDialogRef = useRef<HTMLDivElement>(null);
+  const importDialogTitleRef = useRef<HTMLHeadingElement>(null);
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
   const tesdaPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const closeImportModal = () => {
+    if (isImporting) return;
+    setShowImportModal(false);
+    window.setTimeout(() => importTriggerRef.current?.focus(), 0);
+  };
+
+  useEffect(() => {
+    if (showImportModal) importDialogTitleRef.current?.focus();
+  }, [showImportModal]);
+
+  const handleImportDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeImportModal();
+      return;
+    }
+    if (event.key !== 'Tab' || !importDialogRef.current) return;
+    const focusable = Array.from(importDialogRef.current.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    if (!focusable.length) {
+      event.preventDefault();
+      importDialogTitleRef.current?.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === importDialogTitleRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const defaultFormData: Partial<Student> = {
     uli: '', lastName: '', firstName: '', middleName: '', extension: '', sex: 'Male',
@@ -570,9 +615,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
   const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + CSV_HEADERS.join(",");
-
-    const encodedUri = encodeURI(csvContent);
+    const encodedUri = `data:text/csv;charset=utf-8,${encodeURIComponent(createLearnerCsvTemplate())}`;
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", "Learner_Batch_Template.csv");
@@ -587,89 +630,37 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split(/\r?\n/);
-      if (lines.length < 2) return;
-
-      const studentData: Student[] = [];
-      const headers = lines[0].split(',').map(h => h.trim());
-
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-
-        // Mapping based on MIS file format:
-        // 0: Last Name, 1: First Name, 2: Middle Name, 3: Extension Name, 4: ULI,
-        // 5: Contact Number, 6: E-mail Address, 7: Street Address, 8: Barangay,
-        // 9: Municipality/City, 10: District, 11: Province, 12: Sex,
-        // 13: Date of Birth, 14: Age, 15: Civil Status, 16: Educational Attainment,
-        // 17: Nationality
-        const getVal = (idx: number) => cols[idx] || '';
-
-        // Parse date - handle mm-dd-yy or mm/dd/yyyy format
-        const dobRaw = getVal(13);
-        let dob = '';
-        if (dobRaw) {
-          const dateParts = dobRaw.split(/[\/\-]/);
-          if (dateParts.length === 3) {
-            const month = dateParts[0].padStart(2, '0');
-            const day = dateParts[1].padStart(2, '0');
-            let year = dateParts[2];
-            if (year.length === 2) {
-              year = parseInt(year) > 50 ? '19' + year : '20' + year;
-            }
-            dob = `${year}-${month}-${day}`;
-          }
-        }
-        const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : parseInt(getVal(14)) || 0;
-
-        studentData.push({
-          id: `batch-${Date.now()}-${i}`,
-          orgId: 'temp',
-          uli: getVal(4),
-          lastName: getVal(0),
-          firstName: getVal(1),
-          middleName: getVal(2),
-          extension: getVal(3),
-          sex: (getVal(12) as any) || 'Male',
-          dateOfBirth: dob,
-          age: Math.max(0, age),
-          birthRegion: '',
-          birthProvince: '',
-          birthCity: '',
-          civilStatus: getVal(15) || 'Single',
-          educationalAttainment: getVal(16),
-          nationality: getVal(17) || 'Filipino',
-          email: getVal(6),
-          contactNumber: getVal(5),
-          street: getVal(7),
-          barangay: getVal(8),
-          city: getVal(9),
-          district: getVal(10),
-          province: getVal(11),
-          guardian: '',
-          locationId: undefined,
-          sponsorId: undefined,
-          documents: MANDATORY_DOCS.map((doc, dIdx) => ({
-            id: `doc-${dIdx}-${Date.now()}-${i}`,
-            name: doc,
-            status: 'PENDING'
-          })),
-          createdAt: new Date().toISOString()
-        });
-      }
+      const result = readLearnerCsv(event.target?.result as string, students);
+      const studentData = result.students.map((student, index) => ({
+        ...student,
+        documents: MANDATORY_DOCS.map((doc, dIdx) => ({
+          id: `doc-${dIdx}-${Date.now()}-${index}`, name: doc, status: 'PENDING' as const
+        }))
+      }));
       setImportPreview(studentData);
+      setImportErrors(result.errors);
+      setImportTotalRows(result.totalRows);
       setShowImportModal(true);
       if (csvInputRef.current) csvInputRef.current.value = '';
     };
     reader.readAsText(file);
   };
 
-  const commitBatch = () => {
-    onBatchAddStudents(importPreview);
-    showToast(`${importPreview.length} students imported successfully!`, 'success');
-    setImportPreview([]);
-    setShowImportModal(false);
+  const commitBatch = async () => {
+    if (importErrors.length || !importPreview.length || isImporting) return;
+    setIsImporting(true);
+    try {
+      await onBatchAddStudents(importPreview);
+      showToast(`${importPreview.length} learners imported successfully!`, 'success');
+      setImportPreview([]);
+      setImportErrors([]);
+      setShowImportModal(false);
+      window.setTimeout(() => importTriggerRef.current?.focus(), 0);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to import learners.', 'error');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleDocumentAudit = (docId: string, action: 'VERIFY' | 'REJECT') => {
@@ -926,11 +917,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2.5 text-slate-500 hover:text-brand transition-colors text-xs font-semibold uppercase tracking-wide border border-gray-200 rounded-md bg-white h-10">
-              <Download size={14} /> Template
+            <button title="Includes one clearly marked example row. Remove it or leave it unchanged; it will never be imported." onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2.5 text-slate-500 hover:text-brand transition-colors text-xs font-semibold uppercase tracking-wide border border-gray-200 rounded-md bg-white h-10">
+              <Download size={14} /> Template + Example
             </button>
             <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleCsvFileChange} />
             <button
+              ref={importTriggerRef}
+              title="Required: last name, first name, email, and date of birth in YYYY-MM-DD format. ULI is optional."
               onClick={() => csvInputRef.current?.click()}
               className="flex items-center gap-2 px-3 py-2.5 rounded border text-xs font-semibold h-10 transition-all"
               style={{ backgroundColor: withAlpha(brandColor, 0.1), color: brandColor, borderColor: withAlpha(brandColor, 0.22) }}
@@ -1227,47 +1220,76 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
       {showImportModal && (
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]">
+          <div
+            ref={importDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learner-import-title"
+            aria-describedby="learner-import-description"
+            onKeyDown={handleImportDialogKeyDown}
+            className="bg-white rounded-md shadow-md w-full max-w-6xl overflow-hidden animate-in zoom-in duration-300 border border-gray-200 my-8 flex flex-col h-full max-h-[90vh]"
+          >
             <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-emerald-600 text-white rounded shadow-sm shadow-emerald-100"><FileSpreadsheet size={24} /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Batch Import Preview</h3>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Found {importPreview.length} Institutional Records</p>
+                  <h3 ref={importDialogTitleRef} tabIndex={-1} id="learner-import-title" className="text-lg font-semibold text-gray-800 uppercase tracking-tight focus:outline-none">Batch Import Preview</h3>
+                  <p id="learner-import-description" className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">Found {importTotalRows} learner records. Review validation before committing.</p>
                 </div>
               </div>
-              <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={28} /></button>
+              <button aria-label="Close import preview" onClick={closeImportModal} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={28} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-0 scrollbar-hide">
-              <table className="min-w-full divide-y divide-gray-100">
+            <div className="px-8 py-4 border-b border-gray-100 bg-white">
+              <div className="flex flex-wrap gap-3 text-xs font-semibold">
+                <span className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
+                  {importPreview.length} valid
+                </span>
+                <span className={`px-3 py-2 border rounded ${importErrors.length ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                  {importInvalidRows} invalid ({importErrors.length} {importErrors.length === 1 ? 'error' : 'errors'})
+                </span>
+                <span className="px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded">
+                  Required: Last Name, First Name, E-mail Address, Date of Birth (YYYY-MM-DD). ULI is optional.
+                </span>
+              </div>
+              {importErrors.length > 0 && (
+                <div className="mt-4 max-h-36 overflow-y-auto border border-rose-200 bg-rose-50 rounded" role="alert">
+                  {importErrors.map((error, index) => (
+                    <div key={`${error.row}-${error.field}-${index}`} className="flex gap-3 px-4 py-2 text-xs border-b last:border-b-0 border-rose-100">
+                      <span className="font-bold text-rose-800 shrink-0">
+                        {error.row === 1 ? (error.field === 'CSV' ? 'File' : 'Header') : `Row ${error.row}`}
+                      </span>
+                      <span className="font-semibold text-rose-700 shrink-0">{error.field}</span>
+                      <span className="text-rose-700">{error.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-auto p-0">
+              <table className="min-w-max w-full border-collapse text-xs">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Identities</th>
-                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Personal Info</th>
-                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact & Residence</th>
-                    <th className="px-8 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Registry Data</th>
+                    {LEARNER_CSV_HEADERS.map(header => (
+                      <th key={header} scope="col" className="whitespace-nowrap border-b border-r border-gray-200 px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="bg-white">
                   {importPreview.map((p, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-8 py-5">
-                        <p className="text-sm font-semibold text-gray-800 uppercase">{p.lastName}, {p.firstName}</p>
-                        <p className="text-xs font-mono font-bold text-brand uppercase mt-0.5">{p.uli}</p>
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="text-xs font-bold text-gray-600">{p.dateOfBirth} ({p.age}y)</p>
-                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.sex} � {p.civilStatus}</p>
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="text-xs font-bold text-gray-600 truncate max-w-[200px]">{p.email}</p>
-                        <p className="text-xs text-gray-400 uppercase font-semibold">{p.city}, {p.province}</p>
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="text-xs font-bold text-gray-600">{p.educationalAttainment}</p>
-                        <p className="text-xs text-gray-400 uppercase font-semibold">Guardian: {p.guardian || 'N/A'}</p>
-                      </td>
+                    <tr key={idx} className="odd:bg-white even:bg-gray-50/60 hover:bg-emerald-50/50 transition-colors">
+                      {[
+                        p.lastName, p.firstName, p.middleName, p.extension, p.uli, p.contactNumber,
+                        p.email, p.street, p.barangay, p.city, p.district, p.province, p.sex,
+                        p.dateOfBirth, p.age, p.civilStatus, p.educationalAttainment, p.nationality
+                      ].map((value, columnIndex) => (
+                        <td key={LEARNER_CSV_HEADERS[columnIndex]} className="whitespace-nowrap border-b border-r border-gray-100 px-3 py-2.5 font-medium text-gray-700">
+                          {value === undefined || value === null || value === '' ? <span className="text-gray-400">—</span> : String(value)}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
@@ -1285,8 +1307,14 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                 </div>
               </div>
               <div className="flex gap-4 w-full md:w-auto">
-                <button onClick={() => setShowImportModal(false)} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-white transition-colors">Discard Batch</button>
-                <button onClick={commitBatch} className="flex-1 px-12 py-4 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-md shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">Commit {importPreview.length} Records</button>
+                <button disabled={isImporting} onClick={closeImportModal} className="flex-1 px-8 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-white transition-colors disabled:opacity-50">Discard Batch</button>
+                <button
+                  disabled={importErrors.length > 0 || !importPreview.length || isImporting}
+                  onClick={commitBatch}
+                  className="flex-1 px-12 py-4 bg-brand text-white rounded-md text-xs font-semibold uppercase tracking-wide shadow-md shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all disabled:bg-gray-600 disabled:text-gray-400 disabled:shadow-none disabled:hover:scale-100 disabled:cursor-not-allowed"
+                >
+                  {isImporting ? 'Importing…' : `Commit ${importPreview.length} Records`}
+                </button>
               </div>
             </div>
           </div>
@@ -1810,6 +1838,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                         showToast(`Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
                       }
                     }} className="p-5 space-y-4 [&_input]:px-3 [&_input]:py-2 [&_select]:px-3 [&_select]:py-2 [&_input]:text-xs [&_select]:text-xs [&_label]:text-[10px] [&_label]:leading-tight">
+                      <p className="text-[11px] leading-4 text-gray-500">
+                        Fields marked <span className="font-semibold text-red-500" aria-hidden="true">*</span> are required.
+                      </p>
 
                       {/* Student Photo */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 p-3">
@@ -1911,16 +1942,24 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                         <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                           <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">ULI</label>
-                            <input disabled className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded text-sm font-bold text-gray-500 opacity-75 cursor-not-allowed" value={formData.uli} />
+                            <label htmlFor="edit-student-uli" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">
+                              ULI <span className="font-medium normal-case tracking-normal">(optional)</span>
+                            </label>
+                            <input
+                              id="edit-student-uli"
+                              placeholder="Enter ULI when assigned"
+                              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-semibold text-brand font-mono"
+                              value={formData.uli || ''}
+                              onChange={e => setFormData({ ...formData, uli: e.target.value })}
+                            />
                           </div>
                           <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name</label>
-                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
+                            <label htmlFor="edit-student-last-name" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Last Name <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <input id="edit-student-last-name" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} />
                           </div>
                           <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name</label>
-                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
+                            <label htmlFor="edit-student-first-name" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">First Name <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <input id="edit-student-first-name" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />
                           </div>
                         </div>
 
@@ -1942,8 +1981,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                             </select>
                           </div>
                           <div className="md:col-span-2 space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Date of Birth</label>
-                            <input required type="date" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                            <label htmlFor="edit-student-date-of-birth" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Date of Birth <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <input id="edit-student-date-of-birth" required type="date" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
                           </div>
                         </div>
 
@@ -1994,21 +2033,21 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                         <div className="space-y-3">
                           <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Street Address</label>
-                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
+                            <label htmlFor="edit-student-street" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Street Address <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <input id="edit-student-street" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="space-y-1">
-                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
-                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
+                              <label htmlFor="edit-student-barangay" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay <span className="text-red-500" aria-hidden="true">*</span></label>
+                              <input id="edit-student-barangay" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
-                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                              <label htmlFor="edit-student-city" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality <span className="text-red-500" aria-hidden="true">*</span></label>
+                              <input id="edit-student-city" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
-                              <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
+                              <label htmlFor="edit-student-province" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province <span className="text-red-500" aria-hidden="true">*</span></label>
+                              <input id="edit-student-province" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
                             </div>
                           </div>
                         </div>
@@ -2023,8 +2062,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
-                            <select required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
+                            <label htmlFor="edit-student-educational-attainment" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <select id="edit-student-educational-attainment" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
                               <option value="Elementary Graduate">Elementary Graduate</option>
                               <option value="High School Graduate">High School Graduate</option>
                               <option value="College Level">College Level</option>
@@ -2034,8 +2073,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                             </select>
                           </div>
                           <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
-                            <input required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                            <label htmlFor="edit-student-nationality" className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality <span className="text-red-500" aria-hidden="true">*</span></label>
+                            <input id="edit-student-nationality" required className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none text-sm font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
                           </div>
                           <div className="space-y-1">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
