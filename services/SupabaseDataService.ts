@@ -701,7 +701,13 @@ export class SupabaseDataService implements IDataService {
    * Raw UPDATE to Supabase - with schema filtering and conversion
    * Converts camelCase to snake_case, filters to valid columns, and returns camelCase result
    */
-  private async updateInSupabaseRaw<T>(table: string, id: string, data: any): Promise<T> {
+  private async updateInSupabaseRaw<T>(
+    table: string,
+    id: string,
+    data: any,
+    preferUserToken: boolean = false,
+    requireReturnedRow: boolean = false
+  ): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
       console.warn(`[Supabase] Missing credentials for table '${table}', falling back`);
       throw new Error(`Supabase not configured for ${table}`);
@@ -722,13 +728,19 @@ export class SupabaseDataService implements IDataService {
 
         const response = await fetch(url, {
           method: 'PATCH',
-          headers: { ...(await this.getHeaders()), 'Prefer': 'return=representation' },
+          headers: { ...(await this.getHeaders(preferUserToken)), 'Prefer': 'return=representation' },
           body: JSON.stringify(payload),
         });
 
         if (response.ok) {
           const result = await response.json();
           const returnedRow = Array.isArray(result) ? result[0] : result;
+          if (requireReturnedRow && !returnedRow) {
+            throw new Error(
+              `Supabase accepted the ${table} update request but did not update a row. ` +
+              'Verify that the signed-in user has update permission for this organization.'
+            );
+          }
           const camelResult = returnedRow
             ? this.snakeToCamel(returnedRow)
             : { id, ...this.snakeToCamel(payload) };
@@ -2700,13 +2712,22 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] updateCourseFee called with:', id, updates);
     const snake = this.camelToSnake(updates);
 
+    // Never include record identity, tenant ownership, creation metadata, or
+    // soft-delete metadata in a normal course-fee edit.
+    delete snake.id;
+    delete snake.org_id;
+    delete snake.created_at;
+    delete snake.is_deleted;
+    delete snake.deleted_at;
+    delete snake.deleted_by;
+
     // Convert empty strings to null for UUID columns
     if (snake.gl_account_id === '') snake.gl_account_id = null;
     if (snake.tax_category_id === '') snake.tax_category_id = null;
     if (snake.qualification_id === '') snake.qualification_id = null;
 
     const filtered = this.filterToTableSchema('course_fees', snake);
-    return this.updateInSupabaseRaw('course_fees', id, filtered);
+    return this.updateInSupabaseRaw('course_fees', id, filtered, true, true);
   }
 
   async deleteCourseFee(id: string): Promise<void> {

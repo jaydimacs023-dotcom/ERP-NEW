@@ -73,8 +73,6 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const emptyBulkRow = (): Partial<CourseFee> & { _key: string } => ({
     _key: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     feeCode: '',
-    qualificationId: '',
-    fundingType: undefined,
     feeName: '',
     amount: 0,
     glAccountId: '',
@@ -85,11 +83,9 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     isActive: true,
   });
   const [bulkRows, setBulkRows] = useState<(Partial<CourseFee> & { _key: string })[]>([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
-  const [bulkDefaults, setBulkDefaults] = useState<{ qualificationId: string; fundingType: CourseFeeFundingType | ''; glAccountId: string; category: CourseFeeCategory | '' }>({
+  const [bulkContext, setBulkContext] = useState<{ qualificationId: string; fundingType: CourseFeeFundingType | '' }>({
     qualificationId: '',
     fundingType: '',
-    glAccountId: '',
-    category: '',
   });
 
   const [formData, setFormData] = useState<Partial<CourseFee>>({
@@ -194,26 +190,49 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
   const updateBulkRow = (key: string, field: string, value: any) => {
     setBulkRows(prev => prev.map(r => r._key === key ? { ...r, [field]: value } : r));
   };
-  const applyDefaultsToAll = () => {
-    setBulkRows(prev => prev.map(r => ({
-      ...r,
-      qualificationId: bulkDefaults.qualificationId || r.qualificationId,
-      fundingType: bulkDefaults.fundingType || r.fundingType,
-      glAccountId: bulkDefaults.glAccountId || r.glAccountId,
-      category: (bulkDefaults.category || r.category) as CourseFeeCategory | undefined,
-    })));
-    showToast('Defaults applied to all rows', 'info');
-  };
-
   const openBulkModal = () => {
     setBulkRows([emptyBulkRow(), emptyBulkRow(), emptyBulkRow()]);
-    setBulkDefaults({ qualificationId: '', fundingType: '', glAccountId: '', category: '' });
+    setBulkContext({ qualificationId: '', fundingType: '' });
     setShowBulkModal(true);
   };
 
   const handleBulkSubmit = async () => {
+    if (!bulkContext.qualificationId || !bulkContext.fundingType) {
+      showToast('Select one qualification and one funding type for this fee schedule.', 'error');
+      return;
+    }
+
+    const startedRows = bulkRows.filter(r =>
+      !!r.feeName?.trim() ||
+      !!r.feeCode?.trim() ||
+      !!r.glAccountId ||
+      !!r.category ||
+      Number(r.amount) > 0
+    );
+    const incompleteRows = startedRows
+      .map((row, index) => ({
+        rowNumber: bulkRows.indexOf(row) + 1,
+        missing: [
+          !row.feeName?.trim() && 'fee name',
+          !(Number(row.amount) > 0) && 'amount',
+          !row.category && 'category',
+          !row.glAccountId && 'G/L account',
+        ].filter(Boolean),
+      }))
+      .filter(row => row.missing.length > 0);
+
+    if (incompleteRows.length > 0) {
+      showToast(
+        incompleteRows
+          .map(row => `Row ${row.rowNumber}: ${row.missing.join(', ')} required`)
+          .join(' • '),
+        'error'
+      );
+      return;
+    }
+
     const validRows = bulkRows.filter(r =>
-      r.feeName && r.qualificationId && r.fundingType && r.glAccountId && r.category && Number(r.amount) > 0
+      r.feeName && r.glAccountId && r.category && Number(r.amount) > 0
     );
     if (validRows.length === 0) {
       showToast('Please fill in at least one complete row. Course, funding type, name, amount, category, and GL account are required.', 'error');
@@ -236,7 +255,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
     try {
       for (const row of validRows) {
         try {
-          const feeCode = (row.feeCode || getNextFeeCode(row.qualificationId!)).trim().toUpperCase();
+          const feeCode = (row.feeCode || getNextFeeCode(bulkContext.qualificationId)).trim().toUpperCase();
           if (reservedCodes.has(feeCode) && row.feeCode) {
             throw new Error(`Fee code "${feeCode}" already exists.`);
           }
@@ -246,8 +265,8 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
             id: generateUUID(),
             orgId: '',
             feeCode,
-            qualificationId: row.qualificationId!,
-            fundingType: row.fundingType!,
+            qualificationId: bulkContext.qualificationId,
+            fundingType: bulkContext.fundingType,
             feeName: row.feeName!,
             amount: Number(row.amount) || 0,
             glAccountId: row.glAccountId!,
@@ -766,6 +785,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Funding Type *</label>
                   <select
                     required
+                    aria-required="true"
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.fundingType || ''}
                     onChange={e => setFormData({ ...formData, fundingType: e.target.value as CourseFeeFundingType })}
@@ -963,72 +983,54 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
       {showBulkModal && (
         <ModalPortal>
 <div className="fixed inset-0 bg-gray-800/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] overflow-y-auto">
-          <div className="bg-white rounded-md shadow-md w-full max-w-5xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
+          <div className="bg-white rounded-md shadow-md w-full max-w-4xl overflow-hidden animate-in zoom-in duration-200 border border-gray-200">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-brand text-white rounded shadow-brand/20"><Copy size={20} /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">Bulk Create Course Fees</h3>
-                  <p className="text-xs text-gray-500">Add multiple fee entries at once. All required billing fields must be complete.</p>
+                  <p className="text-xs text-gray-500">Create one fee schedule for a qualification and funding source.</p>
                 </div>
               </div>
               <button onClick={() => setShowBulkModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
 
-            {/* Shared Defaults */}
+            {/* Fee schedule context */}
             <div className="px-6 pt-5 pb-3">
-              <div className="p-4 bg-brand/10 border border-brand-light rounded space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-brand uppercase tracking-wide">Shared Defaults (apply to all rows)</label>
-                  <button
-                    type="button"
-                    onClick={applyDefaultsToAll}
-                    className="text-xs font-semibold text-brand hover:text-brand px-3 py-1 border border-brand rounded hover:bg-white transition-colors"
-                  >
-                    Apply to All
-                  </button>
+              <div className="p-4 bg-brand/10 border border-brand-light rounded">
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-brand uppercase tracking-wide">Fee Schedule</p>
+                  <p className="mt-1 text-xs text-gray-600">All fee lines below will belong to this qualification and funding type.</p>
                 </div>
-                <div className="grid grid-cols-4 gap-3">
-                  <select
-                    value={bulkDefaults.qualificationId}
-                    onChange={e => setBulkDefaults({ ...bulkDefaults, qualificationId: e.target.value })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                  >
-                    <option value="">Default Course...</option>
-                    {qualifications.filter(q => !q.isDeleted).map(q => (
-                      <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={bulkDefaults.fundingType}
-                    onChange={e => setBulkDefaults({ ...bulkDefaults, fundingType: e.target.value as CourseFeeFundingType | '' })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                  >
-                    <option value="">Default Funding Type...</option>
-                    <option value="SPONSORED">Sponsored</option>
-                    <option value="PRIVATE">Private</option>
-                    <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
-                  </select>
-                  <select
-                    value={bulkDefaults.glAccountId}
-                    onChange={e => setBulkDefaults({ ...bulkDefaults, glAccountId: e.target.value })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                  >
-                    <option value="">Default GL Account...</option>
-                    {revenueAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={bulkDefaults.category}
-                    onChange={e => setBulkDefaults({ ...bulkDefaults, category: e.target.value as CourseFeeCategory | '' })}
-                    className="px-3 py-2 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                  >
-                    <option value="">Default Category...</option>
-                    {CATEGORY_OPTIONS.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-xs font-semibold text-gray-600">Qualification *</span>
+                    <select
+                      required
+                      value={bulkContext.qualificationId}
+                      onChange={e => setBulkContext(previous => ({ ...previous, qualificationId: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
+                    >
+                      <option value="">Select qualification...</option>
+                      {qualifications.filter(q => !q.isDeleted).map(q => (
+                        <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-semibold text-gray-600">Funding Type *</span>
+                    <select
+                      required
+                      value={bulkContext.fundingType}
+                      onChange={e => setBulkContext(previous => ({ ...previous, fundingType: e.target.value as CourseFeeFundingType | '' }))}
+                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded text-sm focus:border-brand outline-none"
+                    >
+                      <option value="">Select funding type...</option>
+                      <option value="SPONSORED">Sponsored</option>
+                      <option value="PRIVATE">Private</option>
+                      <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
+                    </select>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1040,8 +1042,6 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                   <tr className="border-b border-gray-200">
                     <th className="py-2 pr-2 text-left text-xs font-semibold text-gray-400 uppercase w-8">#</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Fee Name *</th>
-                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Funding *</th>
-                    <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Course *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase w-28">Amount *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">Category *</th>
                     <th className="py-2 px-2 text-left text-xs font-semibold text-gray-400 uppercase">GL Account *</th>
@@ -1050,8 +1050,7 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                 </thead>
                 <tbody>
                   {bulkRows.map((row, idx) => {
-                    const isValid = !!(row.feeName && row.qualificationId && row.fundingType &&
-                      row.glAccountId && row.category && Number(row.amount) > 0);
+                    const isValid = !!(row.feeName && row.glAccountId && row.category && Number(row.amount) > 0);
                     return (
                       <tr key={row._key} className={`border-b border-gray-100 ${isValid ? 'bg-emerald-50/30' : ''}`}>
                         <td className="py-2 pr-2 text-xs text-gray-400 font-mono">{idx + 1}</td>
@@ -1062,30 +1061,6 @@ const CourseFeesView: React.FC<CourseFeesViewProps> = ({
                             value={row.feeName || ''}
                             onChange={e => updateBulkRow(row._key, 'feeName', e.target.value)}
                           />
-                        </td>
-                        <td className="py-2 px-2">
-                          <select
-                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                            value={row.fundingType || ''}
-                            onChange={e => updateBulkRow(row._key, 'fundingType', e.target.value)}
-                          >
-                            <option value="">Select...</option>
-                            <option value="SPONSORED">Sponsored</option>
-                            <option value="PRIVATE">Private</option>
-                            <option value="TESDA_SCHOLARSHIP">TESDA Scholarship</option>
-                          </select>
-                        </td>
-                        <td className="py-2 px-2">
-                          <select
-                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-sm focus:border-brand outline-none"
-                            value={row.qualificationId || ''}
-                            onChange={e => updateBulkRow(row._key, 'qualificationId', e.target.value)}
-                          >
-                            <option value="">Select...</option>
-                            {qualifications.filter(q => !q.isDeleted).map(q => (
-                              <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
-                            ))}
-                          </select>
                         </td>
                         <td className="py-2 px-2">
                           <input

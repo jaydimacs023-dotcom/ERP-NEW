@@ -1,7 +1,8 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment } from '../types';
+import { Sponsor, Student, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategoryEntry, WHTCategory, BankAccount, Batch, Qualification, ItemGroup, ReviewComment, CourseFee, Enrollment } from '../types';
 import { AccountingService } from '../accountingService';
+import { BillingComputationService } from '../services/BillingComputationService';
 import ModalPortal from '../components/ModalPortal';
 import {
   FileText, Plus, Search, Filter, Mail, CheckCircle, Clock,
@@ -23,6 +24,8 @@ interface ARViewProps {
   bankAccounts: BankAccount[];
   batches: Batch[];
   qualifications: Qualification[];
+  courseFees: CourseFee[];
+  enrollments: Enrollment[];
   taxCategories: TaxCategoryEntry[]; // available tax categories for selection
   onPostInvoice: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onUpdateInvoice?: (entryId: string, entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
@@ -40,9 +43,18 @@ interface ARViewProps {
 
 type ARTab = 'overview' | 'invoices' | 'collections' | 'aging' | 'item-groups';
 type ARDashboardMode = 'sponsors' | 'students';
+type InvoiceFormLine = {
+  itemId: string;
+  qty: number;
+  price: number;
+  taxCategoryId?: string;
+  courseFeeId?: string;
+  description?: string;
+  glAccountId?: string;
+};
 
 const ARView: React.FC<ARViewProps> = ({
-  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], taxCategories = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
+  entries = [], lines = [], students = [], sponsors = [], items = [], itemGroups = [], accounts = [], bankAccounts = [], batches = [], qualifications = [], courseFees = [], enrollments = [], taxCategories = [], onPostInvoice, onUpdateInvoice, onApproveInvoice, onRequestRevision, onAddComment, onAddItemGroup, onUpdateItemGroup, onDeleteItemGroup, currentUser, onNotify, onNavigate,
   orgId
 }) => {
   const [activeTab, setActiveTab] = useState<ARTab>('overview');
@@ -78,7 +90,7 @@ const ARView: React.FC<ARViewProps> = ({
   const [recipientId, setRecipientId] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedArAccountId, setSelectedArAccountId] = useState('');
-  const [invoiceLines, setInvoiceLines] = useState<{ itemId: string, qty: number, price: number, taxCategoryId?: string }[]>([
+  const [invoiceLines, setInvoiceLines] = useState<InvoiceFormLine[]>([
     { itemId: '', qty: 1, price: 0, taxCategoryId: '' }
   ]);
   // tax categories available for invoice modal
@@ -99,6 +111,30 @@ const ARView: React.FC<ARViewProps> = ({
         setRecipientType('SPONSOR');
         setRecipientId(batch.sponsorId);
       }
+
+      const computed = BillingComputationService.computeCourseFeeInvoice({
+        batches,
+        enrollments,
+        courseFees,
+        sponsors
+      }, batchId);
+
+      if (computed.lines.length === 0) {
+        setInvoiceLines([{ itemId: '', qty: 1, price: 0, taxCategoryId: '' }]);
+        onNotify('info', 'No active course-fee schedule matches this batch qualification and sponsor funding type.');
+        return;
+      }
+
+      setInvoiceLines(computed.lines.map(line => ({
+        itemId: '',
+        qty: Number(line.quantity || computed.enrolledQty || 0),
+        price: Number(line.unitPrice || 0),
+        taxCategoryId: line.taxCategoryId || '',
+        courseFeeId: line.courseFeeId,
+        description: line.description,
+        glAccountId: line.glAccountId
+      })));
+      onNotify('success', `Loaded ${computed.lines.length} course fee${computed.lines.length === 1 ? '' : 's'} for ${computed.enrolledQty} enrolled learner${computed.enrolledQty === 1 ? '' : 's'}.`);
     }
   };
 
@@ -503,7 +539,7 @@ const ARView: React.FC<ARViewProps> = ({
 
     setInvoiceLines(prev => {
       // Filter out empty lines and add new lines
-      const nonEmpty = prev.filter(l => l.itemId);
+      const nonEmpty = prev.filter(l => l.itemId || l.courseFeeId);
       return [...nonEmpty, ...newLines];
     });
 
@@ -731,19 +767,26 @@ const ARView: React.FC<ARViewProps> = ({
     finalizedLines.push({ id: `l-ar-${Date.now()}`, journalEntryId: entryId, orgId, accountId: arAccountId, debit: grossInvoiceAmount, credit: 0, contactId: recipientId, contactType: recipientType, batchId });
     invoiceLines.forEach((il, idx) => {
       const item = items.find(i => i.id === il.itemId);
-      if (item) finalizedLines.push({
+      const revenueAccountId = il.glAccountId || item?.incomeAccountId;
+      if (revenueAccountId) {
+        const grossLineAmount = il.qty * il.price;
+        const taxCategory = localTaxCats.find(tc => tc.id === il.taxCategoryId);
+        const vatAmount = extractVat(grossLineAmount, taxCategory);
+        finalizedLines.push({
         id: `l-rev-${idx}-${Date.now()}`,
         journalEntryId: entryId,
         orgId,
-        accountId: item.incomeAccountId,
+        accountId: revenueAccountId,
         debit: 0,
-        credit: il.qty * il.price,
+        credit: grossLineAmount - vatAmount,
+        memo: il.description || item?.name,
         contactId: recipientId,
         contactType: recipientType,
-        itemId: il.itemId,
+        itemId: il.itemId || undefined,
         taxCategoryId: il.taxCategoryId,
         batchId
       });
+      }
     });
     if (totalVat > 0) finalizedLines.push({ id: `l-vat-${Date.now()}`, journalEntryId: entryId, orgId, accountId: vatPayableId, debit: 0, credit: totalVat, contactId: recipientId, contactType: recipientType, batchId });
 
@@ -1491,6 +1534,7 @@ const ARView: React.FC<ARViewProps> = ({
                       <Calendar size={12} /> Training Batch (Optional)
                     </label>
                     <select
+                      aria-label="Training Batch"
                       className="w-full px-5 py-3.5 bg-white border border-gray-200 rounded text-sm font-bold shadow-sm"
                       value={selectedBatchId}
                       onChange={e => handleBatchChange(e.target.value)}
@@ -1597,10 +1641,17 @@ const ARView: React.FC<ARViewProps> = ({
                 {invoiceLines.map((line, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-4 items-center p-4 bg-white rounded border border-gray-100 hover:border-[#025959]/20 transition-all">
                     <div className="col-span-12 sm:col-span-4">
-                      <select required className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
-                        <option value="">Select Item...</option>
-                        {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                      </select>
+                      {line.courseFeeId ? (
+                        <div className="w-full px-4 py-2 bg-blue-50 border border-blue-100 rounded text-xs font-bold text-blue-800">
+                          <span>{line.description || 'Course fee'}</span>
+                          <span className="ml-2 font-mono text-[10px] font-semibold text-blue-500">Course fee</span>
+                        </div>
+                      ) : (
+                        <select required className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs font-bold" value={line.itemId} onChange={e => updateInvoiceLine(idx, { itemId: e.target.value })}>
+                          <option value="">Select Item...</option>
+                          {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                        </select>
+                      )}
                     </div>
                     <div className="col-span-12 sm:col-span-2">
                       <select className="w-full px-4 py-2 bg-gray-50 border-none rounded text-xs" value={line.taxCategoryId || ''} onChange={e => updateInvoiceLine(idx, { taxCategoryId: e.target.value })}>

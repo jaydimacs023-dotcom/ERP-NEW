@@ -7210,7 +7210,26 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'ar' && <ARView entries={activeJournalEntries} lines={filteredLines} students={students} sponsors={sponsors} items={items} accounts={filteredAccounts} bankAccounts={bankAccounts} taxCategories={taxCategories} onPostInvoice={handlePostJournal} onApproveInvoice={handleApproveJournal} currentUser={currentUser} onNotify={handleNotify} orgId={currentOrgId} />}
+          {activeTab === 'ar' && <ARView
+            entries={activeJournalEntries}
+            lines={filteredLines}
+            students={students.filter(student => student.orgId === currentOrgId && !student.isDeleted)}
+            sponsors={sponsors.filter(sponsor => sponsor.orgId === currentOrgId && !sponsor.isDeleted)}
+            items={items.filter(item => item.orgId === currentOrgId && !item.isDeleted)}
+            itemGroups={itemGroups.filter(group => group.orgId === currentOrgId && !group.isDeleted)}
+            accounts={filteredAccounts}
+            bankAccounts={bankAccounts.filter(account => account.orgId === currentOrgId && !account.isDeleted)}
+            batches={batches.filter(batch => batch.orgId === currentOrgId && !batch.isDeleted)}
+            qualifications={qualifications.filter(qualification => qualification.orgId === currentOrgId && !qualification.isDeleted)}
+            courseFees={courseFees.filter(fee => fee.orgId === currentOrgId && !fee.isDeleted)}
+            enrollments={enrollments.filter(enrollment => enrollment.orgId === currentOrgId && !enrollment.isDeleted)}
+            taxCategories={taxCategories.filter(category => category.orgId === currentOrgId && !category.isDeleted)}
+            onPostInvoice={handlePostJournal}
+            onApproveInvoice={handleApproveJournal}
+            currentUser={currentUser}
+            onNotify={handleNotify}
+            orgId={currentOrgId}
+          />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
           {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} employees={users.filter(user => user.orgId === currentOrgId && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}

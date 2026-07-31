@@ -1,9 +1,104 @@
+// @vitest-environment jsdom
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
 import ARView from '../views/ARView';
 
 describe('ARView smoke tests', () => {
+  it('lists all matching course fees as invoice lines when a batch is selected', () => {
+    const onNotify = vi.fn();
+    const props: any = {
+      entries: [],
+      lines: [],
+      students: [],
+      sponsors: [{ id: 'sponsor-1', orgId: 'org', name: 'Forklift Sponsor', courseFeeType: 'SPONSORED' }],
+      items: [],
+      itemGroups: [],
+      accounts: [
+        { id: 'ar-1', orgId: 'org', code: '1200', name: 'Accounts Receivable', class: 'ASSET', isActive: true, isHeader: false },
+        { id: 'revenue-1', orgId: 'org', code: '4100', name: 'Training Revenue', class: 'REVENUE', isActive: true, isHeader: false }
+      ],
+      bankAccounts: [],
+      batches: [{
+        id: 'batch-forklift',
+        orgId: 'org',
+        batchCode: 'FL-2026-01',
+        name: 'Forklift Batch',
+        year: 2026,
+        qualificationId: 'qualification-forklift',
+        trainerId: 'trainer-1',
+        sponsorId: 'sponsor-1',
+        studentIds: ['student-1', 'student-2'],
+        status: 'ONGOING',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31'
+      }],
+      qualifications: [{
+        id: 'qualification-forklift',
+        orgId: 'org',
+        code: 'FORKLIFT',
+        name: 'Forklift Operation',
+        durationDays: 20,
+        createdAt: ''
+      }],
+      enrollments: [],
+      courseFees: [
+        {
+          id: 'fee-training',
+          orgId: 'org',
+          feeCode: 'FL-TRAINING',
+          qualificationId: 'qualification-forklift',
+          fundingType: 'SPONSORED',
+          feeName: 'Forklift Training Fee',
+          amount: 5000,
+          glAccountId: 'revenue-1',
+          isActive: true,
+          createdAt: ''
+        },
+        {
+          id: 'fee-assessment',
+          orgId: 'org',
+          feeCode: 'FL-ASSESSMENT',
+          qualificationId: 'qualification-forklift',
+          fundingType: 'SPONSORED',
+          feeName: 'Forklift Assessment Fee',
+          amount: 1000,
+          glAccountId: 'revenue-1',
+          isActive: true,
+          createdAt: ''
+        },
+        {
+          id: 'fee-other-course',
+          orgId: 'org',
+          feeCode: 'OTHER',
+          qualificationId: 'another-qualification',
+          fundingType: 'SPONSORED',
+          feeName: 'Unrelated Course Fee',
+          amount: 9999,
+          glAccountId: 'revenue-1',
+          isActive: true,
+          createdAt: ''
+        }
+      ],
+      taxCategories: [],
+      onPostInvoice: vi.fn(),
+      onNotify,
+      orgId: 'org'
+    };
+
+    render(<ARView {...props} />);
+    fireEvent.click(screen.getByText(/New Invoice/i));
+
+    const recipientSelect = screen.getAllByRole('combobox')[1];
+    fireEvent.change(recipientSelect, { target: { value: 'sponsor-1' } });
+    fireEvent.change(screen.getByLabelText('Training Batch'), { target: { value: 'batch-forklift' } });
+
+    expect(screen.getByText('Forklift Training Fee')).toBeInTheDocument();
+    expect(screen.getByText('Forklift Assessment Fee')).toBeInTheDocument();
+    expect(screen.queryByText('Unrelated Course Fee')).not.toBeInTheDocument();
+    expect(onNotify).toHaveBeenCalledWith('success', expect.stringContaining('Loaded 2 course fees'));
+  });
+
   it('renders safely with undefined arrays and opens invoice modal', () => {
     const props: any = {
       entries: undefined,

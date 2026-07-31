@@ -53,6 +53,59 @@ interface InvoicesViewProps {
 const INVOICE_PAGE_SIZE = 7;
 const INVOICE_COLUMNS = 'id,org_id,invoice_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id';
 
+const COURSE_FEE_CATEGORY_LABELS: Record<string, string> = {
+  TUITION: 'Tuition',
+  REGISTRATION: 'Registration',
+  CERTIFICATION: 'Certification Fee',
+  ASSESSMENT: 'Assessment Fee',
+  MATERIALS: 'Materials',
+  MISCELLANEOUS: 'Miscellaneous',
+};
+
+const getCourseFeeDescription = (fee?: CourseFee | null): string =>
+  fee ? COURSE_FEE_CATEGORY_LABELS[String(fee.category || '').toUpperCase()] || fee.feeName : '';
+
+const CurrencyLineInput: React.FC<{
+  value?: number;
+  disabled?: boolean;
+  onValueChange: (value: number) => void;
+}> = ({ value = 0, disabled, onValueChange }) => {
+  const formatValue = (amount: number) =>
+    new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const [isFocused, setIsFocused] = useState(false);
+  const [draft, setDraft] = useState(formatValue(value));
+
+  useEffect(() => {
+    if (!isFocused) setDraft(formatValue(value));
+  }, [value, isFocused]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      disabled={disabled}
+      onFocus={event => {
+        setIsFocused(true);
+        setDraft(String(value ?? 0));
+        window.setTimeout(() => event.currentTarget.select(), 0);
+      }}
+      onChange={event => {
+        const nextDraft = event.target.value;
+        if (!/^-?[\d,]*\.?\d{0,2}$/.test(nextDraft)) return;
+        setDraft(nextDraft);
+        const parsed = Number(nextDraft.replace(/,/g, ''));
+        if (Number.isFinite(parsed)) onValueChange(parsed);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        setDraft(formatValue(value));
+      }}
+      className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+    />
+  );
+};
+
 const InvoicesView: React.FC<InvoicesViewProps> = ({
   invoices, payments = [], sponsors, students, users, enrollments, assessmentRegistrations, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onUpdateAssessmentRegistration, onAddStudentLedgerEntry,
@@ -823,17 +876,34 @@ const brandColor = organization?.primaryColor || '#059669';
     const nextPrivateStudentId = studentsInBatch[0]?.id || '';
 
     const computedInvoice = BillingComputationService.computeCourseFeeInvoice(getBillingComputationContext(), batchId);
-    const qualificationFees = courseFees
-      .filter(f =>
-        f.qualificationId === batch.qualificationId &&
-        f.fundingType === getBatchCourseFeeFundingType(batch) &&
-        f.isActive &&
-        !f.isDeleted
-      )
+    const expectedFundingType = getBatchCourseFeeFundingType(batch);
+    const activeQualificationFees = courseFees.filter(f =>
+      f.qualificationId === batch.qualificationId &&
+      f.isActive &&
+      !f.isDeleted
+    );
+    const exactFundingFees = activeQualificationFees.filter(f => f.fundingType === expectedFundingType);
+    const standardSponsoredFees = expectedFundingType === 'TESDA_SCHOLARSHIP'
+      ? activeQualificationFees.filter(f => f.fundingType === 'SPONSORED')
+      : [];
+
+    // Keep private and sponsored schedules strictly separated. A TESDA sponsor
+    // may use the qualification's standard sponsored schedule when no dedicated
+    // TESDA schedule exists, but a sponsored batch must never load PRIVATE fees.
+    const qualificationFees = (exactFundingFees.length > 0
+      ? exactFundingFees
+      : standardSponsoredFees)
       .sort((left, right) =>
         String(left.category || '').localeCompare(String(right.category || '')) ||
         left.feeName.localeCompare(right.feeName)
       );
+
+    if (exactFundingFees.length === 0 && standardSponsoredFees.length > 0) {
+      console.warn(
+        `[InvoicesView] No ${expectedFundingType} fee schedule found for ${batch.batchCode || batch.name}; ` +
+        'using the qualification\'s standard SPONSORED fee schedule.'
+      );
+    }
 
     const manualLines = formData.lines.filter(line => getLineType(line) !== 'COURSE_FEE');
     const shouldPreserveManualLines = manualLines.length > 0
@@ -861,7 +931,7 @@ const brandColor = organization?.primaryColor || '#059669';
         id: generateUUID(),
         invoiceId: editingInvoice?.id || '',
         lineNumber: idx + 1,
-        description: fee.feeName,
+        description: getCourseFeeDescription(fee),
         courseFeeId: fee.id,
         lineType: 'COURSE_FEE' as any,
         quantity: qty,
@@ -1175,7 +1245,7 @@ const brandColor = organization?.primaryColor || '#059669';
         ...updatedLines[index],
         courseFeeId,
         lineType: nextLineType as any,
-        description: nextLineType === 'DISCOUNT' ? `Discount - ${fee.feeName}` : fee.feeName,
+        description: nextLineType === 'DISCOUNT' ? `Discount - ${fee.feeName}` : getCourseFeeDescription(fee),
         quantity: qty,
         unitPrice,
         netAmount,
@@ -2606,7 +2676,9 @@ const brandColor = organization?.primaryColor || '#059669';
           id: '',
           orgId,
           lineNumber: 0,
-          description: fee.feeName || '',
+          description: 'category' in fee
+            ? getCourseFeeDescription(fee as CourseFee)
+            : (fee.feeName || ''),
           courseFeeId: fee.id,
           lineType: 'COURSE_FEE' as any,
           quantity,
@@ -3943,12 +4015,16 @@ const brandColor = organization?.primaryColor || '#059669';
                                       </select>
                                     </td>;
                                   case 'description':
+                                    const linkedCourseFee = line.courseFeeId
+                                      ? courseFees.find(fee => fee.id === line.courseFeeId)
+                                      : undefined;
+                                    const isCourseFeeDescription = getLineType(line) === 'COURSE_FEE' && !!linkedCourseFee;
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <input
                                         type="text"
-                                        value={line.description}
+                                        value={isCourseFeeDescription ? getCourseFeeDescription(linkedCourseFee) : line.description}
                                         onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
-                                        disabled={isReadOnly}
+                                        disabled={isReadOnly || isCourseFeeDescription}
                                         placeholder="Description"
                                         className="w-full px-2 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       />
@@ -3976,6 +4052,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                         min="0"
                                         value={line.quantity}
                                         onChange={e => handleUpdateLine(idx, 'quantity', Math.max(parseInt(e.target.value) || 0, 0))}
+                                        onFocus={e => e.currentTarget.select()}
                                         disabled={isReadOnly}
                                         className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                       />
@@ -3984,12 +4061,10 @@ const brandColor = organization?.primaryColor || '#059669';
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <div className="flex items-center gap-1 justify-end">
                                         <span className="text-[13px] font-normal text-gray-500">₱</span>
-                                        <input
-                                          type="text"
-                                          value={formatInputCurrency(line.unitPrice)}
-                                          onChange={e => handleUpdateLine(idx, 'unitPrice', parseInputCurrency(e.target.value))}
+                                        <CurrencyLineInput
+                                          value={line.unitPrice}
+                                          onValueChange={value => handleUpdateLine(idx, 'unitPrice', value)}
                                           disabled={isReadOnly}
-                                          className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                         />
                                       </div>
                                     </td>;
@@ -3997,12 +4072,10 @@ const brandColor = organization?.primaryColor || '#059669';
                                     return <td key={colKey} className="px-3 py-2 text-right" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <div className="flex items-center gap-1 justify-end">
                                         <span className="text-[13px] font-normal text-gray-500">₱</span>
-                                        <input
-                                          type="text"
-                                          value={formatInputCurrency(line.amount)}
-                                          onChange={e => handleUpdateLine(idx, 'amount', parseInputCurrency(e.target.value))}
+                                        <CurrencyLineInput
+                                          value={line.amount}
+                                          onValueChange={value => handleUpdateLine(idx, 'amount', value)}
                                           disabled={isReadOnly}
-                                          className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                         />
                                       </div>
                                     </td>;
