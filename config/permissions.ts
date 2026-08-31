@@ -182,6 +182,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // AR_SPECIALIST: Accounts Receivable focused
   AR_SPECIALIST: [
     'dashboard',
+    'ledger',
     'journal-vouchers',
     'ar-calendar-tasks',
     'students',

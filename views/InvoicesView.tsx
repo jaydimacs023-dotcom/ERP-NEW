@@ -191,6 +191,54 @@ const SearchableStudentSelect: React.FC<{
   );
 };
 
+const getCourseFeeOptionLabel = (fee: CourseFee) =>
+  `${fee.feeCode ? `${fee.feeCode} - ` : ''}${fee.feeName}`;
+
+const SearchableCourseFeeSelect: React.FC<{
+  fees: CourseFee[];
+  value: string;
+  onChange: (courseFeeId: string) => void;
+  disabled?: boolean;
+  listId: string;
+}> = ({ fees, value, onChange, disabled = false, listId }) => {
+  const selectedFee = fees.find(fee => fee.id === value);
+  const [query, setQuery] = useState(selectedFee ? getCourseFeeOptionLabel(selectedFee) : '');
+
+  useEffect(() => {
+    setQuery(selectedFee ? getCourseFeeOptionLabel(selectedFee) : '');
+  }, [selectedFee?.id, selectedFee?.feeCode, selectedFee?.feeName]);
+
+  return (
+    <>
+      <input
+        type="search"
+        list={listId}
+        value={query}
+        disabled={disabled}
+        placeholder="Search code or fee..."
+        aria-label="Search course fee by code or name"
+        onChange={event => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          const normalizedQuery = nextQuery.trim().toLowerCase();
+          const match = fees.find(fee => getCourseFeeOptionLabel(fee).toLowerCase() === normalizedQuery);
+          if (match) onChange(match.id);
+          else if (!nextQuery) onChange('');
+        }}
+        onBlur={() => {
+          const exactMatch = fees.find(fee => getCourseFeeOptionLabel(fee).toLowerCase() === query.trim().toLowerCase());
+          if (exactMatch) onChange(exactMatch.id);
+          else setQuery(selectedFee ? getCourseFeeOptionLabel(selectedFee) : '');
+        }}
+        className="w-full rounded px-3 py-1 text-[13px] font-normal text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+      />
+      <datalist id={listId}>
+        {fees.map(fee => <option key={fee.id} value={getCourseFeeOptionLabel(fee)} />)}
+      </datalist>
+    </>
+  );
+};
+
 const INVOICE_PAGE_SIZE = 7;
 const INVOICE_COLUMNS = 'id,org_id,invoice_no,document_type,payment_method,si_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id';
 
@@ -705,6 +753,17 @@ const brandColor = organization?.primaryColor || '#059669';
   };
 
   const getSelectableCourseFeesForLine = (line: InvoiceLine) => {
+    if (isNonInvoicePayment) {
+      return [...courseFees].sort((left, right) => {
+        const codeComparison = String(left.feeCode || '').localeCompare(String(right.feeCode || ''), undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        });
+        if (codeComparison !== 0) return codeComparison;
+        return String(left.feeName || '').localeCompare(String(right.feeName || ''), undefined, { sensitivity: 'base' });
+      });
+    }
+
     const qualificationId = getInvoiceQualificationId();
     const batchSponsorId = formData.batchId
       ? getBatchSponsorId(batches.find(batch => batch.id === formData.batchId))
@@ -2626,11 +2685,19 @@ const brandColor = organization?.primaryColor || '#059669';
 
   const glJournalPreview = useMemo(() => {
     const sponsor = formData.sponsorId ? sponsors.find(s => s.id === formData.sponsorId) : null;
-    const arAccount =
+    const cashOnHandAccount = accounts.find(a =>
+      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash on hand'
+    );
+    const operatingBankAccount = accounts.find(a =>
+      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash in bank - operating'
+    );
+    const receivableAccount =
       accounts.find(a => a.id === (sponsor as any)?.arAccountId) ||
-      accounts.find(a => a.code === '1210') ||
       accounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable') && a.class === AccountClass.ASSET && !a.isHeader) ||
       accounts.find(a => (a.name || '').toLowerCase().includes('receivable') && a.class === AccountClass.ASSET && !a.isHeader);
+    const debitAccount = isNonInvoicePayment
+      ? formData.paymentMethod === 'BANK_TRANSFER' ? operatingBankAccount : cashOnHandAccount
+      : receivableAccount;
 
     const fallbackRevenueAccount =
       accounts.find(a => a.code === '4000') ||
@@ -2651,12 +2718,17 @@ const brandColor = organization?.primaryColor || '#059669';
 
     if (grandTotal > 0) {
       lines.push({
-        key: 'ar',
-        accountLabel: getAccountLabel(arAccount, 'Accounts Receivable'),
+        key: 'debit',
+        accountLabel: getAccountLabel(
+          debitAccount,
+          isNonInvoicePayment
+            ? formData.paymentMethod === 'BANK_TRANSFER' ? 'Cash in Bank - Operating' : 'Cash on Hand'
+            : 'Accounts Receivable'
+        ),
         description: formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId),
         debit: grandTotal,
         credit: 0,
-        missing: !arAccount,
+        missing: !debitAccount,
       });
     }
 
@@ -4195,17 +4267,27 @@ const brandColor = organization?.primaryColor || '#059669';
                                   }
                                   case 'courseFeeId':
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
-                                      <select
-                                        value={line.courseFeeId || ''}
-                                        onChange={e => handleApplyCourseFee(idx, e.target.value)}
-                                        disabled={isReadOnly}
-                                        className="w-full px-3 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                      >
-                                        <option value="">-- Select --</option>
-                                        {getSelectableCourseFeesForLine(line).map(cf => (
-                                          <option key={cf.id} value={cf.id} style={{ fontFamily: 'var(--font-sans)' }}>{cf.feeCode} - {cf.feeName}</option>
-                                        ))}
-                                      </select>
+                                      {isNonInvoicePayment ? (
+                                        <SearchableCourseFeeSelect
+                                          fees={getSelectableCourseFeesForLine(line)}
+                                          value={line.courseFeeId || ''}
+                                          onChange={courseFeeId => handleApplyCourseFee(idx, courseFeeId)}
+                                          disabled={isReadOnly}
+                                          listId={`non-invoice-course-fees-${line.id || idx}`}
+                                        />
+                                      ) : (
+                                        <select
+                                          value={line.courseFeeId || ''}
+                                          onChange={e => handleApplyCourseFee(idx, e.target.value)}
+                                          disabled={isReadOnly}
+                                          className="w-full px-3 py-1 rounded text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                          <option value="">-- Select --</option>
+                                          {getSelectableCourseFeesForLine(line).map(cf => (
+                                            <option key={cf.id} value={cf.id} style={{ fontFamily: 'var(--font-sans)' }}>{cf.feeCode} - {cf.feeName}</option>
+                                          ))}
+                                        </select>
+                                      )}
                                     </td>;
                                   case 'description':
                                     const linkedCourseFee = line.courseFeeId
