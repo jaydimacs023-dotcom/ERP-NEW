@@ -738,7 +738,7 @@ const Reports: React.FC<ReportsProps> = ({ accounts: initialAccounts, entries: i
           }
         }
       `}</style>
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 no-print">
+      <header className="sticky top-0 z-30 -mx-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200/80 bg-slate-50/95 px-2 py-4 shadow-[0_8px_16px_-16px_rgba(15,23,42,0.45)] backdrop-blur-sm no-print">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Institutional Financial Reports</h2>
           <p className="text-sm text-gray-500 font-normal italic">Standardized statements and regulatory reporting for educational institutions.</p>

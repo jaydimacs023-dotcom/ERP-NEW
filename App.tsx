@@ -9,7 +9,7 @@ import { AuditService } from './services/AuditService';
 import { BillingComputationService } from './services/BillingComputationService';
 import { config } from './config/app';
 import { generateUUID } from './utils/uuid';
-import { canAccess, canAccessGroup, MODULE_GROUPS, isSystemAdmin as checkSysAdmin, isTenantAdmin as checkTenantAdmin, getDefaultTab, hasFinanceAccess, hasARAccess, hasAPAccess, hasOperationsAccess } from './config/permissions';
+import { canAccess, canAccessGroup, canPerformAction, MODULE_GROUPS, isSystemAdmin as checkSysAdmin, isTenantAdmin as checkTenantAdmin, getDefaultTab, hasFinanceAccess, hasARAccess, hasAPAccess, hasOperationsAccess } from './config/permissions';
 import { useNotifications } from './components/NotificationContext';
 
 // View Imports
@@ -103,7 +103,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2, FilePenLine
+  ArrowDownToLine, UserCheck, UserPlus, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2, FilePenLine
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -6762,6 +6762,7 @@ export default function App() {
               <NavItem icon={<ListTodo size={18} />} label="Calendar & Tasks" active={activeTab === 'ar-calendar-tasks'} onClick={() => navigateTo('ar-calendar-tasks')} compact={!sidebarOpen} brandColor={brandColor} />
 
               <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
+                <NavItem icon={<UserPlus size={18} />} label="Register Learner" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6782,7 +6783,7 @@ export default function App() {
 
               <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
                 <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />
-                <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<BookText size={18} />} label="Journal Entries" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
@@ -6841,17 +6842,19 @@ export default function App() {
               {userCanAccess('ap-memos') && <NavItem icon={<FilePenLine size={18} />} label="Credit/Debit Memos" active={activeTab === 'ap-memos'} onClick={() => navigateTo('ap-memos')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('ap-reclassifications') && <NavItem icon={<RefreshCw size={18} />} label="AP Reclassifications" active={activeTab === 'ap-reclassifications'} onClick={() => navigateTo('ap-reclassifications')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('time-expenses') && <NavItem icon={<ReceiptText size={18} />} label="Time & Expenses" active={activeTab === 'time-expenses'} onClick={() => navigateTo('time-expenses')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {['AP_SPECIALIST', 'AP_CLERK', 'AP_SUPERVISOR'].includes(currentUser.role) && userCanAccess('ap-journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'ap-journal-vouchers'} onClick={() => navigateTo('ap-journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {['AP_SPECIALIST', 'AP_CLERK', 'AP_SUPERVISOR'].includes(currentUser.role) && userCanAccess('ledger') && <NavItem icon={<BookText size={18} />} label="Journal Entries" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
             </NavSection>
           )}
 
-          {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
+          {isFinance && currentUser.role !== 'AR_SPECIALIST' && !['AP_SPECIALIST', 'AP_CLERK', 'AP_SUPERVISOR'].includes(currentUser.role) && (
             <NavSection
               label="Ledger & Audit"
               isOpen={openSections.ledgerAudit}
               onToggle={() => setOpenSections(prev => ({ ...prev, ledgerAudit: !prev.ledgerAudit }))}
               compact={!sidebarOpen}
             >
-              {userCanAccess('ledger') && <NavItem icon={<BookText size={18} />} label="General Ledger" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('ledger') && <NavItem icon={<BookText size={18} />} label="Journal Entries" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('ap-journal-vouchers') && <NavItem icon={<ClipboardCheck size={18} />} label="AP Journal Vouchers" active={activeTab === 'ap-journal-vouchers'} onClick={() => navigateTo('ap-journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('vendor-ledger') && <NavItem icon={<BookOpen size={18} />} label="Vendor Ledger" active={activeTab === 'vendor-ledger'} onClick={() => navigateTo('vendor-ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -7179,8 +7182,11 @@ export default function App() {
           )}
           {activeTab === 'ap-journal-vouchers' && userCanAccess('ap-journal-vouchers') && (
             <APJournalVouchersView
+              orgId={currentOrgId}
               entries={activeJournalEntries}
               lines={filteredLines}
+              payables={payables.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+              taxCategories={taxCategories.filter(category => category.orgId === currentOrgId && !category.isDeleted)}
               vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)}
               accounts={filteredAccounts}
               currency={currentOrg?.currency}
@@ -7232,7 +7238,12 @@ export default function App() {
           />}
           {activeTab === 'revenue-recognition' && <RevenueRecognitionView orgId={currentOrgId} currency={currentOrg?.currency || 'USD'} schedules={revenueSchedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} entries={revenueRecognitionEntries.filter(e => e.orgId === currentOrgId)} customers={[...students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} ` })), ...sponsors.map(sp => ({ id: sp.id, name: sp.name }))]} accounts={filteredAccounts} onCreateSchedule={handleAddRevenueSchedule} onUpdateSchedule={handleUpdateRevenueSchedule} onDeleteSchedule={handleDeleteRevenueSchedule} onCreateEntry={handleAddRevenueRecognitionEntry} onUpdateEntry={handleUpdateRevenueRecognitionEntry} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
           {activeTab === 'ap' && <APView orgId={currentOrgId} payables={payables} checks={checkVouchers} purchaseOrders={purchaseOrders} purchaseOrderLines={purchaseOrderLines} goodsReceipts={goodsReceipts} goodsReceiptLines={goodsReceiptLines} vendors={vendors} accounts={filteredAccounts} entries={activeJournalEntries} items={items} lines={filteredLines} bankAccounts={bankAccounts} currentUserId={currentUser?.id} recurringBills={recurringBills} recurringBillHistory={recurringBillHistory} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onApproveException={handleApproveException} onPostBill={handlePostJournal} onCreateRecurringBill={(bill) => setRecurringBills(prev => [...prev, { ...bill, id: Date.now().toString() } as RecurringBill])} onUpdateRecurringBill={(id, updates) => setRecurringBills(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b))} onDeleteRecurringBill={(id) => setRecurringBills(prev => prev.filter(b => b.id !== id))} onNotify={handleNotify} />}
-          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} employees={users.filter(user => user.orgId === currentOrgId && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'payables' && <PayablesView orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} taxCategories={taxCategories} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} employees={users.filter(user => user.orgId === currentOrgId && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onJournalChanged={async () => {
+            const refreshedEntries = await dataService.getJournalEntriesByOrg(currentOrgId);
+            const refreshedLineGroups = await Promise.all(refreshedEntries.map(entry => dataService.getJournalLinesByEntry(entry.id)));
+            setJournalEntries(refreshedEntries);
+            setJournalLines(refreshedLineGroups.flat());
+          }} onNotify={handleNotify} />}
           {activeTab === 'ap-memos' && userCanAccess('ap-memos') && currentUser?.id && <APMemosView orgId={currentOrgId} payables={payables} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} currentUserId={currentUser.id} currentUserName={currentUser.name || currentUser.email} currentUserRole={currentUser.role} currency={currentOrg?.currency || 'PHP'} brandColor={brandColor} onNotify={handleNotify} />}
           {activeTab === 'ap-reclassifications' && userCanAccess('ap-reclassifications') && currentUser?.id && <APReclassificationsView orgId={currentOrgId} payables={payables} vendors={vendors.filter(v => v.orgId === currentOrgId && !v.isDeleted)} accounts={filteredAccounts} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} entries={activeJournalEntries} lines={filteredLines} currentUserId={currentUser.id} currentUserRole={currentUser.role} currency={currentOrg?.currency || 'PHP'} onNotify={handleNotify} onJournalChanged={async () => {
             const refreshedEntries = await dataService.getJournalEntriesByOrg(currentOrgId);
@@ -7241,7 +7252,12 @@ export default function App() {
             setJournalLines(refreshedLineGroups.flat());
           }} />}
           {activeTab === 'time-expenses' && userCanAccess('time-expenses') && <TimeExpensesView orgId={currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId || ''} payables={payables} vendors={vendors.filter(v => v.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !v.isDeleted)} accounts={filteredAccounts} qualifications={qualifications.filter(q => q.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !q.isDeleted)} taxCategories={taxCategories.filter(tc => tc.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && !tc.isDeleted)} employees={users.filter(user => user.orgId === (currentUser?.role === 'SYSTEM_ADMIN' ? currentOrgId : currentUser?.orgId) && user.role !== 'SYSTEM_ADMIN' && user.role !== 'STUDENT' && !user.isDeleted)} currency={currentOrg?.currency || 'PHP'} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onNotify={handleNotify} />}
-          {activeTab === 'ap-aging-report' && userCanAccess('ap-aging-report') && <PayablesView view="aging" orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
+          {activeTab === 'ap-aging-report' && userCanAccess('ap-aging-report') && <PayablesView view="aging" orgId={currentOrgId} payables={payables} vendors={vendors} accounts={filteredAccounts} qualifications={qualifications} taxCategories={taxCategories} entries={activeJournalEntries} bankAccounts={bankAccounts} vendorTaxSettings={vendorTaxSettings} atcCategories={atcCategories} atcItems={atcItems} atcRates={atcRates} currentUserId={currentUser?.id} onCreatePayable={handleAddPayable} onUpdatePayable={handleUpdatePayable} onDeletePayable={handleDeletePayable} onPostJournal={handlePostJournal} onJournalChanged={async () => {
+            const refreshedEntries = await dataService.getJournalEntriesByOrg(currentOrgId);
+            const refreshedLineGroups = await Promise.all(refreshedEntries.map(entry => dataService.getJournalLinesByEntry(entry.id)));
+            setJournalEntries(refreshedEntries);
+            setJournalLines(refreshedLineGroups.flat());
+          }} onNotify={handleNotify} />}
           {activeTab === 'po' && <PurchaseOrdersView orgId={currentOrgId} purchaseOrders={purchaseOrders} vendors={vendors} items={items} onCreatePO={handleAddPurchaseOrder} onUpdateStatus={handleUpdatePurchaseOrderStatus} onConvertToBill={handleConvertToBill} />}
           {activeTab === 'goods-receipt' && <GoodsReceiptView orgId={currentOrgId} goodsReceipts={goodsReceipts} purchaseOrders={purchaseOrders.filter(po => po.orgId === currentOrgId)} vendors={vendors} accounts={filteredAccounts} currentUserId={currentUser?.id} onCreateGoodsReceipt={handleAddGoodsReceipt} onUpdateGoodsReceipt={handleUpdateGoodsReceipt} onDeleteGoodsReceipt={handleDeleteGoodsReceipt} onPostJournal={handlePostJournal} onNotify={handleNotify} />}
 
@@ -7286,7 +7302,7 @@ export default function App() {
           {activeTab === 'payment-history' && currentOrg && <PaymentHistoryView payments={paymentHistory.filter(p => p.orgId === currentOrgId)} currency={currentOrg.currency} organization={currentOrg} />}
 
           {activeTab === 'payroll' && userCanAccess('payroll') && <PayrollView employees={employees.filter(e => e.orgId === currentOrgId && !e.isDeleted)} payrollRuns={payrollRuns} payrollLines={payrollLines} accounts={filteredAccounts} bankAccounts={bankAccounts} entries={activeJournalEntries} orgName={currentOrg?.name} onPostPayroll={handlePostPayroll} />}
-          {activeTab === 'students' && <StudentsView orgId={currentOrgId} students={students.filter(s => s.orgId === currentOrgId)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} />}
+          {activeTab === 'students' && userCanAccess('students') && <StudentsView orgId={currentOrgId} students={students.filter(s => s.orgId === currentOrgId)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onAddStudent={handleAddStudent} onUpdateStudent={handleUpdateStudent} onDeleteStudent={handleDeleteStudent} onBatchAddStudents={handleBatchAddStudents} canCreateStudent={canPerformAction(currentUser?.role, 'students', 'create')} canEditStudent={canPerformAction(currentUser?.role, 'students', 'edit')} />}
           {activeTab === 'trainers' && <TrainersView organization={currentOrg} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView organization={currentOrg} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}

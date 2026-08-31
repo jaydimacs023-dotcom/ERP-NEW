@@ -54,6 +54,8 @@ interface StudentsViewProps {
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
   onBatchAddStudents: (students: Student[]) => Promise<void>;
+  canCreateStudent?: boolean;
+  canEditStudent?: boolean;
 }
 
 const MANDATORY_DOCS = REQUIRED_STUDENT_DOCUMENTS;
@@ -227,7 +229,7 @@ function buildLearnerProfilePrintHtml(student: Student, courseName: string): str
 </body>
 </html>`;
 }
-const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents }) => {
+const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = [], qualifications = [], brandColor, onAddStudent, onUpdateStudent, onDeleteStudent, onBatchAddStudents, canCreateStudent = true, canEditStudent = true }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [complianceFilter, setComplianceFilter] = useState<'ALL' | 'COMPLIANT' | 'PENDING' | 'REJECTED'>('ALL');
@@ -917,6 +919,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {canEditStudent && (
+              <>
             <button title="Includes one clearly marked example row. Remove it or leave it unchanged; it will never be imported." onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2.5 text-slate-500 hover:text-brand transition-colors text-xs font-semibold uppercase tracking-wide border border-gray-200 rounded-md bg-white h-10">
               <Download size={14} /> Template + Example
             </button>
@@ -939,12 +943,16 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
             >
               <FileText size={14} /> TESDA Form Entry
             </button>
+              </>
+            )}
+            {canCreateStudent && (
             <button onClick={() => {
               resetRegistrationDraft();
               setShowModal(true);
             }} className="flex items-center gap-2 px-3 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-sm text-xs font-semibold h-10" style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px ${withAlpha(brandColor, 0.2)}` }}>
               <Plus size={14} /> Register Learner
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -1370,13 +1378,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                   <ChevronLeft size={16} /> Back
                 </button>
                 <button onClick={() => handlePrintLearnerProfile(auditStudent)} className="p-3 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-800 transition-colors" title="Print TESDA learners profile form"><Printer size={20} /></button>
-                <button
+                {canEditStudent && <button
                   onClick={() => openEditStudent(auditStudent, true)}
                   className="inline-flex items-center gap-2 px-4 py-3 text-white rounded text-xs font-semibold uppercase tracking-wide transition-colors shadow-sm"
                   style={{ backgroundColor: brandColor }}
                 >
                   <RefreshCw size={16} /> Edit
-                </button>
+                </button>}
               </div>
             </div>
 
@@ -1549,9 +1557,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                   <AlertCircle size={17} className="mt-0.5 shrink-0" style={{ color: brandColor }} />
                   <div>
                     <p className="text-xs font-semibold text-gray-700">
-                      Fields marked with <span className="text-red-500" aria-hidden="true">*</span> are required
+                      Only Last Name and First Name are required
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-4 text-gray-500">Complete the required information before registering the learner.</p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-gray-500">All other learner details can be completed later.</p>
                   </div>
                 </div>
 
@@ -1587,8 +1595,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date <span className="text-red-500">*</span></label>
-                      <input type="date" required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Birth Date</label>
+                      <input type="date" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.dateOfBirth} onChange={handleDobChange} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Computed Age</label>
@@ -1622,25 +1630,24 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email <span className="text-red-500">*</span></label>
-                      <input required type="email" placeholder="learner@manila.edu.ph" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Institutional Email</label>
+                      <input type="email" placeholder="learner@manila.edu.ph" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number <span className="text-red-500">*</span></label>
-                      <input required placeholder="09XX XXX XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Contact Number</label>
+                      <input placeholder="09XX XXX XXXX" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <div className="md:col-span-6 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street <span className="text-red-500">*</span></label>
-                      <input required placeholder="Kalsada St. / Bldg 123" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">House # / Street</label>
+                      <input placeholder="Kalsada St. / Bldg 123" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} />
                     </div>
                     <div className="md:col-span-6 space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Region <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Region</label>
                       {PSGC_TOKEN ? (
                         <select
-                          required
                           className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800"
                           value={selectedPsgcRegion}
                           onChange={e => {
@@ -1653,7 +1660,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                           {psgcRegions.map(region => <option key={region.psgc_code} value={region.psgc_code}>{region.area_name}</option>)}
                         </select>
                       ) : (
-                        <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.district || ''} onChange={e => setFormData({ ...formData, district: e.target.value })} placeholder="Region" />
+                        <input className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.district || ''} onChange={e => setFormData({ ...formData, district: e.target.value })} placeholder="Region" />
                       )}
                     </div>
                   </div>
@@ -1664,9 +1671,9 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Province</label>
                       {PSGC_TOKEN ? (
-                        <select required disabled={!selectedPsgcRegion || psgcProvinces.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcProvince} onChange={e => {
+                        <select disabled={!selectedPsgcRegion || psgcProvinces.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcProvince} onChange={e => {
                           const province = psgcProvinces.find(area => area.psgc_code === e.target.value);
                           setSelectedPsgcProvince(e.target.value);
                           setFormData(prev => ({ ...prev, province: province?.area_name || '', city: '', barangay: '' }));
@@ -1675,13 +1682,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                           {psgcProvinces.map(province => <option key={province.psgc_code} value={province.psgc_code}>{province.area_name}</option>)}
                         </select>
                       ) : (
-                        <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
+                        <input className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.province} onChange={e => setFormData({ ...formData, province: e.target.value })} />
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">City / Municipality</label>
                       {PSGC_TOKEN ? (
-                        <select required disabled={!selectedPsgcRegion || psgcCities.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcCity} onChange={e => {
+                        <select disabled={!selectedPsgcRegion || psgcCities.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={selectedPsgcCity} onChange={e => {
                           const city = psgcCities.find(area => area.psgc_code === e.target.value);
                           setSelectedPsgcCity(e.target.value);
                           setFormData(prev => ({ ...prev, city: city?.area_name || '', barangay: '' }));
@@ -1690,13 +1697,13 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                           {psgcCities.map(city => <option key={city.psgc_code} value={city.psgc_code}>{city.area_name}</option>)}
                         </select>
                       ) : (
-                        <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                        <input className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Barangay</label>
                       {PSGC_TOKEN ? (
-                        <select required disabled={!selectedPsgcCity || psgcBarangays.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={formData.barangay || ''} onChange={e => {
+                        <select disabled={!selectedPsgcCity || psgcBarangays.length === 0} className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800 disabled:opacity-60" value={formData.barangay || ''} onChange={e => {
                           const barangay = psgcBarangays.find(area => area.area_name === e.target.value);
                           setFormData(prev => ({ ...prev, barangay: barangay?.area_name || e.target.value }));
                         }}>
@@ -1704,7 +1711,7 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                           {psgcBarangays.map(barangay => <option key={barangay.psgc_code} value={barangay.area_name}>{barangay.area_name}</option>)}
                         </select>
                       ) : (
-                        <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
+                        <input className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.barangay} onChange={e => setFormData({ ...formData, barangay: e.target.value })} />
                       )}
                     </div>
                   </div>
@@ -1719,8 +1726,8 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment <span className="text-red-500">*</span></label>
-                      <select required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Educational Attainment</label>
+                      <select className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.educationalAttainment} onChange={e => setFormData({ ...formData, educationalAttainment: e.target.value })}>
                         <option value="Elementary Graduate">Elementary Graduate</option>
                         <option value="High School Graduate">High School Graduate</option>
                         <option value="College Level">College Level</option>
@@ -1730,12 +1737,12 @@ const StudentsView: React.FC<StudentsViewProps> = ({ orgId, students, batches = 
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality <span className="text-red-500">*</span></label>
-                      <input required className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1">Nationality</label>
+                      <input className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian <span className="text-red-500">*</span></label>
-                      <input required placeholder="Name of parent or guardian" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.guardian} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wide px-1 flex items-center gap-1"><Heart size={10} className="text-rose-500" /> Primary Guardian</label>
+                      <input placeholder="Name of parent or guardian" className="w-full bg-gray-50 border border-gray-100 rounded focus:ring-2 focus:ring-brand/20 outline-none font-bold text-gray-800" value={formData.guardian} onChange={e => setFormData({ ...formData, guardian: e.target.value })} />
                     </div>
                   </div>
                 </section>

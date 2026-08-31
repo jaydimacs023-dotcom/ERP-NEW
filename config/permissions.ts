@@ -183,6 +183,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'dashboard',
     'journal-vouchers',
     'ar-calendar-tasks',
+    'students',
     'customers',
     'invoices',
     'payments',
@@ -206,7 +207,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AP_SPECIALIST: Accounts Payable focused
   AP_SPECIALIST: [
-    'dashboard', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
+    'dashboard', 'ledger', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
     'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
@@ -215,13 +216,13 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
 
   // AP_CLERK: Limited AP data entry
   AP_CLERK: [
-    'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
+    'ledger', 'ap-journal-vouchers', 'reports', 'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt',
     'vendors', 'items', 'feedback'
   ],
 
   // AP_SUPERVISOR: AP with approvals
   AP_SUPERVISOR: [
-    'dashboard', 'ap-journal-vouchers', 'vendor-ledger', 'banking', 'checks',
+    'dashboard', 'ledger', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
     'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'vendors', 'items',
     'inventory', 'stock-items', 'stock-levels',
@@ -422,6 +423,9 @@ export function getRoleDisplayName(role: UserRole | string | undefined): string 
 export type ActionPermission = 'view' | 'create' | 'edit' | 'delete' | 'approve' | 'post' | 'void';
 
 const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPermission[]>>>> = {
+  AR_SPECIALIST: {
+    'students': ['view', 'create'],
+  },
   PRESIDENT: {
     'ap-reclassifications': ['view'],
   },
@@ -442,6 +446,9 @@ const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPer
   },
   // AP_CLERK can view and create, but not approve
   AP_CLERK: {
+    'ledger': ['view'],
+    'ap-journal-vouchers': ['view'],
+    'reports': ['view'],
     'payables': ['view', 'create', 'edit'],
     'ap-memos': ['view', 'create', 'edit'],
     'ap-reclassifications': ['view', 'create', 'edit'],
@@ -449,6 +456,16 @@ const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPer
     'goods-receipt': ['view', 'create', 'edit'],
     'vendors': ['view'],
     'items': ['view'],
+  },
+  AP_SPECIALIST: {
+    'ledger': ['view'],
+    'ap-journal-vouchers': ['view'],
+    'reports': ['view'],
+  },
+  AP_SUPERVISOR: {
+    'ledger': ['view'],
+    'ap-journal-vouchers': ['view'],
+    'reports': ['view'],
   }
 };
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Calculator, Pencil, Plus, ReceiptText, Save, Search, Trash2, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { ArrowLeft, Calculator, Download, Pencil, Plus, ReceiptText, Save, Search, Trash2, X } from 'lucide-react';
 import { ChartOfAccount, Payable, Qualification, TaxCategoryEntry, TimeExpense, User, Vendor } from '../types';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import ModalPortal from '../components/ModalPortal';
@@ -21,10 +22,25 @@ interface Props {
 
 const emptyForm = { rfqCode: '', transactionDate: new Date().toISOString().slice(0, 10), description: '', quantity: '1', unitCost: '', expenseAccountId: '', qualificationId: '', taxCategoryId: '', supplierName: '', employeeId: '' };
 const normalizeGroupValue = (value: string) => value.trim().toLocaleLowerCase();
+const isVatGoodsOrServices = (category?: TaxCategoryEntry) => {
+  const code = String(category?.code || '').toUpperCase().replace(/[\s_-]+/g, '');
+  return code === 'VATGOODS' || code === 'VATSERV';
+};
+const calculateVatExclusiveCost = (quantity: number, unitCost: number, category?: TaxCategoryEntry) => {
+  const grossCost = quantity * unitCost;
+  const rate = Number(category?.rate || 0);
+  if (!isVatGoodsOrServices(category) || !(rate > 0)) return grossCost;
+  return Math.round((grossCost / (1 + rate / 100)) * 100) / 100;
+};
+const calculateInclusiveVatAmount = (quantity: number, unitCost: number, category?: TaxCategoryEntry) => {
+  const grossCost = quantity * unitCost;
+  if (!isVatGoodsOrServices(category)) return 0;
+  return Math.round((grossCost - calculateVatExclusiveCost(quantity, unitCost, category)) * 100) / 100;
+};
 const calculateTaxAmount = (amount: number, category?: TaxCategoryEntry) => {
   const rate = Number(category?.rate || 0);
   if (!(amount > 0) || !(rate > 0)) return 0;
-  const tax = category?.isInclusive
+  const tax = category?.isInclusive && !isVatGoodsOrServices(category)
     ? amount * rate / (100 + rate)
     : amount * rate / 100;
   return Math.round(tax * 100) / 100;
@@ -42,17 +58,33 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TimeExpense['status']>('all');
+  const [expenseAccountSearch, setExpenseAccountSearch] = useState('');
+  const [showExpenseAccountOptions, setShowExpenseAccountOptions] = useState(false);
   const openRows = useMemo(() => rows.filter(row => row.status === 'open'), [rows]);
   const selectedRows = useMemo(() => openRows.filter(row => selected.includes(row.id)), [openRows, selected]);
   const total = selectedRows.reduce((sum, row) => sum + Number(row.amount), 0);
+  const selectedExpenseTotal = Math.round(selectedRows.reduce((sum, row) => {
+    const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId);
+    const expenseAmount = calculateVatExclusiveCost(Number(row.quantity), Number(row.unitCost), taxCategory);
+    return sum + Math.round(expenseAmount * 100) / 100;
+  }, 0) * 100) / 100;
+  const selectedInputVat = Math.round((total - selectedExpenseTotal) * 100) / 100;
   const selectedClaimant = selectedRows[0]?.claimedBy;
   const selectedEmployeeId = selectedRows[0]?.employeeId;
   const expenseAccounts = useMemo(
     () => accounts.filter(account => !account.isHeader && account.class === 'EXPENSE'),
     [accounts]
   );
-  const calculatedAmount = Math.round(Number(form.quantity) * Number(form.unitCost) * 100) / 100;
+  const filteredExpenseAccounts = useMemo(() => {
+    const query = expenseAccountSearch.trim().toLocaleLowerCase();
+    return query
+      ? expenseAccounts.filter(account => `${account.code} ${account.name}`.toLocaleLowerCase().includes(query))
+      : expenseAccounts;
+  }, [expenseAccounts, expenseAccountSearch]);
   const selectedTaxCategory = taxCategories.find(category => category.id === form.taxCategoryId);
+  const calculatedAmount = Math.round(
+    calculateVatExclusiveCost(Number(form.quantity), Number(form.unitCost), selectedTaxCategory) * 100
+  ) / 100;
   const calculatedTax = calculateTaxAmount(calculatedAmount, selectedTaxCategory);
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase();
@@ -75,6 +107,49 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const { currentPage, totalPages, pageStartIndex, pageEndIndex, paginatedRows, setCurrentPage } =
     usePaginatedRows(filteredRows, [searchTerm, statusFilter], 7);
 
+  const handleExportExcel = () => {
+    const exportRows = filteredRows.map(row => {
+      const vendor = vendors.find(item => item.id === row.supplierId);
+      const account = expenseAccounts.find(item => item.id === row.expenseAccountId);
+      const qualification = qualifications.find(item => item.id === row.qualificationId);
+      const taxCategory = taxCategories.find(item => item.id === row.taxCategoryId);
+
+      return {
+        'RFQ Code': row.rfqCode,
+        'Transaction Date': row.transactionDate,
+        Description: row.description,
+        Supplier: row.supplierName || vendor?.name || '',
+        'Claimed By': row.claimedBy,
+        Qualification: qualification ? `${qualification.code} - ${qualification.name}` : '',
+        'Expense Account': account ? `${account.code} - ${account.name}` : '',
+        Quantity: Number(row.quantity),
+        'Unit Cost': Number(row.unitCost),
+        Amount: Number(row.amount),
+        'Tax Category': taxCategory ? `${taxCategory.code} - ${taxCategory.description}` : '',
+        'Tax Rate (%)': taxCategory ? Number(taxCategory.rate) : 0,
+        'Tax Amount': isVatGoodsOrServices(taxCategory)
+          ? calculateInclusiveVatAmount(Number(row.quantity), Number(row.unitCost), taxCategory)
+          : calculateTaxAmount(Number(row.amount), taxCategory),
+        Currency: currency,
+        Status: row.status.charAt(0).toUpperCase() + row.status.slice(1),
+      };
+    });
+
+    if (exportRows.length === 0) {
+      onNotify('info', 'There are no matching expense records to export.');
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    worksheet['!cols'] = Object.keys(exportRows[0]).map(key => ({
+      wch: Math.min(45, Math.max(key.length + 2, ...exportRows.map(row => String(row[key as keyof typeof row] ?? '').length + 2))),
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Time & Expenses');
+    XLSX.writeFile(workbook, `Time_Expenses_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    onNotify('success', `Exported ${exportRows.length} expense record${exportRows.length === 1 ? '' : 's'} to Excel.`);
+  };
+
   useEffect(() => {
     service.getTimeExpensesByOrg(orgId).then(setRows).catch(() => onNotify('error', 'Unable to load time and expense records.'));
   }, [orgId]);
@@ -82,6 +157,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const openCreateForm = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setExpenseAccountSearch('');
     setShowForm(true);
   };
 
@@ -100,6 +176,8 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       supplierName: row.supplierName || vendors.find(vendor => vendor.id === row.supplierId)?.name || '',
       employeeId: row.employeeId || employees.find(employee => employee.name === row.claimedBy)?.id || '',
     });
+    const account = expenseAccounts.find(item => item.id === row.expenseAccountId);
+    setExpenseAccountSearch(account ? `${account.code} — ${account.name}` : '');
     setShowForm(true);
   };
 
@@ -123,6 +201,10 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       const employee = claimableEmployees.find(item => item.id === form.employeeId);
       if (!employee) {
         onNotify('error', 'Select an employee from this organization.');
+        return;
+      }
+      if (!expenseAccounts.some(account => account.id === form.expenseAccountId)) {
+        onNotify('error', 'Select a valid expense account from the search results.');
         return;
       }
       const values = {
@@ -167,6 +249,17 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       (account.code?.startsWith('2100') || account.name.toLocaleLowerCase().includes('accounts payable'))
     );
     if (!apControlAccount) return onNotify('error', 'Configure an Accounts Payable control account before consolidating expenses.');
+    const inputVatAccount = selectedInputVat > 0
+      ? accounts.find(account => !account.isHeader && account.class === 'ASSET' && (
+        account.code?.startsWith('1170') ||
+        account.code?.startsWith('1210') ||
+        account.name.toLocaleLowerCase().includes('input vat') ||
+        account.name.toLocaleLowerCase().includes('input tax')
+      ))
+      : undefined;
+    if (selectedInputVat > 0 && !inputVatAccount) {
+      return onNotify('error', 'Configure an Input VAT asset account before releasing vatable expenses.');
+    }
     setSaving(true);
     try {
       const now = new Date();
@@ -183,13 +276,18 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       const bill = await onCreatePayable({
         id: '', orgId, vendorId: undefined, payableNumber,
         category: 'employee_reimbursements', description: `Employee reimbursement for ${selectedClaimant}: ${selectedRows.map(row => row.rfqCode).join(', ')}`,
-        amount: total, netPayable: total, paidAmount: 0, billDate: now.toISOString().slice(0, 10),
+        amount: selectedExpenseTotal, inputVatAmount: selectedInputVat, inputVatAccountId: inputVatAccount?.id,
+        netPayable: total, paidAmount: 0, billDate: now.toISOString().slice(0, 10),
         dueDate: new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10),
         currency, status: 'for_approval', referenceDocument: selectedRows.map(row => row.rfqCode).join(', '),
         expenseAllocations: selectedRows.map(row => ({
           expenseAccountId: row.expenseAccountId!,
           qualificationId: row.qualificationId,
-          amount: Number(row.amount),
+          amount: calculateVatExclusiveCost(
+            Number(row.quantity),
+            Number(row.unitCost),
+            taxCategories.find(category => category.id === row.taxCategoryId)
+          ),
           description: `${row.rfqCode} — ${row.description}`,
           sourceExpenseId: row.id,
         })),
@@ -199,12 +297,11 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         notes: `Reimburse ${selectedClaimant}. Merchants: ${merchantNames.join(', ') || 'Not specified'}`,
         createdBy: currentUserId, createdAt: now.toISOString()
       } as Payable);
-      await service.postPayableBill(bill.id, currentUserId);
       const updates = await Promise.all(selectedRows.map(row => service.updateTimeExpense(row.id, { status: 'released', payableId: bill.id })));
       const updatedById = new Map(updates.map(row => [row.id, row]));
       setRows(previous => previous.map(row => updatedById.get(row.id) || row));
       setSelected([]);
-      onNotify('success', `AP Bill ${bill.payableNumber} created successfully for reimbursement to ${selectedClaimant} — ${currency} ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
+      onNotify('success', `AP Bill ${bill.payableNumber} released to Bills & Payments with On Hold status — ${currency} ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
     } catch (error) {
       onNotify('error', error instanceof Error ? error.message : 'Unable to consolidate expenses.');
     } finally { setSaving(false); }
@@ -258,7 +355,45 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
               <label className="block text-sm font-semibold text-slate-700">Claimed By<select required value={form.employeeId} onChange={e => setForm({...form, employeeId:e.target.value})} className={fieldClass}><option value="">Select employee</option>{claimableEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name} — {employee.role === 'ADMIN' ? 'Tenant Admin' : employee.role.replaceAll('_', ' ')}</option>)}</select></label>
               <label className="block text-sm font-semibold text-slate-700">Class<select required value={form.qualificationId} onChange={e => setForm({...form, qualificationId:e.target.value})} className={fieldClass}><option value="">Select Class...</option>{qualifications.map(qualification => <option key={qualification.id} value={qualification.id}>{qualification.code} - {qualification.name}</option>)}</select></label>
               <label className="block text-sm font-semibold text-slate-700">Supplier Tax Category<select required value={form.taxCategoryId} onChange={e => setForm({...form, taxCategoryId:e.target.value})} className={fieldClass}><option value="">Select tax category...</option>{taxCategories.map(category => <option key={category.id} value={category.id}>{category.code} - {category.description} ({Number(category.rate).toLocaleString()}%)</option>)}</select></label>
-              <label className="block text-sm font-semibold text-slate-700">Expense Account<select required value={form.expenseAccountId} onChange={e => setForm({...form, expenseAccountId:e.target.value})} className={fieldClass}><option value="">Select expense account</option>{expenseAccounts.map(account => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></label>
+              <div className="relative">
+                <label htmlFor="expense-account-search" className="block text-sm font-semibold text-slate-700">Expense Account</label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400" size={16}/>
+                  <input
+                    id="expense-account-search"
+                    required
+                    role="combobox"
+                    aria-expanded={showExpenseAccountOptions}
+                    aria-controls="expense-account-options"
+                    autoComplete="off"
+                    value={expenseAccountSearch}
+                    onFocus={() => setShowExpenseAccountOptions(true)}
+                    onBlur={() => window.setTimeout(() => setShowExpenseAccountOptions(false), 120)}
+                    onChange={event => {
+                      setExpenseAccountSearch(event.target.value);
+                      setForm(previous => ({ ...previous, expenseAccountId: '' }));
+                      setShowExpenseAccountOptions(true);
+                    }}
+                    placeholder="Search account code or name..."
+                    className={`${fieldClass} pl-9`}
+                  />
+                </div>
+                {showExpenseAccountOptions && <div id="expense-account-options" role="listbox" className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                  {filteredExpenseAccounts.length ? filteredExpenseAccounts.map(account => <button
+                    key={account.id}
+                    type="button"
+                    role="option"
+                    aria-selected={form.expenseAccountId === account.id}
+                    onMouseDown={event => event.preventDefault()}
+                    onClick={() => {
+                      setForm(previous => ({ ...previous, expenseAccountId: account.id }));
+                      setExpenseAccountSearch(`${account.code} — ${account.name}`);
+                      setShowExpenseAccountOptions(false);
+                    }}
+                    className={`flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm transition ${form.expenseAccountId === account.id ? 'bg-brand/10 text-brand' : 'text-slate-700 hover:bg-slate-50'}`}
+                  ><span className="w-24 shrink-0 font-mono text-xs font-bold">{account.code}</span><span className="truncate">{account.name}</span></button>) : <p className="px-3 py-5 text-center text-sm text-slate-400">No expense accounts found.</p>}
+                </div>}
+              </div>
             </section>
           </div>
 
@@ -266,7 +401,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-sm font-semibold text-slate-700">Quantity<input required min="0.01" step="0.01" type="number" value={form.quantity} onChange={e => setForm({...form, quantity:e.target.value})} className={fieldClass}/></label>
               <label className="text-sm font-semibold text-slate-700">Unit Cost<input required min="0.01" step="0.01" type="number" value={form.unitCost} onChange={e => setForm({...form, unitCost:e.target.value})} className={fieldClass}/></label>
-              <label className="text-sm font-semibold text-slate-700">Calculated Amount<input readOnly value={calculatedAmount ? `${currency} ${calculatedAmount.toFixed(2)}` : ''} className={`${fieldClass} bg-white font-mono text-base font-bold text-brand`} aria-label="Calculated amount"/></label>
+              <label className="text-sm font-semibold text-slate-700">Calculated Amount<input readOnly value={calculatedAmount ? `${currency} ${calculatedAmount.toFixed(2)}` : ''} className={`${fieldClass} bg-white font-mono text-base font-bold text-brand`} aria-label="Calculated amount"/><span className="mt-1 block text-xs font-normal text-slate-500">{isVatGoodsOrServices(selectedTaxCategory) ? `VAT-exclusive amount using the selected ${Number(selectedTaxCategory?.rate || 0).toLocaleString()}% rate.` : 'Quantity multiplied by unit cost.'}</span></label>
               <label className="text-sm font-semibold text-slate-700">Tax {selectedTaxCategory ? `(${Number(selectedTaxCategory.rate).toLocaleString()}%)` : ''}<input readOnly value={form.taxCategoryId ? `${currency} ${calculatedTax.toFixed(2)}` : ''} className={`${fieldClass} bg-white font-mono text-base font-bold text-brand`} aria-label="Calculated tax"/><span className="mt-1 block text-xs font-normal text-slate-500">{selectedTaxCategory?.isInclusive ? 'Tax included in the expense amount.' : selectedTaxCategory ? 'Tax calculated on top of the expense amount.' : 'Select a tax category.'}</span></label>
             </div>
           </section>
@@ -286,13 +421,16 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Time & Expenses</h2>
         <p className="text-sm text-gray-500 font-normal">Capture reimbursable costs and consolidate them into supplier bills.</p>
       </div>
-      <button onClick={openCreateForm} className="flex items-center gap-2 rounded bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"><Plus size={17}/> New Expense</button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={handleExportExcel} className="flex items-center gap-2 rounded border border-brand bg-white px-4 py-2 text-sm font-semibold text-brand shadow-sm transition hover:bg-brand/5"><Download size={17}/> Export Excel</button>
+        <button onClick={openCreateForm} className="flex items-center gap-2 rounded bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"><Plus size={17}/> New Expense</button>
+      </div>
     </div>
 
     {selectedRows.length > 0 && <div className="flex flex-col gap-4 rounded-xl border border-brand-light bg-brand/5 p-4 lg:flex-row lg:items-center">
       <div className="min-w-48"><p className="text-xs font-bold uppercase tracking-wider text-brand">Selected for billing</p><p className="text-xl font-bold text-slate-900">{currency} {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
       <p className="flex-1 text-sm text-slate-600"><span className="font-semibold text-slate-900">{selectedClaimant}</span> · {selectedRows.length} expense record{selectedRows.length === 1 ? '' : 's'} will be consolidated regardless of supplier, with individual account tags preserved.</p>
-      <button disabled={saving} onClick={consolidate} className="flex items-center justify-center gap-2 rounded bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-hover disabled:opacity-50"><ReceiptText size={17}/> Approve</button>
+      <button disabled={saving} onClick={consolidate} className="flex items-center justify-center gap-2 rounded bg-brand px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-hover disabled:opacity-50"><ReceiptText size={17}/> Release</button>
     </div>}
 
     <div onClick={openRowDetails} className="[&_tbody_tr]:cursor-pointer">
@@ -305,11 +443,11 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand">
           <option value="all">All statuses</option>
           <option value="open">Open</option>
-          <option value="released">Released</option>
+          <option value="released">On Hold</option>
           <option value="billed">Billed</option>
         </select>
       </div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-brand text-xs uppercase tracking-wider text-white"><tr><th className="p-4"></th><th className="p-4">RFQ Code</th><th className="p-4">Transaction Date</th><th className="p-4">Description</th><th className="p-4">Supplier</th><th className="p-4">Tax Category</th><th className="p-4 text-right">Tax</th><th className="p-4">Claimed By</th><th className="p-4">Expense Account</th><th className="p-4 text-right">Amount</th><th className="p-4">Status</th><th className="p-4"></th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedRows.map(row => { const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId); const taxAmount = calculateTaxAmount(Number(row.amount), taxCategory); const isOpen = row.status === 'open'; const isBilled = row.status === 'billed'; const isSelected = isOpen && selected.includes(row.id); return <tr key={row.id} data-row-id={row.id} className={isSelected ? 'bg-brand/5' : isOpen ? 'hover:bg-brand/5' : isBilled ? 'bg-blue-50/30' : 'bg-emerald-50/30'}><td className="p-4"><input type="checkbox" disabled={!isOpen} checked={isSelected} onChange={() => toggle(row)} className="h-4 w-4 rounded border-slate-300 accent-[var(--brand)] disabled:opacity-40"/></td><td className="p-4 font-semibold text-brand">{row.rfqCode}</td><td className="p-4 text-slate-600">{row.transactionDate}</td><td className="p-4 text-slate-800">{row.description}</td><td className="p-4">{row.supplierName || vendors.find(v => v.id === row.supplierId)?.name || '—'}</td><td className="p-4"><span className="inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{taxCategory ? `${taxCategory.code} · ${Number(taxCategory.rate).toLocaleString()}%` : '—'}</span></td><td className="p-4 text-right font-mono text-slate-700">{taxCategory ? `${currency} ${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}</td><td className="p-4 text-slate-600">{row.claimedBy}</td><td className="p-4 text-slate-600">{expenseAccounts.find(account => account.id === row.expenseAccountId)?.name || '—'}</td><td className="p-4 text-right font-mono font-semibold">{currency} {Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOpen ? 'bg-amber-50 text-amber-700' : isBilled ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{isOpen ? 'Open' : isBilled ? 'Billed' : 'Released'}</span></td><td className="p-4">{isOpen && <div className="flex items-center gap-3"><button onClick={() => openEditForm(row)} className="text-slate-400 hover:text-brand" aria-label={`Edit expense ${row.rfqCode}`}><Pencil size={16}/></button><button onClick={() => remove(row)} className="text-slate-400 hover:text-rose-600" aria-label={`Delete expense ${row.rfqCode}`}><Trash2 size={16}/></button></div>}</td></tr>; })}</tbody></table>{!filteredRows.length && <div className="p-12 text-center text-sm text-slate-500">{rows.length ? 'No expense records match the current filters.' : 'No expense records.'}</div>}</div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-brand text-xs uppercase tracking-wider text-white"><tr><th className="p-4"></th><th className="p-4">RFQ Code</th><th className="p-4">Transaction Date</th><th className="p-4">Description</th><th className="p-4">Supplier</th><th className="p-4">Tax Category</th><th className="p-4 text-right">Tax</th><th className="p-4">Claimed By</th><th className="p-4">Expense Account</th><th className="p-4 text-right">Amount</th><th className="p-4">Status</th><th className="p-4"></th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedRows.map(row => { const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId); const taxAmount = isVatGoodsOrServices(taxCategory) ? calculateInclusiveVatAmount(Number(row.quantity), Number(row.unitCost), taxCategory) : calculateTaxAmount(Number(row.amount), taxCategory); const isOpen = row.status === 'open'; const isBilled = row.status === 'billed'; const isSelected = isOpen && selected.includes(row.id); return <tr key={row.id} data-row-id={row.id} className={isSelected ? 'bg-brand/5' : isOpen ? 'hover:bg-brand/5' : isBilled ? 'bg-blue-50/30' : 'bg-amber-50/30'}><td className="p-4"><input type="checkbox" disabled={!isOpen} checked={isSelected} onChange={() => toggle(row)} className="h-4 w-4 rounded border-slate-300 accent-[var(--brand)] disabled:opacity-40"/></td><td className="p-4 font-semibold text-brand">{row.rfqCode}</td><td className="p-4 text-slate-600">{row.transactionDate}</td><td className="p-4 text-slate-800">{row.description}</td><td className="p-4">{row.supplierName || vendors.find(v => v.id === row.supplierId)?.name || '—'}</td><td className="p-4"><span className="inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{taxCategory ? `${taxCategory.code} · ${Number(taxCategory.rate).toLocaleString()}%` : '—'}</span></td><td className="p-4 text-right font-mono text-slate-700">{taxCategory ? `${currency} ${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}</td><td className="p-4 text-slate-600">{row.claimedBy}</td><td className="p-4 text-slate-600">{expenseAccounts.find(account => account.id === row.expenseAccountId)?.name || '—'}</td><td className="p-4 text-right font-mono font-semibold">{currency} {Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOpen ? 'bg-amber-50 text-amber-700' : isBilled ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{isOpen ? 'Open' : isBilled ? 'Billed' : 'On Hold'}</span></td><td className="p-4">{isOpen && <div className="flex items-center gap-3"><button onClick={() => openEditForm(row)} className="text-slate-400 hover:text-brand" aria-label={`Edit expense ${row.rfqCode}`}><Pencil size={16}/></button><button onClick={() => remove(row)} className="text-slate-400 hover:text-rose-600" aria-label={`Delete expense ${row.rfqCode}`}><Trash2 size={16}/></button></div>}</td></tr>; })}</tbody></table>{!filteredRows.length && <div className="p-12 text-center text-sm text-slate-500">{rows.length ? 'No expense records match the current filters.' : 'No expense records.'}</div>}</div>
       <PaginationControls currentPage={currentPage} totalPages={totalPages} totalItems={filteredRows.length} pageStartIndex={pageStartIndex} pageEndIndex={pageEndIndex} onPageChange={setCurrentPage} itemLabel="expenses"/>
     </div>
     </div>
@@ -332,7 +470,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Quantity × Unit Cost</p><p className="mt-1 font-mono text-sm text-slate-700">{Number(viewingRow.quantity).toLocaleString()} × {currency} {Number(viewingRow.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
           </div>
           <div className="flex items-center justify-between border-t border-brand-light bg-brand/5 px-6 py-4">
-            <span className={`rounded-full px-3 py-1 text-xs font-bold ${viewingRow.status === 'open' ? 'bg-amber-50 text-amber-700' : viewingRow.status === 'billed' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{viewingRow.status === 'open' ? 'Open' : viewingRow.status === 'billed' ? 'Billed' : 'Released'}</span>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${viewingRow.status === 'open' ? 'bg-amber-50 text-amber-700' : viewingRow.status === 'billed' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{viewingRow.status === 'open' ? 'Open' : viewingRow.status === 'billed' ? 'Billed' : 'On Hold'}</span>
             <div className="text-right"><p className="text-xs font-bold uppercase tracking-wider text-brand">Expense Amount</p><p className="font-mono text-xl font-bold text-slate-900">{currency} {Number(viewingRow.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
           </div>
         </div>

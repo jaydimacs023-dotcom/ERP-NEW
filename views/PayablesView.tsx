@@ -1,8 +1,9 @@
 ﻿import React, { useMemo, useState, useEffect } from 'react';
 import {
   Vendor, Payable, PayableCategory, PayableStatus, InvoiceType, PaymentMethod,
-  PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder, Qualification, User
+  PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder, Qualification, TaxCategoryEntry, TimeExpense, User
 } from '../types';
+import * as XLSX from 'xlsx';
 import { AccountingService } from '../accountingService';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
@@ -31,11 +32,13 @@ interface PayablesViewProps {
   atcItems?: any[];
   atcRates?: any[];
   employees?: User[];
+  taxCategories?: TaxCategoryEntry[];
   currentUserId?: string;
   onCreatePayable: (payable: Payable) => Payable | Promise<Payable>;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
   onDeletePayable: (id: string) => void | Promise<void>;
   onPostJournal?: (entry: Partial<JournalEntry>, lines: JournalLine[]) => JournalEntry | null | Promise<JournalEntry | null>;
+  onJournalChanged?: () => void | Promise<void>;
   onNotify: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -68,8 +71,8 @@ const PAYMENT_METHODS: { value: PayablePaymentMethod; label: string }[] = [
 ];
 
 const STATUS_CONFIG: Record<PayableStatus, { label: string; color: string; bgColor: string; borderColor: string }> = {
-  for_approval: { label: 'For Approval', color: 'text-brand', bgColor: 'bg-brand/10', borderColor: 'border-brand-light' },
-  approved: { label: 'Approved', color: 'text-brand', bgColor: 'bg-brand/10', borderColor: 'border-brand-light' },
+  for_approval: { label: 'On Hold', color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
+  approved: { label: 'Posted', color: 'text-brand', bgColor: 'bg-brand/10', borderColor: 'border-brand-light' },
   paid: { label: 'Paid', color: 'text-brand', bgColor: 'bg-brand/10', borderColor: 'border-brand-light' },
   partially_paid: { label: 'Partially Paid', color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200' },
   cancelled: { label: 'Cancelled', color: 'text-gray-500', bgColor: 'bg-gray-100', borderColor: 'border-gray-200' },
@@ -91,9 +94,14 @@ const formatPayableDate = (value?: string) => {
 const PAGE_SIZE = 10;
 const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualification_id,description,amount,bill_date,due_date,payment_date,currency,status,reference_document,journal_entry_id,gl_account_id,expense_account_id,expense_allocations,claimed_by,employee_id,notes,withholding_type,atc_item_id,atc_rate_id,applied_rate_percent,withholding_amount,net_payable,paid_amount,memo_adjustment_total,invoice_type,input_vat_amount,input_vat_account_id,payment_method,payment_bank_account_id,check_number,check_date,reversal_journal_id,created_by,approved_by,paid_by,created_at,updated_at,approved_at,paid_at,is_deleted,deleted_at,deleted_by';
 
+const getPayableVatInclusiveAmount = (payable: Payable) =>
+  Math.round((Number(payable.amount || 0) + Number(payable.inputVatAmount || 0)) * 100) / 100;
 const getPayableOutstanding = (payable: Payable) => Math.max(
   0,
-  (payable.netPayable || payable.amount) + (payable.memoAdjustmentTotal || 0) - (payable.paidAmount || 0)
+  getPayableVatInclusiveAmount(payable) -
+  Number(payable.withholdingAmount || 0) +
+  Number(payable.memoAdjustmentTotal || 0) -
+  Number(payable.paidAmount || 0)
 );
 const getPayableClaimant = (payable: Payable) => {
   if (payable.claimedBy?.trim()) return payable.claimedBy.trim();
@@ -119,11 +127,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   atcItems = [],
   atcRates = [],
   employees = [],
+  taxCategories = [],
   currentUserId,
   onCreatePayable,
   onUpdatePayable,
   onDeletePayable,
   onPostJournal,
+  onJournalChanged,
   onNotify
 }) => {
   // ============================================================================
@@ -153,6 +163,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [pageLoadError, setPageLoadError] = useState('');
   const [isSavingPayable, setIsSavingPayable] = useState(false);
+  const [timeExpenses, setTimeExpenses] = useState<TimeExpense[]>([]);
   const claimableEmployees = useMemo(
     () => employees
       .filter(employee => employee.role !== 'SYSTEM_ADMIN' && employee.role !== 'STUDENT' && !employee.isDeleted)
@@ -240,6 +251,13 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    DataServiceFactory.getService().getTimeExpensesByOrg(orgId)
+      .then(setTimeExpenses)
+      .catch(error => console.error('[PayablesView] Failed to load linked time expenses:', error));
+  }, [orgId]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -504,6 +522,47 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     searchTerm.trim() !== '' ||
     statusFilter !== 'all' ||
     vendorFilter !== 'all';
+
+  const handleExportExcel = () => {
+    const rows = filteredPayables.map(payable => {
+      const qualification = qualifications.find(item => item.id === payable.qualificationId);
+      const category = qualification
+        ? `${qualification.code} - ${qualification.name}`
+        : PAYABLE_CATEGORIES.find(item => item.value === payable.category)?.label || payable.category;
+
+      return {
+        'Bill Date': payable.billDate,
+        'Due Date': payable.dueDate,
+        'Document Number': payable.payableNumber,
+        Vendor: orgVendors.find(vendor => vendor.id === payable.vendorId)?.name || 'Unknown Vendor',
+        'Claimed By': getPayableClaimant(payable),
+        Category: category,
+        Description: payable.description,
+        Amount: getPayableVatInclusiveAmount(payable),
+        'Input VAT': payable.inputVatAmount || 0,
+        Withholding: payable.withholdingAmount || 0,
+        'Net Payable': payable.netPayable || payable.amount,
+        'Paid Amount': payable.paidAmount || 0,
+        Outstanding: getPayableOutstanding(payable),
+        Status: STATUS_CONFIG[payable.status]?.label || payable.status,
+        'Reference Document': payable.referenceDocument || '',
+      };
+    });
+
+    if (rows.length === 0) {
+      onNotify('info', 'There are no matching payables to export.');
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = Object.keys(rows[0]).map(key => ({
+      wch: Math.min(45, Math.max(key.length + 2, ...rows.map(row => String(row[key as keyof typeof row] ?? '').length + 2))),
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Payables');
+    XLSX.writeFile(workbook, `Payables_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    onNotify('success', `Exported ${rows.length} payable${rows.length === 1 ? '' : 's'} to Excel.`);
+  };
 
   // ============================================================================
   // SUMMARY METRICS
@@ -883,7 +942,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       atcRateId: undefined,
       appliedRatePercent: formData.appliedRatePercent,
       withholdingAmount: formData.withholdingAmount,
-      netPayable: formData.expenseAllocations?.length ? allocationTotal : formData.netPayable,
+      netPayable: formData.expenseAllocations?.length
+        ? Math.round((allocationTotal + Number(formData.inputVatAmount || 0) - Number(formData.withholdingAmount || 0)) * 100) / 100
+        : formData.netPayable,
       invoiceType: formData.invoiceType,
       inputVatAmount: formData.inputVatAmount,
       createdBy: currentUserId,
@@ -958,7 +1019,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       withholdingType: formData.withholdingType,
       appliedRatePercent: formData.appliedRatePercent,
       withholdingAmount: formData.withholdingAmount,
-      netPayable: formData.expenseAllocations?.length ? allocationTotal : formData.netPayable,
+      netPayable: formData.expenseAllocations?.length
+        ? Math.round((allocationTotal + Number(formData.inputVatAmount || 0) - Number(formData.withholdingAmount || 0)) * 100) / 100
+        : formData.netPayable,
       invoiceType: formData.invoiceType,
       inputVatAmount: formData.inputVatAmount,
       updatedAt: new Date().toISOString(),
@@ -1053,11 +1116,23 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
     if (!currentUserId) return onNotify('error', 'A signed-in user is required to approve a bill.');
     try {
+      const expectedNetPayable = Math.round((
+        Number(payableToPost.amount || 0) +
+        Number(payableToPost.inputVatAmount || 0) -
+        Number(payableToPost.withholdingAmount || 0)
+      ) * 100) / 100;
+      if (Math.abs(Number(payableToPost.netPayable || 0) - expectedNetPayable) > 0.01) {
+        await DataServiceFactory.getService().updatePayable(payableToPost.id, {
+          netPayable: expectedNetPayable,
+          updatedAt: new Date().toISOString(),
+        });
+      }
       const result = await DataServiceFactory.getService().postPayableBill(payableToPost.id, currentUserId);
+      await onJournalChanged?.();
       setRefreshKey(key => key + 1);
       onNotify('success', result.idempotent
-        ? `${payableToPost.payableNumber} was already posted; no duplicate journal was created.`
-        : `Bill journal posted for ${payableToPost.payableNumber}.`);
+        ? `${payableToPost.payableNumber} was already posted and is available in AP Journal Vouchers and Journal Entries.`
+        : `Bill journal posted for ${payableToPost.payableNumber} and is now available in AP Journal Vouchers and Journal Entries.`);
       setShowPostGLModal(false);
       setShowViewModal(false);
       setSelectedPayable(null);
@@ -1263,6 +1338,14 @@ const PayablesView: React.FC<PayablesViewProps> = ({
             <Landmark size={15} /> Process Payment{selectedPaymentIds.length > 0 ? ` (${selectedPaymentIds.length})` : ''}
           </button>
 
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="inline-flex h-9 items-center gap-2 rounded border border-brand bg-white px-3 text-xs font-semibold text-brand shadow-sm transition-colors hover:bg-brand/5"
+          >
+            <Download size={15} /> Export Excel
+          </button>
+
           <p className="ml-auto text-xs text-gray-500">
           Showing <span className="font-semibold text-gray-700">{totalItems}</span> matching payable{totalItems !== 1 ? 's' : ''}
           </p>
@@ -1372,7 +1455,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-1">
-                          <span className="font-mono text-sm text-gray-700">{"\u20B1"}{formatCurrency(payable.amount)}</span>
+                          <span className="font-mono text-sm text-gray-700">{"\u20B1"}{formatCurrency(getPayableVatInclusiveAmount(payable))}</span>
+                          {Number(payable.inputVatAmount || 0) > 0 && (
+                            <span className="text-xs text-gray-400">VAT inclusive</span>
+                          )}
                           {payable.withholdingAmount > 0 && (
                             <span className="text-xs text-brand">-{"\u20B1"}{formatCurrency(payable.withholdingAmount)} WHT</span>
                           )}
@@ -1717,7 +1803,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <SummaryCard label="Total Open" value={formatCurrency(summaryMetrics.total)} color="text-brand" icon={Coins} />
-        <SummaryCard label="For Approval" value={formatCurrency(summaryMetrics.forApproval)} color="text-brand" icon={Clock} />
+        <SummaryCard label="On Hold" value={formatCurrency(summaryMetrics.forApproval)} color="text-amber-700" icon={Clock} />
         <SummaryCard label="Approved" value={formatCurrency(summaryMetrics.approved)} color="text-brand" icon={CheckCircle} />
         <SummaryCard label="Due Soon (7d)" value={formatCurrency(summaryMetrics.dueSoon)} color="text-violet-600" icon={Calendar} />
         <SummaryCard label="Overdue" value={formatCurrency(summaryMetrics.overdue)} color="text-rose-600" icon={AlertCircle} />
@@ -1739,6 +1825,8 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           vendor={orgVendors.find(v => v.id === selectedPayable.vendorId)}
           accounts={orgAccounts}
           qualifications={qualifications}
+          taxCategories={taxCategories}
+          timeExpenses={timeExpenses}
           onClose={() => { setShowViewModal(false); setSelectedPayable(null); }}
           onApprove={() => { void handleApprovePayable(selectedPayable); }}
           onProcessPayment={() => { setShowViewModal(false); openPaymentModal(selectedPayable); }}
@@ -2433,6 +2521,8 @@ interface PayableDetailModalProps {
   vendor?: Vendor;
   accounts: ChartOfAccount[];
   qualifications: Qualification[];
+  taxCategories: TaxCategoryEntry[];
+  timeExpenses: TimeExpense[];
   onClose: () => void;
   onApprove: () => void;
   onProcessPayment: () => void;
@@ -2447,6 +2537,8 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   vendor,
   accounts,
   qualifications = [],
+  taxCategories = [],
+  timeExpenses = [],
   onClose,
   onApprove,
   onProcessPayment,
@@ -2461,6 +2553,22 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   const invoiceTypeConfig = INVOICE_TYPES.find(t => t.value === payable.invoiceType);
   const formatCurrency = (val: number) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const remainingBalance = getPayableOutstanding(payable);
+  const isTwelvePercentVat = (category?: TaxCategoryEntry) => {
+    const code = String(category?.code || '').toUpperCase().replace(/[\s_-]+/g, '');
+    return Number(category?.rate) === 12 && (code === 'VATGOODS' || code === 'VATSERV');
+  };
+  const legacyVatBySourceId = new Map((payable.expenseAllocations || []).map(allocation => {
+    const expense = timeExpenses.find(item => item.id === allocation.sourceExpenseId);
+    const category = taxCategories.find(item => item.id === expense?.taxCategoryId);
+    const gross = Number(allocation.amount || 0);
+    const vat = isTwelvePercentVat(category) ? Math.round((gross - gross / 1.12) * 100) / 100 : 0;
+    return [allocation.sourceExpenseId, vat] as const;
+  }));
+  const derivedLegacyVat = Number(payable.inputVatAmount || 0) > 0 ? 0 : Math.round(
+    Array.from(legacyVatBySourceId.values()).reduce((sum, vat) => sum + vat, 0) * 100
+  ) / 100;
+  const inputVatAmount = Number(payable.inputVatAmount || 0) + derivedLegacyVat;
+  const grossPayable = Number(payable.netPayable || (Number(payable.amount) + inputVatAmount - Number(payable.withholdingAmount || 0)));
 
   return (
     <ModalPortal>
@@ -2493,7 +2601,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
               </span>
             </div>
             <div className="text-right">
-              <p className="text-lg font-semibold text-gray-800">{"\u20B1"}{formatCurrency(payable.netPayable || payable.amount)}</p>
+              <p className="text-lg font-semibold text-gray-800">{"\u20B1"}{formatCurrency(grossPayable)}</p>
               {remainingBalance !== (payable.netPayable || payable.amount) && (
                 <p className="text-xs text-brand font-semibold">Balance: {"\u20B1"}{formatCurrency(remainingBalance)}</p>
               )}
@@ -2529,7 +2637,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Input VAT</p>
-              <p className="text-gray-700 font-mono">{"\u20B1"}{formatCurrency(payable.inputVatAmount || 0)}</p>
+              <p className="text-gray-700 font-mono">{"\u20B1"}{formatCurrency(inputVatAmount)}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Withholding</p>
@@ -2537,7 +2645,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Paid Amount</p>
-              <p className="text-brand font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.amount || 0)}</p>
+              <p className="text-brand font-mono font-semibold">{"\u20B1"}{formatCurrency(payable.paidAmount || 0)}</p>
             </div>
             {payable.referenceDocument && (
               <div className="col-span-2">
@@ -2552,6 +2660,26 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
               </div>
             )}
           </div>
+
+          {!!payable.expenseAllocations?.length && (
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Bill amount breakdown</p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {payable.expenseAllocations.map((allocation, index) => {
+                  const allocationAccount = accounts.find(account => account.id === allocation.expenseAccountId);
+                  return <div key={allocation.sourceExpenseId || index} className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 text-sm">
+                    <div><p className="font-medium text-gray-700">{allocation.description || `Expense line ${index + 1}`}</p><p className="mt-0.5 text-xs text-gray-400">{allocationAccount ? `${allocationAccount.code} - ${allocationAccount.name}` : 'Expense account'}</p></div>
+                    <p className="font-mono font-semibold text-gray-800">{"\u20B1"}{formatCurrency(Number(allocation.amount || 0))}</p>
+                  </div>;
+                })}
+                <div className="grid grid-cols-[1fr_auto] gap-4 border-t-2 border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold">
+                  <p className="text-right text-gray-600">Total payable</p><p className="font-mono text-gray-900">{"\u20B1"}{formatCurrency(grossPayable)}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* GL Status */}
           {payable.journalEntryId && (

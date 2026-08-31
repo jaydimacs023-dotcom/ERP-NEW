@@ -1177,7 +1177,7 @@ const JournalEntryDetail: React.FC<JournalEntryDetailProps> = ({
 }) => {
   const controlTotal = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
   const isReversalEntry = String(entry.sourceType || '').toUpperCase() === 'REVERSAL' || Boolean(entry.originalEntryId);
-  const canReverse = entry.status === 'POSTED' && !isReversalEntry && !hasExistingReversal;
+  const canReverse = entry.status === 'POSTED' && !isReversalEntry && !hasExistingReversal && !!onReverse && !['AP_SPECIALIST', 'AP_CLERK', 'AP_SUPERVISOR'].includes(currentUser?.role);
   const [isReversing, setIsReversing] = useState(false);
 
   const handleReverseClick = async () => {

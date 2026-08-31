@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { BookOpen, Search, ScrollText } from 'lucide-react';
-import { AccountClass, ChartOfAccount, JournalEntry, JournalLine, Vendor } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BookOpen, Search, ScrollText, X } from 'lucide-react';
+import { AccountClass, ChartOfAccount, JournalEntry, JournalLine, Payable, TaxCategoryEntry, TimeExpense, Vendor } from '../types';
+import ModalPortal from '../components/ModalPortal';
+import { DataServiceFactory } from '../services/DataServiceFactory';
 
 interface BaseProps {
   entries: JournalEntry[];
@@ -8,19 +10,46 @@ interface BaseProps {
   vendors: Vendor[];
   accounts: ChartOfAccount[];
   currency?: string;
+  orgId?: string;
+  payables?: Payable[];
+  taxCategories?: TaxCategoryEntry[];
 }
 
-const AP_SOURCE_TYPES = new Set(['BILL', 'PAYMENT', 'CREDIT_MEMO', 'DEBIT_MEMO', 'REVERSAL', 'GR_IR', 'PURCHASE_ORDER']);
+const AP_EXCLUSIVE_SOURCE_TYPES = new Set(['BILL', 'GR_IR', 'PURCHASE_ORDER', 'AP_RECLASSIFICATION']);
 const money = (value: number, currency = 'PHP') => new Intl.NumberFormat('en-PH', { style: 'currency', currency }).format(value || 0);
 const entryReference = (entry: JournalEntry) => entry.glEntryNumber || entry.reference || entry.id;
 
-export const APJournalVouchersView: React.FC<BaseProps> = ({ entries, lines, vendors, currency = 'PHP' }) => {
+export const APJournalVouchersView: React.FC<BaseProps> = ({ entries, lines, vendors, accounts, currency = 'PHP', orgId, payables = [], taxCategories = [] }) => {
   const [search, setSearch] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [timeExpenses, setTimeExpenses] = useState<TimeExpense[]>([]);
+  useEffect(() => {
+    if (!orgId) return;
+    DataServiceFactory.getService().getTimeExpensesByOrg(orgId)
+      .then(setTimeExpenses)
+      .catch(error => console.error('[APJournalVouchersView] Failed to load linked time expenses:', error));
+  }, [orgId]);
+  const isAPEntry = (entry: JournalEntry) => {
+    const sourceType = String(entry.sourceType || '').toUpperCase();
+    const entryLines = lines.filter(line => line.journalEntryId === entry.id);
+    const hasAPContact = entryLines.some(line => line.contactType === 'VENDOR' || line.contactType === 'EMPLOYEE');
+    const linksToPayable = payables.some(payable => payable.id === entry.sourceRef || payable.journalEntryId === entry.id);
+
+    if (AP_EXCLUSIVE_SOURCE_TYPES.has(sourceType)) return true;
+    if (['PAYMENT', 'CREDIT_MEMO', 'DEBIT_MEMO'].includes(sourceType)) return hasAPContact || linksToPayable;
+    if (sourceType === 'REVERSAL') {
+      const original = entries.find(candidate => candidate.id === entry.originalEntryId);
+      if (!original) return hasAPContact || linksToPayable;
+      const originalType = String(original.sourceType || '').toUpperCase();
+      const originalLines = lines.filter(line => line.journalEntryId === original.id);
+      return AP_EXCLUSIVE_SOURCE_TYPES.has(originalType) ||
+        originalLines.some(line => line.contactType === 'VENDOR' || line.contactType === 'EMPLOYEE') ||
+        payables.some(payable => payable.id === original.sourceRef || payable.journalEntryId === original.id);
+    }
+    return false;
+  };
   const rows = useMemo(() => entries
-    .filter(entry => (entry.status === 'POSTED' || entry.status === 'REVERSED') && (
-      AP_SOURCE_TYPES.has(String(entry.sourceType).toUpperCase()) ||
-      lines.some(line => line.journalEntryId === entry.id && line.contactType === 'VENDOR')
-    ))
+    .filter(entry => (entry.status === 'POSTED' || entry.status === 'REVERSED') && isAPEntry(entry))
     .map(entry => {
       const entryLines = lines.filter(line => line.journalEntryId === entry.id);
       const vendorId = entryLines.find(line => line.contactType === 'VENDOR')?.contactId;
@@ -34,7 +63,7 @@ export const APJournalVouchersView: React.FC<BaseProps> = ({ entries, lines, ven
     .filter(row => [entryReference(row.entry), row.entry.description, row.entry.sourceType, row.vendor]
       .join(' ').toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => (b.entry.date || '').localeCompare(a.entry.date || '')),
-  [entries, lines, vendors, search]);
+  [entries, lines, vendors, payables, search]);
 
   return (
     <div className="space-y-5">
@@ -53,16 +82,69 @@ export const APJournalVouchersView: React.FC<BaseProps> = ({ entries, lines, ven
               <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">GL Reference</th><th className="px-4 py-3 text-left">Source</th><th className="px-4 py-3 text-left">Vendor</th><th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-right">Debit</th><th className="px-4 py-3 text-right">Credit</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.length ? rows.map(({ entry, vendor, debit, credit }) => <tr key={entry.id} className="hover:bg-gray-50">
+              {rows.length ? rows.map(({ entry, vendor, debit, credit }) => <tr key={entry.id} onClick={() => setSelectedEntry(entry)} className="cursor-pointer hover:bg-brand/5">
                 <td className="px-4 py-3 text-gray-600">{entry.date}</td><td className="px-4 py-3 font-mono font-semibold text-brand">{entryReference(entry)}</td><td className="px-4 py-3"><span className="rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{entry.sourceType}</span></td><td className="px-4 py-3 font-medium text-gray-700">{vendor}</td><td className="max-w-sm truncate px-4 py-3 text-gray-600">{entry.description}</td><td className="px-4 py-3 text-right font-mono">{money(debit, currency)}</td><td className="px-4 py-3 text-right font-mono">{money(credit, currency)}</td>
               </tr>) : <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No AP journal transactions found.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+      {selectedEntry && (() => {
+        const selectedLines = lines.filter(line => line.journalEntryId === selectedEntry.id);
+        const linkedPayable = payables.find(payable => payable.id === selectedEntry.sourceRef || payable.payableNumber === selectedEntry.reference);
+        const hasInputVatLine = selectedLines.some(line => {
+          const account = accounts.find(item => item.id === line.accountId);
+          return Number(line.debit || 0) > 0 && /input (vat|tax)/i.test(account?.name || '');
+        });
+        const derivedInputVat = hasInputVatLine || Number(linkedPayable?.inputVatAmount || 0) > 0 ? 0 : Math.round((linkedPayable?.expenseAllocations || []).reduce((sum, allocation) => {
+          const expense = timeExpenses.find(item => item.id === allocation.sourceExpenseId);
+          const category = taxCategories.find(item => item.id === expense?.taxCategoryId);
+          const code = String(category?.code || '').toUpperCase().replace(/[\s_-]+/g, '');
+          const gross = Number(allocation.amount || 0);
+          return sum + (Number(category?.rate) === 12 && (code === 'VATGOODS' || code === 'VATSERV') ? gross - gross / 1.12 : 0);
+        }, 0) * 100) / 100;
+        const inputVatAccount = accounts.find(account => !account.isHeader && account.class === AccountClass.ASSET && (
+          account.code?.startsWith('1170') || account.code?.startsWith('1210') || /input (vat|tax)/i.test(account.name)
+        ));
+        const expenseDebitTotal = selectedLines.reduce((sum, line) => accounts.find(account => account.id === line.accountId)?.class === AccountClass.EXPENSE ? sum + Number(line.debit || 0) : sum, 0);
+        const displayLines = selectedLines.map(line => {
+          const isExpenseDebit = accounts.find(account => account.id === line.accountId)?.class === AccountClass.EXPENSE && Number(line.debit || 0) > 0;
+          if (!isExpenseDebit || derivedInputVat <= 0 || expenseDebitTotal <= 0) return line;
+          const vatShare = derivedInputVat * Number(line.debit || 0) / expenseDebitTotal;
+          return { ...line, debit: Math.round((Number(line.debit || 0) - vatShare) * 100) / 100 };
+        });
+        if (derivedInputVat > 0) displayLines.splice(Math.max(0, displayLines.length - 1), 0, {
+          id: `derived-input-vat-${selectedEntry.id}`, journalEntryId: selectedEntry.id,
+          accountId: inputVatAccount?.id || '', debit: derivedInputVat, credit: 0,
+          description: 'Input VAT - VATGOODS / VAT-SERV', memo: 'Derived from linked Time & Expense tax category'
+        });
+        const totalDebit = displayLines.reduce((sum, line) => sum + Number(line.debit || 0), 0);
+        const totalCredit = displayLines.reduce((sum, line) => sum + Number(line.credit || 0), 0);
+        return <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={() => setSelectedEntry(null)}>
+            <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
+              <div className="flex items-start justify-between border-b border-gray-200 bg-gray-50 px-6 py-5">
+                <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">AP Journal Voucher</p><h3 className="mt-1 text-xl font-semibold text-gray-900">{entryReference(selectedEntry)}</h3><p className="mt-1 text-sm text-gray-500">{selectedEntry.description}</p></div>
+                <button type="button" onClick={() => setSelectedEntry(null)} className="rounded-lg p-2 text-gray-400 transition hover:bg-white hover:text-gray-700" aria-label="Close journal voucher details"><X size={20}/></button>
+              </div>
+              <div className="grid gap-4 border-b border-gray-200 px-6 py-4 sm:grid-cols-4">
+                <Detail label="Date" value={selectedEntry.date}/><Detail label="Source" value={selectedEntry.sourceType}/><Detail label="Document Reference" value={selectedEntry.reference || '—'}/><Detail label="Status" value={selectedEntry.status}/>
+              </div>
+              <div className="max-h-[55vh] overflow-auto p-6">
+                <table className="w-full text-sm"><thead className="bg-brand text-white"><tr><th className="px-4 py-3 text-left">Account</th><th className="px-4 py-3 text-left">Description</th><th className="px-4 py-3 text-right">Debit</th><th className="px-4 py-3 text-right">Credit</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">{displayLines.map(line => { const account = accounts.find(item => item.id === line.accountId); const isDerivedVat = line.id === `derived-input-vat-${selectedEntry.id}`; return <tr key={line.id} className={isDerivedVat ? 'bg-brand/5' : ''}><td className="px-4 py-3"><div className={`font-semibold ${isDerivedVat ? 'text-brand' : 'text-gray-800'}`}>{account?.name || (isDerivedVat ? 'Input VAT' : 'Unknown account')}</div><div className="font-mono text-xs text-gray-400">{account?.code || line.accountId || 'Input VAT account'}</div></td><td className="px-4 py-3 text-gray-600">{line.description || line.memo || '—'}</td><td className="px-4 py-3 text-right font-mono">{line.debit ? money(Number(line.debit), currency) : '—'}</td><td className="px-4 py-3 text-right font-mono">{line.credit ? money(Number(line.credit), currency) : '—'}</td></tr>; })}</tbody>
+                  <tfoot className="border-t-2 border-gray-200 bg-gray-50 font-bold"><tr><td colSpan={2} className="px-4 py-3 text-right">Totals</td><td className="px-4 py-3 text-right font-mono">{money(totalDebit, currency)}</td><td className="px-4 py-3 text-right font-mono">{money(totalCredit, currency)}</td></tr></tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>;
+      })()}
     </div>
   );
 };
+
+const Detail: React.FC<{ label: string; value?: string }> = ({ label, value }) => <div><p className="text-xs font-bold uppercase tracking-wider text-gray-400">{label}</p><p className="mt-1 text-sm font-semibold text-gray-700">{value || '—'}</p></div>;
 
 export const VendorLedgerView: React.FC<BaseProps> = ({ entries, lines, vendors, accounts, currency = 'PHP' }) => {
   const [vendorId, setVendorId] = useState('');

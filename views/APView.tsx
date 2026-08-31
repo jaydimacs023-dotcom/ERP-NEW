@@ -1,5 +1,6 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { Vendor, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher, RecurringBill, RecurringBillHistory } from '../types';
 import { AccountingService } from '../accountingService';
 import MatchingDashboard from './MatchingDashboard';
@@ -298,6 +299,63 @@ const APView: React.FC<APViewProps> = ({
     return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const handleExportExcel = () => {
+    let rows: Record<string, string | number>[] = [];
+    let sheetName = 'Bills';
+
+    if (activeTab === 'payments') {
+      sheetName = 'Payments';
+      rows = filteredPayments.map(payment => ({
+        Date: payment.date,
+        Reference: payment.reference,
+        Description: payment.description,
+        Amount: lines.filter(line => line.journalEntryId === payment.id).reduce((sum, line) => sum + line.debit, 0),
+        Status: payment.status,
+      }));
+    } else if (activeTab === 'aging') {
+      sheetName = 'AP Aging';
+      rows = agingReport.map(item => ({
+        Vendor: item.name,
+        Current: item.current,
+        '31-60 Days': item.thirty,
+        '61-90 Days': item.sixty,
+        'Over 90 Days': item.ninety,
+        Total: item.total,
+        'As of': agingAsOf,
+      }));
+    } else {
+      rows = filteredBills.map(bill => {
+        const payableLine = lines.find(line => {
+          const account = accounts.find(item => item.id === line.accountId);
+          return line.journalEntryId === bill.id && account?.class === AccountClass.LIABILITY && account.name.toLowerCase().includes('payable');
+        });
+        const vendor = vendors.find(item => item.id === payableLine?.contactId);
+        return {
+          Vendor: vendor?.name || bill.description,
+          'Bill Number': bill.reference,
+          Date: bill.date,
+          Description: bill.description,
+          'Amount Due': payableLine ? payableLine.credit - payableLine.debit : 0,
+          Status: bill.status,
+        };
+      });
+    }
+
+    if (rows.length === 0) {
+      onNotify('info', `There are no ${sheetName.toLowerCase()} records to export.`);
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = Object.keys(rows[0]).map(key => ({
+      wch: Math.min(45, Math.max(key.length + 2, ...rows.map(row => String(row[key] ?? '').length + 2))),
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+    XLSX.writeFile(workbook, `AP_${sheetName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    onNotify('success', `${sheetName} exported to Excel.`);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -331,6 +389,13 @@ const APView: React.FC<APViewProps> = ({
             className="flex items-center gap-2 px-5 py-2.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all shadow-md font-bold text-sm active:scale-95"
           >
             <Landmark size={18} /> Pay Bill
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-brand border border-brand rounded hover:bg-brand/5 transition-all shadow-sm font-bold text-sm active:scale-95"
+          >
+            <Download size={18} /> Export Excel
           </button>
            <button 
             onClick={() => setShowModal(true)}
