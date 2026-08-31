@@ -50,6 +50,7 @@ export type ModuleTab =
   // AR Modules
   | 'ar'
   | 'invoices'
+  | 'non-invoice-payments'
   | 'payments'
   | 'bank-deposits'
   | 'customers'
@@ -138,7 +139,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // ADMIN: Full organization access (no system admin modules)
   ADMIN: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
-    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'non-invoice-payments', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -160,7 +161,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // FINANCE_MANAGER: All finance modules
   FINANCE_MANAGER: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking', 'checks',
-    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'non-invoice-payments', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'payroll', 'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -171,7 +172,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   // ACCOUNTANT: General Ledger, Reporting, Journal Entries
   ACCOUNTANT: [
     'dashboard', 'ledger', 'journal-vouchers', 'ap-journal-vouchers', 'vendor-ledger', 'reports', 'banking',
-    'invoices', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
+    'invoices', 'non-invoice-payments', 'payments', 'customers', 'bank-deposits', 'recurring-invoices', 'revenue-recognition',
     'payables', 'ap-memos', 'ap-reclassifications', 'ap-aging-report', 'time-expenses', 'po', 'goods-receipt', 'recurring-bills',
     'budgets',
     'sponsors', 'vendors', 'items', 'assets',
@@ -186,6 +187,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
     'students',
     'customers',
     'invoices',
+    'non-invoice-payments',
     'payments',
     'credit-debit-memo',
     'write-off',

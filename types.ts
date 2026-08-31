@@ -292,6 +292,7 @@ export interface Sponsor extends BaseEntity {
   ewtRate?: number; // Expanded Withholding Tax Rate (e.g., 0.02 for 2%)
   arAccountId?: string;
   courseFeeType?: SponsoredCourseFeeType;
+  customerType?: 'SPONSOR' | 'OTHER';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -933,6 +934,7 @@ export interface AssessmentRegistration extends BaseEntity {
 // Invoice - AR Invoice for sponsors/students with EWT tracking
 export type InvoiceStatus = 'DRAFT' | 'ON_HOLD' | 'OPEN' | 'CLOSED' | 'VOIDED';
 export type InvoiceLineType = 'COURSE_FEE' | 'DISCOUNT' | 'ADJUSTMENT' | 'MANUAL';
+export type InvoiceDocumentType = 'INVOICE' | 'NON_INVOICE_PAYMENT';
 
 
 export interface InvoiceLine extends BaseEntity {
@@ -960,6 +962,9 @@ export interface Invoice extends BaseEntity {
   id: string;
   orgId: string;
   invoiceNo: string;           // Human-readable invoice number (e.g., INV-2025-00001)
+  documentType?: InvoiceDocumentType; // Standard AR invoice or immediate cash/non-invoice payment
+  paymentMethod?: Extract<PaymentMethod, 'CASH' | 'BANK_TRANSFER' | 'EWALLET'>;
+  siNo?: string;
   sponsorId?: string;          // FK to Sponsor (primary billing party)
   studentId?: string;          // FK to Student (if individual billing)
   enrollmentId?: string;       // FK to Enrollment (optional link)
@@ -1156,7 +1161,7 @@ export interface JournalEntry extends BaseEntity {
   createdAt: string;
   updatedBy?: string;
   updatedAt?: string;
-  sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'DEBIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT' | 'INVENTORY' | 'AP_RECLASSIFICATION';
+  sourceType: 'MANUAL' | 'JOURNAL' | 'INVOICE' | 'NON_INVOICE_PAYMENT' | 'BILL' | 'PAYMENT' | 'COLLECTION' | 'DEPRECIATION' | 'TRANSFER' | 'PURCHASE_ORDER' | 'PAYROLL' | 'CREDIT_MEMO' | 'DEBIT_MEMO' | 'GR_IR' | 'ACCRUAL' | 'REVERSAL' | 'APPLICATION' | 'VOID' | 'DEPOSIT' | 'INVENTORY' | 'AP_RECLASSIFICATION';
   sourceRef?: string; // Unified reference to source document ID (Invoice ID, Payment ID, Deposit ID, etc.)
   // Enhanced audit fields
   postedBy?: string;

@@ -21,6 +21,7 @@ import {
 
 
 interface InvoicesViewProps {
+  documentMode?: 'INVOICE' | 'NON_INVOICE_PAYMENT';
   invoices: Invoice[];
   payments?: Payment[];
   sponsors: Sponsor[];
@@ -50,8 +51,148 @@ interface InvoicesViewProps {
   onNavigate?: (tab: string, context?: any) => void;
 }
 
+const getStudentOptionLabel = (student: Student) =>
+  `${student.lastName}, ${student.firstName}`;
+
+const compareStudentsByName = (left: Student, right: Student) => {
+  const lastNameComparison = String(left.lastName || '').localeCompare(String(right.lastName || ''), undefined, { sensitivity: 'base' });
+  if (lastNameComparison !== 0) return lastNameComparison;
+
+  return String(left.firstName || '').localeCompare(String(right.firstName || ''), undefined, { sensitivity: 'base' });
+};
+
+const SearchableStudentSelect: React.FC<{
+  students: Student[];
+  value: string;
+  onChange: (studentId: string) => void;
+  disabled?: boolean;
+}> = ({ students, value, onChange, disabled = false }) => {
+  const selectedStudent = students.find(student => student.id === value);
+  const [query, setQuery] = useState(selectedStudent ? getStudentOptionLabel(selectedStudent) : '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(selectedStudent ? getStudentOptionLabel(selectedStudent) : '');
+  }, [selectedStudent?.id, selectedStudent?.firstName, selectedStudent?.middleName, selectedStudent?.lastName]);
+
+  const filteredStudents = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const matches = [...students]
+      .filter(student => !normalizedQuery || !!selectedStudent || [
+        student.lastName,
+        student.firstName,
+        student.middleName,
+        student.uli,
+        student.email,
+      ].some(value => String(value || '').toLowerCase().includes(normalizedQuery)))
+      .sort((left, right) => {
+        if (normalizedQuery && !selectedStudent) {
+          const leftMatchesName = [left.lastName, left.firstName, left.middleName]
+            .some(value => String(value || '').toLowerCase().includes(normalizedQuery));
+          const rightMatchesName = [right.lastName, right.firstName, right.middleName]
+            .some(value => String(value || '').toLowerCase().includes(normalizedQuery));
+
+          if (leftMatchesName !== rightMatchesName) return leftMatchesName ? -1 : 1;
+        }
+
+        return compareStudentsByName(left, right);
+      });
+
+    return matches.slice(0, 60);
+  }, [query, selectedStudent, students]);
+
+  const selectStudent = (student: Student) => {
+    onChange(student.id);
+    setQuery(getStudentOptionLabel(student));
+    setIsOpen(false);
+    setActiveIndex(0);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative mt-1"
+      onBlur={event => {
+        if (!containerRef.current?.contains(event.relatedTarget as Node)) setIsOpen(false);
+      }}
+    >
+      <div className="relative">
+        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-controls="invoice-student-options"
+          aria-autocomplete="list"
+          value={query}
+          disabled={disabled}
+          placeholder="Search learner by name, ULI, or email..."
+          className="w-full rounded-lg border py-2 pl-9 pr-9 focus:ring-2 focus:ring-orange-200 disabled:cursor-not-allowed disabled:opacity-60"
+          onFocus={() => setIsOpen(true)}
+          onChange={event => {
+            setQuery(event.target.value);
+            if (value) onChange('');
+            setActiveIndex(0);
+            setIsOpen(true);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              setIsOpen(true);
+              setActiveIndex(index => Math.min(index + 1, Math.max(0, filteredStudents.length - 1)));
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              setActiveIndex(index => Math.max(0, index - 1));
+            } else if (event.key === 'Enter' && isOpen && filteredStudents[activeIndex]) {
+              event.preventDefault();
+              selectStudent(filteredStudents[activeIndex]);
+            } else if (event.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
+        />
+        {(query || value) && !disabled && (
+          <button
+            type="button"
+            aria-label="Clear selected student"
+            onClick={() => {
+              onChange('');
+              setQuery('');
+              setIsOpen(true);
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      {isOpen && !disabled && (
+        <div id="invoice-student-options" role="listbox" className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
+          {filteredStudents.length > 0 ? filteredStudents.map((student, index) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={student.id === value}
+              key={student.id}
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => selectStudent(student)}
+              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm ${index === activeIndex ? 'bg-orange-50 text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <span className="truncate font-medium">{getStudentOptionLabel(student)}</span>
+            </button>
+          )) : (
+            <p className="px-3 py-4 text-center text-sm text-gray-500">No learners match "{query}".</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const INVOICE_PAGE_SIZE = 7;
-const INVOICE_COLUMNS = 'id,org_id,invoice_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id';
+const INVOICE_COLUMNS = 'id,org_id,invoice_no,document_type,payment_method,si_no,sponsor_id,student_id,enrollment_id,batch_id,invoice_date,due_date,status,subtotal,vat_amount,grand_total,total_ewt_amount,net_amount_due,amount_paid,balance_due,ewt_rate,is_subject_to_ewt,reference,terms,notes,journal_entry_id,posted_by,posted_at,voided_by,voided_at,void_reason,is_deleted,deleted_at,deleted_by,created_at,created_by,updated_at,updated_by,vat_pricing,vat_rate,gl_entry_number,assessment_registration_id';
 
 const COURSE_FEE_CATEGORY_LABELS: Record<string, string> = {
   TUITION: 'Tuition',
@@ -107,6 +248,7 @@ const CurrencyLineInput: React.FC<{
 };
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
+  documentMode = 'INVOICE',
   invoices, payments = [], sponsors, students, users, enrollments, assessmentRegistrations, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onUpdateAssessmentRegistration, onAddStudentLedgerEntry,
   onViewJournal,
@@ -116,6 +258,9 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   taxCategories,
   onNavigate
 }) => {
+  const isNonInvoicePayment = documentMode === 'NON_INVOICE_PAYMENT';
+  const documentLabel = isNonInvoicePayment ? 'Non-Invoice Payment' : 'Invoice';
+  const documentLabelPlural = isNonInvoicePayment ? 'Non-Invoice Payments' : 'Invoices';
   const [viewMode, setViewMode] = useState<'LIST' | 'FORM'>('LIST');
   const [showViewModal, setShowViewModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -205,6 +350,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   // Form state
   const [formData, setFormData] = useState<{
     invoiceNo: string;
+    paymentMethod: 'CASH' | 'BANK_TRANSFER' | 'EWALLET';
+    siNo: string;
     sponsorId: string;
     studentId: string;
     enrollmentId: string;
@@ -222,6 +369,8 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
     lines: InvoiceLine[];
   }>({
     invoiceNo: '',
+    paymentMethod: 'CASH',
+    siNo: '',
     sponsorId: '',
     studentId: '',
     enrollmentId: '',
@@ -359,12 +508,13 @@ const brandColor = organization?.primaryColor || '#059669';
   // Generate next invoice number
   const generateInvoiceNo = () => {
     const year = new Date().getFullYear();
+    const prefix = isNonInvoicePayment ? 'CINV' : 'INV';
     const existingNums = invoices
-      .filter(i => i.invoiceNo?.startsWith(`INV-${year}-`))
+      .filter(i => i.invoiceNo?.startsWith(`${prefix}-${year}-`))
       .map(i => parseInt(i.invoiceNo?.split('-')[2] || '0'))
       .filter(n => !isNaN(n));
     const nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
-    return `INV-${year}-${String(nextNum).padStart(5, '0')}`;
+    return `${prefix}-${year}-${String(nextNum).padStart(5, '0')}`;
   };
 
   // Calculate totals (simple version without VatService)
@@ -389,6 +539,8 @@ const brandColor = organization?.primaryColor || '#059669';
     const terms = 'Net 30';
     setFormData({
       invoiceNo: generateInvoiceNo(),
+      paymentMethod: 'CASH',
+      siNo: '',
       sponsorId: '',
       studentId: '',
       enrollmentId: '',
@@ -449,6 +601,8 @@ const brandColor = organization?.primaryColor || '#059669';
     const normalizedStatus = hydratedInvoice.status === 'DRAFT' ? 'ON_HOLD' : hydratedInvoice.status;
     setFormData({
       invoiceNo: hydratedInvoice.invoiceNo,
+      paymentMethod: hydratedInvoice.paymentMethod || 'CASH',
+      siNo: hydratedInvoice.siNo || '',
       sponsorId: hydratedInvoice.sponsorId || '',
       studentId: hydratedInvoice.studentId || '',
       enrollmentId: hydratedInvoice.enrollmentId || '',
@@ -1287,7 +1441,7 @@ const brandColor = organization?.primaryColor || '#059669';
       return;
     }
     if (!formData.sponsorId && !formData.studentId) {
-      alert('Please select a sponsor or student.');
+      alert('Please select a customer or student.');
       return;
     }
     if (formData.lines.length === 0) {
@@ -1311,6 +1465,9 @@ const brandColor = organization?.primaryColor || '#059669';
       id: editingInvoice?.id || generateUUID(),
       orgId: editingInvoice?.orgId || '',
       invoiceNo: formData.invoiceNo,
+      documentType: documentMode,
+      paymentMethod: isNonInvoicePayment ? formData.paymentMethod : undefined,
+      siNo: isNonInvoicePayment ? String(formData.siNo || '').trim() || undefined : undefined,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       enrollmentId: formData.enrollmentId || undefined,
@@ -1326,8 +1483,8 @@ const brandColor = organization?.primaryColor || '#059669';
       grandTotal: totals.grandTotal,
       totalEwtAmount: 0,
       netAmountDue: totals.grandTotal,
-      amountPaid: editingInvoice?.amountPaid || 0,
-      balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
+      amountPaid: isNonInvoicePayment ? totals.grandTotal : (editingInvoice?.amountPaid || 0),
+      balanceDue: isNonInvoicePayment ? 0 : totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: String(formData.notes || '').trim() || undefined,
@@ -1361,7 +1518,7 @@ const brandColor = organization?.primaryColor || '#059669';
       return;
     }
     if (!formData.sponsorId && !formData.studentId) {
-      alert('Please select a sponsor or student.');
+      alert('Please select a customer or student.');
       return;
     }
     if (formData.lines.length === 0) {
@@ -1385,6 +1542,9 @@ const brandColor = organization?.primaryColor || '#059669';
       id: editingInvoice?.id || generateUUID(),
       orgId: editingInvoice?.orgId || '',
       invoiceNo: formData.invoiceNo,
+      documentType: documentMode,
+      paymentMethod: isNonInvoicePayment ? formData.paymentMethod : undefined,
+      siNo: isNonInvoicePayment ? String(formData.siNo || '').trim() || undefined : undefined,
       sponsorId: formData.sponsorId || undefined,
       studentId: formData.studentId || undefined,
       enrollmentId: formData.enrollmentId || undefined,
@@ -1400,8 +1560,8 @@ const brandColor = organization?.primaryColor || '#059669';
       grandTotal: totals.grandTotal,
       totalEwtAmount: 0,
       netAmountDue: totals.grandTotal,
-      amountPaid: editingInvoice?.amountPaid || 0,
-      balanceDue: totals.grandTotal - (editingInvoice?.amountPaid || 0),
+      amountPaid: isNonInvoicePayment ? totals.grandTotal : (editingInvoice?.amountPaid || 0),
+      balanceDue: isNonInvoicePayment ? 0 : totals.grandTotal - (editingInvoice?.amountPaid || 0),
       reference: formData.reference || undefined,
       terms: formData.terms || undefined,
       notes: String(formData.notes || '').trim() || undefined,
@@ -1510,6 +1670,7 @@ const brandColor = organization?.primaryColor || '#059669';
     if (orgId) {
       filters.push({ column: 'org_id', operator: 'eq', value: orgId });
     }
+    filters.push({ column: 'document_type', operator: 'eq', value: documentMode });
 
     if (statusFilter !== 'ALL') {
       filters.push({
@@ -1539,7 +1700,7 @@ const brandColor = organization?.primaryColor || '#059669';
     }
 
     return filters;
-  }, [dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, orgId, statusFilter]);
+  }, [dateFilterMode, dateFrom, dateTo, documentMode, filterSponsorId, filterStudentId, orgId, statusFilter]);
 
   const invoiceOrderBy = useMemo<PageOrder[]>(() => {
     if (sortConfig.direction === 'none') {
@@ -1600,10 +1761,12 @@ const brandColor = organization?.primaryColor || '#059669';
   // Filter invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
+      if ((inv.documentType || 'INVOICE') !== documentMode) return false;
       const matchesSearch =
         inv.invoiceNo?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         inv.reference?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         getInvoiceGlRef(inv).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        getInvoicePayerName(inv).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         sponsors.find(s => s.id === inv.sponsorId)?.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         students.find(s => s.id === inv.studentId)?.firstName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       
@@ -1651,8 +1814,8 @@ const brandColor = organization?.primaryColor || '#059669';
 
       // Handle specific keys that need derivation
       if (key === 'payer') {
-        const payerA = a.sponsorId ? sponsors.find(s => s.id === a.sponsorId)?.name : students.find(s => s.id === a.studentId)?.lastName;
-        const payerB = b.sponsorId ? sponsors.find(s => s.id === b.sponsorId)?.name : students.find(s => s.id === b.studentId)?.lastName;
+        const payerA = getInvoicePayerName(a);
+        const payerB = getInvoicePayerName(b);
         valA = payerA || '';
         valB = payerB || '';
       }
@@ -1769,11 +1932,18 @@ const brandColor = organization?.primaryColor || '#059669';
     return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.bg} ${badge.text} ${className}`} title={badge.title || ''}>{badge.label}</span>;
   };
 
-  const getSponsorName = (id?: string) => sponsors.find(s => s.id === id)?.name || '-';
-  const getStudentName = (id?: string) => {
+  function getSponsorName(id?: string) {
+    return sponsors.find(s => s.id === id)?.name || '-';
+  }
+  function getStudentName(id?: string) {
     const s = students.find(st => st.id === id);
     return s ? `${s.lastName}, ${s.firstName}` : '-';
-  };
+  }
+  function getInvoicePayerName(invoice: Pick<Invoice, 'documentType' | 'sponsorId' | 'studentId'>) {
+    if (invoice.sponsorId) return getSponsorName(invoice.sponsorId);
+    if (invoice.studentId) return getStudentName(invoice.studentId);
+    return '-';
+  }
   const getBatchCode = (id?: string) => batches.find(b => b.id === id)?.batchCode || '-';
   const normalizeGlReference = (value?: string) => {
     const ref = (value || '').trim();
@@ -2141,7 +2311,7 @@ const brandColor = organization?.primaryColor || '#059669';
       { key: 'invoiceNo', label: 'Invoice No.', value: (inv: Invoice) => inv.invoiceNo || '-' },
       { key: 'status', label: 'Status', value: (inv: Invoice) => getDisplayStatusLabel(inv.status) },
       { key: 'glReference', label: 'GL Reference No.', value: (inv: Invoice) => getInvoiceGlRef(inv) },
-      { key: 'payer', label: 'Sponsor/Student', value: (inv: Invoice) => (inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId)) },
+      { key: 'payer', label: 'Sponsor/Student', value: (inv: Invoice) => getInvoicePayerName(inv) },
       { key: 'totalAmount', label: 'Grand Total', value: (inv: Invoice) => inv.grandTotal ?? 0 },
       { key: 'balance', label: 'Balance', value: (inv: Invoice) => inv.balanceDue ?? 0 },
       { key: 'createdBy', label: 'Created By', value: (inv: Invoice) => getCreatedByName(inv.createdBy) },
@@ -2238,7 +2408,7 @@ const brandColor = organization?.primaryColor || '#059669';
   };
 
   const buildInvoiceA4Html = (invoice: Invoice): string => {
-    const billedTo = invoice.sponsorId ? getSponsorName(invoice.sponsorId) : getStudentName(invoice.studentId);
+    const billedTo = getInvoicePayerName(invoice);
     const billAddress = invoice.sponsorId
       ? (sponsors.find(s => s.id === invoice.sponsorId)?.address || '-')
       : (() => {
@@ -2851,11 +3021,11 @@ const brandColor = organization?.primaryColor || '#059669';
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">Invoices</h2>
-              <p className="text-sm italic text-gray-500">Manage your invoices and billing</p>
+              <h2 className="text-xl font-semibold text-gray-800">{documentLabelPlural}</h2>
+              <p className="text-sm italic text-gray-500">{isNonInvoicePayment ? 'Record cash sales that do not create receivables' : 'Manage your invoices and billing'}</p>
             </div>
             <div className="flex items-center gap-3">
-              {sponsorsWithUnbilledEnrollments.length > 0 && (
+              {!isNonInvoicePayment && sponsorsWithUnbilledEnrollments.length > 0 && (
                 <button
                   onClick={() => setShowGenerateModal(true)}
                   className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-purple-50 transition-colors text-purple-600 border-purple-300"
@@ -2872,7 +3042,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors bg-emerald-600 hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-300"
               >
                 <Plus size={20} />
-                New Invoice
+                New {documentLabel}
               </button>
             </div>
           </div>
@@ -3210,7 +3380,7 @@ const brandColor = organization?.primaryColor || '#059669';
               // ── 2. Invoice No. ────────────────────────────
               {
                 key: 'invoiceNo',
-                label: 'Invoice No.',
+                label: isNonInvoicePayment ? 'Cash Invoice Number' : 'Invoice No.',
                 sortKey: 'invoiceNo',
                 width: 'w-40',
                 align: 'text-left' as const,
@@ -3241,7 +3411,7 @@ const brandColor = organization?.primaryColor || '#059669';
                 sortKey: 'payer',
                 width: 'w-64',
                 align: 'text-left' as const,
-                render: (inv: any) => inv.sponsorId ? getSponsorName(inv.sponsorId) : getStudentName(inv.studentId),
+                render: (inv: Invoice) => getInvoicePayerName(inv),
               },
               // ── 6. Grand Total ────────────────────────────
               {
@@ -3423,7 +3593,7 @@ const brandColor = organization?.primaryColor || '#059669';
               <div>
 
                 <h3 className="text-xl font-bold text-gray-800" style={{ color: brandColor }}>
-                  Invoice No: {formData.invoiceNo}
+                  {isNonInvoicePayment ? 'Cash Invoice Number' : 'Invoice No'}: {formData.invoiceNo}
                   {(formData.sponsorId || formData.studentId) && ` - ${formData.sponsorId ? getSponsorName(formData.sponsorId) : getStudentName(formData.studentId)}`}
                 </h3>
               </div>
@@ -3545,7 +3715,7 @@ const brandColor = organization?.primaryColor || '#059669';
               <div className="bg-brand/5 rounded-lg p-4 border border-brand/20">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
 
-                  <div className="min-w-0 lg:col-span-4">
+                  {!isNonInvoicePayment && <div className="min-w-0 lg:col-span-4">
                     <label className="text-xs font-medium text-gray-500">Walk-in Assessment Candidate</label>
                     <select
                       value={formData.assessmentRegistrationId}
@@ -3565,10 +3735,10 @@ const brandColor = organization?.primaryColor || '#059669';
                       })}
                     </select>
                     <p className="text-xs text-brand mt-1">Select the registered walk-in candidate to bill assessment fees without a training batch.</p>
-                  </div>
+                  </div>}
 
                   {/* batch in center */}
-                  <div className="min-w-0 lg:col-span-4">
+                  {!isNonInvoicePayment && <div className="min-w-0 lg:col-span-4">
                     <label className="text-xs font-medium text-gray-500">Select Batch</label>
                     <select
                       value={formData.batchId}
@@ -3582,11 +3752,11 @@ const brandColor = organization?.primaryColor || '#059669';
                       ))}
                     </select>
                     <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Sponsored batches hide after billing; private batches stay until every student is billed.</p>
-                  </div>
+                  </div>}
                   {/* sponsor and student side by side */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-4">
+                  <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${isNonInvoicePayment ? 'lg:col-span-8' : 'lg:col-span-4'}`}>
                     <div className="min-w-0">
-                      <label className="text-xs font-medium text-gray-500">Sponsor</label>
+                      <label className="text-xs font-medium text-gray-500">{isNonInvoicePayment ? 'Customer / Sponsor' : 'Sponsor'}</label>
                       <select
                         value={formData.sponsorId}
                         onChange={e => {
@@ -3596,30 +3766,22 @@ const brandColor = organization?.primaryColor || '#059669';
                         disabled={(!!formData.studentId && !formData.assessmentRegistrationId) || isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        <option value="">-- Auto-filled if Batch is selected --</option>
-                        {sponsors.map(s => (
+                        <option value="">Select Sponsor</option>
+                        {sponsors.filter(s => isNonInvoicePayment || (s.customerType || 'SPONSOR') === 'SPONSOR').map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
                     </div>
                     <div className="min-w-0">
                       <label className="text-xs font-medium text-gray-500">Student</label>
-                      <select
+                      <SearchableStudentSelect
+                        students={formData.batchId ? batchStudentsForBilling : students.filter(student => !student.isDeleted)}
                         value={formData.studentId}
-                        onChange={e => {
-                          setFormData(prev => ({ ...prev, studentId: e.target.value, sponsorId: '', assessmentRegistrationId: prev.assessmentRegistrationId && e.target.value ? prev.assessmentRegistrationId : '' }));
+                        onChange={studentId => {
+                          setFormData(prev => ({ ...prev, studentId, sponsorId: '', assessmentRegistrationId: prev.assessmentRegistrationId && studentId ? prev.assessmentRegistrationId : '' }));
                         }}
                         disabled={(!!formData.sponsorId && !formData.assessmentRegistrationId) || isReadOnly}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        <option value="">-- Select Student --</option>
-                        {(formData.batchId
-                          ? batchStudentsForBilling
-                          : students
-                        ).map(s => (
-                          <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                   {/* dates on right */}
@@ -3661,7 +3823,7 @@ const brandColor = organization?.primaryColor || '#059669';
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Invoice No. */}
                 <div>
-                  <label className="text-xs font-medium text-gray-500">Invoice No.</label>
+                  <label className="text-xs font-medium text-gray-500">{isNonInvoicePayment ? 'Cash Invoice Number' : 'Invoice No.'}</label>
                   <input
                     type="text"
                     value={formData.invoiceNo}
@@ -3669,6 +3831,37 @@ const brandColor = organization?.primaryColor || '#059669';
                     className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 bg-gray-50 text-gray-900"
                   />
                 </div>
+                {isNonInvoicePayment && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500">Payment Method *</label>
+                    <select
+                      value={formData.paymentMethod}
+                      onChange={event => setFormData(prev => ({
+                        ...prev,
+                        paymentMethod: event.target.value as 'CASH' | 'BANK_TRANSFER' | 'EWALLET'
+                      }))}
+                      disabled={isReadOnly}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="CASH">Cash on Hand</option>
+                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                      <option value="EWALLET">Ewallet</option>
+                    </select>
+                  </div>
+                )}
+                {isNonInvoicePayment && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-500">SI No. <span className="font-normal text-gray-400">(Optional)</span></label>
+                    <input
+                      type="text"
+                      value={formData.siNo}
+                      onChange={event => setFormData(prev => ({ ...prev, siNo: event.target.value }))}
+                      disabled={isReadOnly}
+                      placeholder="Enter sales invoice number"
+                      className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                )}
                 {/* Reference */}
                 <div>
                   <label className="text-xs font-medium text-gray-500">External Reference</label>
@@ -4247,7 +4440,7 @@ const brandColor = organization?.primaryColor || '#059669';
                     <div>
                       <p className="text-xs font-medium text-gray-500 mb-1">Bill To</p>
                       <p className="font-medium text-gray-800">
-                        {resolvedViewingInvoice.sponsorId ? getSponsorName(resolvedViewingInvoice.sponsorId) : getStudentName(resolvedViewingInvoice.studentId)}
+                        {getInvoicePayerName(resolvedViewingInvoice)}
                       </p>
                       {resolvedViewingInvoice.batchId && (
                         <p className="text-sm text-gray-500">Batch: {getBatchCode(resolvedViewingInvoice.batchId)}</p>

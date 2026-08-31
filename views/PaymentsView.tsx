@@ -1300,8 +1300,7 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
     if (!formData.paymentNo) return 'Payment number is required.';
     if (!formData.paymentDate) return 'Payment date is required.';
     if (!formData.bankAccountId) return 'Cash account is required.';
-    if (!sourceInvoiceId) return 'Invoice No. is required. Tag this payment to an invoice before saving or approving.';
-    if (!selectedSourceInvoice) return 'Select a valid invoice number before saving or approving payment.';
+    if (sourceInvoiceId && !selectedSourceInvoice) return 'Select a valid invoice number before saving or approving payment.';
     if (existingLinkedInvoicePayment) {
       return `A payment already exists for invoice ${selectedSourceInvoice.invoiceNo} (${existingLinkedInvoicePayment.paymentNo}, ${existingLinkedInvoicePaymentStatusLabel}). Review, edit, or complete the existing payment instead of creating a new one.`;
     }
@@ -1604,10 +1603,6 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
   const handleSourceInvoiceChange = (invoiceId: string) => {
     if (!invoiceId) {
-      if (sourceInvoiceId) {
-        alert('Invoice No. is required. Select another invoice instead of clearing the tagged invoice.');
-        return;
-      }
       setSourceInvoiceId(undefined);
       return;
     }
@@ -3513,15 +3508,15 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12">
                     <div className="md:col-span-3">
-                      <label className={invoiceLabelClass}>Invoice No. *</label>
+                      <label className={invoiceLabelClass}>Invoice No.</label>
                       <select
                         value={sourceInvoiceId || ''}
                         onChange={e => handleSourceInvoiceChange(e.target.value)}
                         disabled={isReadOnly || (!selectedPayorId && !sourceInvoiceId)}
                         className={invoiceInputClass}
                       >
-                        <option value="" disabled={!!selectedPayorId || !!sourceInvoiceId}>
-                          {selectedPayorId || sourceInvoiceId ? 'Select Invoice' : 'Select Sponsor/Student first'}
+                        <option value="">
+                          {selectedPayorId || sourceInvoiceId ? 'No invoice / select invoice' : 'Optional — select sponsor/student first'}
                         </option>
                         {invoiceSelectionOptions.map(invoice => (
                           <option key={invoice.id} value={invoice.id}>{invoice.invoiceNo}</option>
@@ -4588,5 +4583,4 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({
 };
 
 export default PaymentsView;
-
 

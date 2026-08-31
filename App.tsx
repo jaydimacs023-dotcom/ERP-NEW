@@ -103,7 +103,7 @@ import {
   FileText, Tag, Wallet, Activity, Loader2, Database,
   Cloud, BarChart2, CalendarCheck, Printer, Zap, Package,
   CheckCircle2, AlertCircle, HardDrive, RefreshCw, TrendingUp,
-  ArrowDownToLine, UserCheck, UserPlus, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2, FilePenLine
+  ArrowDownToLine, UserCheck, UserPlus, ListTodo, MessageSquare, ClipboardCheck, UserCircle, FilePlus2, FilePenLine, Banknote
 } from 'lucide-react';
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -1753,6 +1753,7 @@ export default function App() {
   };
 
   const ensureStudentLedgerEntryForInvoice = (invoice: Invoice, journalRef: string, postedAt?: string) => {
+    if (invoice.documentType === 'NON_INVOICE_PAYMENT') return;
     if (invoice.sponsorId || !invoice.studentId) return;
     if (!journalRef.trim()) return;
     const ledgerEntry: StudentLedger = {
@@ -4937,7 +4938,16 @@ export default function App() {
       studentId: invoice.studentId,
       preferredAccountId: (sponsor as any)?.arAccountId
     });
-    const arAccountId = arAccount?.id;
+    const cashOnHandAccount = filteredAccounts.find(a =>
+      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash on hand'
+    );
+    const operatingBankAccount = filteredAccounts.find(a =>
+      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash in bank - operating'
+    );
+    const nonInvoiceDebitAccount = invoice.paymentMethod === 'BANK_TRANSFER'
+      ? operatingBankAccount
+      : cashOnHandAccount;
+    const debitAccountId = invoice.documentType === 'NON_INVOICE_PAYMENT' ? nonInvoiceDebitAccount?.id : arAccount?.id;
 
     const vatPayableId =
       filteredAccounts.find(a => a.code === '2200')?.id ||
@@ -4948,8 +4958,10 @@ export default function App() {
       filteredAccounts.find(a => (a.name || '').toLowerCase().includes('sales tax'))?.id ||
       filteredAccounts.find(a => /\bvat\b/i.test(a.name || ''))?.id;
 
-    if (!arAccountId) {
-      handleNotify('error', 'Cannot post GL: Accounts Receivable account is not configured.');
+    if (!debitAccountId) {
+      handleNotify('error', invoice.documentType === 'NON_INVOICE_PAYMENT'
+        ? `Cannot post GL: ${invoice.paymentMethod === 'BANK_TRANSFER' ? 'Cash in Bank - Operating' : 'Cash on Hand'} account is not configured.`
+        : 'Cannot post GL: Accounts Receivable account is not configured.');
       return null;
     } else if (invoice.vatAmount > 0 && !vatPayableId) {
       handleNotify('error', 'Cannot post GL: Output VAT account (2200) not found.');
@@ -4963,10 +4975,10 @@ export default function App() {
       id: `${jeId}-ar`,
       orgId: currentOrgId,
       journalEntryId: jeId,
-      accountId: arAccountId,
+      accountId: debitAccountId,
       debit: invoice.grandTotal,
       credit: 0,
-      classificationCode: DEFAULT_RECEIVABLE_CLASSIFICATION_CODE,
+      classificationCode: invoice.documentType === 'NON_INVOICE_PAYMENT' ? undefined : DEFAULT_RECEIVABLE_CLASSIFICATION_CODE,
       description: invoiceTransactionDescription,
       memo: invoiceTransactionDescription,
       contactId: invoice.sponsorId || invoice.studentId || undefined,
@@ -5063,7 +5075,7 @@ export default function App() {
       reference: glRef,
       glEntryNumber: glRef,
       description: invoiceTransactionDescription,
-      sourceType: 'INVOICE',
+      sourceType: invoice.documentType === 'NON_INVOICE_PAYMENT' ? 'NON_INVOICE_PAYMENT' : 'INVOICE',
       sourceRef: invoice.id,
       status: 'POSTED',
       createdBy: currentUser?.id || 'system',
@@ -5514,9 +5526,7 @@ export default function App() {
 
   const validatePaymentInvoiceLink = (payment?: PaymentWithSource, excludePaymentId?: string): string => {
     const sourceInvoiceId = String(payment?.sourceInvoiceId || '').trim();
-    if (!sourceInvoiceId) {
-      return 'Invoice No. is required before saving or approving payment.';
-    }
+    if (!sourceInvoiceId) return '';
 
     const sourceInvoice = invoices.find(invoice =>
       invoice.id === sourceInvoiceId &&
@@ -5673,9 +5683,8 @@ export default function App() {
     return payment ? `Payment ${payment.paymentNo}` : '';
   };
 
-  const validatePaymentRequiredFields = (payment?: Pick<PaymentWithSource, 'crNo' | 'notes' | 'sourceInvoiceId'> | null): string => {
+  const validatePaymentRequiredFields = (payment?: Pick<PaymentWithSource, 'crNo' | 'notes'> | null): string => {
     const missingFields: string[] = [];
-    if (!String(payment?.sourceInvoiceId || '').trim()) missingFields.push('Invoice No.');
     if (!String(payment?.notes || '').trim()) missingFields.push('Transaction Description');
     if (!String(payment?.crNo || '').trim()) missingFields.push('C.R. No.');
 
@@ -6765,6 +6774,7 @@ export default function App() {
                 <NavItem icon={<UserPlus size={18} />} label="Register Learner" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
+                <NavItem icon={<Banknote size={18} />} label="Non-Invoice Payments" active={activeTab === 'non-invoice-payments'} onClick={() => navigateTo('non-invoice-payments')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
@@ -6823,6 +6833,7 @@ export default function App() {
               {userCanAccess('revenue-recognition') && <NavItem icon={<TrendingUp size={18} />} label="Revenue Recognition" active={activeTab === 'revenue-recognition'} onClick={() => navigateTo('revenue-recognition')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('customers') && <NavItem icon={<Users size={18} />} label="Learners & Customers" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('invoices') && <NavItem icon={<FileText size={18} />} label="Invoices" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />}
+              {userCanAccess('non-invoice-payments') && <NavItem icon={<Banknote size={18} />} label="Non-Invoice Payments" active={activeTab === 'non-invoice-payments'} onClick={() => navigateTo('non-invoice-payments')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('payments') && <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('bank-deposits') && <NavItem icon={<ArrowDownToLine size={18} />} label="Bank Deposits" active={activeTab === 'bank-deposits'} onClick={() => navigateTo('bank-deposits')} compact={!sidebarOpen} brandColor={brandColor} />}
               {userCanAccess('course-fees') && <NavItem icon={<Receipt size={18} />} label="Course Fees" active={activeTab === 'course-fees'} onClick={() => navigateTo('course-fees')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -7333,7 +7344,7 @@ export default function App() {
             />
           )}
           {activeTab === 'invoices' && <InvoicesView
-            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted)}
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted && (i.documentType || 'INVOICE') === 'INVOICE')}
             payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
             sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
             students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
@@ -7353,6 +7364,34 @@ export default function App() {
             onUpdateEnrollment={handleUpdateEnrollment}
             onUpdateAssessmentRegistration={handleUpdateAssessmentRegistration}
             onAddStudentLedgerEntry={entry => setStudentLedger(prev => [...prev, entry])}
+            journalEntries={activeJournalEntries}
+            onViewJournal={handleViewJournal}
+            onNavigate={navigateTo}
+            organization={currentOrg}
+            orgId={currentOrgId}
+            taxCategories={taxCategories}
+          />}
+          {activeTab === 'non-invoice-payments' && <InvoicesView
+            documentMode="NON_INVOICE_PAYMENT"
+            invoices={invoices.filter(i => i.orgId === currentOrgId && !i.isDeleted && i.documentType === 'NON_INVOICE_PAYMENT')}
+            payments={payments.filter(p => p.orgId === currentOrgId && !p.isDeleted)}
+            sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)}
+            users={users.filter(u => u.orgId === currentOrgId && !u.isDeleted)}
+            enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)}
+            assessmentRegistrations={assessmentRegistrations.filter(r => r.orgId === currentOrgId && !r.isDeleted)}
+            batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)}
+            qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)}
+            courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)}
+            accounts={filteredAccounts}
+            currency={currentOrg?.currency || 'PHP'}
+            isVatRegistered={currentOrg?.isVatRegistered || false}
+            onAddInvoice={handleAddInvoice}
+            onUpdateInvoice={handleUpdateInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onVoidInvoice={handleVoidInvoice}
+            onUpdateEnrollment={handleUpdateEnrollment}
+            onUpdateAssessmentRegistration={handleUpdateAssessmentRegistration}
             journalEntries={activeJournalEntries}
             onViewJournal={handleViewJournal}
             onNavigate={navigateTo}

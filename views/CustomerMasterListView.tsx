@@ -78,7 +78,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     onUpdateStudent,
     onNotify
 }) => {
-    const [activeSubTab, setActiveSubTab] = useState<'sponsors' | 'students'>('sponsors');
+    const [activeSubTab, setActiveSubTab] = useState<'sponsors' | 'students' | 'others'>('sponsors');
     const [searchTerm, setSearchTerm] = useState('');
     const [billingFilter, setBillingFilter] = useState<BillingFilter>('ALL');
     const [showBillingDropdown, setShowBillingDropdown] = useState(false);
@@ -122,6 +122,16 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     const openCreateSponsorModal = () => {
         setEditingSponsor(null);
         setSponsorFormData({ sponsorCode: getNextSponsorCode(sponsors), name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: 'NON_VAT', ewtRate: 0, arAccountId: '' });
+        setShowSponsorModal(true);
+    };
+
+    const openCreateOtherCustomerModal = () => {
+        setEditingSponsor(null);
+        setSponsorFormData({
+            sponsorCode: `OTH-${String(sponsors.filter(sponsor => sponsor.customerType === 'OTHER').length + 1).padStart(3, '0')}`,
+            name: '', contactPerson: '', email: '', phone: '', address: '', tin: '', taxType: 'NON_VAT', ewtRate: 0,
+            arAccountId: '', customerType: 'OTHER'
+        });
         setShowSponsorModal(true);
     };
 
@@ -216,14 +226,15 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 
     // --- Filtering Logic ---
     const filteredData = useMemo(() => {
-        if (activeSubTab === 'sponsors') {
+        if (activeSubTab !== 'students') {
             const lowerSearch = searchTerm.toLowerCase();
+            const expectedType = activeSubTab === 'others' ? 'OTHER' : 'SPONSOR';
             return sponsors.filter(s =>
                 !s.isDeleted && (
                     s.name.toLowerCase().includes(lowerSearch) ||
                     s.sponsorCode?.toLowerCase().includes(lowerSearch) ||
                     s.contactPerson?.toLowerCase().includes(lowerSearch)
-                ) &&
+                ) && (s.customerType || 'SPONSOR') === expectedType &&
                 (billingFilter === 'ALL' || getSponsorBillingStatus(s.id) === billingFilter)
             );
         } else {
@@ -240,14 +251,14 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
     }, [activeSubTab, sponsors, students, searchTerm, billingFilter, invoices, enrollments]);
 
     const activeTabData = useMemo(
-        () => activeSubTab === 'sponsors'
-            ? sponsors.filter(s => !s.isDeleted)
+        () => activeSubTab !== 'students'
+            ? sponsors.filter(s => !s.isDeleted && (s.customerType || 'SPONSOR') === (activeSubTab === 'others' ? 'OTHER' : 'SPONSOR'))
             : students.filter(s => !s.isDeleted),
         [activeSubTab, sponsors, students]
     );
 
     const summary = useMemo(() => {
-        if (activeSubTab === 'sponsors') {
+        if (activeSubTab !== 'students') {
             const billedCount = activeTabData.filter(item => getSponsorBillingStatus((item as Sponsor).id) === 'BILLED').length;
             const unbilledCount = activeTabData.filter(item => getSponsorBillingStatus((item as Sponsor).id) === 'UNBILLED').length;
             return {
@@ -271,11 +282,11 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         };
     }, [activeSubTab, activeTabData, filteredData.length, enrollments, invoices]);
 
-    const activeColumnOrder = activeSubTab === 'sponsors' ? sponsorColumnOrder : studentColumnOrder;
+    const activeColumnOrder = activeSubTab !== 'students' ? sponsorColumnOrder : studentColumnOrder;
 
-    const tableColumns: Record<CustomerColumnKey, { key: CustomerColumnKey; label: string; width: string }> = activeSubTab === 'sponsors'
+    const tableColumns: Record<CustomerColumnKey, { key: CustomerColumnKey; label: string; width: string }> = activeSubTab !== 'students'
         ? {
-            identity: { key: 'identity', label: 'Sponsor Identification', width: 'w-[34%]' },
+            identity: { key: 'identity', label: activeSubTab === 'others' ? 'Customer Identification' : 'Sponsor Identification', width: 'w-[34%]' },
             contact: { key: 'contact', label: 'Contact Person', width: 'w-[22%]' },
             details: { key: 'details', label: 'Contact Details', width: 'w-[24%]' },
             billing: { key: 'billing', label: 'Billing Status', width: 'w-[20%]' },
@@ -288,7 +299,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         };
 
     const getSortValue = (item: Sponsor | Student, key: CustomerColumnKey): string => {
-        if (activeSubTab === 'sponsors') {
+        if (activeSubTab !== 'students') {
             const sponsor = item as Sponsor;
             switch (key) {
                 case 'identity':
@@ -347,7 +358,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
             return nextOrder;
         };
 
-        if (activeSubTab === 'sponsors') {
+        if (activeSubTab !== 'students') {
             setSponsorColumnOrder(reorder);
         } else {
             setStudentColumnOrder(reorder);
@@ -373,7 +384,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         return sortedData.slice(start, start + PAGE_SIZE);
     }, [sortedData, currentPage]);
 
-    const handleTabChange = (tab: 'sponsors' | 'students') => {
+    const handleTabChange = (tab: 'sponsors' | 'students' | 'others') => {
         setActiveSubTab(tab);
         setSearchTerm('');
         setBillingFilter('ALL');
@@ -391,7 +402,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
         </div>
     );
 
-    const availableBillingFilters: Array<{ value: BillingFilter; label: string }> = activeSubTab === 'sponsors'
+    const availableBillingFilters: Array<{ value: BillingFilter; label: string }> = activeSubTab !== 'students'
         ? [
             { value: 'ALL', label: 'All' },
             { value: 'BILLED', label: 'Billed' },
@@ -430,31 +441,29 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                         >
                             Learners
                         </button>
+                        <button
+                            onClick={() => handleTabChange('others')}
+                            className={`px-6 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all ${activeSubTab === 'others' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Others
+                        </button>
                     </div>
-                    {/* {activeSubTab === 'sponsors' ? (
+                    {activeSubTab === 'others' && (
                         <button
-                            onClick={openCreateSponsorModal}
+                            onClick={openCreateOtherCustomerModal}
                             className="flex items-center gap-2 px-6 py-2.5 text-white rounded-xl transition-all font-semibold text-[10px] uppercase tracking-widest"
                             style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
                         >
-                            <Plus size={16} /> New Sponsor
+                            <Plus size={16} /> New Other Customer
                         </button>
-                    ) : (
-                        <button
-                            onClick={() => { resetStudentForm(); setShowStudentModal(true); }}
-                            className="flex items-center gap-2 px-6 py-2.5 text-white rounded-xl transition-all font-semibold text-[10px] uppercase tracking-widest"
-                            style={{ backgroundColor: brandColor, boxShadow: `0 10px 20px -10px ${brandColor}` }}
-                        >
-                            <Plus size={16} /> Register Learner
-                        </button>
-                    )} */}
+                    )}
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                        {activeSubTab === 'sponsors' ? 'Total Sponsors' : 'Total Learners'}
+                        {activeSubTab === 'sponsors' ? 'Total Sponsors' : activeSubTab === 'others' ? 'Total Other Customers' : 'Total Learners'}
                     </p>
                     <p className="mt-2 text-2xl font-semibold text-gray-900">{summary.total}</p>
                 </div>
@@ -580,7 +589,7 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {paginatedData.map((item) => {
-                            if (activeSubTab === 'sponsors') {
+                            if (activeSubTab !== 'students') {
                                 const sponsor = item as Sponsor;
                                 const status = getSponsorBillingStatus(sponsor.id);
                                 const cells: Record<CustomerColumnKey, React.ReactNode> = {
@@ -761,7 +770,9 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
-                                        {editingSponsor ? 'Edit Sponsor' : 'New Sponsor Profile'}
+                                        {sponsorFormData.customerType === 'OTHER'
+                                            ? editingSponsor ? 'Edit Other Customer' : 'New Other Customer'
+                                            : editingSponsor ? 'Edit Sponsor' : 'New Sponsor Profile'}
                                     </h3>
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enterprise & Organization Setup</p>
                                 </div>
@@ -1232,7 +1243,9 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
                                     </h3>
                                     <div className="flex items-center gap-3">
                                         <span className="text-[10px] font-mono font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">CODE: {selectedSponsor.sponsorCode || 'N/A'}</span>
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sponsor Organization</span>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            {selectedSponsor.customerType === 'OTHER' ? 'Other Customer' : 'Sponsor Organization'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1299,4 +1312,3 @@ const CustomerMasterListView: React.FC<CustomerMasterListViewProps> = ({
 };
 
 export default CustomerMasterListView;
-
