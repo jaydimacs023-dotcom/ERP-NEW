@@ -16,7 +16,7 @@ interface InventoryTransactionsViewProps {
 }
 
 const PAGE_SIZE = 10;
-const INVENTORY_TRANSACTION_COLUMNS = 'id,org_id,reference_number,stock_item_id,from_location_id,to_location_id,transaction_type,quantity,unit_cost,total_cost,notes,journal_entry_id,created_by,created_at,is_deleted';
+const INVENTORY_TRANSACTION_COLUMNS = 'id,org_id,reference_number,stock_item_id,from_location_id,to_location_id,transaction_type,quantity,unit_cost,total_cost,notes,journal_entry_id,posting_date,status,source_document,source_module,reversal_of_id,created_by,created_at,is_deleted';
 
 interface TransactionWithDetails extends InventoryTransaction {
   item?: StockItem;
@@ -436,7 +436,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                 <tr>
                    <td colSpan={5} className="px-8 py-20 text-center">
                       <div className="w-10 h-10 border-4 border-orange-200 rounded-full animate-spin mx-auto mb-4" style={{ borderTopColor: brandColor }}></div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.3em]">Querying Archive Nodes...</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.3em]">Loading Inventory transactions…</p>
                    </td>
                 </tr>
               ) : paginatedTransactions.length === 0 ? (
@@ -455,7 +455,7 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                          <div className="flex items-center gap-3">
                             <Calendar size={14} className="text-gray-300" />
                             <div>
-                               <p className="text-xs font-semibold text-gray-900">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                               <p className="text-xs font-semibold text-gray-900">{new Date(tx.postingDate || tx.createdAt).toLocaleDateString()}</p>
                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">{new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                          </div>
@@ -492,25 +492,25 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                               <div className="space-y-4">
                                  <div>
-                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Movement Path</p>
+                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Warehouse</p>
                                     <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
                                        <MapPin size={14} style={{ color: brandColor }} />
-                                       {tx.location?.name || 'Undefined Cluster'} ({tx.location?.code || 'N/A'})
+                                       {tx.location?.name || 'Warehouse unavailable'} ({tx.location?.code || 'N/A'})
                                     </div>
                                  </div>
                                  <div>
-                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Control Reference</p>
+                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Inventory Reference</p>
                                     <div className="flex items-center gap-2 text-xs font-mono font-semibold text-gray-800">
                                        <Hash size={14} className="text-gray-300" />
-                                       {tx.referenceNumber || 'INTERNAL_JOURNAL'}
+                                       {tx.referenceNumber || 'No reference'}
                                     </div>
                                  </div>
                               </div>
 
                               <div className="md:col-span-2">
-                                 <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Auditor Remarks</p>
+                                 <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Reason and Notes</p>
                                  <div className="p-4 bg-white rounded border border-gray-200 text-xs font-bold text-gray-600 italic">
-                                    "{tx.notes || 'No manual annotation provided for this movement.'}"
+                                    {tx.notes || 'No additional notes were provided.'}
                                  </div>
                               </div>
 
@@ -528,7 +528,13 @@ export const InventoryTransactionsView: React.FC<InventoryTransactionsViewProps>
                                     </>
                                  )}
                                  <div className="pt-2 border-t border-gray-200">
-                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide leading-tight">Executor: <span className="text-gray-600 font-semibold">{tx.createdBy || 'SYSTEM_DAEMON'}</span></p>
+                                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide leading-tight">Posted by: <span className="text-gray-600 font-semibold">{tx.createdBy || 'System'}</span></p>
+                                    <p className="mt-2 text-xs text-gray-500">Journal: <span className="font-mono font-semibold text-gray-700">{tx.journalEntryId || 'Not linked'}</span></p>
+                                    {tx.reversalOfId && <p className="mt-1 text-xs text-rose-600">Reverses transaction <span className="font-mono font-semibold">{tx.reversalOfId}</span></p>}
+                                 </div>
+                                 <div>
+                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Source</p>
+                                    <p className="text-xs font-semibold text-gray-700">{tx.sourceModule || 'Inventory'} · <span className="font-mono">{tx.sourceDocument || tx.referenceNumber}</span></p>
                                  </div>
                               </div>
                            </div>

@@ -376,6 +376,7 @@ export interface IDataService {
   createStockAdjustment(adjustment: StockAdjustment): Promise<StockAdjustment>;
   updateStockAdjustment(id: string, updates: Partial<StockAdjustment>): Promise<StockAdjustment>;
   deleteStockAdjustment(id: string): Promise<void>;
+  reverseStockAdjustment(id: string, reversalDate: string, reason: string): Promise<any>;
   getStockAdjustmentsByOrg(orgId: string): Promise<StockAdjustment[]>;
   getStockAdjustmentById(id: string): Promise<StockAdjustment | null>;
   getStockAdjustmentsByItem(orgId: string, stockItemId: string): Promise<StockAdjustment[]>;

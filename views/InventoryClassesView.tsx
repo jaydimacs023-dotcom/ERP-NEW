@@ -22,11 +22,24 @@ export default function InventoryClassesView({ classes, accounts, warehouses, or
   const [editing, setEditing] = useState<Partial<InventoryClass> | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const activeAccounts = accounts.filter(account => account.isActive && !account.isHeader);
+  const activeAccounts = accounts.filter(account => account.isActive && !account.isHeader && !account.isDeleted);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editing) return;
+    if (!editing.code?.trim() || !editing.name?.trim()) {
+      setError('Code and name are required.');
+      return;
+    }
+    if (!editing.inventoryAssetAccountId || !editing.cogsAccountId || !editing.adjustmentAccountId) {
+      setError('Inventory Asset, Cost of Goods Sold, and Inventory Adjustment accounts are required.');
+      return;
+    }
+    const selectedRequiredAccounts = [editing.inventoryAssetAccountId, editing.cogsAccountId, editing.adjustmentAccountId];
+    if (new Set(selectedRequiredAccounts).size !== selectedRequiredAccounts.length) {
+      setError('Required Inventory Class mappings must use distinct GL accounts.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -118,17 +131,21 @@ export default function InventoryClassesView({ classes, accounts, warehouses, or
 
       <div className="bg-white border rounded-xl overflow-hidden">
         <table className="w-full">
-          <thead className="text-white" style={{ backgroundColor: brandColor }}><tr><th className="px-4 py-3 text-left">Class</th><th className="px-4 py-3 text-left">Valuation</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
+          <thead className="text-white" style={{ backgroundColor: brandColor }}><tr><th className="px-4 py-3 text-left">Class</th><th className="px-4 py-3 text-left">Valuation</th><th className="px-4 py-3 text-left">Configuration</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
           <tbody className="divide-y">
             {classes.map(value => (
               <tr key={value.id}>
                 <td className="px-4 py-3"><p className="font-semibold">{value.code}</p><p className="text-xs text-gray-500">{value.name}</p></td>
                 <td className="px-4 py-3 text-sm">{value.valuationMethod.replace('_', ' ')}</td>
+                <td className="px-4 py-3 text-sm">{value.inventoryAssetAccountId && value.cogsAccountId && value.adjustmentAccountId
+                  ? <span className="inline-flex items-center gap-1 text-emerald-700 text-xs font-semibold"><Check size={13}/> Ready to post</span>
+                  : <span className="text-xs font-semibold text-amber-700">Missing required mapping</span>}
+                </td>
                 <td className="px-4 py-3">{value.isActive ? <span className="inline-flex items-center gap-1 text-emerald-700 text-xs font-semibold"><Check size={13}/> Active</span> : 'Inactive'}</td>
                 <td className="px-4 py-3 text-right"><button onClick={() => setEditing(value)} className="p-2 transition-opacity hover:opacity-70" style={{ color: brandColor }}><Edit2 size={16}/></button></td>
               </tr>
             ))}
-            {!classes.length && <tr><td colSpan={4} className="p-10 text-center text-gray-500">Create an inventory class before assigning stock items.</td></tr>}
+            {!classes.length && <tr><td colSpan={5} className="p-10 text-center text-gray-500">Create an inventory class before assigning stock items.</td></tr>}
           </tbody>
         </table>
       </div>

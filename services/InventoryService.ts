@@ -10,6 +10,16 @@ import {
 
 export class InventoryService {
   /**
+   * Convert an absolute physical count into the signed ledger variance.
+   */
+  static calculateCountVariance(systemQuantity: number, countedQuantity: number): number {
+    const system = Number(systemQuantity);
+    const counted = Number(countedQuantity);
+    if (!Number.isFinite(system) || !Number.isFinite(counted)) return 0;
+    return counted - system;
+  }
+
+  /**
    * Calculate available quantity across one or more warehouse levels.
    */
   static getAvailableQuantity(levels: InventoryLevel | InventoryLevel[]): number {

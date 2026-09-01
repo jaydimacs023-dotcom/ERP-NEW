@@ -22,3 +22,17 @@ describe('InventoryService stock availability', () => {
     expect(InventoryService.getAvailableQuantity(level)).toBe(5);
   });
 });
+
+describe('InventoryService physical count variance', () => {
+  it('returns a negative movement when the physical count is lower', () => {
+    expect(InventoryService.calculateCountVariance(100, 87)).toBe(-13);
+  });
+
+  it('returns a positive movement when unrecorded stock is counted', () => {
+    expect(InventoryService.calculateCountVariance(20, 24)).toBe(4);
+  });
+
+  it('does not emit an invalid numeric movement', () => {
+    expect(InventoryService.calculateCountVariance(Number.NaN, 10)).toBe(0);
+  });
+});

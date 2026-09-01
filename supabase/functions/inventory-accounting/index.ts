@@ -70,6 +70,13 @@ function requestedOrg(claims: Claims, body: any): string {
   return role === "SYSTEM_ADMIN" ? String(body.orgId || own) : own;
 }
 
+function actorRole(claims: Claims): string {
+  return String(claims.appRole || claims.app_role || claims.role || "").toUpperCase();
+}
+
+const READ_ROLES = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "AR_SPECIALIST", "AP_SPECIALIST", "AP_SUPERVISOR", "AUDITOR"]);
+const WRITE_ROLES = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "AR_SPECIALIST"]);
+
 function classValues(input: any) {
   return {
     code: String(input.code || "").trim().toUpperCase(),
@@ -96,8 +103,18 @@ async function validateClassReferences(orgId: string, values: any): Promise<stri
   ].filter(Boolean);
   const uniqueIds = [...new Set(accountIds)];
   const { data: accounts, error } = await admin
-    .from("chart_of_accounts").select("id").eq("org_id", orgId).in("id", uniqueIds);
+    .from("chart_of_accounts").select("id,class,is_active,is_header,is_deleted").eq("org_id", orgId).in("id", uniqueIds);
   if (error || (accounts || []).length !== uniqueIds.length) return "One or more GL accounts are outside this organization";
+  if ((accounts || []).some(account => !account.is_active || account.is_header || account.is_deleted)) {
+    return "Inventory mappings require active posting accounts";
+  }
+  const accountClass = (id: string | null) => String((accounts || []).find(account => account.id === id)?.class || "").toUpperCase();
+  if (accountClass(values.inventory_asset_account_id) !== "ASSET") return "Inventory Asset must use an Asset account";
+  if (accountClass(values.cogs_account_id) !== "EXPENSE") return "Cost of Goods Sold must use an Expense account";
+  if (accountClass(values.adjustment_account_id) !== "EXPENSE") return "Inventory Adjustment must use an Expense account";
+  if (values.write_off_account_id && accountClass(values.write_off_account_id) !== "EXPENSE") return "Write-Off must use an Expense account";
+  if (values.opening_balance_equity_account_id && accountClass(values.opening_balance_equity_account_id) !== "EQUITY") return "Opening Balance must use an Equity account";
+  if (values.in_transit_account_id && accountClass(values.in_transit_account_id) !== "ASSET") return "Inventory In Transit must use an Asset account";
   if (values.default_warehouse_id) {
     const { data } = await admin.from("warehouse_locations").select("id")
       .eq("org_id", orgId).eq("id", values.default_warehouse_id).maybeSingle();
@@ -114,6 +131,10 @@ Deno.serve(async request => {
   const body = await request.json().catch(() => ({}));
   const orgId = requestedOrg(actor, body);
   if (!orgId) return response(403, { error: "Missing organization scope" });
+  if (!READ_ROLES.has(actorRole(actor))) return response(403, { error: "Inventory accounting access is not permitted" });
+  if (["save_class", "post_opening"].includes(String(body.action || "")) && !WRITE_ROLES.has(actorRole(actor))) {
+    return response(403, { error: "Inventory accounting changes are not permitted for this role" });
+  }
 
   if (body.action === "list_classes") {
     const { data, error } = await admin.from("inventory_classes").select("*")

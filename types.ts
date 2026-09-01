@@ -747,6 +747,14 @@ export interface InventoryTransaction extends BaseEntity {
   unitCost: number;
   totalCost: number;
   notes?: string;
+  postingDate?: string;
+  status?: 'DRAFT' | 'POSTED' | 'REVERSED';
+  sourceDocument?: string;
+  sourceModule?: string;
+  journalEntryId?: string;
+  reversalOfId?: string;
+  batchLot?: string;
+  serialNumber?: string;
   createdBy?: string;
   createdAt: string;
 }
@@ -758,10 +766,21 @@ export interface StockAdjustment extends BaseEntity {
   stockItemId: string;
   warehouseLocationId: string;
   quantityChange: number;  // Positive or negative
+  quantity?: number; // Absolute quantity retained for compatibility with existing views
+  expectedQuantity?: number;
+  countedQuantity?: number;
+  requestId?: string;
+  adjustmentType: 'OPENING_INVENTORY' | 'PHYSICAL_COUNT' | 'DAMAGE' | 'DAMAGED' | 'LOST' | 'EXPIRED' | 'SHRINKAGE' | 'WRITEOFF' | 'ADJUSTMENT' | 'CORRECTION';
   reason: string;  // Variance, Damage, Count Difference, etc.
+  notes?: string;
+  postingDate?: string;
+  isApproved?: boolean;
   approvedBy?: string;
   approvalDate?: string;
   journalEntryId?: string;  // Links to GL entry
+  reversedBy?: string;
+  reversedAt?: string;
+  reversalTransactionId?: string;
   createdBy?: string;
   createdAt: string;
 }

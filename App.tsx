@@ -579,6 +579,7 @@ export default function App() {
   const [inventoryLevels, setInventoryLevels] = useState<InventoryLevel[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
   const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>([]);
+  const [inventoryAdjustmentItemId, setInventoryAdjustmentItemId] = useState<string | null>(null);
   const [reorderPoints, setReorderPoints] = useState<ReorderPoint[]>([]);
 
   useEffect(() => {
@@ -4128,6 +4129,25 @@ export default function App() {
     }
   };
 
+  const handleReverseStockAdjustment = async (id: string, reversalDate: string, reason: string) => {
+    try {
+      await dataService.reverseStockAdjustment(id, reversalDate, reason);
+      const [refreshedAdjustments, refreshedLevels, refreshedTransactions] = await Promise.all([
+        dataService.getStockAdjustmentsByOrg(currentOrgId),
+        dataService.getInventoryLevelsByOrg(currentOrgId),
+        dataService.getInventoryTransactionsByOrg(currentOrgId),
+      ]);
+      setStockAdjustments(refreshedAdjustments);
+      setInventoryLevels(refreshedLevels);
+      setInventoryTransactions(refreshedTransactions);
+      handleNotify('success', 'Stock adjustment reversed successfully');
+    } catch (error) {
+      console.error('[App] Error reversing stock adjustment:', error);
+      handleNotify('error', 'Failed to reverse stock adjustment.');
+      throw error;
+    }
+  };
+
   // Reorder Points CRUD
   const handleAddReorderPoint = async (point: Omit<ReorderPoint, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -7292,13 +7312,13 @@ export default function App() {
           {activeTab === 'assets' && <AssetsView assets={fixedAssets.filter(a => a.orgId === currentOrgId && !a.isDeleted)} accounts={filteredAccounts} lines={filteredLines} entries={activeJournalEntries} onDepreciate={handleDepreciate} onAddAsset={handleAddFixedAsset} onUpdateAsset={handleUpdateFixedAsset} onDeleteAsset={handleDeleteFixedAsset} onNotify={handleNotify} />}
 
           {/* Inventory Management Views */}
-          {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} />}
+          {activeTab === 'inventory' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} onSelectItem={(itemId) => setActiveTab('stock-items')} onAdjustItem={(itemId) => { setInventoryAdjustmentItemId(itemId); setActiveTab('stock-adjustments'); }} />}
           {activeTab === 'warehouse-locations' && <WarehouseLocationsView orgId={currentOrgId} locations={warehouseLocations.filter(l => !l.isDeleted)} onAdd={handleAddWarehouseLocation} onUpdate={handleUpdateWarehouseLocation} onDelete={handleDeleteWarehouseLocation} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-classes' && <InventoryClassesView classes={inventoryClasses} accounts={filteredAccounts} warehouses={warehouseLocations} organization={currentOrg} onSave={handleSaveInventoryClass} />}
-          {activeTab === 'opening-inventory' && <OpeningInventoryView items={stockItems} warehouses={warehouseLocations} organization={currentOrg} onPost={handlePostOpeningInventory} />}
+          {activeTab === 'opening-inventory' && <OpeningInventoryView items={stockItems} warehouses={warehouseLocations} levels={inventoryLevels} organization={currentOrg} onPost={handlePostOpeningInventory} />}
           {activeTab === 'stock-items' && <StockItemsView orgId={currentOrgId} items={stockItems.filter(i => !i.isDeleted)} inventoryClasses={inventoryClasses} accounts={filteredAccounts} locations={warehouseLocations.filter(location => !location.isDeleted)} levels={inventoryLevels.filter(level => !level.isDeleted)} onAdd={handleAddStockItem} onUpdate={handleUpdateStockItem} onDelete={handleDeleteStockItem} onManageQuantity={() => setActiveTab('stock-adjustments')} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
-          {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} organization={currentOrg} />}
-          {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
+          {activeTab === 'stock-levels' && <InventoryView items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} transactions={inventoryTransactions.filter(t => !t.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} reorderPoints={reorderPoints.filter(r => !r.isDeleted)} currency={currentOrg?.currency || 'USD'} organization={currentOrg} onAdjustItem={(itemId) => { setInventoryAdjustmentItemId(itemId); setActiveTab('stock-adjustments'); }} />}
+          {activeTab === 'stock-adjustments' && <StockAdjustmentsView adjustments={stockAdjustments.filter(a => !a.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} accounts={filteredAccounts} onAdd={handleAddStockAdjustment} onUpdate={handleUpdateStockAdjustment} onDelete={handleDeleteStockAdjustment} onReverse={handleReverseStockAdjustment} initialItemId={inventoryAdjustmentItemId || undefined} onInitialItemConsumed={() => setInventoryAdjustmentItemId(null)} currency={currentOrg?.currency || 'USD'} currentUserId={currentUser?.id} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'reorder-points' && <ReorderView reorderPoints={reorderPoints.filter(r => !r.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} levels={inventoryLevels.filter(l => !l.isDeleted)} onAdd={handleAddReorderPoint} onUpdate={handleUpdateReorderPoint} onDelete={handleDeleteReorderPoint} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'inventory-transactions' && <InventoryTransactionsView orgId={currentOrgId} transactions={inventoryTransactions.filter(t => !t.isDeleted)} items={stockItems.filter(i => !i.isDeleted)} locations={warehouseLocations.filter(l => !l.isDeleted)} currency={currentOrg?.currency || 'USD'} isLoading={isLoading} organization={currentOrg} />}
           {activeTab === 'banking' && <BankingView bankAccounts={bankAccounts.filter(b => b.orgId === currentOrgId && !b.isDeleted)} summaries={summaries} accounts={filteredAccounts} entries={activeJournalEntries} lines={filteredLines} bankReconciliations={bankReconciliations} onAddBankAccount={handleAddBankAccount} onUpdateBankAccount={handleUpdateBankAccount} onDeleteBankAccount={handleDeleteBankAccount} onAddBankReconciliation={handleAddBankReconciliation} onUpdateBankReconciliation={handleUpdateBankReconciliation} onDeleteBankReconciliation={handleDeleteBankReconciliation} onPostTransfer={handlePostJournal} onToggleClearLine={id => setJournalLines(prev => prev.map(l => l.id === id ? { ...l, isCleared: !l.isCleared } : l))} onNotify={handleNotify} />}

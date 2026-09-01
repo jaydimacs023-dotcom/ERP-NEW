@@ -105,6 +105,28 @@ function stockItemValues(input: any) {
   };
 }
 
+async function validateStockItem(orgId: string, values: ReturnType<typeof stockItemValues>): Promise<string | null> {
+  if (!values.code || !values.name) return "Code and name are required";
+  if ([values.reorder_level, values.reorder_quantity, values.safety_stock, values.standard_cost]
+    .some(value => !Number.isFinite(value) || value < 0)) return "Stock quantities and standard cost must be zero or greater";
+  if (values.reorder_level > 0 && values.safety_stock > values.reorder_level) {
+    return "Safety stock cannot be greater than the reorder level";
+  }
+  if (values.type === "STOCK_ITEM" && !values.inventory_class_id) return "Inventory Class is required for stock items";
+  if (values.inventory_class_id) {
+    const { data } = await admin.from("inventory_classes").select("id")
+      .eq("id", values.inventory_class_id).eq("org_id", orgId).eq("is_active", true).maybeSingle();
+    if (!data) return "Inventory Class is outside this organization or inactive";
+  }
+  if (values.default_warehouse_id) {
+    const { data } = await admin.from("warehouse_locations").select("id")
+      .eq("id", values.default_warehouse_id).eq("org_id", orgId).eq("is_active", true)
+      .eq("is_deleted", false).maybeSingle();
+    if (!data) return "Default warehouse is outside this organization or inactive";
+  }
+  return null;
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json(405, { error: "Method not allowed" });
@@ -133,15 +155,8 @@ Deno.serve(async (request) => {
 
   if (body.action === "create") {
     const values = stockItemValues(body.item || {});
-    if (!values.code || !values.name) return json(400, { error: "Code and name are required" });
-    if (values.type === "STOCK_ITEM" && !values.inventory_class_id) {
-      return json(400, { error: "Inventory Class is required for stock items" });
-    }
-    if (values.inventory_class_id) {
-      const { data: inventoryClass } = await admin.from("inventory_classes").select("id")
-        .eq("id", values.inventory_class_id).eq("org_id", orgId).eq("is_active", true).maybeSingle();
-      if (!inventoryClass) return json(403, { error: "Inventory Class is outside this organization or inactive" });
-    }
+    const validationError = await validateStockItem(orgId, values);
+    if (validationError) return json(400, { error: validationError });
     const { data, error } = await admin
       .from("stock_items")
       .insert({ ...values, org_id: orgId, is_deleted: false })
@@ -156,15 +171,8 @@ Deno.serve(async (request) => {
 
   if (body.action === "update") {
     const values = stockItemValues(body.updates || {});
-    if (!values.code || !values.name) return json(400, { error: "Code and name are required" });
-    if (values.type === "STOCK_ITEM" && !values.inventory_class_id) {
-      return json(400, { error: "Inventory Class is required for stock items" });
-    }
-    if (values.inventory_class_id) {
-      const { data: inventoryClass } = await admin.from("inventory_classes").select("id")
-        .eq("id", values.inventory_class_id).eq("org_id", orgId).eq("is_active", true).maybeSingle();
-      if (!inventoryClass) return json(403, { error: "Inventory Class is outside this organization or inactive" });
-    }
+    const validationError = await validateStockItem(orgId, values);
+    if (validationError) return json(400, { error: validationError });
     const { data, error } = await admin
       .from("stock_items")
       .update(values)

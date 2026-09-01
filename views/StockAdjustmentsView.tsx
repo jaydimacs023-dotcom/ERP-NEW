@@ -1,8 +1,10 @@
-﻿import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, AlertCircle, Download, ChevronDown, RotateCcw } from 'lucide-react';
-import { StockAdjustment, StockItem, InventoryLevel, ChartOfAccount, JournalEntry, JournalLine, Organization } from '../types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle, ArrowDown, ArrowUp, Check, ChevronDown, ClipboardCheck,
+  Download, History, PackageSearch, Plus, RotateCcw, Search, ShieldCheck, Undo2, X,
+} from 'lucide-react';
+import { ChartOfAccount, InventoryLevel, Organization, StockAdjustment, StockItem } from '../types';
 import { InventoryService } from '../services/InventoryService';
-import { InventoryGLService } from '../services/InventoryGLService';
 import { DataExportService } from '../services/DataExportService';
 
 interface StockAdjustmentsViewProps {
@@ -14,700 +16,294 @@ interface StockAdjustmentsViewProps {
   onAdd: (adj: Omit<StockAdjustment, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onUpdate: (id: string, adj: Partial<StockAdjustment>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onPostGL?: (entry: Partial<JournalEntry>, lines: JournalLine[], adjustmentId: string) => Promise<void>;
+  onReverse?: (id: string, reversalDate: string, reason: string) => Promise<void>;
+  initialItemId?: string;
+  onInitialItemConsumed?: () => void;
   currency: string;
   isLoading?: boolean;
   currentUserId?: string;
   organization?: Organization;
 }
 
+type EventKind = 'COUNT' | 'FOUND' | 'DAMAGE' | 'LOST' | 'EXPIRED' | 'SHRINKAGE';
+
 interface FormData {
   stockItemId: string;
   warehouseLocationId: string;
-  adjustmentType: typeof ADJUSTMENT_TYPES[number];
+  eventKind: EventKind;
   quantity: string;
+  postingDate: string;
   reason: string;
   notes: string;
 }
 
-const ADJUSTMENT_TYPES = ['ADJUSTMENT', 'CORRECTION', 'DAMAGE', 'LOST', 'EXPIRED', 'SHRINKAGE', 'WRITEOFF'] as const;
+const EVENT_OPTIONS: Array<{
+  value: EventKind;
+  label: string;
+  description: string;
+  adjustmentType: StockAdjustment['adjustmentType'];
+  direction: 'COUNT' | 'IN' | 'OUT';
+}> = [
+  { value: 'COUNT', label: 'Count differs from system', description: 'Enter the quantity physically counted.', adjustmentType: 'PHYSICAL_COUNT', direction: 'COUNT' },
+  { value: 'FOUND', label: 'Unrecorded stock found', description: 'Add stock that is present but missing from the system.', adjustmentType: 'CORRECTION', direction: 'IN' },
+  { value: 'DAMAGE', label: 'Item was damaged', description: 'Remove unusable damaged stock.', adjustmentType: 'DAMAGE', direction: 'OUT' },
+  { value: 'LOST', label: 'Item was lost', description: 'Remove stock that cannot be located.', adjustmentType: 'LOST', direction: 'OUT' },
+  { value: 'EXPIRED', label: 'Item expired', description: 'Remove stock that can no longer be issued.', adjustmentType: 'EXPIRED', direction: 'OUT' },
+  { value: 'SHRINKAGE', label: 'Other stock shortage', description: 'Remove a verified shortage for another reason.', adjustmentType: 'SHRINKAGE', direction: 'OUT' },
+];
 
+const today = () => new Date().toISOString().slice(0, 10);
 const INITIAL_FORM: FormData = {
-  stockItemId: '',
-  warehouseLocationId: '',
-  adjustmentType: 'ADJUSTMENT',
-  quantity: '',
-  reason: '',
-  notes: '',
+  stockItemId: '', warehouseLocationId: '', eventKind: 'COUNT', quantity: '',
+  postingDate: today(), reason: '', notes: '',
+};
+
+const eventForAdjustment = (type: string): EventKind => {
+  if (type === 'PHYSICAL_COUNT') return 'COUNT';
+  if (type === 'CORRECTION' || type === 'ADJUSTMENT') return 'FOUND';
+  if (type === 'DAMAGE' || type === 'DAMAGED') return 'DAMAGE';
+  if (type === 'LOST') return 'LOST';
+  if (type === 'EXPIRED') return 'EXPIRED';
+  return 'SHRINKAGE';
 };
 
 export const StockAdjustmentsView: React.FC<StockAdjustmentsViewProps> = ({
-  adjustments,
-  items,
-  levels,
-  locations,
-  accounts = [],
-  onAdd,
-  onUpdate,
-  onDelete,
-  onPostGL,
-  currency,
-  isLoading = false,
-  currentUserId,
-  organization,
+  adjustments, items, levels, locations, accounts: _accounts = [], onAdd,
+  onUpdate: _onUpdate, onDelete: _onDelete, onReverse, currency,
+  initialItemId, onInitialItemConsumed, isLoading = false, currentUserId: _currentUserId, organization,
 }) => {
   const brandColor = organization?.primaryColor || '#F47721';
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | typeof ADJUSTMENT_TYPES[number]>('ALL');
-  const [approvalFilter, setApprovalFilter] = useState<'ALL' | 'APPROVED' | 'PENDING'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | EventKind>('ALL');
+  const [postingFilter, setPostingFilter] = useState<'ALL' | 'POSTED' | 'REVERSED'>('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH'>('ALL');
+  const [itemQuery, setItemQuery] = useState('');
+  const [warehouseQuery, setWarehouseQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [postingGL, setPostingGL] = useState<string | null>(null);
+  const [reversing, setReversing] = useState<StockAdjustment | null>(null);
+  const [reversalDate, setReversalDate] = useState(today());
+  const [reversalReason, setReversalReason] = useState('');
+  const requestIdRef = useRef(crypto.randomUUID());
 
-  const stockItems = useMemo(
-    () => items.filter((i) => !i.isDeleted && i.type === 'STOCK_ITEM'),
-    [items]
-  );
+  useEffect(() => {
+    if (!initialItemId) return;
+    const item = items.find(value => value.id === initialItemId);
+    requestIdRef.current = crypto.randomUUID();
+    setFormData({ ...INITIAL_FORM, stockItemId: initialItemId, warehouseLocationId: item?.defaultWarehouseId || item?.warehouseLocationId || '' });
+    setReviewing(false);
+    setError(null);
+    setShowForm(true);
+    onInitialItemConsumed?.();
+  }, [initialItemId, items, onInitialItemConsumed]);
 
-  const activeLocations = useMemo(() => locations.filter((l) => !l.isDeleted && l.isActive), [locations]);
+  const stockItems = useMemo(() => items.filter(item => !item.isDeleted && item.isActive && item.type === 'STOCK_ITEM'), [items]);
+  const activeLocations = useMemo(() => locations.filter(location => !location.isDeleted && location.isActive), [locations]);
+  const activeAdjustments = useMemo(() => adjustments.filter(adjustment => !adjustment.isDeleted), [adjustments]);
+  const selectableItems = useMemo(() => {
+    const query = itemQuery.trim().toLowerCase();
+    return !query ? stockItems : stockItems.filter(item => [item.code, item.name, item.barcode, item.unitOfMeasure].filter(Boolean).join(' ').toLowerCase().includes(query));
+  }, [itemQuery, stockItems]);
+  const selectableLocations = useMemo(() => {
+    const query = warehouseQuery.trim().toLowerCase();
+    return !query ? activeLocations : activeLocations.filter(location => [location.code, location.name].filter(Boolean).join(' ').toLowerCase().includes(query));
+  }, [activeLocations, warehouseQuery]);
 
-  const handleAddClick = () => {
-    setEditingId(null);
-    setFormData(INITIAL_FORM);
+  const selectedItem = stockItems.find(item => item.id === formData.stockItemId);
+  const selectedLocation = activeLocations.find(location => location.id === formData.warehouseLocationId);
+  const selectedEvent = EVENT_OPTIONS.find(option => option.value === formData.eventKind) || EVENT_OPTIONS[0];
+  const selectedLevel = levels.find(level => !level.isDeleted && level.stockItemId === formData.stockItemId && level.warehouseLocationId === formData.warehouseLocationId);
+  const systemQuantity = Number(selectedLevel?.quantityOnHand || 0);
+  const reservedQuantity = Number(selectedLevel?.quantityReserved || 0);
+  const enteredQuantity = Number(formData.quantity || 0);
+  const quantityChange = selectedEvent.direction === 'COUNT'
+    ? InventoryService.calculateCountVariance(systemQuantity, enteredQuantity)
+    : selectedEvent.direction === 'IN' ? enteredQuantity : -enteredQuantity;
+  const resultingQuantity = systemQuantity + quantityChange;
+  const estimatedUnitCost = Number(selectedItem?.standardCost || selectedItem?.costPrice || 0);
+  const estimatedValue = Math.abs(quantityChange) * estimatedUnitCost;
+
+  const filteredAdjustments = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+    return activeAdjustments.filter(adjustment => {
+      const item = stockItems.find(value => value.id === adjustment.stockItemId);
+      const location = activeLocations.find(value => value.id === adjustment.warehouseLocationId);
+      const matchesSearch = !search || [adjustment.adjustmentNumber, item?.code, item?.name, location?.code, location?.name, adjustment.reason]
+        .filter(Boolean).join(' ').toLowerCase().includes(search);
+      const matchesPosting = postingFilter === 'ALL'
+        || (postingFilter === 'POSTED' && Boolean(adjustment.journalEntryId) && !adjustment.reversedAt)
+        || (postingFilter === 'REVERSED' && Boolean(adjustment.reversedAt));
+      const recordDate = String(adjustment.postingDate || adjustment.createdAt).slice(0, 7);
+      const matchesDate = dateFilter === 'ALL' || recordDate === today().slice(0, 7);
+      return matchesSearch && matchesPosting && matchesDate && (typeFilter === 'ALL' || eventForAdjustment(adjustment.adjustmentType) === typeFilter);
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [activeAdjustments, activeLocations, dateFilter, postingFilter, searchTerm, stockItems, typeFilter]);
+
+  const validate = () => {
+    if (!formData.stockItemId) return 'Select a stock item.';
+    if (!formData.warehouseLocationId) return 'Select a warehouse.';
+    if (!Number.isFinite(enteredQuantity) || enteredQuantity < 0) return 'Enter a valid quantity.';
+    if (selectedEvent.direction !== 'COUNT' && enteredQuantity <= 0) return 'Quantity must be greater than zero.';
+    if (selectedEvent.direction === 'COUNT' && quantityChange === 0) return 'The counted quantity matches the system quantity; no adjustment is required.';
+    if (quantityChange < 0 && resultingQuantity < 0) return `Only ${systemQuantity.toLocaleString()} ${selectedItem?.unitOfMeasure || 'units'} are on hand.`;
+    if (!formData.postingDate) return 'Posting date is required.';
+    if (!formData.reason.trim()) return 'Enter a reason for the adjustment.';
+    return null;
+  };
+
+  const startAdjustment = (itemId = '', warehouseLocationId = '') => {
+    requestIdRef.current = crypto.randomUUID();
+    setFormData({ ...INITIAL_FORM, stockItemId: itemId, warehouseLocationId });
+    setItemQuery(''); setWarehouseQuery('');
+    setReviewing(false);
     setError(null);
     setShowForm(true);
   };
 
-  const handleEditClick = (adj: StockAdjustment) => {
-    setEditingId(adj.id);
-    setFormData({
-      stockItemId: adj.stockItemId,
-      warehouseLocationId: adj.warehouseLocationId,
-      adjustmentType: adj.adjustmentType,
-      quantity: String(adj.quantity ?? ''),
-      reason: adj.reason || '',
-      notes: adj.notes || '',
-    });
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
-    setShowForm(true);
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData(INITIAL_FORM);
-    setError(null);
-  };
-
-  const validateForm = (): boolean => {
-    if (!formData.stockItemId) {
-      setError('Item is required');
-      return false;
-    }
-    if (!formData.warehouseLocationId) {
-      setError('Warehouse location is required');
-      return false;
-    }
-    const quantity = Number(formData.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      setError('Quantity must be greater than zero');
-      return false;
-    }
-    if (!formData.reason.trim()) {
-      setError('Reason is required');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!validateForm()) {
-      return;
-    }
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
+    if (!reviewing) { setReviewing(true); return; }
 
     setSubmitting(true);
     try {
-      const payload = {
-        stockItemId: formData.stockItemId,
-        warehouseLocationId: formData.warehouseLocationId,
-        adjustmentType: formData.adjustmentType,
-        quantity: Number(formData.quantity),
-        reason: formData.reason.trim(),
-        notes: formData.notes.trim(),
+      await onAdd({
+        orgId: organization?.id || '', adjustmentNumber: '', stockItemId: formData.stockItemId,
+        warehouseLocationId: formData.warehouseLocationId, adjustmentType: selectedEvent.adjustmentType,
+        quantity: enteredQuantity, quantityChange, expectedQuantity: systemQuantity,
+        countedQuantity: selectedEvent.direction === 'COUNT' ? enteredQuantity : undefined,
+        postingDate: formData.postingDate, reason: formData.reason.trim(), notes: formData.notes.trim(),
         isApproved: true,
-      };
-
-      if (editingId) {
-        await onUpdate(editingId, payload);
-        setSuccess('Adjustment updated successfully');
-      } else {
-        await onAdd(payload);
-        setSuccess('Adjustment recorded successfully');
-      }
-
-      setShowForm(false);
-      setEditingId(null);
-      setFormData(INITIAL_FORM);
-
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'An error occurred';
-      setError(message);
-      console.error('Error saving adjustment:', err);
-    } finally {
-      setSubmitting(false);
-    }
+        requestId: requestIdRef.current,
+      } as Omit<StockAdjustment, 'id' | 'createdAt' | 'updatedAt'>);
+      setSuccess('Adjustment and balanced journal entry posted successfully.');
+      setShowForm(false); setReviewing(false); setFormData(INITIAL_FORM);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Inventory posting failed.');
+    } finally { setSubmitting(false); }
   };
 
-  const handleDeleteClick = async (id: string) => {
-    if (deleting === id) {
-      setDeleting(null);
-      setSubmitting(true);
-      try {
-        await onDelete(id);
-        setSuccess('Adjustment deleted successfully');
-        setTimeout(() => setSuccess(null), 3000);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to delete adjustment';
-        setError(message);
-        console.error('Error deleting adjustment:', err);
-      } finally {
-        setSubmitting(false);
-      }
-    } else {
-      setDeleting(id);
-    }
-  };
-
-  const handlePostToGL = async (adj: StockAdjustment) => {
-    if (!onPostGL || accounts.length === 0) {
-      setError('GL posting not configured. Please provide accounts and onPostGL callback.');
-      return;
-    }
-
-    const item = items.find(i => i.id === adj.stockItemId);
-    if (!item) {
-      setError('Item not found for this adjustment.');
-      return;
-    }
-
-    setPostingGL(adj.id);
+  const submitReversal = async () => {
+    if (!reversing || !onReverse) return;
+    if (!reversalDate || !reversalReason.trim()) { setError('Reversal date and reason are required.'); return; }
+    setSubmitting(true); setError(null);
     try {
-      const glEntry = InventoryGLService.createAdjustmentEntry(adj, item, accounts, adj.orgId, currentUserId || 'system');
-      
-      if (!glEntry) {
-        setError('GL entry creation failed. Please ensure required GL accounts are configured (Inventory, Variance).');
-        return;
-      }
-
-      await onPostGL(glEntry.entry, glEntry.lines, adj.id);
-      setSuccess(`Adjustment GL entry posted successfully (${glEntry.entry.reference})`);
-      await onUpdate(adj.id, { journalEntryId: `je-adj-${adj.id}` });
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to post GL entry';
-      setError(message);
-      console.error('Error posting GL entry:', err);
-    } finally {
-      setPostingGL(null);
-    }
+      await onReverse(reversing.id, reversalDate, reversalReason.trim());
+      setSuccess(`Adjustment ${reversing.adjustmentNumber} was reversed with a linked Inventory transaction.`);
+      setReversing(null); setReversalReason(''); setReversalDate(today());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Inventory reversal failed.');
+    } finally { setSubmitting(false); }
   };
 
-  const activeAdjustments = useMemo(() => adjustments.filter((adj) => !adj.isDeleted), [adjustments]);
-
-  const filteredAdjustments = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
-    return activeAdjustments
-      .filter((adj) => {
-        const item = stockItems.find((i) => i.id === adj.stockItemId);
-        const location = activeLocations.find((l) => l.id === adj.warehouseLocationId);
-        const searchableText = [
-          item?.code || '',
-          item?.name || '',
-          location?.code || '',
-          location?.name || '',
-          adj.reason || '',
-          adj.notes || '',
-        ].join(' ').toLowerCase();
-
-        const matchesSearch = normalizedSearch === '' || searchableText.includes(normalizedSearch);
-        const matchesType = typeFilter === 'ALL' || adj.adjustmentType === typeFilter;
-        const matchesApproval = approvalFilter === 'ALL'
-          || (approvalFilter === 'APPROVED' && adj.isApproved)
-          || (approvalFilter === 'PENDING' && !adj.isApproved);
-
-        return matchesSearch && matchesType && matchesApproval;
-      })
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [activeAdjustments, stockItems, activeLocations, searchTerm, typeFilter, approvalFilter]);
-
-  const hasActiveFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || approvalFilter !== 'ALL';
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'DAMAGE':
-        return 'bg-red-100 text-red-800';
-      case 'WRITEOFF':
-        return 'bg-orange-100 text-orange-800';
-      case 'CORRECTION':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const hasFilters = searchTerm.trim() !== '' || typeFilter !== 'ALL' || postingFilter !== 'ALL' || dateFilter !== 'ALL';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="space-y-6 pb-20 animate-in fade-in duration-300">
+      <header className="flex flex-col gap-4 border-b border-gray-200 pb-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800 tracking-tight">Stock Adjustments</h2>
-          <p className="text-sm text-gray-500 font-normal italic">Record inventory variances, damage, and write-offs.</p>
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400"><ShieldCheck size={15} style={{ color: brandColor }} /> Inventory control</div>
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Count & Adjust</h2>
+          <p className="mt-1 text-sm text-gray-500">Record what physically happened. Inventory and accounting post together.</p>
         </div>
-        <div className="flex gap-3">
-           {!showForm && (
-            <button
-              onClick={handleAddClick}
-              disabled={isLoading || submitting}
-              className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded font-semibold text-xs uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-brand/20 hover:bg-brand-hover hover:-translate-y-0.5"
-            >
-              <Plus className="w-4 h-4" />
-              New Adjustment
-            </button>
-           )}
-        </div>
+        {!showForm && <button onClick={() => startAdjustment()} disabled={isLoading || submitting} className="inline-flex items-center justify-center gap-2 rounded px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50" style={{ backgroundColor: brandColor }}><Plus size={17} /> New count or adjustment</button>}
       </header>
 
-      {/* Notifications */}
-      <div className="space-y-4">
-        {error && (
-          <div className="p-4 bg-rose-50 border-2 border-rose-100 rounded flex items-center justify-between gap-3 animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-3">
-               <AlertCircle className="text-rose-600" size={20} />
-               <p className="text-sm font-semibold text-rose-800 uppercase tracking-tight">{error}</p>
-            </div>
-            <button onClick={() => setError(null)} className="p-1.5 hover:bg-rose-100 rounded-lg text-rose-500 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+      {error && <Notice tone="error" text={error} onClose={() => setError(null)} />}
+      {success && <Notice tone="success" text={success} onClose={() => setSuccess(null)} />}
 
-        {success && (
-          <div className="p-4 bg-emerald-50 border-2 border-emerald-100 rounded flex items-center justify-between gap-3 animate-in slide-in-from-top-2">
-             <div className="flex items-center gap-3">
-               <Check className="text-emerald-600" size={20} />
-               <p className="text-sm font-semibold text-emerald-800 uppercase tracking-tight">{success}</p>
-             </div>
-             <button onClick={() => setSuccess(null)} className="p-1.5 hover:bg-emerald-100 rounded-lg text-emerald-500 transition-colors">
-               <X className="w-4 h-4" />
-             </button>
-          </div>
-        )}
-      </div>
+      {!showForm && <section className="grid gap-3 md:grid-cols-4">
+        <Metric label="Posted adjustments" value={activeAdjustments.length.toLocaleString()} icon={<History size={18} />} />
+        <Metric label="Count variances" value={activeAdjustments.filter(value => value.adjustmentType === 'PHYSICAL_COUNT').length.toLocaleString()} icon={<ClipboardCheck size={18} />} />
+        <Metric label="Stock increases" value={activeAdjustments.filter(value => value.quantityChange > 0).length.toLocaleString()} icon={<ArrowUp size={18} />} positive />
+        <Metric label="Stock decreases" value={activeAdjustments.filter(value => value.quantityChange < 0).length.toLocaleString()} icon={<ArrowDown size={18} />} negative />
+      </section>}
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm relative overflow-hidden group">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Adjustments</p>
-          <div className="flex items-end justify-between">
-            <p className="text-xl font-semibold text-gray-800 tracking-tight">{activeAdjustments.length}</p>
-            <BookOpen className="text-gray-200 group-hover:scale-110 transition-transform" size={40} />
-          </div>
+      {showForm && <form onSubmit={handleSubmit} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4">
+          <div><p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: brandColor }}>{reviewing ? 'Step 2 of 2 · Review' : 'Step 1 of 2 · Physical event'}</p><h3 className="mt-1 text-lg font-semibold text-gray-900">{reviewing ? 'Confirm the impact' : 'What happened to the stock?'}</h3></div>
+          <button type="button" onClick={() => { setShowForm(false); setReviewing(false); }} className="rounded p-2 text-gray-400 hover:bg-white hover:text-gray-700" aria-label="Close adjustment form"><X size={19} /></button>
         </div>
-        <div className="bg-rose-50 p-6 rounded border border-rose-100 shadow-sm">
-           <p className="text-xs font-semibold text-rose-800 uppercase tracking-wide mb-1">Write-Offs / Damages</p>
-           <p className="text-xl font-semibold text-rose-600 tracking-tight">
-             {activeAdjustments.filter(a => a.adjustmentType === 'WRITEOFF' || a.adjustmentType === 'DAMAGE').length}
-           </p>
-        </div>
-        <div className="bg-amber-50 p-6 rounded border border-amber-100 shadow-sm">
-           <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">Pending GL Posting</p>
-           <p className="text-xl font-semibold text-amber-600 tracking-tight">
-             {activeAdjustments.filter(a => !a.journalEntryId).length}
-           </p>
-        </div>
-        <div className="bg-white p-6 rounded border border-gray-200 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Units (Net Change)</p>
-          <p className="text-xl font-semibold text-gray-800 tracking-tight leading-none pt-1">
-            {activeAdjustments.reduce((sum, a) => sum + (a.adjustmentType === 'RECEIPT' || (a.adjustmentType === 'CORRECTION' && a.quantity > 0) ? a.quantity : -a.quantity), 0).toFixed(0)}
-          </p>
-        </div>
-      </div>
 
-       {/* Form Overlay (Institutional Standard) */}
-       {showForm && (
-        <div className="bg-white rounded-md border-2 border-orange-100 shadow-sm overflow-hidden animate-in zoom-in-95 duration-200">
-           <div className="p-8 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-800 uppercase tracking-tight">{editingId ? 'Edit Stock Adjustment' : 'Record Physical Variance'}</h3>
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-wide mt-1 italic">Authorized personal only â€¢ Document #ADJ-{Date.now().toString().slice(-4)}</p>
-              </div>
-              <button onClick={handleCancel} className="p-2.5 bg-white rounded shadow-sm text-gray-400 hover:text-gray-600 transition-all border border-gray-100"><X size={20} /></button>
-           </div>
-           
-           <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Reference SKU *</label>
-                    <select
-                      value={formData.stockItemId}
-                      onChange={(e) => setFormData({ ...formData, stockItemId: e.target.value })}
-                      disabled={submitting}
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800"
-                    >
-                      <option value="">Select an item...</option>
-                      {stockItems.map((item) => (
-                        <option key={item.id} value={item.id}>[{item.code}] {item.name}</option>
-                      ))}
-                    </select>
-                 </div>
+        {!reviewing ? <div className="space-y-6 p-5 md:p-7">
+          <fieldset><legend className="mb-3 text-sm font-semibold text-gray-800">Choose the event</legend><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {EVENT_OPTIONS.map(option => <label key={option.value} className={`cursor-pointer rounded-lg border p-4 transition ${formData.eventKind === option.value ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'border-gray-200 hover:border-gray-300'}`}>
+              <input type="radio" className="sr-only" name="eventKind" value={option.value} checked={formData.eventKind === option.value} onChange={() => setFormData(current => ({ ...current, eventKind: option.value, quantity: '' }))} />
+              <span className="text-sm font-semibold text-gray-900">{option.label}</span><span className="mt-1 block text-xs leading-5 text-gray-500">{option.description}</span>
+            </label>)}
+          </div></fieldset>
 
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Warehouse Zone *</label>
-                    <select
-                      value={formData.warehouseLocationId}
-                      onChange={(e) => setFormData({ ...formData, warehouseLocationId: e.target.value })}
-                      disabled={submitting}
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800"
-                    >
-                      <option value="">Select a location...</option>
-                      {activeLocations.map((loc) => (
-                        <option key={loc.id} value={loc.id}>[{loc.code}] {loc.name}</option>
-                      ))}
-                    </select>
-                 </div>
-
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Adjustment Type *</label>
-                    <select
-                      value={formData.adjustmentType}
-                      onChange={(e) => setFormData({ ...formData, adjustmentType: e.target.value as any })}
-                      disabled={submitting}
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800 uppercase"
-                    >
-                      {ADJUSTMENT_TYPES.map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                 </div>
-
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Quantity Variance *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      inputMode="decimal"
-                      placeholder="Enter quantity"
-                      value={formData.quantity}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                      disabled={submitting}
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800 font-mono"
-                    />
-                 </div>
-
-                 <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Primary Justification *</label>
-                    <input
-                      type="text"
-                      value={formData.reason}
-                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                      disabled={submitting}
-                      placeholder="Enter legal justification for stock variance..."
-                      className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800"
-                    />
-                 </div>
-
-                 <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Internal Notes</label>
-                    <textarea
-                       value={formData.notes || ''}
-                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                       disabled={submitting}
-                       placeholder="Additional details for audit trail..."
-                       rows={3}
-                       className="w-full px-5 py-3.5 bg-gray-50 border-2 border-transparent rounded outline-none focus:border-orange-400/20 focus:bg-white transition-all text-sm font-semibold text-gray-800 resize-none"
-                    />
-                 </div>
-
-                 <div className="md:col-span-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
-                   Committing posts an immutable inventory-ledger movement and its balanced journal entry. Corrections must be entered as a new reversing adjustment.
-                 </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-8 py-3.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors"
-                >
-                  Discard
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-3.5 bg-[#F47721] text-white rounded font-semibold text-xs uppercase tracking-wide shadow-sm shadow-gray-300/30 hover:bg-[#E06610] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {submitting ? 'PROCESSING...' : 'COMMIT ADJUSTMENT'}
-                </button>
-              </div>
-           </form>
-        </div>
-      )}
-
-      {/* Filter & List Bar */}
-      {!showForm && (
-        <div className="bg-white border-y px-4 py-2 no-print">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer group w-full max-w-md">
-              <Search size={14} className="text-gray-400 mr-2" />
-              <input
-                type="text"
-                placeholder="Search adjustments..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
-              />
-            </div>
-
-            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
-              <span className="text-[13px] text-gray-500 mr-1">Type:</span>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as 'ALL' | typeof ADJUSTMENT_TYPES[number])}
-                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
-              >
-                <option value="ALL">All</option>
-                {ADJUSTMENT_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
-            </div>
-
-            <div className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors">
-              <span className="text-[13px] text-gray-500 mr-1">Approval:</span>
-              <select
-                value={approvalFilter}
-                onChange={(e) => setApprovalFilter(e.target.value as 'ALL' | 'APPROVED' | 'PENDING')}
-                className="bg-transparent border-none outline-none text-[13px] font-bold text-gray-800 pr-4 appearance-none cursor-pointer max-w-[170px]"
-              >
-                <option value="ALL">All</option>
-                <option value="APPROVED">Approved</option>
-                <option value="PENDING">Pending</option>
-              </select>
-              <ChevronDown size={14} className="text-gray-400 absolute right-2 pointer-events-none" />
-            </div>
-
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setTypeFilter('ALL');
-                setApprovalFilter('ALL');
-              }}
-              className={`p-2 transition-colors ${hasActiveFilters ? 'text-brand hover:text-brand' : 'text-gray-400 hover:text-brand'}`}
-              title="Clear all filters"
-            >
-              <RotateCcw size={16} />
-            </button>
-
-            <div className="ml-auto text-xs text-gray-500">
-              Showing <span className="font-semibold text-gray-700">{filteredAdjustments.length}</span> of {activeAdjustments.length} adjustments
-            </div>
-
-            <button
-              onClick={() => {
-                const exportData = filteredAdjustments.map(adj => {
-                  const item = stockItems.find(i => i.id === adj.stockItemId);
-                  const location = activeLocations.find(l => l.id === adj.warehouseLocationId);
-                  return {
-                    Date: new Date(adj.createdAt).toLocaleDateString(),
-                    Code: item?.code || 'N/A',
-                    Item: item?.name || 'N/A',
-                    Location: location?.name || 'N/A',
-                    Type: adj.adjustmentType,
-                    Qty: adj.quantity,
-                    Reason: adj.reason,
-                    Posted: adj.journalEntryId ? 'Yes' : 'No'
-                  };
-                });
-                DataExportService.exportToCSV(exportData, `Stock_Adjustments_${new Date().toISOString().split('T')[0]}.csv`);
-              }}
-              className="flex items-center gap-2 h-9 px-3 bg-white text-gray-700 rounded border border-gray-200 hover:bg-gray-50 transition-colors text-[13px] font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={filteredAdjustments.length === 0}
-            >
-              <Download size={14} />
-              Export
-            </button>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-2"><input aria-label="Find SKU" value={itemQuery} onChange={event => setItemQuery(event.target.value)} placeholder="Find by code, name, barcode, or unit…" className="h-9 w-full rounded border border-gray-200 px-3 text-xs outline-none focus:border-brand" /><Field label="Stock item" required><select value={formData.stockItemId} onChange={event => { const itemId = event.target.value; const item = stockItems.find(value => value.id === itemId); setFormData(current => ({ ...current, stockItemId: itemId, warehouseLocationId: item?.defaultWarehouseId || item?.warehouseLocationId || current.warehouseLocationId })); }}><option value="">Select item…</option>{selectableItems.map(item => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}</select></Field></div>
+            <div className="space-y-2"><input aria-label="Find warehouse" value={warehouseQuery} onChange={event => setWarehouseQuery(event.target.value)} placeholder="Find warehouse by code or name…" className="h-9 w-full rounded border border-gray-200 px-3 text-xs outline-none focus:border-brand" /><Field label="Warehouse" required><select value={formData.warehouseLocationId} onChange={event => setFormData(current => ({ ...current, warehouseLocationId: event.target.value }))}><option value="">Select warehouse…</option>{selectableLocations.map(location => <option key={location.id} value={location.id}>{location.code} — {location.name}</option>)}</select></Field></div>
           </div>
+
+          {selectedItem && selectedLocation && <div className="grid gap-px overflow-hidden rounded-lg border border-gray-200 bg-gray-200 sm:grid-cols-3"><StockFact label="On hand" value={`${systemQuantity.toLocaleString()} ${selectedItem.unitOfMeasure}`} /><StockFact label="Reserved" value={`${reservedQuantity.toLocaleString()} ${selectedItem.unitOfMeasure}`} /><StockFact label="Available" value={`${(systemQuantity - reservedQuantity).toLocaleString()} ${selectedItem.unitOfMeasure}`} /></div>}
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field label={selectedEvent.direction === 'COUNT' ? 'Quantity physically counted' : 'Quantity affected'} required hint={selectedItem?.unitOfMeasure ? `Unit: ${selectedItem.unitOfMeasure}` : undefined}><input type="number" min="0" step="any" inputMode="decimal" value={formData.quantity} onChange={event => setFormData(current => ({ ...current, quantity: event.target.value }))} /></Field>
+            <Field label="Posting date" required hint="Must fall in an open accounting period."><input type="date" value={formData.postingDate} onChange={event => setFormData(current => ({ ...current, postingDate: event.target.value }))} /></Field>
+          </div>
+          <Field label="Reason" required><input value={formData.reason} maxLength={240} placeholder="Briefly explain why this happened" onChange={event => setFormData(current => ({ ...current, reason: event.target.value }))} /></Field>
+          <Field label="Notes" hint="Optional audit details, count sheet reference, or supervisor note."><textarea rows={3} value={formData.notes} onChange={event => setFormData(current => ({ ...current, notes: event.target.value }))} /></Field>
+        </div> : <div className="space-y-6 p-5 md:p-7">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <section className="rounded-xl border border-gray-200 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Inventory impact</p><div className="mt-4 space-y-3 text-sm">
+              <ReviewRow label="Event" value={selectedEvent.label} /><ReviewRow label="Item" value={`${selectedItem?.code} — ${selectedItem?.name}`} /><ReviewRow label="Warehouse" value={`${selectedLocation?.code} — ${selectedLocation?.name}`} /><ReviewRow label="Current quantity" value={`${systemQuantity.toLocaleString()} ${selectedItem?.unitOfMeasure || ''}`} />
+              {selectedEvent.direction === 'COUNT' && <ReviewRow label="Counted quantity" value={`${enteredQuantity.toLocaleString()} ${selectedItem?.unitOfMeasure || ''}`} />}
+              <ReviewRow label="Change" value={`${quantityChange > 0 ? '+' : ''}${quantityChange.toLocaleString()} ${selectedItem?.unitOfMeasure || ''}`} tone={quantityChange > 0 ? 'positive' : 'negative'} /><ReviewRow label="Quantity after posting" value={`${resultingQuantity.toLocaleString()} ${selectedItem?.unitOfMeasure || ''}`} strong />
+            </div></section>
+            <section className="rounded-xl border border-gray-200 bg-slate-950 p-5 text-white"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Accounting preview</p><p className="mt-3 text-sm text-slate-300">The server uses the item's Inventory Class and valuation method. Users cannot override the accounts.</p><div className="mt-5 space-y-3 text-sm">
+              <ReviewRow dark label="Debit" value={quantityChange > 0 ? 'Inventory Asset' : ['DAMAGE', 'LOST', 'EXPIRED'].includes(selectedEvent.adjustmentType) ? 'Write-off Expense' : 'Inventory Adjustment'} /><ReviewRow dark label="Credit" value={quantityChange > 0 ? 'Inventory Adjustment' : 'Inventory Asset'} /><ReviewRow dark label="Estimated value" value={`${currency} ${estimatedValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} strong /><ReviewRow dark label="Posting date" value={formData.postingDate} />
+            </div><p className="mt-5 border-t border-slate-800 pt-4 text-xs leading-5 text-slate-400">Final cost and accounts are validated during atomic posting. A failure creates no partial stock or journal records.</p></section>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Posting is permanent. If it is wrong, use the linked <strong>Reverse</strong> action instead of editing or deleting it.</div>
+        </div>}
+
+        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end"><button type="button" onClick={() => reviewing ? setReviewing(false) : setShowForm(false)} className="rounded border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100">{reviewing ? 'Back to details' : 'Cancel'}</button><button type="submit" disabled={submitting} className="rounded px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: brandColor }}>{submitting ? 'Posting…' : reviewing ? 'Approve and post' : 'Review impact'}</button></div>
+      </form>}
+
+      {!showForm && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 p-4">
+          <div className="relative min-w-[240px] flex-1 sm:max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} /><input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search item, warehouse, reason…" className="h-10 w-full rounded border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-brand" /></div>
+          <div className="relative"><select value={typeFilter} onChange={event => setTypeFilter(event.target.value as 'ALL' | EventKind)} className="h-10 appearance-none rounded border border-gray-200 bg-white pl-3 pr-9 text-sm font-medium outline-none focus:border-brand"><option value="ALL">All events</option>{EVENT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} /></div>
+          <div className="relative"><select aria-label="Posting status" value={postingFilter} onChange={event => setPostingFilter(event.target.value as 'ALL' | 'POSTED' | 'REVERSED')} className="h-10 appearance-none rounded border border-gray-200 bg-white pl-3 pr-9 text-sm font-medium outline-none focus:border-brand"><option value="ALL">All posting statuses</option><option value="POSTED">Posted</option><option value="REVERSED">Reversed</option></select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} /></div>
+          <button type="button" onClick={() => setDateFilter(current => current === 'THIS_MONTH' ? 'ALL' : 'THIS_MONTH')} className={`h-10 rounded border px-3 text-sm font-semibold ${dateFilter === 'THIS_MONTH' ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 text-gray-600'}`}>This month</button>
+          <button onClick={() => { setSearchTerm(''); setTypeFilter('ALL'); setPostingFilter('ALL'); setDateFilter('ALL'); }} disabled={!hasFilters} className="rounded p-2.5 text-gray-500 hover:bg-gray-100 disabled:opacity-30" title="Clear filters"><RotateCcw size={16} /></button>
+          <button onClick={() => DataExportService.exportToCSV(filteredAdjustments.map(adjustment => { const item = stockItems.find(value => value.id === adjustment.stockItemId); const location = activeLocations.find(value => value.id === adjustment.warehouseLocationId); return { Number: adjustment.adjustmentNumber, Date: adjustment.postingDate || adjustment.createdAt, ItemCode: item?.code || '', Item: item?.name || '', Warehouse: location?.name || '', Type: adjustment.adjustmentType, QuantityChange: adjustment.quantityChange, Reason: adjustment.reason, JournalEntry: adjustment.journalEntryId || '' }; }), `Inventory_Adjustments_${today()}.csv`)} disabled={!filteredAdjustments.length} className="inline-flex h-10 items-center gap-2 rounded border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"><Download size={15} /> Export</button>
         </div>
-      )}
+        {isLoading ? <div className="p-12 text-center text-sm text-gray-500">Loading Inventory adjustments…</div> : filteredAdjustments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Reference</th><th className="px-4 py-3 text-left">Item and warehouse</th><th className="px-4 py-3 text-left">Event</th><th className="px-4 py-3 text-right">Change</th><th className="px-4 py-3 text-left">Reason</th><th className="px-4 py-3 text-left">Accounting</th><th className="px-4 py-3 text-right">Action</th></tr></thead><tbody className="divide-y divide-gray-100">
+          {filteredAdjustments.map(adjustment => { const item = stockItems.find(value => value.id === adjustment.stockItemId); const location = activeLocations.find(value => value.id === adjustment.warehouseLocationId); return <tr key={adjustment.id} className="align-top hover:bg-gray-50">
+            <td className="px-4 py-3"><p className="font-mono text-xs font-semibold text-gray-800">{adjustment.adjustmentNumber}</p><p className="mt-1 text-xs text-gray-500">{new Date(adjustment.postingDate || adjustment.createdAt).toLocaleDateString()}</p></td>
+            <td className="px-4 py-3"><p className="font-semibold text-gray-900">{item?.code} · {item?.name}</p><p className="mt-1 text-xs text-gray-500">{location?.code} — {location?.name}</p></td>
+            <td className="px-4 py-3"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">{EVENT_OPTIONS.find(value => value.value === eventForAdjustment(adjustment.adjustmentType))?.label}</span></td>
+            <td className={`px-4 py-3 text-right font-mono font-semibold ${adjustment.quantityChange > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{adjustment.quantityChange > 0 ? '+' : ''}{Number(adjustment.quantityChange).toLocaleString()} {item?.unitOfMeasure}</td>
+            <td className="max-w-[260px] px-4 py-3 text-gray-600">{adjustment.reason}</td>
+            <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${adjustment.journalEntryId ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{adjustment.journalEntryId ? <Check size={12} /> : <AlertCircle size={12} />}{adjustment.journalEntryId ? 'Posted with journal' : 'Posting incomplete'}</span></td>
+            <td className="px-4 py-3 text-right">{adjustment.reversedAt ? <span className="text-xs font-semibold text-gray-400">Reversed</span> : adjustment.journalEntryId && onReverse ? <button onClick={() => { setReversing(adjustment); setError(null); }} className="inline-flex items-center gap-1.5 rounded border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"><Undo2 size={14} /> Reverse</button> : null}</td>
+          </tr>; })}
+        </tbody></table></div> : <div className="p-14 text-center"><PackageSearch className="mx-auto text-gray-300" size={38} /><p className="mt-3 font-semibold text-gray-700">No adjustments found</p><p className="mt-1 text-sm text-gray-500">{hasFilters ? 'Clear the filters to see more records.' : 'Start with a physical count or stock event.'}</p></div>}
+      </section>}
 
-      {/* List Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#F47721] rounded-full animate-spin"></div>
-            <p className="mt-2 text-gray-600">Loading adjustments...</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full font-sans">
-              <thead className="bg-brand border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Item</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Location</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Type</th>
-                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Quantity</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Reason</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">Approval</th>
-                  <th className="px-4 py-3 text-left text-[13px] font-bold text-white">GL Status</th>
-                  <th className="px-4 py-3 text-right text-[13px] font-bold text-white">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredAdjustments.length > 0 ? filteredAdjustments.map((adj) => {
-                  const item = stockItems.find((i) => i.id === adj.stockItemId);
-                  const location = activeLocations.find((l) => l.id === adj.warehouseLocationId);
-
-                  return (
-                    <tr key={adj.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-4 py-3 text-sm">
-                        <div className="font-medium text-gray-900">{item?.code}</div>
-                        <div className="text-xs text-gray-600">{item?.name}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {location?.code} - {location?.name}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getTypeColor(adj.adjustmentType)}`}>
-                          {adj.adjustmentType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">
-                        {adj.quantity} {item?.unitOfMeasure}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {adj.reason}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                            adj.isApproved
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
-                        >
-                          {adj.isApproved ? 'Approved' : 'Pending'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {adj.journalEntryId ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                            <Check className="w-3 h-3" />
-                            Posted
-                          </span>
-                        ) : adj.isApproved ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
-                            <AlertCircle className="w-3 h-3" />
-                            Ready
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-500">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {adj.isApproved && !adj.journalEntryId && onPostGL && (
-                            <button
-                              onClick={() => handlePostToGL(adj)}
-                              disabled={submitting || postingGL === adj.id}
-                              className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="Post to GL"
-                            >
-                              {postingGL === adj.id ? <div className="w-4 h-4 border-2 border-brand-light border-t-gray-500 rounded-full animate-spin" /> : <BookOpen className="w-4 h-4" />}
-                            </button>
-                          )}
-                          {adj.journalEntryId && (
-                            <div className="flex items-center gap-1 text-xs text-green-600 px-2 py-1 bg-green-50 rounded">
-                              <Check className="w-3 h-3" />
-                              GL Posted
-                            </div>
-                          )}
-                          {!adj.isApproved && (
-                            <>
-                              <button
-                                onClick={() => handleEditClick(adj)}
-                                disabled={submitting}
-                                className="p-2 hover:bg-brand-light text-gray-400 hover:text-brand rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteClick(adj.id)}
-                                disabled={submitting}
-                                className={`p-2 rounded transition-colors ${
-                                  deleting === adj.id
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'hover:bg-red-50 text-red-600 hover:text-red-700'
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                title={deleting === adj.id ? 'Click again to confirm' : 'Delete'}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }) : (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                      <BookOpen size={40} className="mx-auto mb-2 text-gray-300" />
-                      {hasActiveFilters
-                        ? 'Try adjusting your search or filters.'
-                        : 'No adjustments recorded yet.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Summary Audit Footer */}
-        {!isLoading && filteredAdjustments.length > 0 && (
-           <div className="p-5 bg-gray-50 border-t border-gray-100 flex justify-between items-center no-print">
-               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm"><AlertCircle size={16} className="text-amber-500" /></div>
-                  <div>
-                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Integrity Check</p>
-                     <p className="text-xs font-bold text-gray-600">Representing {filteredAdjustments.length} physical count variance logs.</p>
-                  </div>
-               </div>
-               <div className="text-right">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-end gap-1.5"><Check size={12} className="text-brand" /> LOGISTICS_AUDIT_ENABLED</p>
-                  <p className="text-xs font-bold text-gray-300 italic mt-1 uppercase">Snapshot: {new Date().toLocaleString()}</p>
-               </div>
-           </div>
-        )}
-      </div>
+      {reversing && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><section role="dialog" aria-modal="true" aria-labelledby="reverse-title" className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="border-b border-gray-200 px-6 py-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-600">Linked correction</p><h3 id="reverse-title" className="mt-1 text-xl font-semibold text-gray-900">Reverse {reversing.adjustmentNumber}</h3><p className="mt-2 text-sm leading-6 text-gray-500">The original remains unchanged. The system creates an opposite Inventory movement and balanced journal entry using the original cost.</p></div>
+        <div className="space-y-5 p-6"><Field label="Reversal date" required hint="Must fall in an open accounting period."><input type="date" value={reversalDate} onChange={event => setReversalDate(event.target.value)} /></Field><Field label="Reason for reversal" required><textarea rows={3} value={reversalReason} maxLength={240} placeholder="Explain why the original posting must be reversed" onChange={event => setReversalReason(event.target.value)} /></Field></div>
+        <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4"><button onClick={() => setReversing(null)} disabled={submitting} className="rounded border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700">Cancel</button><button onClick={submitReversal} disabled={submitting} className="rounded bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{submitting ? 'Reversing…' : 'Confirm reversal'}</button></div>
+      </section></div>}
     </div>
   );
 };
 
-export default StockAdjustmentsView;
+const Field: React.FC<{ label: string; required?: boolean; hint?: string; children: React.ReactElement }> = ({ label, required, hint, children }) => <label className="block space-y-1.5"><span className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}{required ? ' *' : ''}</span>{React.cloneElement(children, { className: 'min-h-11 w-full rounded border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10' })}{hint && <span className="block text-xs text-gray-500">{hint}</span>}</label>;
+const StockFact: React.FC<{ label: string; value: string }> = ({ label, value }) => <div className="bg-gray-50 px-4 py-3"><p className="text-xs uppercase tracking-wide text-gray-400">{label}</p><p className="mt-1 font-mono text-sm font-semibold text-gray-900">{value}</p></div>;
+const ReviewRow: React.FC<{ label: string; value: string; tone?: 'positive' | 'negative'; strong?: boolean; dark?: boolean }> = ({ label, value, tone, strong, dark }) => <div className={`flex items-start justify-between gap-5 border-b pb-3 last:border-0 last:pb-0 ${dark ? 'border-slate-800' : 'border-gray-100'}`}><span className={dark ? 'text-slate-400' : 'text-gray-500'}>{label}</span><span className={`text-right ${strong ? 'font-semibold' : 'font-medium'} ${tone === 'positive' ? 'text-emerald-600' : tone === 'negative' ? 'text-rose-600' : dark ? 'text-white' : 'text-gray-900'}`}>{value}</span></div>;
+const Metric: React.FC<{ label: string; value: string; icon: React.ReactNode; positive?: boolean; negative?: boolean }> = ({ label, value, icon, positive, negative }) => <div className="rounded-lg border border-gray-200 bg-white p-4"><div className={`flex items-center justify-between ${positive ? 'text-emerald-600' : negative ? 'text-rose-600' : 'text-gray-400'}`}>{icon}<span className="text-2xl font-semibold text-gray-900">{value}</span></div><p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p></div>;
+const Notice: React.FC<{ tone: 'error' | 'success'; text: string; onClose: () => void }> = ({ tone, text, onClose }) => <div className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><div className="flex items-center gap-2">{tone === 'error' ? <AlertCircle size={17} /> : <Check size={17} />}<span className="font-medium">{text}</span></div><button onClick={onClose} className="rounded p-1 hover:bg-white/60" aria-label="Dismiss message"><X size={15} /></button></div>;
 
+export default StockAdjustmentsView;

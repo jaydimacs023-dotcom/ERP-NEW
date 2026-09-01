@@ -80,8 +80,11 @@ function requestedOrgId(actor: JwtPayload, body: any): string {
   return String(body.orgId || body.org_id || ownOrgId || "");
 }
 
+const READ_ROLES = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "AR_SPECIALIST", "AP_SPECIALIST", "AP_SUPERVISOR", "AUDITOR"]);
+const WRITE_ROLES = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "AR_SPECIALIST"]);
+
 function adjustmentValues(input: any, actorId: string) {
-  const type = ["DAMAGE", "DAMAGED", "LOST", "EXPIRED", "SHRINKAGE", "WRITEOFF", "ADJUSTMENT", "CORRECTION"].includes(input.adjustmentType)
+  const type = ["PHYSICAL_COUNT", "DAMAGE", "DAMAGED", "LOST", "EXPIRED", "SHRINKAGE", "WRITEOFF", "ADJUSTMENT", "CORRECTION"].includes(input.adjustmentType)
     ? input.adjustmentType
     : "ADJUSTMENT";
   const quantity = Math.abs(Number(input.quantity ?? input.quantityChange ?? 0));
@@ -117,6 +120,11 @@ Deno.serve(async (request) => {
   const body = await request.json().catch(() => ({}));
   const orgId = requestedOrgId(actor, body);
   if (!orgId) return json(403, { error: "Missing organization scope" });
+  const role = actorRole(actor);
+  if (!READ_ROLES.has(role)) return json(403, { error: "Inventory access is not permitted" });
+  if (!["list", "list_levels"].includes(String(body.action || "")) && !WRITE_ROLES.has(role)) {
+    return json(403, { error: "Inventory adjustment posting is not permitted for this role" });
+  }
 
   if (body.action === "list") {
     const { data, error } = await admin
@@ -160,22 +168,45 @@ Deno.serve(async (request) => {
 
   if (body.action === "create") {
     const values = adjustmentValues(body.adjustment || {}, actor.sub);
-    if (!values.stock_item_id || !values.warehouse_location_id || !values.quantity_change || !values.reason) {
+    const source = body.adjustment || {};
+    const countedQuantity = Number(source.countedQuantity ?? source.counted_quantity ?? source.quantity);
+    const hasValidQuantity = values.adjustment_type === "PHYSICAL_COUNT"
+      ? Number.isFinite(countedQuantity) && countedQuantity >= 0
+      : Boolean(values.quantity_change);
+    if (!values.stock_item_id || !values.warehouse_location_id || !hasValidQuantity || !values.reason) {
       return json(400, { error: "Item, warehouse, quantity, and reason are required" });
     }
-    const source = body.adjustment || {};
-    const { data: posting, error: postingError } = await admin.rpc("post_stock_adjustment", {
-      p_org_id: orgId,
-      p_stock_item_id: values.stock_item_id,
-      p_warehouse_location_id: values.warehouse_location_id,
-      p_adjustment_type: values.adjustment_type,
-      p_quantity: Math.abs(values.quantity_change),
-      p_unit_cost: Number(source.unitCost || source.unit_cost || 0),
-      p_posting_date: source.postingDate || source.posting_date || new Date().toISOString().slice(0, 10),
-      p_reason: values.reason,
-      p_notes: values.notes,
-      p_actor_id: actor.sub,
-    });
+    const requestId = String(source.requestId || source.request_id || crypto.randomUUID());
+    const rpcName = values.adjustment_type === "PHYSICAL_COUNT"
+      ? "post_inventory_count_idempotent"
+      : "post_stock_adjustment_idempotent";
+    const rpcArguments = values.adjustment_type === "PHYSICAL_COUNT"
+      ? {
+          p_org_id: orgId,
+          p_stock_item_id: values.stock_item_id,
+          p_warehouse_location_id: values.warehouse_location_id,
+          p_expected_quantity: Number(source.expectedQuantity ?? source.expected_quantity ?? 0),
+          p_counted_quantity: Number(source.countedQuantity ?? source.counted_quantity ?? source.quantity ?? 0),
+          p_posting_date: source.postingDate || source.posting_date || new Date().toISOString().slice(0, 10),
+          p_reason: values.reason,
+          p_notes: values.notes,
+          p_actor_id: actor.sub,
+          p_request_id: requestId,
+        }
+      : {
+          p_org_id: orgId,
+          p_stock_item_id: values.stock_item_id,
+          p_warehouse_location_id: values.warehouse_location_id,
+          p_adjustment_type: values.adjustment_type,
+          p_quantity: Math.abs(values.quantity_change),
+          p_unit_cost: Number(source.unitCost || source.unit_cost || 0),
+          p_posting_date: source.postingDate || source.posting_date || new Date().toISOString().slice(0, 10),
+          p_reason: values.reason,
+          p_notes: values.notes,
+          p_actor_id: actor.sub,
+          p_request_id: requestId,
+        };
+    const { data: posting, error: postingError } = await admin.rpc(rpcName, rpcArguments);
     if (postingError) return json(400, { error: postingError.message, code: postingError.code });
     const { data, error } = await admin
       .from("stock_adjustments")
@@ -188,6 +219,23 @@ Deno.serve(async (request) => {
 
   const id = String(body.id || "");
   if (!id) return json(400, { error: "Stock adjustment id is required" });
+
+  if (body.action === "reverse") {
+    const reason = String(body.reason || "").trim();
+    const reversalDate = String(body.reversalDate || body.reversal_date || "");
+    if (!reason || !reversalDate) {
+      return json(400, { error: "Reversal date and reason are required" });
+    }
+    const { data: posting, error } = await admin.rpc("reverse_inventory_adjustment", {
+      p_org_id: orgId,
+      p_adjustment_id: id,
+      p_reversal_date: reversalDate,
+      p_reason: reason,
+      p_actor_id: actor.sub,
+    });
+    if (error) return json(400, { error: error.message, code: error.code });
+    return json(200, { reversal: posting });
+  }
 
   if (body.action === "update") {
     const { data: existing } = await admin

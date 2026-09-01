@@ -4065,6 +4065,7 @@ export class SupabaseDataService implements IDataService {
       ...adjustment,
       quantity: Math.abs(Number(adjustment.quantityChange || 0)),
       isApproved: Boolean(adjustment.approvalDate),
+      isReversed: Boolean(adjustment.reversedAt || adjustment.reversalTransactionId),
       adjustmentType: adjustment.adjustmentType || 'ADJUSTMENT',
     };
   }
@@ -4162,6 +4163,10 @@ export class SupabaseDataService implements IDataService {
   async deleteStockAdjustment(id: string): Promise<void> {
     console.debug('[Supabase] deleteStockAdjustment called with id:', id);
     await this.stockAdjustmentRequest('delete', { id });
+  }
+
+  async reverseStockAdjustment(id: string, reversalDate: string, reason: string): Promise<any> {
+    return this.stockAdjustmentRequest('reverse', { id, reversalDate, reason });
   }
 
   async getStockAdjustmentsByOrg(orgId: string): Promise<any[]> {

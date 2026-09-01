@@ -165,6 +165,16 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
       setError('Reorder and safety quantities must be valid numbers of zero or greater');
       return false;
     }
+    const standardCost = formData.standardCost.trim() === '' ? 0 : Number(formData.standardCost);
+    if (!Number.isFinite(standardCost) || standardCost < 0) {
+      setError('Standard cost must be a valid number of zero or greater');
+      return false;
+    }
+    const [reorderLevel, , safetyStock] = numericValues;
+    if (reorderLevel > 0 && safetyStock > reorderLevel) {
+      setError('Safety stock cannot be greater than the reorder level');
+      return false;
+    }
 
     return true;
   };
@@ -175,6 +185,18 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
 
     if (!validateForm()) {
       return;
+    }
+
+    if (editingId) {
+      const original = items.find(item => item.id === editingId);
+      const hasPostedBalance = levels.some(level => level.stockItemId === editingId && Number(level.quantityOnHand || 0) !== 0);
+      const accountingSetupChanged = original && (
+        original.inventoryClassId !== formData.inventoryClassId
+        || original.valuationMethod !== formData.valuationMethod
+      );
+      if (hasPostedBalance && accountingSetupChanged && !window.confirm('This item has posted Inventory history. The new setup applies only to future movements; existing ledger values and journals will not change. Continue?')) {
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -498,10 +520,10 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
                     <Database size={28} />
                 </div>
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-800 uppercase tracking-tight">
-                        {editingId ? 'Modify Inventory Specification' : 'Initialize Stock Item Entry'}
+                    <h2 className="text-lg font-semibold text-gray-800 tracking-tight">
+                        {editingId ? 'Edit Stock Item' : 'Create Stock Item'}
                     </h2>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2">Logistics Architecture & Valuation Calibration</p>
+                    <p className="text-xs text-gray-500 mt-2">Set up item details, stock rules, and accounting classification.</p>
                 </div>
             </div>
             <button onClick={handleCancel} className="p-4 hover:bg-gray-200 rounded-full transition-colors text-gray-400 hover:text-gray-800"><X size={24} /></button>
@@ -512,16 +534,16 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
               <div className="space-y-8">
                  <div className="bg-gray-50 p-8 rounded border border-gray-100 space-y-6">
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                       <Tag size={14} style={{ color: brandColor }} /> Identity Attributes
+                       <Tag size={14} style={{ color: brandColor }} /> Basic Information
                     </h3>
                     <div className="space-y-4">
                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Universal Item ID / SKU</label>
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Item Code / SKU</label>
                           <input required type="text" placeholder="e.g. LAB-COAT-XL" className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-bold text-gray-800 focus:ring-4 focus:ring-orange-400/10 transition-all uppercase"
                             value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Official Nomenclature</label>
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Item Name</label>
                           <input required type="text" placeholder="e.g. Protective Laboratory Gear" className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800 focus:ring-4 focus:ring-orange-400/10 transition-all"
                             value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                        </div>
@@ -530,18 +552,18 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
 
                  <div className="bg-gray-50 p-8 rounded border border-gray-100 space-y-6">
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-2">
-                       <Zap size={14} className="text-[#F47721]" /> Measurement Dynamics
+                       <Zap size={14} className="text-[#F47721]" /> Unit and Valuation
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Unit System</label>
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Unit of Measure</label>
                           <select className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800"
                             value={formData.unitOfMeasure} onChange={e => setFormData({...formData, unitOfMeasure: e.target.value})}>
                             {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
                        </div>
                        <div className="space-y-2">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Valuation Logic</label>
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide ml-1">Valuation Method</label>
                           <select className="w-full px-6 py-4 bg-white border border-gray-200 rounded outline-none font-semibold text-gray-800"
                             value={formData.valuationMethod} onChange={e => setFormData({...formData, valuationMethod: e.target.value as any})}>
                             {VALUATION_METHODS.map(m => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
@@ -589,7 +611,7 @@ export const StockItemsView: React.FC<StockItemsViewProps> = ({
               <div className="space-y-8">
                  <div className="bg-white p-8 rounded border border-gray-200 shadow-sm space-y-6">
                     <h3 className="text-xs font-semibold text-brand uppercase tracking-wide flex items-center gap-2">
-                       <Target size={14} /> Threshold Surveillance
+                       <Target size={14} /> Stock Rules
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2 text-gray-700">
