@@ -8,6 +8,7 @@ import { AccountingService } from '../accountingService';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { DataServiceFactory } from '../services/DataServiceFactory';
+import { fetchAllOpenPayables, getPayableOutstanding } from '../services/APAgingService';
 import type { PageFilter } from '../services/IDataService';
 import {
   Search, Calculator, Building, Coins, AlertCircle, Calendar,
@@ -96,16 +97,6 @@ const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualificati
 
 const getPayableVatInclusiveAmount = (payable: Payable) =>
   Math.round((Number(payable.amount || 0) + Number(payable.inputVatAmount || 0)) * 100) / 100;
-export const getPayableOutstanding = (payable: Payable) => {
-  const outstanding = getPayableVatInclusiveAmount(payable) -
-  Number(payable.withholdingAmount || 0) +
-  Number(payable.memoAdjustmentTotal || 0) -
-  Number(payable.paidAmount || 0);
-
-  return payable.invoiceType === 'credit_memo'
-    ? -Math.abs(outstanding)
-    : Math.max(0, outstanding);
-};
 const getPayableClaimant = (payable: Payable) => {
   if (payable.claimedBy?.trim()) return payable.claimedBy.trim();
   const claimant = payable.notes?.match(/(?:Reimburse|Claimed by):\s*([^\r\n]+)/i)?.[1]?.trim();
@@ -339,34 +330,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     setAgingLoadError('');
     setAgingPayables(null);
 
-    const loadAllOpenPayables = async () => {
-      const service = DataServiceFactory.getService();
-      const rows: Payable[] = [];
-      const pageSize = 500;
-      let page = 1;
-      let totalPages = 1;
-
-      do {
-        const result = await service.fetchPage<Payable>('payables', {
-          page,
-          pageSize,
-          columns: PAYABLE_COLUMNS,
-          filters: [
-            { column: 'org_id', operator: 'eq', value: orgId },
-            { column: 'is_deleted', operator: 'eq', value: false },
-            { column: 'status', operator: 'in', value: ['approved', 'partially_paid'] },
-          ],
-          orderBy: [{ column: 'due_date', ascending: true }, { column: 'created_at', ascending: true }],
-        });
-        rows.push(...result.rows);
-        totalPages = result.totalPages;
-        page += 1;
-      } while (page <= totalPages);
-
-      return rows;
-    };
-
-    loadAllOpenPayables()
+    fetchAllOpenPayables(DataServiceFactory.getService(), orgId, PAYABLE_COLUMNS)
       .then(rows => {
         if (isActive) setAgingPayables(rows);
       })
