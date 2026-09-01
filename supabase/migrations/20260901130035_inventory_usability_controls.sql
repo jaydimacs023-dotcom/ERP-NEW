@@ -30,7 +30,7 @@ begin
   if tg_op = 'DELETE' then
     raise exception 'Posted stock adjustments cannot be deleted; create a reversal instead';
   end if;
-  if current_user <> 'service_role' and (
+  if current_user not in ('service_role', 'postgres') and (
     new.journal_entry_id is distinct from old.journal_entry_id
     or new.reversed_by is distinct from old.reversed_by
     or new.reversed_at is distinct from old.reversed_at

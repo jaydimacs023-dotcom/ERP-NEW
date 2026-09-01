@@ -206,7 +206,7 @@ Users should record the physical event that occurred. The Inventory posting engi
 ### 12. Improve Filters and Statuses
 
 - [ ] Add Inventory filters for warehouse, stock status, active item, adjustment type, posting status, and date range.
-- [ ] Add saved Inventory-only views such as `Needs Attention`, `My Warehouse`, `Unposted Drafts`, and `This Month`.
+- [x] Add saved Inventory-only views such as `Needs Attention`, `My Warehouse`, `Unposted Drafts`, and `This Month`.
 - [x] Use text plus color for status; do not communicate status using color alone.
 - [x] Make summary cards clickable filters.
 - [x] Keep exports consistent with the active filters.
