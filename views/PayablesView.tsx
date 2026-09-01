@@ -96,13 +96,16 @@ const PAYABLE_COLUMNS = 'id,org_id,vendor_id,payable_number,category,qualificati
 
 const getPayableVatInclusiveAmount = (payable: Payable) =>
   Math.round((Number(payable.amount || 0) + Number(payable.inputVatAmount || 0)) * 100) / 100;
-const getPayableOutstanding = (payable: Payable) => Math.max(
-  0,
-  getPayableVatInclusiveAmount(payable) -
+export const getPayableOutstanding = (payable: Payable) => {
+  const outstanding = getPayableVatInclusiveAmount(payable) -
   Number(payable.withholdingAmount || 0) +
   Number(payable.memoAdjustmentTotal || 0) -
-  Number(payable.paidAmount || 0)
-);
+  Number(payable.paidAmount || 0);
+
+  return payable.invoiceType === 'credit_memo'
+    ? -Math.abs(outstanding)
+    : Math.max(0, outstanding);
+};
 const getPayableClaimant = (payable: Payable) => {
   if (payable.claimedBy?.trim()) return payable.claimedBy.trim();
   const claimant = payable.notes?.match(/(?:Reimburse|Claimed by):\s*([^\r\n]+)/i)?.[1]?.trim();
@@ -162,6 +165,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [pageLoadError, setPageLoadError] = useState('');
+  const [agingPayables, setAgingPayables] = useState<Payable[] | null>(null);
+  const [isLoadingAging, setIsLoadingAging] = useState(false);
+  const [agingLoadError, setAgingLoadError] = useState('');
   const [isSavingPayable, setIsSavingPayable] = useState(false);
   const [timeExpenses, setTimeExpenses] = useState<TimeExpense[]>([]);
   const claimableEmployees = useMemo(
@@ -218,8 +224,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // MULTI-TENANT FILTERING
   // ============================================================================
   const orgPayables = useMemo(() =>
-    payables.filter(p => p.orgId === orgId && !p.isDeleted),
-    [payables, orgId]
+    (view === 'aging' && agingPayables !== null ? agingPayables : payables)
+      .filter(p => p.orgId === orgId && !p.isDeleted),
+    [agingPayables, orgId, payables, view]
   );
 
   const orgVendors = useMemo(() =>
@@ -323,6 +330,59 @@ const PayablesView: React.FC<PayablesViewProps> = ({
       isActive = false;
     };
   }, [activeTab, currentPage, debouncedSearchTerm, orgId, payableFilters, refreshKey]);
+
+  useEffect(() => {
+    if (!orgId || view !== 'aging') return;
+
+    let isActive = true;
+    setIsLoadingAging(true);
+    setAgingLoadError('');
+    setAgingPayables(null);
+
+    const loadAllOpenPayables = async () => {
+      const service = DataServiceFactory.getService();
+      const rows: Payable[] = [];
+      const pageSize = 500;
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const result = await service.fetchPage<Payable>('payables', {
+          page,
+          pageSize,
+          columns: PAYABLE_COLUMNS,
+          filters: [
+            { column: 'org_id', operator: 'eq', value: orgId },
+            { column: 'is_deleted', operator: 'eq', value: false },
+            { column: 'status', operator: 'in', value: ['approved', 'partially_paid'] },
+          ],
+          orderBy: [{ column: 'due_date', ascending: true }, { column: 'created_at', ascending: true }],
+        });
+        rows.push(...result.rows);
+        totalPages = result.totalPages;
+        page += 1;
+      } while (page <= totalPages);
+
+      return rows;
+    };
+
+    loadAllOpenPayables()
+      .then(rows => {
+        if (isActive) setAgingPayables(rows);
+      })
+      .catch(error => {
+        if (!isActive) return;
+        console.error('[PayablesView] Failed to load AP aging transactions:', error);
+        setAgingLoadError(error instanceof Error ? error.message : 'Failed to load AP aging transactions.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoadingAging(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [orgId, view]);
 
   // Bills may capitalize an asset or recognize an expense.
   const expenseAccounts = useMemo(() =>
@@ -1555,6 +1615,18 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
   const renderAgingTab = () => (
     <div className="space-y-6">
+      {isLoadingAging && (
+        <div role="status" className="flex items-center gap-2 rounded border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700">
+          <RefreshCw size={16} className="animate-spin" />
+          Loading all open AP transactions…
+        </div>
+      )}
+      {agingLoadError && (
+        <div role="alert" className="flex items-start gap-2 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>AP Aging could not be loaded from Supabase: {agingLoadError}</span>
+        </div>
+      )}
       {/* Vendor Filter for Aging */}
       <div className="flex items-center gap-4 bg-white p-4 rounded border shadow-sm">
         <div className="relative">

@@ -55,13 +55,21 @@ export class SupabaseDataService implements IDataService {
   // the authenticated AT-ERP token when RLS depends on user claims.
   private async getHeaders(preferUserToken: boolean = false): Promise<Record<string, string>> {
     const accessToken = preferUserToken ? await TokenManager.getAccessToken() : null;
-    const effectiveToken = accessToken || this.supabaseKey;
-
-    return {
+    const headers: Record<string, string> = {
       'apikey': this.supabaseKey,
-      'Authorization': `Bearer ${effectiveToken}`,
       'Content-Type': 'application/json',
     };
+
+    // The API key is sufficient for anonymous PostgREST access. Do not also
+    // put it in Authorization: newer publishable keys are not JWTs, and custom
+    // AT-ERP JWTs are only understood by our Edge Functions. A bearer header
+    // is added here only when a caller explicitly supplies a Supabase-compatible
+    // user token.
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return headers;
   }
 
   /**
@@ -2727,7 +2735,10 @@ export class SupabaseDataService implements IDataService {
     if (snake.qualification_id === '') snake.qualification_id = null;
 
     const filtered = this.filterToTableSchema('course_fees', snake);
-    return this.updateInSupabaseRaw('course_fees', id, filtered, true, true);
+    // PostgREST can only verify Supabase-issued JWTs (or the configured anon
+    // key). The TokenManager token is an AT-ERP application JWT intended for
+    // our Edge Functions, so sending it here causes PGRST301.
+    return this.updateInSupabaseRaw('course_fees', id, filtered, false, true);
   }
 
   async deleteCourseFee(id: string): Promise<void> {
