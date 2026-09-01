@@ -2,6 +2,9 @@
 import { ChartOfAccount, AccountClass, JournalLine, Qualification } from '../types';
 import { Plus, ChevronRight, ChevronDown, Edit2, Trash2, FolderPlus, FilePlus, AlertTriangle, ShieldCheck, X, Link, Award } from 'lucide-react';
 import ModalPortal from '../components/ModalPortal';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
+
+const COA_PAGE_SIZE = 20;
 
 interface ChartOfAccountsProps {
   accounts: ChartOfAccount[];
@@ -142,14 +145,12 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
   };
 
   const renderAccountRow = (acc: ChartOfAccount, depth: number = 0) => {
-    const children = accounts.filter(a => a.parentId === acc.id);
     const isExpanded = expanded.has(acc.id);
     const hasPostings = lines.some(l => l.accountId === acc.id);
     const linkedQual = qualifications.find(q => q.id === acc.qualificationId);
 
     return (
-      <React.Fragment key={acc.id}>
-        <tr className={`hover:bg-gray-50 border-b group transition-all duration-200 ${acc.isHeader ? 'bg-gray-50/40' : 'bg-white'} ${!acc.isActive ? 'bg-gray-50/80 grayscale-[0.5]' : ''}`}>
+        <tr key={acc.id} className={`hover:bg-gray-50 border-b group transition-all duration-200 ${acc.isHeader ? 'bg-gray-50/40' : 'bg-white'} ${!acc.isActive ? 'bg-gray-50/80 grayscale-[0.5]' : ''}`}>
           <td className={`px-6 py-3 whitespace-nowrap text-sm font-mono ${!acc.isActive ? 'text-gray-400' : 'text-gray-500'}`}>
             {acc.code}
           </td>
@@ -252,12 +253,29 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             </div>
           </td>
         </tr>
-        {acc.isHeader && isExpanded && children.map(child => renderAccountRow(child, depth + 1))}
-      </React.Fragment>
     );
   };
 
   const topLevel = accounts.filter(a => !a.parentId);
+  const visibleAccounts = (() => {
+    const rows: Array<{ account: ChartOfAccount; depth: number }> = [];
+    const appendVisible = (account: ChartOfAccount, depth: number) => {
+      rows.push({ account, depth });
+      if (account.isHeader && expanded.has(account.id)) {
+        accounts.filter(child => child.parentId === account.id).forEach(child => appendVisible(child, depth + 1));
+      }
+    };
+    topLevel.forEach(account => appendVisible(account, 0));
+    return rows;
+  })();
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows,
+    setCurrentPage
+  } = usePaginatedRows(visibleAccounts, [accounts], COA_PAGE_SIZE);
   const parentPath = getAccountPath(selectedParent);
   const isNominal = formData.class === AccountClass.REVENUE || formData.class === AccountClass.EXPENSE;
 
@@ -288,13 +306,22 @@ const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, lines, qual
             </tr>
           </thead>
           <tbody>
-            {topLevel.length > 0 ? topLevel.map(acc => renderAccountRow(acc)) : (
+            {paginatedRows.length > 0 ? paginatedRows.map(({ account, depth }) => renderAccountRow(account, depth)) : (
               <tr>
                 <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">No accounts defined for this organization.</td>
               </tr>
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={visibleAccounts.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="accounts"
+        />
       </div>
 
       {/* Confirmation Modal */}

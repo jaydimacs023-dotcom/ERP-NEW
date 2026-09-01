@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AuditLog } from '../types';
-import { ChevronDown, Clock, Filter, History, RotateCcw, Search, ShieldCheck } from 'lucide-react';
+import { BriefcaseBusiness, ChevronDown, Clock, Filter, History, LogIn, LogOut, RotateCcw, Search, ShieldCheck, UserRound } from 'lucide-react';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import type { PageFilter } from '../services/IDataService';
@@ -12,15 +12,57 @@ interface AuditTrailProps {
 }
 
 type DateFilterMode = 'ALL' | 'TODAY' | 'THIS_MONTH' | 'CUSTOM';
-type AuditTrailTab = 'BUSINESS' | 'SYSTEM';
+type AuditTrailTab = 'BUSINESS' | 'AUTHENTICATION';
 
 const todayKey = () => new Date().toISOString().split('T')[0];
 const PAGE_SIZE = 7;
 const AUDIT_COLUMNS = 'id,org_id,user_id,action,entity_type,entity_id,details,ip_address,user_agent,created_at';
 const SYSTEM_MOVEMENT_ACTIONS = ['LOGIN', 'LOGOUT'];
 
-const isSystemMovementLog = (log: Pick<AuditLog, 'action'>) =>
+const isAuthenticationLog = (log: Pick<AuditLog, 'action'>) =>
   SYSTEM_MOVEMENT_ACTIONS.includes(String(log.action || '').toUpperCase());
+
+const ACTION_LABELS: Record<string, string> = {
+  CREATE: 'Created', UPDATE: 'Updated', DELETE: 'Permanently deleted', SOFT_DELETE: 'Archived',
+  RESTORE: 'Restored', POST: 'Posted', REVERSE: 'Reversed', APPROVE: 'Approved', REJECT: 'Rejected',
+  VOID: 'Voided', PRINT: 'Printed', RELEASE: 'Released', LOGIN: 'Logged in', LOGOUT: 'Logged out',
+  EXPORT: 'Exported', IMPORT: 'Imported'
+};
+
+const ENTITY_LABELS: Record<string, string> = {
+  JOURNAL_ENTRY: 'Journal entry', RECURRING_JOURNAL_ENTRY: 'Recurring journal entry',
+  CHART_OF_ACCOUNT: 'Chart of account', PURCHASE_ORDER: 'Purchase order', GOODS_RECEIPT: 'Goods receipt',
+  CHECK_VOUCHER: 'Check voucher', BANK_ACCOUNT: 'Bank account', BANK_RECONCILIATION: 'Bank reconciliation',
+  FIXED_ASSET: 'Fixed asset', COURSE_FEE: 'Course fee', ASSESSMENT_REGISTRATION: 'Assessment registration',
+  REVENUE_SCHEDULE: 'Revenue schedule', STOCK_ADJUSTMENT: 'Stock adjustment',
+  INVENTORY_TRANSACTION: 'Inventory transaction', FEEDBACK_TICKET: 'Feedback ticket'
+};
+
+export const formatAuditAction = (action?: string) => {
+  const normalized = String(action || '').trim().toUpperCase();
+  return ACTION_LABELS[normalized] || normalized.replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase()) || 'Activity';
+};
+
+export const formatAuditEntity = (entityType?: string) => {
+  const normalized = String(entityType || '').trim().toUpperCase();
+  return ENTITY_LABELS[normalized] || normalized.replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase()) || 'Record';
+};
+
+export const normalizeAuditDetails = (log: Pick<AuditLog, 'action' | 'details' | 'entityType' | 'entityId'>) => {
+  const action = String(log.action || '').toUpperCase();
+  if (action === 'LOGIN') return 'Signed in to the ERP';
+  if (action === 'LOGOUT') return 'Signed out of the ERP';
+
+  const rawDetails = String(log.details || '').trim();
+  if (!rawDetails) return `${formatAuditAction(action)} ${formatAuditEntity(log.entityType).toLowerCase()} ${log.entityId || ''}`.trim();
+
+  return rawDetails
+    .replaceAll('â†’', '→')
+    .replace(/\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/g, value => formatAuditEntity(value))
+    .replace(/\s*\|\s*/g, '. ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1');
+};
 
 const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
 const dateEndIso = (date: string) => `${date}T23:59:59.999Z`;
@@ -63,7 +105,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
   );
 
   const categoryOrgLogs = useMemo(
-    () => orgLogs.filter(log => activeAuditTab === 'SYSTEM' ? isSystemMovementLog(log) : !isSystemMovementLog(log)),
+    () => orgLogs.filter(log => activeAuditTab === 'AUTHENTICATION' ? isAuthenticationLog(log) : !isAuthenticationLog(log)),
     [activeAuditTab, orgLogs]
   );
 
@@ -82,7 +124,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
 
     filters.push({
       column: 'action',
-      operator: activeAuditTab === 'SYSTEM' ? 'in' : 'not.in',
+      operator: activeAuditTab === 'AUTHENTICATION' ? 'in' : 'not.in',
       value: `(${SYSTEM_MOVEMENT_ACTIONS.join(',')})`
     });
 
@@ -235,7 +277,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
   const summary = useMemo(() => {
     const visibleLogs = useFallbackRows ? localFilteredLogs : serverLogs;
     const users = new Set(visibleLogs.map(log => log.userId).filter(Boolean)).size;
-    const entityTypes = new Set(visibleLogs.map(log => log.entityType).filter(Boolean)).size;
+    const recordTypes = new Set(visibleLogs.map(log => activeAuditTab === 'BUSINESS' ? log.entityType : log.action).filter(Boolean)).size;
     const todayEvents = dateFilterMode === 'TODAY' && !useFallbackRows
       ? serverTotal
       : visibleLogs.filter(log => log.createdAt.slice(0, 10) === todayKey()).length;
@@ -243,10 +285,10 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
     return {
       total: totalItems,
       users,
-      entityTypes,
+      recordTypes,
       todayEvents
     };
-  }, [dateFilterMode, localFilteredLogs, serverLogs, serverTotal, totalItems, useFallbackRows]);
+  }, [activeAuditTab, dateFilterMode, localFilteredLogs, serverLogs, serverTotal, totalItems, useFallbackRows]);
 
   const hasActiveFilters =
     searchTerm.trim().length > 0 ||
@@ -296,8 +338,8 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
       <div className="rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {[
-            { key: 'BUSINESS' as const, label: 'Business Transactions', description: 'Posting, approvals, updates, receipts, invoices, and operational records' },
-            { key: 'SYSTEM' as const, label: 'System Movement', description: 'Login and logout activity' }
+            { key: 'BUSINESS' as const, label: 'Business Movement', description: 'Changes to financial, training, inventory, and operational records', icon: BriefcaseBusiness },
+            { key: 'AUTHENTICATION' as const, label: 'Login & Logout', description: 'A clear history of who entered or left the ERP', icon: UserRound }
           ].map(tab => {
             const active = activeAuditTab === tab.key;
             return (
@@ -310,8 +352,8 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
                 }`}
                 style={active ? { backgroundColor: brandColor } : undefined}
               >
-                <span className="block text-sm font-bold">{tab.label}</span>
-                <span className={`mt-1 block text-xs ${active ? 'text-white/80' : 'text-gray-400'}`}>{tab.description}</span>
+                <span className="flex items-center gap-2 text-sm font-bold"><tab.icon size={17} />{tab.label}</span>
+                <span className={`mt-1.5 block text-xs ${active ? 'text-white/80' : 'text-gray-400'}`}>{tab.description}</span>
               </button>
             );
           })}
@@ -328,8 +370,8 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
           <p className="mt-2 text-2xl font-semibold text-gray-900">{summary.users}</p>
         </div>
         <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Entity Types</p>
-          <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{summary.entityTypes}</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{activeAuditTab === 'BUSINESS' ? 'Record Types' : 'Access Types'}</p>
+          <p className="mt-2 text-2xl font-semibold" style={{ color: brandColor }}>{summary.recordTypes}</p>
         </div>
         <div className="bg-white rounded-md border border-gray-200 shadow-sm p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today</p>
@@ -343,7 +385,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
             <Search size={14} className="text-gray-400 mr-2" />
             <input
               type="text"
-              placeholder="Search audit trail..."
+              placeholder={activeAuditTab === 'BUSINESS' ? 'Search user, action, record, or details...' : 'Search user, login, logout, or IP address...'}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="bg-transparent border-none outline-none text-[13px] font-medium text-gray-700 flex-1 placeholder:text-gray-300 placeholder:font-normal"
@@ -381,7 +423,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
             )}
           </div>
 
-          <div className="relative">
+          {activeAuditTab === 'BUSINESS' && <div className="relative">
             <div
               onClick={() => setShowEntityDropdown(prev => !prev)}
               className="relative border rounded flex items-center bg-white h-9 px-3 hover:bg-gray-50 transition-colors cursor-pointer select-none max-w-[220px]"
@@ -410,7 +452,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
                 </div>
               </>
             )}
-          </div>
+          </div>}
 
           <div className="relative">
             <div
@@ -512,17 +554,17 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead style={{ backgroundColor: brandColor }}>
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-48">Timestamp</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-32">User</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-32">Action</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-40">Entity</th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">Details</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-48">Date & time</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-48">Performed by</th>
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-40">Activity</th>
+              {activeAuditTab === 'BUSINESS' && <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide w-48">Record</th>}
+              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wide">What happened</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-20 text-center text-gray-500">
+                <td colSpan={activeAuditTab === 'BUSINESS' ? 5 : 4} className="px-6 py-20 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <History size={32} className="text-gray-300" />
                     <p>Loading audit records...</p>
@@ -531,7 +573,7 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
               </tr>
             ) : totalItems === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-20 text-center text-gray-500">
+                <td colSpan={activeAuditTab === 'BUSINESS' ? 5 : 4} className="px-6 py-20 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <History size={32} className="text-gray-300" />
                     <p>{loadError ? 'Unable to load audit records from Supabase.' : 'No audit records found for the current search and filter.'}</p>
@@ -553,9 +595,9 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                         style={{ backgroundColor: 'var(--acm-primary-light)', color: brandColor }}
                       >
-                        {log.userId.substring(0, 2).toUpperCase()}
+                        {String(log.userId || 'System').substring(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-gray-600">{log.userId}</span>
+                      <span className="font-medium text-gray-700">{log.userId || 'System'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -565,18 +607,22 @@ const AuditTrail: React.FC<AuditTrailProps> = ({ orgId, logs = [], brandColor = 
                         ? { backgroundColor: 'var(--acm-primary-light)', color: brandColor }
                         : undefined}
                     >
-                      {log.action}
+                      <span className="inline-flex items-center gap-1.5">
+                        {log.action === 'LOGIN' && <LogIn size={13} />}
+                        {log.action === 'LOGOUT' && <LogOut size={13} />}
+                        {formatAuditAction(log.action)}
+                      </span>
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {activeAuditTab === 'BUSINESS' && <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
-                      <span className="text-gray-500 text-xs font-bold uppercase tracking-tight">{log.entityType.replace('_', ' ')}</span>
-                      <span className="text-gray-900 font-mono text-xs">{log.entityId}</span>
+                      <span className="text-sm font-semibold text-gray-700">{formatAuditEntity(log.entityType)}</span>
+                      <span className="text-xs text-gray-400">Reference: {log.entityId || 'Not available'}</span>
                     </div>
-                  </td>
+                  </td>}
                   <td className="px-6 py-4">
                     <div className="text-gray-600 leading-relaxed">
-                      {log.details}
+                      <p className="font-medium text-gray-700">{normalizeAuditDetails(log)}</p>
                       {log.ipAddress && (
                         <div className="text-xs text-gray-400 mt-2">IP: {log.ipAddress}</div>
                       )}
