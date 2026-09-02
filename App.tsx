@@ -7808,7 +7808,7 @@ function NavItem({ icon, label, active, onClick, compact, brandColor }: NavItemP
       onClick={onClick}
       title={compact ? label : undefined}
       aria-label={compact ? label : undefined}
-      className={`w-full border border-transparent text-left flex items-center gap-4 p-3.5 rounded-2xl outline-none transition-colors group focus:outline-none ${active ? 'text-white shadow-none' : 'text-slate-600 hover:text-brand hover:bg-brand/10 focus-visible:bg-brand/10'} `}
+      className={`w-full border border-transparent text-left flex items-center gap-4 p-3.5 rounded-lg outline-none transition-colors group focus:outline-none ${active ? 'text-white shadow-none' : 'text-slate-600 hover:text-brand hover:bg-brand/10 focus-visible:bg-brand/10'} `}
       style={{
         ...(active ? { backgroundColor: brandColor, borderColor: brandColor, boxShadow: 'none' } : {}),
       } as React.CSSProperties}

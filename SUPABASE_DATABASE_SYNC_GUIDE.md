@@ -196,3 +196,13 @@ psql "postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-[region].pooler.supab
 ### Error 4: `[Config] Refusing to start: VITE_APP_ENV is local but VITE_SUPABASE_URL points to hosted Supabase`
 - **Cause:** Safety check in [config/app.ts](file:///e:/ERP-NEW/config/app.ts) preventing accidental mutations between environments.
 - **Fix:** In `.env.local`, ensure `VITE_SUPABASE_URL` is set to `http://127.0.0.1:54321` when `VITE_APP_ENV=local`.
+
+### Error 5: `Journal voucher function secrets are not configured` (or Edge Function 500 error)
+- **Cause:** Edge functions (e.g. `journal-vouchers`, `stock-adjustments-write`, `users-write`) require `AT_ERP_JWT_SECRET` to verify user auth tokens. In Cloud, this is set in Cloud Secrets, but locally it must be provided in `supabase/functions/.env`.
+- **Fix:** Create `supabase/functions/.env` containing:
+  ```env
+  AT_ERP_JWT_SECRET=AT-ERP-JWT-SECRET-KEY-2024-CHANGE-IN-PRODUCTION
+  ```
+  Then restart local Supabase (`npx supabase stop` then `npx supabase start`).
+
+

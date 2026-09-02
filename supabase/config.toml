@@ -393,6 +393,9 @@ verify_jwt = false
 [functions.time-expenses-write]
 verify_jwt = false
 
+[functions.ap-memos-write]
+verify_jwt = false
+
 [functions.ap-reclassifications-write]
 verify_jwt = false
 
