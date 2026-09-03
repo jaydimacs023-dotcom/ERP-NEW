@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, PayrollRun, PayrollLine, ChartOfAccount, BankAccount, JournalEntry, JournalLine, PayFrequency, OvertimeType } from '../types';
 import { AccountingService } from '../accountingService';
@@ -79,8 +79,12 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
    const currentRunSummary = useMemo(() => {
       let gross = 0;
-      let depr = 0;
+      let totalDeductions = 0;
       let net = 0;
+      let totalSSS = 0;
+      let totalPhilHealth = 0;
+      let totalPagIBIG = 0;
+      let totalTax = 0;
 
       const lines = activeEmployees.map(emp => {
          const basic = emp.basicSalary;
@@ -109,6 +113,10 @@ const PayrollView: React.FC<PayrollViewProps> = ({
          const ph = contributions.philHealthEmployeeShare;
          const pi = contributions.pagIBIGEmployeeShare;
 
+         const sssEmployer = contributions.sssEmployerShare;
+         const phEmployer = contributions.philHealthEmployerShare;
+         const piEmployer = contributions.pagIBIGEmployerShare;
+
          // BIR withholding tax using configurable brackets
          // Default: Monthly pay frequency with BIR 2024 tax table
          const payFrequency: PayFrequency = 'MONTHLY';
@@ -119,13 +127,52 @@ const PayrollView: React.FC<PayrollViewProps> = ({
          const empNet = empGross - empDeductions;
 
          gross += empGross;
-         depr += empDeductions;
+         totalDeductions += empDeductions;
          net += empNet;
+         totalSSS += sss;
+         totalPhilHealth += ph;
+         totalPagIBIG += pi;
+         totalTax += tax;
 
-         return { emp, empGross, empDeductions, empNet, sss, ph, pi, tax, overtimePay, dailyRate, hourlyRate };
+         return { 
+            emp, 
+            empGross, 
+            empDeductions, 
+            empNet, 
+            sss, 
+            ph, 
+            pi, 
+            tax, 
+            sssEmployer,
+            phEmployer,
+            piEmployer,
+            totalEmployerShare: sssEmployer + phEmployer + piEmployer,
+            overtimePay, 
+            dailyRate, 
+            hourlyRate 
+         };
       });
 
-      return { lines, gross, depr, net };
+      const totalEmployerSSS = lines.reduce((sum, l) => sum + l.sssEmployer, 0);
+      const totalEmployerPhilHealth = lines.reduce((sum, l) => sum + l.phEmployer, 0);
+      const totalEmployerPagIBIG = lines.reduce((sum, l) => sum + l.piEmployer, 0);
+      const totalEmployerContributions = totalEmployerSSS + totalEmployerPhilHealth + totalEmployerPagIBIG;
+
+      return { 
+         lines, 
+         gross, 
+         depr: totalDeductions, 
+         totalDeductions, 
+         net,
+         totalSSS,
+         totalPhilHealth,
+         totalPagIBIG,
+         totalTax,
+         totalEmployerSSS,
+         totalEmployerPhilHealth,
+         totalEmployerPagIBIG,
+         totalEmployerContributions
+      };
    }, [activeEmployees, adjustments]);
 
    const filteredPayrollRuns = useMemo(() => {
@@ -187,10 +234,40 @@ const PayrollView: React.FC<PayrollViewProps> = ({
       const runId = `pr-${Date.now()}`;
       const bank = bankAccounts.find(b => b.id === bankId);
 
-      const salariesExpId = accounts.find(a => a.name.includes('Salaries'))?.id;
-      const taxPayId = accounts.find(a => a.name.includes('Accrued Payroll'))?.id;
+      // Resilient labor expense account resolution
+      const salariesExp = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.EXPENSE && 
+         (a.name.toLowerCase().includes('salaries') || a.name.toLowerCase().includes('payroll') || a.code === '5500' || a.code.startsWith('55'))
+      ) || accounts.find(a => !a.isHeader && a.class === AccountClass.EXPENSE);
 
-      if (!salariesExpId || !bank) return;
+      // Specific statutory liability accounts if present in COA
+      const taxPayable = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.LIABILITY && 
+         (a.name.toLowerCase().includes('withholding tax') || a.name.toLowerCase().includes('1601'))
+      );
+
+      const sssPayable = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.LIABILITY && 
+         (a.name.toLowerCase().includes('sss') || a.name.toLowerCase().includes('social security'))
+      );
+
+      const phPayable = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.LIABILITY && 
+         (a.name.toLowerCase().includes('philhealth') || a.name.toLowerCase().includes('health insurance'))
+      );
+
+      const piPayable = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.LIABILITY && 
+         (a.name.toLowerCase().includes('pag-ibig') || a.name.toLowerCase().includes('pagibig') || a.name.toLowerCase().includes('hdmf'))
+      );
+
+      // General fallback accrued payroll liability account
+      const generalPayrollLiability = accounts.find(a => 
+         !a.isHeader && a.class === AccountClass.LIABILITY && 
+         (a.name.toLowerCase().includes('accrued payroll') || a.name.toLowerCase().includes('payroll liabilities') || a.code === '2400' || a.name.toLowerCase().includes('salaries payable'))
+      ) || accounts.find(a => !a.isHeader && a.class === AccountClass.LIABILITY);
+
+      if (!salariesExp || !bank || !generalPayrollLiability) return;
 
       const newRun: Partial<PayrollRun> = {
          id: runId,
@@ -198,7 +275,7 @@ const PayrollView: React.FC<PayrollViewProps> = ({
          periodEnd,
          status: 'POSTED',
          totalGross: currentRunSummary.gross,
-         totalDeductions: currentRunSummary.depr,
+         totalDeductions: currentRunSummary.totalDeductions,
          totalNet: currentRunSummary.net,
          createdAt: new Date().toISOString()
       };
@@ -214,10 +291,40 @@ const PayrollView: React.FC<PayrollViewProps> = ({
 
       const entryId = `je-pr-${Date.now()}`;
       const journalLines: JournalLine[] = [
-         { id: `l1-${entryId}`, journalEntryId: entryId, orgId, accountId: salariesExpId, debit: currentRunSummary.gross, credit: 0, memo: `Gross Payroll: ${periodStart} to ${periodEnd}` },
+         // DR: Gross Labor Expense
+         { id: `l1-${entryId}`, journalEntryId: entryId, orgId, accountId: salariesExp.id, debit: currentRunSummary.gross, credit: 0, memo: `Gross Payroll: ${periodStart} to ${periodEnd}` },
+         // CR: Net Cash Disbursement
          { id: `l2-${entryId}`, journalEntryId: entryId, orgId, accountId: bank.glAccountId, debit: 0, credit: currentRunSummary.net, memo: `Net Disbursement: ${periodStart} to ${periodEnd}` },
-         { id: `l3-${entryId}`, journalEntryId: entryId, orgId, accountId: taxPayId || '', debit: 0, credit: currentRunSummary.depr, memo: `Payroll Deductions: ${periodStart} to ${periodEnd}` }
-      ].filter(l => l.accountId !== '');
+      ];
+
+      // Track how much liability has been allocated
+      let allocatedLiability = 0;
+
+      if (taxPayable && currentRunSummary.totalTax > 0) {
+         journalLines.push({ id: `l-tax-${entryId}`, journalEntryId: entryId, orgId, accountId: taxPayable.id, debit: 0, credit: currentRunSummary.totalTax, memo: `BIR Withholding Tax (1601-C): ${periodStart} to ${periodEnd}` });
+         allocatedLiability += currentRunSummary.totalTax;
+      }
+
+      if (sssPayable && currentRunSummary.totalSSS > 0) {
+         journalLines.push({ id: `l-sss-${entryId}`, journalEntryId: entryId, orgId, accountId: sssPayable.id, debit: 0, credit: currentRunSummary.totalSSS, memo: `SSS Employee Contributions: ${periodStart} to ${periodEnd}` });
+         allocatedLiability += currentRunSummary.totalSSS;
+      }
+
+      if (phPayable && currentRunSummary.totalPhilHealth > 0) {
+         journalLines.push({ id: `l-ph-${entryId}`, journalEntryId: entryId, orgId, accountId: phPayable.id, debit: 0, credit: currentRunSummary.totalPhilHealth, memo: `PhilHealth Employee Contributions: ${periodStart} to ${periodEnd}` });
+         allocatedLiability += currentRunSummary.totalPhilHealth;
+      }
+
+      if (piPayable && currentRunSummary.totalPagIBIG > 0) {
+         journalLines.push({ id: `l-pi-${entryId}`, journalEntryId: entryId, orgId, accountId: piPayable.id, debit: 0, credit: currentRunSummary.totalPagIBIG, memo: `Pag-IBIG Employee Contributions: ${periodStart} to ${periodEnd}` });
+         allocatedLiability += currentRunSummary.totalPagIBIG;
+      }
+
+      // Any remaining unallocated deductions go to General Payroll Liability
+      const remainingDeductions = Math.round((currentRunSummary.totalDeductions - allocatedLiability + Number.EPSILON) * 100) / 100;
+      if (remainingDeductions > 0) {
+         journalLines.push({ id: `l-gen-${entryId}`, journalEntryId: entryId, orgId, accountId: generalPayrollLiability.id, debit: 0, credit: remainingDeductions, memo: `Accrued Payroll Deductions: ${periodStart} to ${periodEnd}` });
+      }
 
       onPostPayroll(newRun, newLines, {
          id: entryId,
@@ -765,9 +872,13 @@ const PayrollView: React.FC<PayrollViewProps> = ({
                               <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Register Reference</label>
                               <p className="text-sm font-semibold text-brand font-mono bg-brand/5 px-3 py-1 rounded-lg border border-brand-light">{payrollRef}</p>
                            </div>
-                           <SummaryRow label="Gross Labor Cost" value={currentRunSummary.gross} />
-                           <SummaryRow label="Statutory Liabilities" value={currentRunSummary.depr} isNegative />
-                           <div className="pt-6 border-t-2 border-gray-200 mt-4 flex justify-between items-end">
+                           <SummaryRow label="Gross Employee Earnings" value={currentRunSummary.gross} />
+                           <SummaryRow label="Employee Withholding" value={currentRunSummary.depr} isNegative />
+                           <div className="pt-2 flex justify-between items-center text-xs font-medium text-gray-500">
+                              <span>Employer Statutory Match</span>
+                              <span className="font-mono font-semibold text-gray-700">{"\u20B1"} {currentRunSummary.totalEmployerContributions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                           </div>
+                           <div className="pt-4 border-t-2 border-gray-200 mt-4 flex justify-between items-end">
                               <span className="text-xs font-semibold text-gray-800 uppercase tracking-wide">NET PAYABLE</span>
                               <span className="text-lg font-mono font-semibold text-brand">{"\u20B1"} {currentRunSummary.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                            </div>

@@ -5115,6 +5115,19 @@ export class SupabaseDataService implements IDataService {
   async deleteJournalEntry(id: string): Promise<void> {
     console.debug('[Supabase] deleteJournalEntry called with id:', id);
     try {
+      // Strict audit guard: Prevent deletion of POSTED journal entries
+      const checkUrl = `${this.baseUrl}/journal_entries?id=eq.${id}&select=id,status,reference`;
+      const checkRes = await fetch(checkUrl, {
+        headers: (await this.getHeaders())
+      });
+      if (checkRes.ok) {
+        const entries = await checkRes.json();
+        const entry = entries?.[0];
+        if (entry && entry.status === 'POSTED') {
+          throw new Error(`Cannot delete posted journal entry (${entry.reference || id}). Under GAAP, IFRS, and BIR audit compliance rules, posted transactions cannot be deleted. Please post a reversal entry instead.`);
+        }
+      }
+
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',

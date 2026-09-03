@@ -1,8 +1,9 @@
-﻿
+
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Vendor, JournalEntry, JournalLine, NonStockItem, ChartOfAccount, AccountClass, TaxCategory, WHTCategory, BankAccount, Payable, PurchaseOrder, PurchaseOrderLine, GoodsReceipt, GoodsReceiptLine, CheckVoucher, RecurringBill, RecurringBillHistory } from '../types';
 import { AccountingService } from '../accountingService';
+import { DataServiceFactory } from '../services/DataServiceFactory';
 import MatchingDashboard from './MatchingDashboard';
 import CheckRegisterView from './CheckRegisterView';
 import RecurringBillsView from './RecurringBillsView';
@@ -33,6 +34,8 @@ interface APViewProps {
   currentUserId?: string;
   onPostBill: (entry: Partial<JournalEntry>, lines: JournalLine[]) => void;
   onCreatePayable: (payable: Payable) => void;
+  onUpdatePayable?: (id: string, updates: Partial<Payable>) => void;
+  onDeletePayable?: (id: string) => void;
   onApproveException?: (payableId: string, notes: string) => void;
   onCreateRecurringBill?: (bill: Partial<RecurringBill>) => void;
   onUpdateRecurringBill?: (id: string, updates: Partial<RecurringBill>) => void;
@@ -43,7 +46,7 @@ interface APViewProps {
 type APTab = 'bills' | 'payments' | 'aging' | 'matching' | 'checks' | 'recurring';
 
 const APView: React.FC<APViewProps> = ({ 
-  vendors, entries, lines, items, accounts, bankAccounts, payables = [], checks = [], recurringBills = [], recurringBillHistory = [], purchaseOrders = [], purchaseOrderLines = [], goodsReceipts = [], goodsReceiptLines = [], currency = 'PHP', currentUserId = 'system', onPostBill, onCreatePayable, onApproveException, onNotify, onCreateRecurringBill, onUpdateRecurringBill, onDeleteRecurringBill 
+  vendors, entries, lines, items, accounts, bankAccounts, payables = [], checks = [], recurringBills = [], recurringBillHistory = [], purchaseOrders = [], purchaseOrderLines = [], goodsReceipts = [], goodsReceiptLines = [], currency = 'PHP', currentUserId = 'system', onPostBill, onCreatePayable, onUpdatePayable, onDeletePayable, onApproveException, onNotify, onCreateRecurringBill, onUpdateRecurringBill, onDeleteRecurringBill 
 }) => {
   const [activeTab, setActiveTab] = useState<APTab>('bills');
   const [showModal, setShowModal] = useState(false);
@@ -256,7 +259,7 @@ const APView: React.FC<APViewProps> = ({
     resetForm();
   };
 
-  const handlePostPayment = (e: React.FormEvent) => {
+  const handlePostPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payVendorId) return onNotify('error', 'Validation Error: A payee vendor must be selected.');
     if (payAmount <= 0) return onNotify('error', 'Validation Error: Payment amount must exceed zero.');
@@ -268,24 +271,70 @@ const APView: React.FC<APViewProps> = ({
 
     if (!bank || !apAccountId) return onNotify('error', "Accounting Resolution Error: Targeted bank or AP ledger account is currently unreachable.");
 
-    const entryId = `je-pymt-${Date.now()}`;
-    const finalizedLines: JournalLine[] = [
-      { id: `l-ap-dr-${Date.now()}`, journalEntryId: entryId, accountId: apAccountId, debit: payAmount, credit: 0, memo: payMemo || `Payment ${payRef} to ${vendor?.name}`, contactId: payVendorId, contactType: 'VENDOR' },
-      { id: `l-cash-cr-${Date.now()}`, journalEntryId: entryId, accountId: bank.glAccountId, debit: 0, credit: payAmount, memo: payMemo || `Payment ${payRef} to ${vendor?.name}`, contactId: payVendorId, contactType: 'VENDOR' }
-    ];
+    // Find all open or partially paid bills for this vendor, sorted by date (FIFO)
+    const openPayables = payables
+      .filter(p => p.vendorId === payVendorId && (p.status === 'unpaid' || p.status === 'partially_paid' || (p.balance !== undefined && p.balance > 0)))
+      .sort((a, b) => new Date(a.billDate || a.createdAt).getTime() - new Date(b.billDate || b.createdAt).getTime());
 
-    onPostBill({
-      id: entryId,
-      date: payDate,
-      reference: payRef,
-      description: `Vendor Payment: ${vendor?.name}`,
-      sourceType: 'PAYMENT',
-      status: 'POSTED'
-    }, finalizedLines);
+    if (openPayables.length === 0) {
+      return onNotify('error', `No open or unpaid bills found for vendor ${vendor?.name || 'selected'}. Disbursements must be applied against open bills.`);
+    }
 
-    setShowPaymentModal(false);
-    setPayAmount(0);
-    setPayVendorId('');
+    const totalOpenBalance = openPayables.reduce((sum, p) => sum + (p.balance !== undefined ? p.balance : p.amount), 0);
+    if (payAmount > totalOpenBalance + 0.01) {
+      return onNotify('error', `Payment amount (${formatCurrency(payAmount)}) exceeds the total outstanding balance (${formatCurrency(totalOpenBalance)}) for this vendor.`);
+    }
+
+    // Allocate payment across open bills (FIFO)
+    let remaining = payAmount;
+    const allocations: { payable: Payable; amount: number }[] = [];
+
+    for (const p of openPayables) {
+      if (remaining <= 0) break;
+      const currentBal = p.balance !== undefined ? p.balance : p.amount;
+      const alloc = Math.min(currentBal, remaining);
+      if (alloc > 0) {
+        allocations.push({ payable: p, amount: alloc });
+        remaining -= alloc;
+      }
+    }
+
+    try {
+      const paymentEventId = `pe-${Date.now()}`;
+      const dataService = DataServiceFactory.getService();
+
+      // Post atomic settlement through PostgreSQL stored procedure
+      await dataService.postPayablePayment({
+        paymentEventId,
+        payableIds: allocations.map(a => a.payable.id),
+        amounts: allocations.map(a => a.amount),
+        cashAccountId: bank.glAccountId,
+        paymentDate: payDate,
+        paymentMethod: 'BANK_TRANSFER',
+        actorId: currentUserId || 'system',
+      });
+
+      // Update in-memory / local state for immediate UI feedback
+      if (onUpdatePayable) {
+        for (const alloc of allocations) {
+          const prevBalance = alloc.payable.balance !== undefined ? alloc.payable.balance : alloc.payable.amount;
+          const newBalance = Math.max(0, prevBalance - alloc.amount);
+          const newStatus = newBalance <= 0.005 ? 'paid' : 'partially_paid';
+          onUpdatePayable(alloc.payable.id, {
+            balance: newBalance,
+            status: newStatus as any,
+          });
+        }
+      }
+
+      onNotify('success', `Disbursement of ${formatCurrency(payAmount)} settled across ${allocations.length} bill(s) for ${vendor?.name}.`);
+      setShowPaymentModal(false);
+      setPayAmount(0);
+      setPayVendorId('');
+    } catch (error: any) {
+      console.error('[APView] Error executing postPayablePayment:', error);
+      onNotify('error', `Failed to settle bills: ${error?.message || 'Transaction aborted.'}`);
+    }
   };
 
   const resetForm = () => {

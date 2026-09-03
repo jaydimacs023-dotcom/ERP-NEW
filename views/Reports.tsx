@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEffect, useCallback } from 'react';
 import { TransactionSummary, ChartOfAccount, JournalEntry, JournalLine, AccountClass, Qualification, Batch } from '../types';
 import { AccountingService } from '../accountingService';
@@ -921,7 +921,19 @@ const Reports: React.FC<ReportsProps> = ({ accounts: initialAccounts, entries: i
                   <div className="space-y-12 max-w-3xl mx-auto">
                     <DetailedFinancialSection title="I. ASSETS" rows={balanceSheetDetails.assets} total={bs.totalAssets} symbol={currencySymbol} />
                     <DetailedFinancialSection title="II. LIABILITIES" rows={balanceSheetDetails.liabilities} total={bs.totalLiabilities} symbol={currencySymbol} />
-                    <DetailedFinancialSection title="III. OWNER'S EQUITY" rows={balanceSheetDetails.equity} total={bs.totalEquity} symbol={currencySymbol} />
+                    <DetailedFinancialSection
+                      title="III. OWNER'S EQUITY"
+                      rows={balanceSheetDetails.equity}
+                      total={bs.totalEquity}
+                      symbol={currencySymbol}
+                      additionalItems={Math.abs(bs.currentPeriodNetIncome) > 0.005 ? [
+                        {
+                          label: bs.currentPeriodNetIncome >= 0 ? "Current Period Net Income" : "Current Period Net Loss",
+                          code: "NET-INCOME",
+                          amount: bs.currentPeriodNetIncome
+                        }
+                      ] : undefined}
+                    />
 
                     <div className="pt-10 mt-6 border-t-2 border-gray-800 flex justify-between items-center">
                       <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">TOTAL LIABILITIES AND EQUITY</span>
@@ -1114,7 +1126,13 @@ const ReportTab: React.FC<{ active: boolean, label: string, onClick: () => void,
   </button>
 );
 
-const DetailedFinancialSection: React.FC<{ title: string, rows: DetailedFinancialRow[], total: number, symbol: string }> = ({ title, rows, total, symbol }) => {
+const DetailedFinancialSection: React.FC<{
+  title: string;
+  rows: DetailedFinancialRow[];
+  total: number;
+  symbol: string;
+  additionalItems?: { label: string; code?: string; amount: number }[];
+}> = ({ title, rows, total, symbol, additionalItems }) => {
   return (
     <div className="animate-in fade-in duration-700 slide-in-from-bottom-2">
       <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-8 flex items-center gap-4">
@@ -1158,6 +1176,33 @@ const DetailedFinancialSection: React.FC<{ title: string, rows: DetailedFinancia
             No activity attributed to this segment.
           </div>
         )}
+
+        {additionalItems && additionalItems.map((item, idx) => (
+          <div
+            key={`extra-${idx}`}
+            className="grid grid-cols-[1fr_auto] gap-4 py-2 border-t border-gray-100"
+          >
+            <div className="min-w-0 flex items-center gap-3">
+              <ChevronRight size={12} className="text-brand print:text-gray-900 transition-colors" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="text-sm tracking-tight print:text-gray-900 font-semibold text-gray-800 uppercase">
+                    {item.label}
+                  </span>
+                  {item.code && (
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide print:text-gray-700">
+                      {item.code}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <span className={`font-mono text-xs text-right print:text-gray-900 font-semibold ${item.amount < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+              {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        ))}
+
         <div className="flex justify-between items-center pt-6 mt-6 border-t border-gray-100 text-sm font-semibold text-gray-900 uppercase tracking-wide print:border-gray-800">
           <span>SUBTOTAL {title}</span>
           <span className="border-b-2 border-gray-800 pb-1">{symbol} {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

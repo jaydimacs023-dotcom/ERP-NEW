@@ -31,15 +31,27 @@ export class InventoryGLService {
     orgId: string,
     createdBy: string
   ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
-    // Get GL accounts
-    const varianceAccount = accounts.find(a => 
-      a.name.toLowerCase().includes('inventory variance') && 
-      a.class === AccountClass.EXPENSE
-    ) || accounts.find(a => a.code === '5100'); // Fallback to COGS
+    // Resolve Inventory Variance / Shrinkage account (Must be an EXPENSE account)
+    const varianceAccount = (item.cogsAccountId 
+      ? accounts.find(a => a.id === item.cogsAccountId && a.class === AccountClass.EXPENSE)
+      : null) ||
+      accounts.find(a => 
+        !a.isHeader &&
+        a.class === AccountClass.EXPENSE &&
+        (a.name.toLowerCase().includes('inventory variance') || a.name.toLowerCase().includes('shrinkage') || a.name.toLowerCase().includes('inventory adjustment'))
+      ) || 
+      accounts.find(a => !a.isHeader && a.class === AccountClass.EXPENSE && (a.name.toLowerCase().includes('cogs') || a.name.toLowerCase().includes('cost of goods') || a.code === '5100' || a.code.startsWith('51')));
 
-    const inventoryAccount = item.cogsAccountId 
-      ? accounts.find(a => a.id === item.cogsAccountId)
-      : accounts.find(a => a.name.toLowerCase().includes('inventory') && a.class === AccountClass.ASSET);
+    // Resolve Inventory Asset account (Must be an ASSET account)
+    const inventoryAccount = ((item as any).inventoryAssetAccountId
+      ? accounts.find(a => a.id === (item as any).inventoryAssetAccountId && a.class === AccountClass.ASSET)
+      : null) ||
+      accounts.find(a => 
+        !a.isHeader &&
+        a.class === AccountClass.ASSET &&
+        (a.name.toLowerCase().includes('merchandise inventory') || a.name.toLowerCase().includes('inventory') || a.code === '1300' || a.code.startsWith('13'))
+      ) ||
+      accounts.find(a => !a.isHeader && a.class === AccountClass.ASSET && a.name.toLowerCase().includes('inventory'));
 
     if (!varianceAccount || !inventoryAccount) return null;
 
@@ -53,7 +65,7 @@ export class InventoryGLService {
       date: adjustment.createdAt,
       description: `Inventory Adjustment: ${adjustment.reason}`,
       reference: `ADJ-${adjustment.adjustmentNumber}`,
-      sourceType: 'PURCHASE_ORDER', // Generic source for adjustments
+      sourceType: 'INVENTORY',
       status: 'POSTED',
       createdBy,
     };
@@ -117,9 +129,15 @@ export class InventoryGLService {
     orgId: string,
     createdBy: string
   ): { entry: Partial<JournalEntry>; lines: JournalLine[] } | null {
-    const inventoryAccount = item.cogsAccountId 
-      ? accounts.find(a => a.id === item.cogsAccountId)
-      : accounts.find(a => a.name.toLowerCase().includes('inventory') && a.class === AccountClass.ASSET);
+    const inventoryAccount = ((item as any).inventoryAssetAccountId
+      ? accounts.find(a => a.id === (item as any).inventoryAssetAccountId && a.class === AccountClass.ASSET)
+      : null) ||
+      accounts.find(a => 
+        !a.isHeader &&
+        a.class === AccountClass.ASSET &&
+        (a.name.toLowerCase().includes('merchandise inventory') || a.name.toLowerCase().includes('inventory') || a.code === '1300' || a.code.startsWith('13'))
+      ) ||
+      accounts.find(a => !a.isHeader && a.class === AccountClass.ASSET && a.name.toLowerCase().includes('inventory'));
 
     if (!inventoryAccount) return null;
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   GoodsReceipt, GoodsReceiptLine, GoodsReceiptStatus, PurchaseOrder,
   Vendor, ChartOfAccount, JournalEntry, JournalLine
@@ -203,11 +203,11 @@ const GoodsReceiptView: React.FC<GoodsReceiptViewProps> = ({
     // CR GR/IR Clearing (Liability)
     if (onPostJournal) {
       const inventoryAccount = accounts.find(a =>
-        a.name.toLowerCase().includes('inventory') && a.accountClass === 'ASSET'
+        a.name.toLowerCase().includes('inventory') && a.class === 'ASSET'
       );
       const grirAccount = accounts.find(a =>
         a.name.toLowerCase().includes('gr/ir') || a.name.toLowerCase().includes('goods receipt')
-      ) || accounts.find(a => a.accountClass === 'LIABILITY');
+      ) || accounts.find(a => a.class === 'LIABILITY');
 
       if (inventoryAccount && grirAccount) {
         const lines: JournalLine[] = [

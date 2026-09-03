@@ -1,4 +1,3 @@
-
 import { AccountClass, JournalLine, ChartOfAccount, TransactionSummary, JournalEntry } from './types';
 
 export class AccountingService {
@@ -104,9 +103,27 @@ export class AccountingService {
 
     const totalAssets = assets.reduce((sum, s) => sum + s.balance, 0);
     const totalLiabilities = liabilities.reduce((sum, s) => sum + s.balance, 0);
-    const totalEquity = equity.reduce((sum, s) => sum + s.balance, 0);
+    const rawEquity = equity.reduce((sum, s) => sum + s.balance, 0);
 
-    return { assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity };
+    // Calculate current period net income from all revenue and expense summaries
+    const revenue = summaries.filter(s => s.accountClass === AccountClass.REVENUE && topLevel.some(t => t.id === s.accountId));
+    const expenses = summaries.filter(s => s.accountClass === AccountClass.EXPENSE && topLevel.some(t => t.id === s.accountId));
+    const totalRevenue = revenue.reduce((sum, s) => sum + s.balance, 0);
+    const totalExpenses = expenses.reduce((sum, s) => sum + s.balance, 0);
+    const currentPeriodNetIncome = totalRevenue - totalExpenses;
+
+    const totalEquity = rawEquity + currentPeriodNetIncome;
+
+    return { 
+      assets, 
+      liabilities, 
+      equity, 
+      totalAssets, 
+      totalLiabilities, 
+      totalEquity,
+      rawEquity,
+      currentPeriodNetIncome
+    };
   }
 
   static generateIncomeStatement(summaries: TransactionSummary[], accounts: ChartOfAccount[]) {
@@ -133,32 +150,57 @@ export class AccountingService {
     const netIncome = incomeStatement.netIncome;
 
     // 1. Operating Activities (Indirect Method)
-    const deprAccounts = accounts.filter(a => a.name.toLowerCase().includes('depreciation') && a.class === AccountClass.ASSET);
+    const deprAccounts = accounts.filter(a => 
+      !a.isHeader && 
+      (a.name.toLowerCase().includes('depreciation') || a.name.toLowerCase().includes('amortization')) && 
+      a.class === AccountClass.ASSET
+    );
     const deprIds = new Set(deprAccounts.map(a => a.id));
     const depreciationAdjustment = lines
       .filter(l => deprIds.has(l.accountId))
       .reduce((sum, l) => sum + (l.credit - l.debit), 0);
 
-    const arAccounts = accounts.filter(a => a.name.toLowerCase().includes('receivable') && a.class === AccountClass.ASSET);
+    const arAccounts = accounts.filter(a => 
+      !a.isHeader && 
+      a.class === AccountClass.ASSET && 
+      (a.name.toLowerCase().includes('receivable') || a.code === '1200' || a.code.startsWith('12'))
+    );
     const openingAR = openingSummaries.filter(s => arAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
     const endingAR = endingSummaries.filter(s => arAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
     const changeInAR = openingAR - endingAR;
 
-    const apAccounts = accounts.filter(a => a.name.toLowerCase().includes('payable') && a.class === AccountClass.LIABILITY);
+    const apAccounts = accounts.filter(a => 
+      !a.isHeader && 
+      a.class === AccountClass.LIABILITY && 
+      (a.name.toLowerCase().includes('payable') || a.code === '2100' || a.code.startsWith('21'))
+    );
     const openingAP = openingSummaries.filter(s => apAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
     const endingAP = endingSummaries.filter(s => apAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
     const changeInAP = endingAP - openingAP;
 
     const operatingCashFlow = netIncome + depreciationAdjustment + changeInAR + changeInAP;
 
-    // 2. Investing Activities
-    const assetCostAccounts = accounts.filter(a => a.code.startsWith('15') && !a.isHeader);
+    // 2. Investing Activities: Capital Expenditures & Fixed Assets (PPE)
+    const nonInvestingKeywords = ['receivable', 'cash', 'bank', 'inventory', 'prepaid', 'deposit', 'supplies', 'depreciation', 'allowance', 'amortization'];
+    const ppeKeywords = ['property', 'plant', 'equipment', 'furniture', 'fixture', 'machinery', 'vehicle', 'building', 'land', 'leasehold', 'computer', 'hardware', 'capital asset', 'fixed asset'];
+    const assetCostAccounts = accounts.filter(a => 
+      !a.isHeader && 
+      a.class === AccountClass.ASSET && 
+      !nonInvestingKeywords.some(kw => a.name.toLowerCase().includes(kw)) &&
+      (
+        a.code.startsWith('15') || 
+        a.code.startsWith('16') || 
+        a.code.startsWith('17') || 
+        a.code.startsWith('18') ||
+        ppeKeywords.some(kw => a.name.toLowerCase().includes(kw))
+      )
+    );
     const assetCostIds = new Set(assetCostAccounts.map(a => a.id));
     const investingCashFlow = -lines
       .filter(l => assetCostIds.has(l.accountId))
       .reduce((sum, l) => sum + (l.debit - l.credit), 0);
 
-    // 3. Financing Activities
+    // 3. Financing Activities (Equity changes)
     const equityAccounts = accounts.filter(a => a.class === AccountClass.EQUITY && !a.isHeader);
     const equityIds = new Set(equityAccounts.map(a => a.id));
     const financingCashFlow = lines
@@ -167,7 +209,17 @@ export class AccountingService {
 
     const netCashFlow = operatingCashFlow + investingCashFlow + financingCashFlow;
 
-    const cashAccounts = accounts.filter(a => (a.code.startsWith('11') || a.name.toLowerCase().includes('cash') || a.name.toLowerCase().includes('checking')) && !a.isHeader);
+    // Cash and Cash Equivalents
+    const cashKeywords = ['cash', 'bank', 'checking', 'savings', 'petty', 'treasury', 'depository'];
+    const cashAccounts = accounts.filter(a => 
+      !a.isHeader && 
+      a.class === AccountClass.ASSET && 
+      (
+        a.code.startsWith('10') || 
+        a.code.startsWith('11') || 
+        cashKeywords.some(kw => a.name.toLowerCase().includes(kw))
+      )
+    );
     const beginningCash = openingSummaries.filter(s => cashAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
     const totalCash = endingSummaries.filter(s => cashAccounts.some(a => a.id === s.accountId)).reduce((sum, s) => sum + s.balance, 0);
 

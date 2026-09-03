@@ -1778,8 +1778,15 @@ export default function App() {
 
   const resolvePostingPeriodId = (explicitPeriodId?: string, entryDate?: string): string => {
     const orgPeriods = accountingPeriods.filter(p => p.orgId === currentOrgId && !p.isDeleted);
-    if (explicitPeriodId && orgPeriods.some(p => p.id === explicitPeriodId)) {
-      return explicitPeriodId;
+    if (explicitPeriodId) {
+      const explicitPeriod = orgPeriods.find(p => p.id === explicitPeriodId);
+      // Strictly block posting into HARD_CLOSE or LOCKED periods
+      if (explicitPeriod && (explicitPeriod.status === 'HARD_CLOSE' || explicitPeriod.status === 'LOCKED' || explicitPeriod.glClosed)) {
+        return '';
+      }
+      if (explicitPeriod) {
+        return explicitPeriodId;
+      }
     }
 
     const targetDate = new Date(entryDate || new Date().toISOString().split('T')[0]);
@@ -1789,17 +1796,11 @@ export default function App() {
       return targetDate >= start && targetDate <= end;
     });
 
-    const openMatched = dateMatched.find(p => p.status === 'OPEN');
+    const openMatched = dateMatched.find(p => p.status === 'OPEN' && !p.glClosed);
     if (openMatched) return openMatched.id;
 
-    const softMatched = dateMatched.find(p => p.status === 'SOFT_CLOSE');
+    const softMatched = dateMatched.find(p => p.status === 'SOFT_CLOSE' && !p.glClosed);
     if (softMatched) return softMatched.id;
-
-    const anyOpen = orgPeriods.find(p => p.status === 'OPEN');
-    if (anyOpen) return anyOpen.id;
-
-    const anySoft = orgPeriods.find(p => p.status === 'SOFT_CLOSE');
-    if (anySoft) return anySoft.id;
 
     return '';
   };
@@ -1815,26 +1816,17 @@ export default function App() {
       return targetDate >= start && targetDate <= end;
     });
 
+    // Only allow OPEN or unclosed SOFT_CLOSE periods; strictly never fall back to HARD_CLOSE or LOCKED periods
     const pickByPriority = (periods: typeof orgPeriods) =>
-      periods.find(p => p.status === 'OPEN') ||
-      periods.find(p => p.status === 'SOFT_CLOSE') ||
-      periods.find(p => p.status === 'HARD_CLOSE') ||
-      periods.find(p => p.status === 'LOCKED') ||
+      periods.find(p => p.status === 'OPEN' && !p.glClosed && !p.arClosed) ||
+      periods.find(p => p.status === 'SOFT_CLOSE' && !p.glClosed && !p.arClosed) ||
       null;
 
     const datePriority = pickByPriority(dateMatched);
     if (datePriority) return datePriority.id;
 
-    const orgPriority = pickByPriority(orgPeriods);
-    if (orgPriority) return orgPriority.id;
-
-    const latestPeriod = [...orgPeriods].sort((a, b) => {
-      const endA = new Date(a.endDate || a.startDate).getTime();
-      const endB = new Date(b.endDate || b.startDate).getTime();
-      return endB - endA;
-    })[0];
-
-    return latestPeriod?.id || '';
+    // Never fall back to closed or locked periods
+    return '';
   };
 
   const DEFAULT_JOURNAL_CLASSIFICATION_CODE = '00000-00000';
@@ -1966,6 +1958,11 @@ export default function App() {
       }
 
       const postingTimestamp = new Date().toISOString();
+      const isNewEntry = !existingManualEntry;
+
+      // Two-Phase Commit Pattern:
+      // When creating a new journal entry, stage it as DRAFT in Phase 1 so that
+      // if line insertion fails, an unbalanced/orphaned POSTED entry never pollutes the GL.
       const savedEntry = existingManualEntry
         ? await dataService.updateJournalEntry(existingManualEntry.id, {
             status: 'POSTED',
@@ -1979,6 +1976,7 @@ export default function App() {
           })
         : await dataService.createJournalEntry({
             ...fullEntry,
+            status: 'DRAFT',
             postedBy: currentUser?.id || 'system',
             postedAt: postingTimestamp
           });
@@ -2008,11 +2006,32 @@ export default function App() {
         orgId: currentOrgId
       }));
 
-      // Manual journal lines already belong to the draft. They become GL
-      // transactions by virtue of the parent changing to POSTED.
-      const savedLines = existingManualEntry
-        ? linesWithActualId
-        : await dataService.createJournalLines(linesWithActualId);
+      // Insert lines with automatic rollback of the staged DRAFT header on error
+      let savedLines: JournalLine[] = [];
+      try {
+        savedLines = existingManualEntry
+          ? linesWithActualId
+          : await dataService.createJournalLines(linesWithActualId);
+      } catch (lineError) {
+        if (isNewEntry && savedEntry?.id) {
+          try {
+            await dataService.deleteJournalEntry(savedEntry.id);
+            console.warn('[App] Rolled back staged DRAFT journal header after line failure:', savedEntry.id);
+          } catch (cleanupError) {
+            console.error('[App] Failed to rollback staged DRAFT journal header:', cleanupError);
+          }
+        }
+        throw lineError;
+      }
+
+      // Phase 2: Lines are committed; transition new entry to POSTED status
+      if (isNewEntry && savedEntry?.id) {
+        await dataService.updateJournalEntry(savedEntry.id, {
+          status: 'POSTED',
+          updatedAt: new Date().toISOString()
+        });
+        normalizedSavedEntry.status = 'POSTED';
+      }
       const sourceLineClassMap = new Map(
         normalizedLines.map(line => [line.id, String((line as any).classificationCode || '').trim()])
       );
@@ -4450,63 +4469,96 @@ export default function App() {
         return;
       }
 
+      // Resolve Depreciation Expense and Accumulated Depreciation accounts
+      const deprExpenseAccount = filteredAccounts.find(a =>
+        !a.isHeader &&
+        a.class === AccountClass.EXPENSE &&
+        (a.name.toLowerCase().includes('depreciation') || a.code === '5200' || a.code.startsWith('52'))
+      ) || filteredAccounts.find(a => !a.isHeader && a.class === AccountClass.EXPENSE);
+
+      const accumDeprAccount = filteredAccounts.find(a =>
+        !a.isHeader &&
+        a.class === AccountClass.ASSET &&
+        (a.name.toLowerCase().includes('accumulated') || a.name.toLowerCase().includes('allowance'))
+      ) || (asset.glAccountId ? filteredAccounts.find(a => a.id === asset.glAccountId) : null);
+
+      if (!deprExpenseAccount || !accumDeprAccount) {
+        handleNotify('error', 'Cannot record depreciation: Depreciation Expense or Accumulated Depreciation GL account is not configured.');
+        return;
+      }
+
       // Calculate monthly depreciation: Purchase Cost / (Useful Life Years * 12)
-      const monthlyDepreciation = asset.purchaseCost / (asset.usefulLifeYears * 12);
+      const monthlyDepreciation = Math.round(((asset.purchaseCost / (Math.max(asset.usefulLifeYears, 1) * 12)) + Number.EPSILON) * 100) / 100;
+      if (monthlyDepreciation <= 0) {
+        handleNotify('error', 'Depreciation amount must be greater than zero.');
+        return;
+      }
 
-      // Generate entry ID
-      const entryId = `depr - ${Date.now()} `;
+      const currentAccum = asset.accumulatedDepreciation || 0;
+      const salvageValue = asset.salvageValue || 0;
+      const maxDepreciable = Math.max(0, asset.purchaseCost - salvageValue);
+      if (currentAccum >= maxDepreciable) {
+        handleNotify('info', `Asset ${asset.name} is already fully depreciated.`);
+        return;
+      }
+      const actualDepreciation = Math.min(monthlyDepreciation, maxDepreciable - currentAccum);
 
-      // Create depreciation lines with proper journalEntryId reference
+      // Generate entry ID and reference
+      const nowIso = new Date().toISOString();
+      const todayDate = nowIso.split('T')[0];
+      const entryId = `depr-${Date.now()}`;
+      const deprRef = `DEP-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`;
+
+      // Create depreciation lines with proper double-entry accounting
       const deprLines: JournalLine[] = [
         {
-          id: `line - ${Date.now()} -debit`,
+          id: `line-${Date.now()}-debit`,
           journalEntryId: entryId,
           orgId: currentOrgId,
-          accountId: '', // Depreciation expense account-will use blank for now
-          debit: monthlyDepreciation,
+          accountId: deprExpenseAccount.id,
+          debit: actualDepreciation,
           credit: 0,
-          description: `Depreciation expense - ${asset.name} `,
+          description: `Depreciation expense - ${asset.name}`,
+          memo: `Depreciation expense - ${asset.name}`,
           assetId: assetId
         },
         {
-          id: `line - ${Date.now()} -credit`,
+          id: `line-${Date.now()}-credit`,
           journalEntryId: entryId,
           orgId: currentOrgId,
-          accountId: asset.glAccountId, // Fixed Asset account
+          accountId: accumDeprAccount.id,
           debit: 0,
-          credit: monthlyDepreciation,
-          description: `Accumulated depreciation - ${asset.name} `,
+          credit: actualDepreciation,
+          description: `Accumulated depreciation - ${asset.name}`,
+          memo: `Accumulated depreciation - ${asset.name}`,
           assetId: assetId
         }
       ];
 
-      // Create depreciation journal entry with double-entry accounting
-      const newEntry: JournalEntry = {
+      // Create depreciation journal entry
+      const newEntry: Partial<JournalEntry> = {
         id: entryId,
         orgId: currentOrgId,
-        periodId: '', // Will need period context
-        date: new Date().toISOString().split('T')[0],
+        date: todayDate,
         description: `Monthly depreciation for ${asset.name}`,
-        reference: `DEP - ${new Date().getFullYear()} -${Math.floor(Math.random() * 100000).toString().padStart(5, '0')} `,
+        reference: deprRef,
         status: 'POSTED',
         createdBy: currentUser?.id || 'system',
         sourceType: 'DEPRECIATION',
-        createdAt: new Date().toISOString(),
+        sourceRef: assetId,
+        createdAt: nowIso,
         isDeleted: false
       };
 
-      // Add journal entry lines separately
-      const newLines: JournalLine[] = deprLines.map(line => ({
-        ...line,
-        journalEntryId: entryId
-      }));
-
-      // Add to journal entries and lines
-      setJournalEntries(prev => [...prev, newEntry]);
-      setJournalLines(prev => [...prev, ...newLines]);
+      // Persist to General Ledger via handlePostJournal
+      const savedEntry = await handlePostJournal(newEntry, deprLines);
+      if (!savedEntry) {
+        handleNotify('error', 'Depreciation was not posted to the General Ledger. Please verify that an open accounting period exists.');
+        return;
+      }
 
       // Update accumulated depreciation on the asset
-      const newAccumulated = (asset.accumulatedDepreciation || 0) + monthlyDepreciation;
+      const newAccumulated = currentAccum + actualDepreciation;
       await handleUpdateFixedAsset(assetId, { accumulatedDepreciation: newAccumulated });
 
       // Audit: Depreciation recorded
@@ -4518,10 +4570,10 @@ export default function App() {
         entityType: 'FIXED_ASSET',
         entityId: assetId,
         entityName: asset.name,
-        details: `Depreciation: ${monthlyDepreciation.toFixed(2)} | New Accumulated: ${newAccumulated.toFixed(2)} `
+        details: `Depreciation: ${actualDepreciation.toFixed(2)} | New Accumulated: ${newAccumulated.toFixed(2)}`
       });
 
-      handleNotify('success', `Depreciation of ${monthlyDepreciation.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded successfully`);
+      handleNotify('success', `Depreciation of ${actualDepreciation.toLocaleString(undefined, { minimumFractionDigits: 2 })} recorded and posted to GL successfully`);
     } catch (error) {
       console.error('[App] Error recording depreciation:', error);
       handleNotify('error', 'Failed to record depreciation');
@@ -4959,14 +5011,18 @@ export default function App() {
       preferredAccountId: (sponsor as any)?.arAccountId
     });
     const cashOnHandAccount = filteredAccounts.find(a =>
-      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash on hand'
-    );
+      !a.isHeader && a.class === AccountClass.ASSET && 
+      (String(a.name || '').toLowerCase().includes('cash on hand') || String(a.name || '').toLowerCase().includes('petty cash') || a.code === '1101' || a.code === '1010')
+    ) || filteredAccounts.find(a => !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').toLowerCase().includes('cash'));
+
     const operatingBankAccount = filteredAccounts.find(a =>
-      !a.isHeader && a.class === AccountClass.ASSET && String(a.name || '').trim().toLowerCase() === 'cash in bank - operating'
-    );
+      !a.isHeader && a.class === AccountClass.ASSET && 
+      (String(a.name || '').toLowerCase().includes('operating') || String(a.name || '').toLowerCase().includes('checking') || String(a.name || '').toLowerCase().includes('bank') || a.code === '1100' || a.code === '1020')
+    ) || filteredAccounts.find(a => !a.isHeader && a.class === AccountClass.ASSET && (String(a.name || '').toLowerCase().includes('bank') || String(a.name || '').toLowerCase().includes('cash')));
+
     const nonInvoiceDebitAccount = invoice.paymentMethod === 'BANK_TRANSFER'
-      ? operatingBankAccount
-      : cashOnHandAccount;
+      ? (operatingBankAccount || cashOnHandAccount)
+      : (cashOnHandAccount || operatingBankAccount);
     const debitAccountId = invoice.documentType === 'NON_INVOICE_PAYMENT' ? nonInvoiceDebitAccount?.id : arAccount?.id;
 
     const vatPayableId =
@@ -5998,10 +6054,12 @@ export default function App() {
         je => je.sourceType === 'APPLICATION' && je.sourceRef === savedApplication.id && je.status === 'POSTED'
       );
       if (!savedApplicationEntry) {
+        const applDate = applicationTs.split('T')[0];
+        const applPeriodId = resolvePostingPeriodId(undefined, applDate);
         const applEntry: Partial<JournalEntry> = {
           orgId: currentOrgId,
-          periodId: invoice.periodId || '',
-          date: new Date().toISOString().split('T')[0],
+          periodId: applPeriodId,
+          date: applDate,
           reference: applicationJournalDetail,
           description: applicationDescription,
           status: 'POSTED',
