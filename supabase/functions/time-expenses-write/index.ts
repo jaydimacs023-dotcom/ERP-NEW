@@ -131,8 +131,8 @@ Deno.serve(async (request) => {
     }
     const { data: expenseAccount } = await admin.from("chart_of_accounts")
       .select("id").eq("id", values.expense_account_id).eq("org_id", orgId)
-      .eq("class", "EXPENSE").eq("is_header", false).maybeSingle();
-    if (!expenseAccount) return json(403, { error: "Expense account is outside this organization or is not a posting expense account" });
+      .in("class", ["EXPENSE", "ASSET"]).eq("is_header", false).maybeSingle();
+    if (!expenseAccount) return json(403, { error: "Expense or asset account is outside this organization or is not a posting account" });
     const { data: qualification } = await admin.from("qualifications").select("id")
       .eq("id", values.qualification_id).eq("org_id", orgId).maybeSingle();
     if (!qualification) return json(403, { error: "Class is outside this organization or inactive" });
@@ -176,8 +176,8 @@ Deno.serve(async (request) => {
       }
       const { data: expenseAccount } = await admin.from("chart_of_accounts")
         .select("id").eq("id", values.expense_account_id).eq("org_id", orgId)
-        .eq("class", "EXPENSE").eq("is_header", false).maybeSingle();
-      if (!expenseAccount) return json(403, { error: "Expense account is outside this organization or is not a posting expense account" });
+        .in("class", ["EXPENSE", "ASSET"]).eq("is_header", false).maybeSingle();
+      if (!expenseAccount) return json(403, { error: "Expense or asset account is outside this organization or is not a posting account" });
       const { data: qualification } = await admin.from("qualifications").select("id")
         .eq("id", values.qualification_id).eq("org_id", orgId).maybeSingle();
       if (!qualification) return json(403, { error: "Class is outside this organization or inactive" });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location, Organization } from '../types';
+import { Batch, Qualification, Trainer, Student, BatchStatus, Sponsor, TrainerSchedule, DaySlot, Location, Organization, Enrollment } from '../types';
 import { generateUUID } from '../utils/uuid';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 import { DataServiceFactory } from '../services/DataServiceFactory';
@@ -20,6 +20,7 @@ interface BatchesViewProps {
   schedules: TrainerSchedule[];
   locations: Location[];
   organization?: Organization;
+  enrollments?: Enrollment[];
   onAddBatch: (batch: Batch) => Promise<void> | void;
   onUpdateBatch: (batch: Batch) => Promise<void> | void;
   onDeleteBatch: (id: string) => Promise<boolean | void> | void;
@@ -113,10 +114,54 @@ const getBatchCalculationSlots = (
 
 const BatchesView: React.FC<BatchesViewProps> = ({
   batches, qualifications, trainers, students, sponsors, schedules, locations, organization,
+  enrollments = [],
   onAddBatch, onUpdateBatch, onDeleteBatch, onNotify
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  const getBatchFundingSummary = (batch: Batch) => {
+    const batchEnrs = (enrollments || []).filter(e => !e.isDeleted && e.batchId === batch.id);
+    if (batchEnrs.length === 0) {
+      const sp = sponsors.find(s => s.id === batch.sponsorId);
+      return {
+        isMixed: false,
+        hasEnrollments: false,
+        primarySponsor: sp,
+        breakdown: [] as { id: string; name: string; count: number; isPrivate: boolean }[]
+      };
+    }
+
+    const breakdownMap = new Map<string, { id: string; name: string; count: number; isPrivate: boolean }>();
+
+    for (const enr of batchEnrs) {
+      const effectiveSponsorId = enr.sponsorId !== undefined && enr.sponsorId !== null
+        ? enr.sponsorId
+        : (batch.sponsorId || '');
+
+      if (!effectiveSponsorId) {
+        const current = breakdownMap.get('__private__') || { id: '', name: 'Private / Self-pay', count: 0, isPrivate: true };
+        current.count++;
+        breakdownMap.set('__private__', current);
+      } else {
+        const sp = sponsors.find(s => s.id === effectiveSponsorId);
+        const spName = sp ? sp.name : 'Sponsored';
+        const current = breakdownMap.get(effectiveSponsorId) || { id: effectiveSponsorId, name: spName, count: 0, isPrivate: false };
+        current.count++;
+        breakdownMap.set(effectiveSponsorId, current);
+      }
+    }
+
+    const breakdown = Array.from(breakdownMap.values());
+    const isMixed = breakdown.length > 1;
+
+    return {
+      isMixed,
+      hasEnrollments: true,
+      primarySponsor: sponsors.find(s => s.id === batch.sponsorId),
+      breakdown
+    };
+  };
   const [statusFilter, setStatusFilter] = useState<BatchStatus | 'ALL'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -154,6 +199,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
   const [viewingBatch, setViewingBatch] = useState<Batch | null>(null);
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [visibleAvailableStudentCount, setVisibleAvailableStudentCount] = useState(AVAILABLE_LEARNERS_CHUNK_SIZE);
+  const [studentSponsors, setStudentSponsors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<Partial<Batch>>({
     name: '',
@@ -317,6 +363,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     setEditingBatch(null);
     setProjection(null);
     setStudentSearchTerm('');
+    setStudentSponsors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -338,6 +385,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
         await onUpdateBatch({
           ...editingBatch,
           ...formData,
+          studentSponsors,
           status: BatchStatus.PLANNED,
           currentStudents: studentCount
         } as Batch);
@@ -355,6 +403,7 @@ const BatchesView: React.FC<BatchesViewProps> = ({
           sponsorId: formData.sponsorId || undefined,
           locationId: formData.locationId || undefined,
           studentIds: formData.studentIds || [],
+          studentSponsors,
           status: BatchStatus.PLANNED,
           startDate: formData.startDate!,
           endDate: formData.endDate!,
@@ -487,6 +536,18 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     setFormData({
       ...batch
     });
+    const initialSponsors: Record<string, string> = {};
+    (batch.studentIds || []).forEach(studentId => {
+      const enr = (enrollments || []).find(e => !e.isDeleted && e.batchId === batch.id && e.studentId === studentId);
+      if (enr && enr.sponsorId !== undefined && enr.sponsorId !== null) {
+        initialSponsors[studentId] = enr.sponsorId;
+      } else if (batch.studentSponsors && batch.studentSponsors[studentId] !== undefined) {
+        initialSponsors[studentId] = batch.studentSponsors[studentId];
+      } else {
+        initialSponsors[studentId] = batch.sponsorId || '';
+      }
+    });
+    setStudentSponsors(initialSponsors);
     setStudentSearchTerm('');
     setShowModal(true);
   };
@@ -495,8 +556,17 @@ const BatchesView: React.FC<BatchesViewProps> = ({
     const current = formData.studentIds || [];
     if (current.includes(studentId)) {
       setFormData({ ...formData, studentIds: current.filter(id => id !== studentId) });
+      setStudentSponsors(prev => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
     } else {
       setFormData({ ...formData, studentIds: [...current, studentId] });
+      setStudentSponsors(prev => ({
+        ...prev,
+        [studentId]: prev[studentId] !== undefined ? prev[studentId] : (formData.sponsorId || '')
+      }));
     }
   };
 
@@ -777,10 +847,32 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                 </p>
               </div>
               <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sponsor</p>
-                <p className="text-sm font-semibold text-gray-700">
-                  {sponsors.find(s => s.id === viewingBatch.sponsorId)?.name || 'Private / Self-Funded'}
-                </p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Funding Profile</p>
+                {(() => {
+                  const summary = getBatchFundingSummary(viewingBatch);
+                  if (summary.isMixed) {
+                    return (
+                      <div className="space-y-1.5 mt-1">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-800">
+                          <Layers size={12} /> Mixed Cohort ({summary.breakdown.length} Groups)
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {summary.breakdown.map(b => (
+                            <span key={b.name} className={`px-2 py-0.5 rounded text-xs font-medium border ${b.isPrivate ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-brand/10 text-brand border-brand-light'}`}>
+                              {b.name}: <strong>{b.count}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const defaultSponsor = sponsors.find(s => s.id === viewingBatch.sponsorId);
+                  return (
+                    <p className="text-sm font-semibold text-gray-700">
+                      {defaultSponsor ? `${defaultSponsor.name} (Sponsored)` : 'Private / Self-Funded'}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -831,15 +923,32 @@ const BatchesView: React.FC<BatchesViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {viewingBatch.studentIds.map(studentId => {
                   const student = students.find(s => s.id === studentId);
+                  const studentEnrollment = (enrollments || []).find(e => !e.isDeleted && e.batchId === viewingBatch.id && e.studentId === studentId);
+                  const effectiveSponsorId = studentEnrollment?.sponsorId !== undefined && studentEnrollment.sponsorId !== null
+                    ? studentEnrollment.sponsorId
+                    : (viewingBatch.sponsorId || '');
+                  const studentSponsor = sponsors.find(s => s.id === effectiveSponsorId);
+
                   return student ? (
                     <div key={student.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded border border-gray-100">
                       <div className="w-9 h-9 rounded border border-brand-light bg-brand/10 text-brand flex items-center justify-center text-xs font-semibold shrink-0">
                         {student.lastName[0]}
                       </div>
                       <div className="flex-1 overflow-hidden">
-                        <p className="text-xs font-semibold text-gray-800 truncate">
-                          {student.lastName}, {student.firstName}
-                        </p>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-xs font-semibold text-gray-800 truncate">
+                            {student.lastName}, {student.firstName}
+                          </p>
+                          {studentSponsor ? (
+                            <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand-light shrink-0 truncate max-w-[110px]" title={studentSponsor.name}>
+                              {studentSponsor.code || studentSponsor.name}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                              Private
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs font-mono text-gray-400 mt-0.5">
                           {student.uli?.slice(-6) || 'N/A'}
                         </p>
@@ -1041,10 +1150,34 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${sponsor ? 'bg-brand/10 border border-brand-light text-brand' : 'bg-amber-50 border border-amber-100 text-amber-600'}`}>
-                        {sponsor ? <Handshake size={12} /> : <Users size={12} />}
-                        {sponsor ? 'Sponsored' : 'Private'}
-                      </div>
+                      {(() => {
+                        const funding = getBatchFundingSummary(batch);
+                        if (funding.isMixed) {
+                          return (
+                            <div
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-indigo-50 border border-indigo-100 text-indigo-700"
+                              title={funding.breakdown.map(b => `${b.name}: ${b.count}`).join(', ')}
+                            >
+                              <Layers size={12} />
+                              Mixed Cohort ({funding.breakdown.length})
+                            </div>
+                          );
+                        }
+                        if (sponsor) {
+                          return (
+                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-brand/10 border border-brand-light text-brand">
+                              <Handshake size={12} />
+                              {sponsor.name}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-amber-50 border border-amber-100 text-amber-600">
+                            <Users size={12} />
+                            Private
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
@@ -1277,7 +1410,21 @@ const BatchesView: React.FC<BatchesViewProps> = ({
                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">Funding Sponsor</label>
                     <select
                       className="w-full bg-gray-50 border border-gray-200 rounded font-semibold text-gray-800 appearance-none"
-                      value={formData.sponsorId} onChange={e => setFormData({ ...formData, sponsorId: e.target.value })}
+                      value={formData.sponsorId} onChange={e => {
+                        const newSponsorId = e.target.value;
+                        const prevSponsorId = formData.sponsorId || '';
+                        setFormData(prev => ({ ...prev, sponsorId: newSponsorId }));
+                        // Automatically synchronize learners tracking previous batch sponsor or unset
+                        setStudentSponsors(prev => {
+                          const updated = { ...prev };
+                          for (const sId of (formData.studentIds || [])) {
+                            if (!updated[sId] || updated[sId] === prevSponsorId) {
+                              updated[sId] = newSponsorId;
+                            }
+                          }
+                          return updated;
+                        });
+                      }}
                     >
                       <option value="">Private / Individual</option>
                       {sponsors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1427,33 +1574,111 @@ const BatchesView: React.FC<BatchesViewProps> = ({
 
                     <div className="p-5 space-y-3 bg-white">
                       <div className="flex items-center justify-between gap-3">
-                        <h5 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Selected Learners</h5>
-                        <span className="text-xs font-semibold text-brand">{selectedStudents.length}</span>
+                        <div>
+                          <h5 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Selected Learners</h5>
+                          {selectedStudents.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500">
+                              <span>{selectedStudents.length} enrolled</span>
+                              {(() => {
+                                let sponsoredCount = 0;
+                                let privateCount = 0;
+                                for (const st of selectedStudents) {
+                                  const sId = studentSponsors[st.id] !== undefined ? studentSponsors[st.id] : (formData.sponsorId || '');
+                                  if (sId) sponsoredCount++;
+                                  else privateCount++;
+                                }
+                                return (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-emerald-700 font-semibold">{sponsoredCount} sponsored</span>
+                                    <span>•</span>
+                                    <span className="text-amber-700 font-semibold">{privateCount} private</span>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-brand/10 text-brand text-xs font-bold border border-brand/20">
+                          {selectedStudents.length}
+                        </span>
                       </div>
+
                       <div className="max-h-[488px] overflow-y-auto space-y-2 pr-1">
                         {selectedStudents.length > 0 ? (
-                          selectedStudents.map(student => (
-                            <button
-                              key={student.id}
-                              type="button"
-                              onClick={() => toggleStudent(student.id)}
-                              className="w-full flex items-center gap-3 p-4 rounded transition-all border bg-brand border-brand text-white shadow-sm shadow-brand/20 group"
-                              title="Remove learner from batch"
-                            >
-                              <div className="w-10 h-10 rounded flex items-center justify-center text-xs font-semibold shrink-0 bg-white/20 text-white">
-                                {student.lastName[0]}
-                              </div>
-                              <div className="flex-1 text-left overflow-hidden">
-                                <div className="text-xs font-semibold truncate uppercase text-white">
-                                  {student.lastName}, {student.firstName}
+                          selectedStudents.map(student => {
+                            const currentTag = studentSponsors[student.id] !== undefined
+                              ? studentSponsors[student.id]
+                              : (formData.sponsorId || '');
+                            const isSponsored = Boolean(currentTag);
+
+                            return (
+                              <div
+                                key={student.id}
+                                className={`w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-lg border transition-all ${
+                                  isSponsored
+                                    ? 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300'
+                                    : 'bg-amber-50/50 border-amber-200 hover:border-amber-300'
+                                } shadow-sm`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                    isSponsored ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {student.lastName[0]}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs font-bold uppercase text-gray-900 truncate">
+                                      {student.lastName}, {student.firstName}
+                                    </div>
+                                    <div className="text-[11px] font-mono text-gray-500">
+                                      ULI: {student.uli?.slice(-6) || 'N/A'}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-xs font-mono mt-0.5 text-white/80">
-                                  ULI: {student.uli?.slice(-6) || 'N/A'}
+
+                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                  <div className="relative">
+                                    <select
+                                      value={currentTag}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setStudentSponsors(prev => ({
+                                          ...prev,
+                                          [student.id]: val
+                                        }));
+                                      }}
+                                      className={`text-[11px] font-semibold rounded-md pl-2 pr-6 py-1 border transition-colors outline-none cursor-pointer appearance-none ${
+                                        isSponsored
+                                          ? 'bg-emerald-100/80 border-emerald-300 text-emerald-900 focus:border-emerald-500'
+                                          : 'bg-amber-100/80 border-amber-300 text-amber-900 focus:border-amber-500'
+                                      }`}
+                                      title="Select funding tag for this learner"
+                                    >
+                                      <option value="">👤 Private / Self-Pay</option>
+                                      {sponsors.map(s => (
+                                        <option key={s.id} value={s.id}>
+                                          🏛️ {s.code || s.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-500 text-[9px]">
+                                      ▼
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleStudent(student.id)}
+                                    className="p-1 rounded text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                    title="Remove learner from batch"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
                                 </div>
                               </div>
-                              <CheckCircle size={18} className="shrink-0 text-white" />
-                            </button>
-                          ))
+                            );
+                          })
                         ) : (
                           <div className="rounded border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
                             <Users size={32} className="mx-auto text-gray-200 mb-3" />

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { ArrowLeft, Calculator, Download, Pencil, Plus, ReceiptText, Save, Search, Trash2, X } from 'lucide-react';
-import { ChartOfAccount, Payable, Qualification, TaxCategoryEntry, TimeExpense, User, Vendor } from '../types';
+import { AccountClass, ChartOfAccount, Payable, Qualification, TaxCategoryEntry, TimeExpense, User, Vendor } from '../types';
 import { DataServiceFactory } from '../services/DataServiceFactory';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
@@ -72,7 +72,9 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const selectedClaimant = selectedRows[0]?.claimedBy;
   const selectedEmployeeId = selectedRows[0]?.employeeId;
   const expenseAccounts = useMemo(
-    () => accounts.filter(account => !account.isHeader && account.class === 'EXPENSE'),
+    () => accounts
+      .filter(account => !account.isHeader && account.isActive !== false && !account.isDeleted)
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
     [accounts]
   );
   const filteredExpenseAccounts = useMemo(() => {
@@ -94,7 +96,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         row.rfqCode, row.transactionDate, row.description,
         row.supplierName || vendors.find(vendor => vendor.id === row.supplierId)?.name,
         row.claimedBy,
-        expenseAccounts.find(account => account.id === row.expenseAccountId)?.name,
+        accounts.find(account => account.id === row.expenseAccountId)?.name,
         taxCategories.find(category => category.id === row.taxCategoryId)?.code,
         taxCategories.find(category => category.id === row.taxCategoryId)?.description,
         qualifications.find(qualification => qualification.id === row.qualificationId)?.code,
@@ -103,14 +105,14 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       ].some(value => String(value || '').toLocaleLowerCase().includes(query));
       return matchesStatus && matchesSearch;
     });
-  }, [rows, searchTerm, statusFilter, expenseAccounts, taxCategories, qualifications, vendors]);
+  }, [rows, searchTerm, statusFilter, accounts, taxCategories, qualifications, vendors]);
   const { currentPage, totalPages, pageStartIndex, pageEndIndex, paginatedRows, setCurrentPage } =
     usePaginatedRows(filteredRows, [searchTerm, statusFilter], 7);
 
   const handleExportExcel = () => {
     const exportRows = filteredRows.map(row => {
       const vendor = vendors.find(item => item.id === row.supplierId);
-      const account = expenseAccounts.find(item => item.id === row.expenseAccountId);
+      const account = accounts.find(item => item.id === row.expenseAccountId) || expenseAccounts.find(item => item.id === row.expenseAccountId);
       const qualification = qualifications.find(item => item.id === row.qualificationId);
       const taxCategory = taxCategories.find(item => item.id === row.taxCategoryId);
 
@@ -176,7 +178,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
       supplierName: row.supplierName || vendors.find(vendor => vendor.id === row.supplierId)?.name || '',
       employeeId: row.employeeId || employees.find(employee => employee.name === row.claimedBy)?.id || '',
     });
-    const account = expenseAccounts.find(item => item.id === row.expenseAccountId);
+    const account = accounts.find(item => item.id === row.expenseAccountId) || expenseAccounts.find(item => item.id === row.expenseAccountId);
     setExpenseAccountSearch(account ? `${account.code} — ${account.name}` : '');
     setShowForm(true);
   };
@@ -204,7 +206,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         return;
       }
       if (!expenseAccounts.some(account => account.id === form.expenseAccountId)) {
-        onNotify('error', 'Select a valid expense account from the search results.');
+        onNotify('error', 'Select a valid expense or asset account from the search results.');
         return;
       }
       const values = {
@@ -356,7 +358,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
               <label className="block text-sm font-semibold text-slate-700">Class<select required value={form.qualificationId} onChange={e => setForm({...form, qualificationId:e.target.value})} className={fieldClass}><option value="">Select Class...</option>{qualifications.map(qualification => <option key={qualification.id} value={qualification.id}>{qualification.code} - {qualification.name}</option>)}</select></label>
               <label className="block text-sm font-semibold text-slate-700">Supplier Tax Category<select required value={form.taxCategoryId} onChange={e => setForm({...form, taxCategoryId:e.target.value})} className={fieldClass}><option value="">Select tax category...</option>{taxCategories.map(category => <option key={category.id} value={category.id}>{category.code} - {category.description} ({Number(category.rate).toLocaleString()}%)</option>)}</select></label>
               <div className="relative">
-                <label htmlFor="expense-account-search" className="block text-sm font-semibold text-slate-700">Expense Account</label>
+                <label htmlFor="expense-account-search" className="block text-sm font-semibold text-slate-700">Expense Account (or Cash Advance / Asset)</label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400" size={16}/>
                   <input
@@ -391,7 +393,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
                       setShowExpenseAccountOptions(false);
                     }}
                     className={`flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm transition ${form.expenseAccountId === account.id ? 'bg-brand/10 text-brand' : 'text-slate-700 hover:bg-slate-50'}`}
-                  ><span className="w-24 shrink-0 font-mono text-xs font-bold">{account.code}</span><span className="truncate">{account.name}</span></button>) : <p className="px-3 py-5 text-center text-sm text-slate-400">No expense accounts found.</p>}
+                  ><span className="w-24 shrink-0 font-mono text-xs font-bold">{account.code}</span><span className="truncate">{account.name}</span></button>) : <p className="px-3 py-5 text-center text-sm text-slate-400">No matching accounts found.</p>}
                 </div>}
               </div>
             </section>
@@ -447,7 +449,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
           <option value="billed">Billed</option>
         </select>
       </div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-brand text-xs uppercase tracking-wider text-white"><tr><th className="p-4"></th><th className="p-4">RFQ Code</th><th className="p-4">Transaction Date</th><th className="p-4">Description</th><th className="p-4">Supplier</th><th className="p-4">Tax Category</th><th className="p-4 text-right">Tax</th><th className="p-4">Claimed By</th><th className="p-4">Expense Account</th><th className="p-4 text-right">Amount</th><th className="p-4">Status</th><th className="p-4"></th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedRows.map(row => { const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId); const taxAmount = isVatGoodsOrServices(taxCategory) ? calculateInclusiveVatAmount(Number(row.quantity), Number(row.unitCost), taxCategory) : calculateTaxAmount(Number(row.amount), taxCategory); const isOpen = row.status === 'open'; const isBilled = row.status === 'billed'; const isSelected = isOpen && selected.includes(row.id); return <tr key={row.id} data-row-id={row.id} className={isSelected ? 'bg-brand/5' : isOpen ? 'hover:bg-brand/5' : isBilled ? 'bg-blue-50/30' : 'bg-amber-50/30'}><td className="p-4"><input type="checkbox" disabled={!isOpen} checked={isSelected} onChange={() => toggle(row)} className="h-4 w-4 rounded border-slate-300 accent-[var(--brand)] disabled:opacity-40"/></td><td className="p-4 font-semibold text-brand">{row.rfqCode}</td><td className="p-4 text-slate-600">{row.transactionDate}</td><td className="p-4 text-slate-800">{row.description}</td><td className="p-4">{row.supplierName || vendors.find(v => v.id === row.supplierId)?.name || '—'}</td><td className="p-4"><span className="inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{taxCategory ? `${taxCategory.code} · ${Number(taxCategory.rate).toLocaleString()}%` : '—'}</span></td><td className="p-4 text-right font-mono text-slate-700">{taxCategory ? `${currency} ${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}</td><td className="p-4 text-slate-600">{row.claimedBy}</td><td className="p-4 text-slate-600">{expenseAccounts.find(account => account.id === row.expenseAccountId)?.name || '—'}</td><td className="p-4 text-right font-mono font-semibold">{currency} {Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOpen ? 'bg-amber-50 text-amber-700' : isBilled ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{isOpen ? 'Open' : isBilled ? 'Billed' : 'On Hold'}</span></td><td className="p-4">{isOpen && <div className="flex items-center gap-3"><button onClick={() => openEditForm(row)} className="text-slate-400 hover:text-brand" aria-label={`Edit expense ${row.rfqCode}`}><Pencil size={16}/></button><button onClick={() => remove(row)} className="text-slate-400 hover:text-rose-600" aria-label={`Delete expense ${row.rfqCode}`}><Trash2 size={16}/></button></div>}</td></tr>; })}</tbody></table>{!filteredRows.length && <div className="p-12 text-center text-sm text-slate-500">{rows.length ? 'No expense records match the current filters.' : 'No expense records.'}</div>}</div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-brand text-xs uppercase tracking-wider text-white"><tr><th className="p-4"></th><th className="p-4">RFQ Code</th><th className="p-4">Transaction Date</th><th className="p-4">Description</th><th className="p-4">Supplier</th><th className="p-4">Tax Category</th><th className="p-4 text-right">Tax</th><th className="p-4">Claimed By</th><th className="p-4">Expense Account</th><th className="p-4 text-right">Amount</th><th className="p-4">Status</th><th className="p-4"></th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedRows.map(row => { const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId); const taxAmount = isVatGoodsOrServices(taxCategory) ? calculateInclusiveVatAmount(Number(row.quantity), Number(row.unitCost), taxCategory) : calculateTaxAmount(Number(row.amount), taxCategory); const isOpen = row.status === 'open'; const isBilled = row.status === 'billed'; const isSelected = isOpen && selected.includes(row.id); return <tr key={row.id} data-row-id={row.id} className={isSelected ? 'bg-brand/5' : isOpen ? 'hover:bg-brand/5' : isBilled ? 'bg-blue-50/30' : 'bg-amber-50/30'}><td className="p-4"><input type="checkbox" disabled={!isOpen} checked={isSelected} onChange={() => toggle(row)} className="h-4 w-4 rounded border-slate-300 accent-[var(--brand)] disabled:opacity-40"/></td><td className="p-4 font-semibold text-brand">{row.rfqCode}</td><td className="p-4 text-slate-600">{row.transactionDate}</td><td className="p-4 text-slate-800">{row.description}</td><td className="p-4">{row.supplierName || vendors.find(v => v.id === row.supplierId)?.name || '—'}</td><td className="p-4"><span className="inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{taxCategory ? `${taxCategory.code} · ${Number(taxCategory.rate).toLocaleString()}%` : '—'}</span></td><td className="p-4 text-right font-mono text-slate-700">{taxCategory ? `${currency} ${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}</td><td className="p-4 text-slate-600">{row.claimedBy}</td><td className="p-4 text-slate-600">{(accounts.find(account => account.id === row.expenseAccountId) || expenseAccounts.find(account => account.id === row.expenseAccountId))?.name || '—'}</td><td className="p-4 text-right font-mono font-semibold">{currency} {Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOpen ? 'bg-amber-50 text-amber-700' : isBilled ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{isOpen ? 'Open' : isBilled ? 'Billed' : 'On Hold'}</span></td><td className="p-4">{isOpen && <div className="flex items-center gap-3"><button onClick={() => openEditForm(row)} className="text-slate-400 hover:text-brand" aria-label={`Edit expense ${row.rfqCode}`}><Pencil size={16}/></button><button onClick={() => remove(row)} className="text-slate-400 hover:text-rose-600" aria-label={`Delete expense ${row.rfqCode}`}><Trash2 size={16}/></button></div>}</td></tr>; })}</tbody></table>{!filteredRows.length && <div className="p-12 text-center text-sm text-slate-500">{rows.length ? 'No expense records match the current filters.' : 'No expense records.'}</div>}</div>
       <PaginationControls currentPage={currentPage} totalPages={totalPages} totalItems={filteredRows.length} pageStartIndex={pageStartIndex} pageEndIndex={pageEndIndex} onPageChange={setCurrentPage} itemLabel="expenses"/>
     </div>
     </div>
@@ -465,7 +467,7 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Supplier</p><p className="mt-1 text-sm font-semibold text-slate-800">{viewingRow.supplierName || vendors.find(vendor => vendor.id === viewingRow.supplierId)?.name || '—'}</p></div>
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Claimed By</p><p className="mt-1 text-sm font-semibold text-slate-800">{viewingRow.claimedBy}</p></div>
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Class</p><p className="mt-1 text-sm text-slate-700">{qualifications.find(item => item.id === viewingRow.qualificationId)?.name || '—'}</p></div>
-            <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Expense Account</p><p className="mt-1 text-sm text-slate-700">{expenseAccounts.find(account => account.id === viewingRow.expenseAccountId)?.name || '—'}</p></div>
+            <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Expense Account</p><p className="mt-1 text-sm text-slate-700">{(accounts.find(account => account.id === viewingRow.expenseAccountId) || expenseAccounts.find(account => account.id === viewingRow.expenseAccountId))?.name || '—'}</p></div>
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Tax Category</p><p className="mt-1 text-sm text-slate-700">{taxCategories.find(item => item.id === viewingRow.taxCategoryId)?.description || '—'}</p></div>
             <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Quantity × Unit Cost</p><p className="mt-1 font-mono text-sm text-slate-700">{Number(viewingRow.quantity).toLocaleString()} × {currency} {Number(viewingRow.unitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p></div>
           </div>

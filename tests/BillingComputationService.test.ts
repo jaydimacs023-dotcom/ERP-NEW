@@ -258,4 +258,156 @@ describe('BillingComputationService', () => {
     expect(result.billableQty).toBe(8);
     expect(result.billableEnrollments).toHaveLength(8);
   });
+
+  describe('Mixed Batch Student Funding and Billing', () => {
+    const mixedBatch: Batch = {
+      id: 'mixed-batch-1',
+      orgId: 'org-1',
+      batchCode: 'MIX-2026',
+      name: 'Mixed Batch Class 2026',
+      year: 2026,
+      qualificationId: 'qual-welding',
+      trainerId: 'trainer-1',
+      studentIds: [],
+      status: 'ONGOING' as any,
+      startDate: '2026-06-01',
+      endDate: '2026-06-30'
+    };
+
+    const privateFee: CourseFee = {
+      id: 'fee-priv',
+      orgId: 'org-1',
+      feeCode: 'FEE-PRIV',
+      qualificationId: 'qual-welding',
+      fundingType: 'PRIVATE',
+      feeName: 'Welding Private Tuition',
+      amount: 25000,
+      glAccountId: 'gl-rev',
+      isSubjectToEwt: false,
+      isActive: true,
+      createdAt: '2026-05-01'
+    };
+
+    const sponsoredFee: CourseFee = {
+      id: 'fee-spon',
+      orgId: 'org-1',
+      feeCode: 'FEE-SPON',
+      qualificationId: 'qual-welding',
+      fundingType: 'SPONSORED',
+      feeName: 'Welding Corporate Tuition',
+      amount: 22000,
+      glAccountId: 'gl-rev',
+      isSubjectToEwt: false,
+      isActive: true,
+      createdAt: '2026-05-01'
+    };
+
+    const tesdaFee: CourseFee = {
+      id: 'fee-tesda',
+      orgId: 'org-1',
+      feeCode: 'FEE-TESDA',
+      qualificationId: 'qual-welding',
+      fundingType: 'TESDA_SCHOLARSHIP',
+      feeName: 'Welding TESDA Training Fee',
+      amount: 20000,
+      glAccountId: 'gl-rev',
+      isSubjectToEwt: false,
+      isActive: true,
+      createdAt: '2026-05-01'
+    };
+
+    const mixedEnrollments: Enrollment[] = [
+      // 2 Private Students
+      { id: 'enr-priv-1', orgId: 'org-1', studentId: 'stu-p1', batchId: 'mixed-batch-1', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-priv-2', orgId: 'org-1', studentId: 'stu-p2', batchId: 'mixed-batch-1', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      // 3 Corporate Sponsored Students (Toyota)
+      { id: 'enr-corp-1', orgId: 'org-1', studentId: 'stu-c1', batchId: 'mixed-batch-1', sponsorId: 'spon-toyota', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-corp-2', orgId: 'org-1', studentId: 'stu-c2', batchId: 'mixed-batch-1', sponsorId: 'spon-toyota', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-corp-3', orgId: 'org-1', studentId: 'stu-c3', batchId: 'mixed-batch-1', sponsorId: 'spon-toyota', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      // 4 TESDA Scholars
+      { id: 'enr-tesda-1', orgId: 'org-1', studentId: 'stu-t1', batchId: 'mixed-batch-1', sponsorId: 'spon-tesda', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-tesda-2', orgId: 'org-1', studentId: 'stu-t2', batchId: 'mixed-batch-1', sponsorId: 'spon-tesda', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-tesda-3', orgId: 'org-1', studentId: 'stu-t3', batchId: 'mixed-batch-1', sponsorId: 'spon-tesda', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' },
+      { id: 'enr-tesda-4', orgId: 'org-1', studentId: 'stu-t4', batchId: 'mixed-batch-1', sponsorId: 'spon-tesda', billingType: 'BILLABLE', billingStatus: 'UNBILLED', enrollmentStatus: 'ACTIVE', enrollmentDate: '2026-06-01', createdAt: '2026-06-01' }
+    ];
+
+    const mixedContext: BillingComputationContext = {
+      batches: [mixedBatch],
+      enrollments: mixedEnrollments,
+      courseFees: [privateFee, sponsoredFee, tesdaFee],
+      sponsors: [
+        { id: 'spon-toyota', orgId: 'org-1', name: 'Toyota Motors', courseFeeType: 'SPONSORED' },
+        { id: 'spon-tesda', orgId: 'org-1', name: 'TESDA Regional Office', courseFeeType: 'TESDA_SCHOLARSHIP' }
+      ]
+    };
+
+    it('correctly breaks down funding groups for a mixed batch', () => {
+      const groups = BillingComputationService.getBatchFundingGroups(mixedContext, 'mixed-batch-1');
+      expect(groups).toHaveLength(3);
+
+      const privateGroup = groups.find(g => !g.sponsorId);
+      expect(privateGroup).toBeDefined();
+      expect(privateGroup?.fundingType).toBe('PRIVATE');
+      expect(privateGroup?.totalLearners).toBe(2);
+
+      const corporateGroup = groups.find(g => g.sponsorId === 'spon-toyota');
+      expect(corporateGroup).toBeDefined();
+      expect(corporateGroup?.fundingType).toBe('SPONSORED');
+      expect(corporateGroup?.totalLearners).toBe(3);
+
+      const tesdaGroup = groups.find(g => g.sponsorId === 'spon-tesda');
+      expect(tesdaGroup).toBeDefined();
+      expect(tesdaGroup?.fundingType).toBe('TESDA_SCHOLARSHIP');
+      expect(tesdaGroup?.totalLearners).toBe(4);
+    });
+
+    it('computes invoice for corporate sponsor using SPONSORED fees and corporate student count only', () => {
+      const invoice = BillingComputationService.computeCourseFeeInvoice(
+        mixedContext,
+        'mixed-batch-1',
+        'spon-toyota'
+      );
+
+      expect(invoice.enrolledQty).toBe(3);
+      expect(invoice.billableQty).toBe(3);
+      expect(invoice.lines).toHaveLength(1);
+      expect(invoice.lines[0].description).toBe('Welding Corporate Tuition');
+      expect(invoice.lines[0].unitPrice).toBe(22000);
+      expect(invoice.lines[0].quantity).toBe(3);
+      expect(invoice.courseFeeTotal).toBe(66000);
+    });
+
+    it('computes invoice for TESDA using TESDA_SCHOLARSHIP fees and TESDA scholar count only', () => {
+      const invoice = BillingComputationService.computeCourseFeeInvoice(
+        mixedContext,
+        'mixed-batch-1',
+        'spon-tesda'
+      );
+
+      expect(invoice.enrolledQty).toBe(4);
+      expect(invoice.billableQty).toBe(4);
+      expect(invoice.lines).toHaveLength(1);
+      expect(invoice.lines[0].description).toBe('Welding TESDA Training Fee');
+      expect(invoice.lines[0].unitPrice).toBe(20000);
+      expect(invoice.lines[0].quantity).toBe(4);
+      expect(invoice.courseFeeTotal).toBe(80000);
+    });
+
+    it('computes invoice for a private student using PRIVATE fees and quantity 1', () => {
+      const invoice = BillingComputationService.computeCourseFeeInvoice(
+        mixedContext,
+        'mixed-batch-1',
+        null,
+        'stu-p1'
+      );
+
+      expect(invoice.enrolledQty).toBe(1);
+      expect(invoice.billableQty).toBe(1);
+      expect(invoice.lines).toHaveLength(1);
+      expect(invoice.lines[0].description).toBe('Welding Private Tuition');
+      expect(invoice.lines[0].unitPrice).toBe(25000);
+      expect(invoice.lines[0].quantity).toBe(1);
+      expect(invoice.courseFeeTotal).toBe(25000);
+    });
+  });
 });

@@ -297,7 +297,7 @@ const CurrencyLineInput: React.FC<{
 
 const InvoicesView: React.FC<InvoicesViewProps> = ({
   documentMode = 'INVOICE',
-  invoices, payments = [], sponsors, students, users, enrollments, assessmentRegistrations, batches, qualifications, courseFees, accounts, currency, isVatRegistered,
+  invoices, payments = [], sponsors = [], students = [], users = [], enrollments = [], assessmentRegistrations = [], batches = [], qualifications = [], courseFees = [], accounts = [], currency = 'PHP', isVatRegistered,
   onAddInvoice, onUpdateInvoice, onDeleteInvoice, onPostInvoice, onVoidInvoice, onUpdateEnrollment, onUpdateAssessmentRegistration, onAddStudentLedgerEntry,
   onViewJournal,
   journalEntries = [],
@@ -374,10 +374,21 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [refreshKey, setRefreshKey] = useState(0);
 
 
-  // Derived: Students in the batch for annex
+  // Derived: Students in the batch for annex (scoped strictly to invoice sponsor/student recipient)
   const batchStudents = React.useMemo(() => {
     if (!showViewModal || !viewingInvoice?.batchId) return [];
-    const batchEnrollments = enrollments.filter(e => e.batchId === viewingInvoice.batchId && !e.isDeleted);
+    const batch = batches.find(b => b.id === viewingInvoice.batchId);
+    const batchEnrollments = enrollments.filter(e => {
+      if (e.batchId !== viewingInvoice.batchId || e.isDeleted) return false;
+      if (viewingInvoice.sponsorId) {
+        const enrSponsorId = e.sponsorId || batch?.sponsorId || '';
+        return enrSponsorId === viewingInvoice.sponsorId;
+      }
+      if (viewingInvoice.studentId) {
+        return e.studentId === viewingInvoice.studentId;
+      }
+      return true;
+    });
     return batchEnrollments.map(e => {
       const student = students.find(s => s.id === e.studentId);
       return student ? {
@@ -387,7 +398,7 @@ const InvoicesView: React.FC<InvoicesViewProps> = ({
         courseName: qualifications.find(q => q.id === student.qualificationId)?.name || '',
       } : null;
     }).filter(Boolean);
-  }, [showViewModal, viewingInvoice, enrollments, students, qualifications]);
+  }, [showViewModal, viewingInvoice, enrollments, students, qualifications, batches]);
 
   // Generate from Enrollments state
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>('');
@@ -882,21 +893,18 @@ const brandColor = organization?.primaryColor || '#059669';
   };
 
   const getCourseFeeFundingTypeForSponsorId = (sponsorId?: string) => {
-    if (!sponsorId) return 'PRIVATE' as const;
-    return sponsors.find(sponsor => sponsor.id === sponsorId)?.courseFeeType === 'TESDA_SCHOLARSHIP'
-      ? 'TESDA_SCHOLARSHIP' as const
-      : 'SPONSORED' as const;
+    return BillingComputationService.getCourseFeeFundingTypeForSponsor(getBillingComputationContext(), sponsorId);
   };
 
-  const getBatchCourseFeeFundingType = (batch?: Batch | null) =>
-    getCourseFeeFundingTypeForSponsorId(getBatchSponsorId(batch));
+  const getBatchCourseFeeFundingType = (batch?: Batch | null, sponsorId?: string, studentId?: string) =>
+    BillingComputationService.getBatchCourseFeeFundingType(getBillingComputationContext(), batch, sponsorId, studentId);
 
   const isSponsoredBatchContext = (batch?: Batch | null, fallbackSponsorId = '') => {
     return !!getBatchSponsorId(batch) || !!String(fallbackSponsorId || '').trim();
   };
 
   const getEnrollmentSponsorId = (enrollment: Enrollment) => {
-    return enrollment.sponsorId || getBatchSponsorId(batches.find(batch => batch.id === enrollment.batchId)) || '';
+    return BillingComputationService.getEnrollmentSponsorId(enrollment, batches.find(batch => batch.id === enrollment.batchId));
   };
 
   const getBillableSponsoredEnrollments = (rows: Enrollment[]) => {
@@ -923,22 +931,30 @@ const brandColor = organization?.primaryColor || '#059669';
     });
   };
 
-  const getSponsoredBatchEnrolledQuantity = (batch: Batch, fallbackSponsorId = '') => {
-    if (!isSponsoredBatchContext(batch, fallbackSponsorId)) return 0;
-    const backendQty = Number(backendBatchEnrolledQty[batch.id] || 0);
+  const getSponsoredBatchEnrolledQuantity = (batch: Batch, fallbackSponsorId = '', targetStudentId = '') => {
+    if (targetStudentId) return 1;
+    const activeSponsorId = fallbackSponsorId !== undefined ? fallbackSponsorId : getBatchSponsorId(batch);
+    const cacheKey = activeSponsorId ? `${batch.id}:${activeSponsorId}` : batch.id;
+    const backendQty = Number(backendBatchEnrolledQty[cacheKey] || (activeSponsorId ? 0 : backendBatchEnrolledQty[batch.id]) || 0);
     if (backendQty > 0) return backendQty;
-    return BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id);
+    return BillingComputationService.getValidEnrolledQty(
+      getBillingComputationContext(),
+      batch.id,
+      activeSponsorId || undefined,
+      targetStudentId || undefined
+    );
   };
 
-  const fetchBackendCourseFeeInvoice = async (batchId: string) => {
+  const fetchBackendCourseFeeInvoice = async (batchId: string, sponsorId?: string) => {
     try {
       const { DataServiceFactory } = await import('../services/DataServiceFactory');
       const service = DataServiceFactory.getService() as any;
       if (typeof service.fetchBillingCourseFeeInvoice !== 'function') return null;
-      const rows = await service.fetchBillingCourseFeeInvoice(batchId);
+      const rows = await service.fetchBillingCourseFeeInvoice(batchId, sponsorId);
       const qty = Number(rows?.[0]?.quantity ?? 0);
+      const cacheKey = sponsorId ? `${batchId}:${sponsorId}` : batchId;
       if (qty > 0) {
-        setBackendBatchEnrolledQty(prev => ({ ...prev, [batchId]: qty }));
+        setBackendBatchEnrolledQty(prev => ({ ...prev, [cacheKey]: qty }));
       }
       return Array.isArray(rows) ? rows : null;
     } catch (error) {
@@ -970,14 +986,14 @@ const brandColor = organization?.primaryColor || '#059669';
   const getCourseFeeLineQuantity = (fallbackQty = 1) => {
     const selectedBatch = batches.find(batch => batch.id === formData.batchId);
     if (!selectedBatch) return fallbackQty;
-    return getSponsoredBatchEnrolledQuantity(selectedBatch, formData.sponsorId) ||
-      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), selectedBatch.id) ||
+    return getSponsoredBatchEnrolledQuantity(selectedBatch, formData.sponsorId, formData.studentId) ||
+      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), selectedBatch.id, formData.sponsorId || undefined, formData.studentId || undefined) ||
       fallbackQty;
   };
 
   const applySponsoredBatchQuantityToLines = (batch: Batch, lines: InvoiceLine[], fallbackSponsorId = '') => {
-    const qty = getSponsoredBatchEnrolledQuantity(batch, fallbackSponsorId) ||
-      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id);
+    const qty = getSponsoredBatchEnrolledQuantity(batch, fallbackSponsorId, formData.studentId) ||
+      BillingComputationService.getValidEnrolledQty(getBillingComputationContext(), batch.id, fallbackSponsorId || formData.sponsorId || undefined, formData.studentId || undefined);
     if (qty <= 0) return lines;
 
     return applyQuantityToLines(lines, qty);
@@ -986,7 +1002,7 @@ const brandColor = organization?.primaryColor || '#059669';
   const getBatchContractAdjustedLines = (lines: InvoiceLine[], batchId?: string, fallbackSponsorId = '') => {
     const batch = batchId ? batches.find(b => b.id === batchId) : null;
     if (!batch) return lines;
-    return applySponsoredBatchQuantityToLines(batch, lines, fallbackSponsorId || getBatchSponsorId(batch));
+    return applySponsoredBatchQuantityToLines(batch, lines, fallbackSponsorId !== undefined ? fallbackSponsorId : getBatchSponsorId(batch));
   };
 
   const invoiceLinesChanged = (left: InvoiceLine[], right: InvoiceLine[]) => {
@@ -1003,16 +1019,24 @@ const brandColor = organization?.primaryColor || '#059669';
 
   const getBillableStudentsForBatch = (batchId: string, includeStudentId?: string) => {
     const batch = batches.find(b => b.id === batchId);
+    const batchEnrollments = enrollments.filter(e => e.batchId === batchId && !e.isDeleted);
+    const privateEnrollmentStudentIds = new Set(
+      batchEnrollments
+        .filter(e => !e.sponsorId && (!batch?.sponsorId || e.sponsorId === ''))
+        .map(e => e.studentId)
+    );
+
     const batchStudents = getBatchStudentIds(batchId)
       .map(id => students.find(s => s.id === id))
       .filter((s): s is Student => !!s && !s.isDeleted);
 
-    if (isSponsoredBatchContext(batch)) return batchStudents;
-
     const billedStudentIds = getBilledStudentIdsForPrivateBatch(batchId);
-    return batchStudents.filter(student =>
-      !billedStudentIds.has(student.id) || student.id === includeStudentId
-    );
+    return batchStudents.filter(student => {
+      if (privateEnrollmentStudentIds.size > 0 && !privateEnrollmentStudentIds.has(student.id) && student.id !== includeStudentId) {
+        return false;
+      }
+      return !billedStudentIds.has(student.id) || student.id === includeStudentId;
+    });
   };
 
   const getBillableSponsoredEnrollmentsForBatch = (batchId: string) => {
@@ -1021,14 +1045,14 @@ const brandColor = organization?.primaryColor || '#059669';
     );
   };
 
+  const isBatchFullyBilled = (batch: Batch) => {
+    const validEnrs = enrollments.filter(e => e.batchId === batch.id && !e.isDeleted);
+    if (validEnrs.length === 0) return false;
+    return validEnrs.every(e => e.billingStatus === 'BILLED');
+  };
+
   const isPrivateBatchFullyBilled = (batch: Batch) => {
-    if (isSponsoredBatchContext(batch)) return false;
-
-    const studentIds = getBatchStudentIds(batch.id);
-    if (studentIds.length === 0) return false;
-
-    const billedStudentIds = getBilledStudentIdsForPrivateBatch(batch.id);
-    return studentIds.every(studentId => billedStudentIds.has(studentId));
+    return isBatchFullyBilled(batch);
   };
 
   useEffect(() => {
@@ -1059,7 +1083,6 @@ const brandColor = organization?.primaryColor || '#059669';
               netAmount,
               vatAmount,
               grossAmount
-              // amount left untouched so user entries persist
             };
           }
           return line;
@@ -1073,50 +1096,77 @@ const brandColor = organization?.primaryColor || '#059669';
     }
   }, [viewMode, formData.vatPricing, formData.vatRate, formData.sponsorId, sponsors]);
 
-  // Handle batch change - auto-fill sponsor, quantity, and line items
-  const handleBatchChange = async (batchId: string) => {
+  // Handle batch change - auto-fill sponsor, quantity, and line items (with mixed cohort subgroup support)
+  const handleBatchChange = async (batchId: string, targetSponsorId?: string, targetStudentId?: string) => {
     const batch = batches.find(b => b.id === batchId);
     if (!batch) {
       setFormData(prev => ({ ...prev, batchId: '', assessmentRegistrationId: '', sponsorId: '', studentId: '', lines: [] }));
       return;
     }
 
-    const fundingSponsorId = getBatchSponsorId(batch) || formData.sponsorId || '';
-    const invoiceSponsorId = fundingSponsorId;
-    const backendFeeRows = await fetchBackendCourseFeeInvoice(batchId);
-    const backendQty = Number(backendFeeRows?.[0]?.quantity ?? 0);
-    const studentsInBatch = getBillableStudentsForBatch(batchId, formData.studentId);
-    const nextPrivateStudentId = studentsInBatch[0]?.id || '';
+    const fundingGroups = BillingComputationService.getBatchFundingGroups(getBillingComputationContext(), batchId);
 
-    const computedInvoice = BillingComputationService.computeCourseFeeInvoice(getBillingComputationContext(), batchId);
-    const expectedFundingType = getBatchCourseFeeFundingType(batch);
+    let resolvedSponsorId = targetSponsorId !== undefined
+      ? targetSponsorId
+      : (formData.sponsorId || '');
+    let resolvedStudentId = targetStudentId !== undefined
+      ? targetStudentId
+      : (formData.studentId || '');
+
+    if (!resolvedSponsorId && !resolvedStudentId) {
+      if (fundingGroups.length === 1) {
+        if (fundingGroups[0].sponsorId) {
+          resolvedSponsorId = fundingGroups[0].sponsorId;
+        } else {
+          const studentsInBatch = getBillableStudentsForBatch(batchId);
+          resolvedStudentId = studentsInBatch[0]?.id || '';
+        }
+      } else if (fundingGroups.length > 1) {
+        const batchSponsor = getBatchSponsorId(batch);
+        const matchingSponsor = fundingGroups.find(g => g.sponsorId && g.sponsorId === batchSponsor);
+        if (matchingSponsor && matchingSponsor.unbilledLearners > 0) {
+          resolvedSponsorId = matchingSponsor.sponsorId!;
+        } else {
+          const firstUnbilledSponsor = fundingGroups.find(g => g.sponsorId && g.unbilledLearners > 0);
+          if (firstUnbilledSponsor) {
+            resolvedSponsorId = firstUnbilledSponsor.sponsorId!;
+          } else {
+            const studentsInBatch = getBillableStudentsForBatch(batchId);
+            resolvedStudentId = studentsInBatch[0]?.id || '';
+          }
+        }
+      } else {
+        resolvedSponsorId = getBatchSponsorId(batch);
+      }
+    }
+
+    const backendFeeRows = resolvedStudentId
+      ? null
+      : await fetchBackendCourseFeeInvoice(batchId, resolvedSponsorId || undefined);
+    const backendQty = Number(backendFeeRows?.[0]?.quantity ?? 0);
+
+    const computedInvoice = BillingComputationService.computeCourseFeeInvoice(
+      getBillingComputationContext(),
+      batchId,
+      resolvedSponsorId || undefined,
+      resolvedStudentId || undefined
+    );
+    const expectedFundingType = getBatchCourseFeeFundingType(batch, resolvedSponsorId || undefined, resolvedStudentId || undefined);
     const activeQualificationFees = courseFees.filter(f =>
       f.qualificationId === batch.qualificationId &&
       f.isActive &&
       !f.isDeleted
     );
-    const exactFundingFees = activeQualificationFees.filter(f => f.fundingType === expectedFundingType);
-    const standardSponsoredFees = expectedFundingType === 'TESDA_SCHOLARSHIP'
-      ? activeQualificationFees.filter(f => f.fundingType === 'SPONSORED')
-      : [];
+    let exactFundingFees = activeQualificationFees.filter(f => f.fundingType === expectedFundingType);
+    if (exactFundingFees.length === 0 && expectedFundingType === 'TESDA_SCHOLARSHIP') {
+      exactFundingFees = activeQualificationFees.filter(f => f.fundingType === 'SPONSORED');
+    }
 
-    // Keep private and sponsored schedules strictly separated. A TESDA sponsor
-    // may use the qualification's standard sponsored schedule when no dedicated
-    // TESDA schedule exists, but a sponsored batch must never load PRIVATE fees.
-    const qualificationFees = (exactFundingFees.length > 0
-      ? exactFundingFees
-      : standardSponsoredFees)
+    const qualificationFees = exactFundingFees
       .sort((left, right) =>
         String(left.category || '').localeCompare(String(right.category || '')) ||
         left.feeName.localeCompare(right.feeName)
       );
-
-    if (exactFundingFees.length === 0 && standardSponsoredFees.length > 0) {
-      console.warn(
-        `[InvoicesView] No ${expectedFundingType} fee schedule found for ${batch.batchCode || batch.name}; ` +
-        'using the qualification\'s standard SPONSORED fee schedule.'
-      );
-    }
 
     const manualLines = formData.lines.filter(line => getLineType(line) !== 'COURSE_FEE');
     const shouldPreserveManualLines = manualLines.length > 0
@@ -1126,10 +1176,11 @@ const brandColor = organization?.primaryColor || '#059669';
     const newLines: InvoiceLine[] = qualificationFees.map((fee, idx) => {
       const computedLine = computedInvoice.lines.find(line => line.courseFeeId === fee.id);
       const backendLine = backendFeeRows?.find(row => row.courseFeeId === fee.id || row.course_fee_id === fee.id);
-      const qty = Number(backendLine?.quantity ?? backendQty) || computedInvoice.enrolledQty || 0;
+      const qty = resolvedStudentId
+        ? (computedInvoice.enrolledQty || 1)
+        : (Number(backendLine?.quantity ?? backendQty) || computedInvoice.enrolledQty || 0);
       const unitPrice = fee.amount || 0;
 
-      // To evaluate classification correctly we temporarily patch the batchId into formData before evaluation although handleBatchChange does not wait
       const code = (() => {
          const account = accounts.find(a => a.id === fee.glAccountId);
          if (!account) return '';
@@ -1169,8 +1220,8 @@ const brandColor = organization?.primaryColor || '#059669';
       ...prev,
       batchId,
       assessmentRegistrationId: '',
-      sponsorId: invoiceSponsorId,
-      studentId: fundingSponsorId ? '' : nextPrivateStudentId,
+      sponsorId: resolvedSponsorId,
+      studentId: resolvedSponsorId ? '' : resolvedStudentId,
       lines: nextLines
     }));
   };
@@ -1793,8 +1844,7 @@ const brandColor = organization?.primaryColor || '#059669';
       orderBy: invoiceOrderBy
     })
       .then(result => {
-        if (!isActive) return;
-        setServerInvoices(result.rows);
+        setServerInvoices(Array.isArray(result?.rows) ? result.rows : []);
         setServerTotal(result.total);
         setServerTotalPages(result.totalPages);
       })
@@ -1931,12 +1981,12 @@ const brandColor = organization?.primaryColor || '#059669';
   } = usePaginatedRows(filteredInvoices, [debouncedSearchTerm, statusFilter, dateFilterMode, dateFrom, dateTo, filterSponsorId, filterStudentId, payerFilterMode, payerSearchTerm, sortConfig], INVOICE_PAGE_SIZE);
 
   const useFallbackRows = !serverFetchEnabled || !!pageLoadError;
-  const paginatedInvoices = useFallbackRows ? fallbackPaginatedInvoices : serverInvoices;
+  const paginatedInvoices = useFallbackRows ? fallbackPaginatedInvoices : (serverInvoices || []);
   const totalInvoices = useFallbackRows ? filteredInvoices.length : serverTotal;
   const totalPages = useFallbackRows ? fallbackTotalPages : serverTotalPages;
   const currentPage = useFallbackRows ? fallbackCurrentPage : serverCurrentPage;
   const pageStartIndex = useFallbackRows ? fallbackPageStartIndex : (serverCurrentPage - 1) * INVOICE_PAGE_SIZE;
-  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + serverInvoices.length, serverTotal);
+  const pageEndIndex = useFallbackRows ? fallbackPageEndIndex : Math.min(pageStartIndex + (serverInvoices?.length || 0), serverTotal);
   const setCurrentPage = useFallbackRows ? setFallbackCurrentPage : setServerCurrentPage;
 
   // Summary stats
@@ -2816,18 +2866,17 @@ const brandColor = organization?.primaryColor || '#059669';
   // Sponsored batches hide once billed. Private batches stay available until every student is billed.
   // Keep currently selected batch visible while editing its own invoice.
   const selectableBatches = useMemo(() => {
-    const billedBatchIds = new Set(
-      invoices
-        .filter(inv => !!inv.batchId && !!inv.sponsorId && inv.status !== 'VOIDED' && inv.id !== editingInvoice?.id)
-        .map(inv => inv.batchId as string)
-    );
+    return batches.filter(batch => {
+      if (batch.isDeleted) return false;
+      if (batch.id === editingInvoice?.batchId) return true;
+      return !isBatchFullyBilled(batch);
+    });
+  }, [batches, editingInvoice?.id, enrollments]);
 
-    return batches.filter(batch =>
-      !batch.isDeleted &&
-      !billedBatchIds.has(batch.id) &&
-      !isPrivateBatchFullyBilled(batch)
-    );
-  }, [batches, invoices, editingInvoice?.id, enrollments, students]);
+  const selectedBatchFundingGroups = useMemo(() => {
+    if (!formData.batchId) return [];
+    return BillingComputationService.getBatchFundingGroups(getBillingComputationContext(), formData.batchId);
+  }, [formData.batchId, enrollments, batches, sponsors, courseFees]);
 
   const batchStudentsForBilling = useMemo(() => {
     if (!formData.batchId) return [] as Student[];
@@ -3823,7 +3872,51 @@ const brandColor = organization?.primaryColor || '#059669';
                         <option key={b.id} value={b.id}>{b.batchCode} - {qualifications.find(q => q.id === b.qualificationId)?.name}</option>
                       ))}
                     </select>
-                    <p className="text-xs text-brand mt-1">Selecting a batch will auto-populate the sponsor and line items. Sponsored batches hide after billing; private batches stay until every student is billed.</p>
+                    <p className="text-xs text-brand mt-1">Select a batch to load course fees. Mixed cohorts support billing specific sponsors or private students.</p>
+
+                    {formData.batchId && selectedBatchFundingGroups.length > 1 && (
+                      <div className="mt-2.5 p-3 bg-brand/5 border border-brand/20 rounded-lg">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-xs font-bold text-brand uppercase tracking-wide">
+                            Mixed Cohort ({selectedBatchFundingGroups.length} Funding Groups)
+                          </span>
+                          <span className="text-[11px] text-gray-500">
+                            Select funding recipient
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedBatchFundingGroups.map(group => {
+                            const isSelected = group.sponsorId
+                              ? formData.sponsorId === group.sponsorId
+                              : (!formData.sponsorId && !!formData.studentId);
+                            return (
+                              <button
+                                key={group.sponsorId || 'private'}
+                                type="button"
+                                onClick={() => {
+                                  if (group.sponsorId) {
+                                    handleBatchChange(formData.batchId, group.sponsorId, '');
+                                  } else {
+                                    const firstPrivate = getBillableStudentsForBatch(formData.batchId)[0]?.id || '';
+                                    handleBatchChange(formData.batchId, '', firstPrivate);
+                                  }
+                                }}
+                                className={`px-2.5 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-brand text-white border-brand shadow-xs'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:border-brand/40 hover:bg-gray-50'
+                                }`}
+                              >
+                                {group.sponsorName}
+                                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                                  {group.unbilledLearners} unbilled
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>}
                   {/* sponsor and student side by side */}
                   <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${isNonInvoicePayment ? 'lg:col-span-8' : 'lg:col-span-4'}`}>
@@ -3832,8 +3925,13 @@ const brandColor = organization?.primaryColor || '#059669';
                       <select
                         value={formData.sponsorId}
                         onChange={e => {
-                          handleSponsorChange(e.target.value);
-                          if (e.target.value) setFormData(prev => ({ ...prev, studentId: '', assessmentRegistrationId: prev.assessmentRegistrationId || '' }));
+                          const newSponsorId = e.target.value;
+                          handleSponsorChange(newSponsorId);
+                          if (formData.batchId) {
+                            handleBatchChange(formData.batchId, newSponsorId, '');
+                          } else if (newSponsorId) {
+                            setFormData(prev => ({ ...prev, studentId: '', assessmentRegistrationId: prev.assessmentRegistrationId || '' }));
+                          }
                         }}
                         disabled={(!!formData.studentId && !formData.assessmentRegistrationId) || isReadOnly}
                         className="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-200 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -3850,7 +3948,11 @@ const brandColor = organization?.primaryColor || '#059669';
                         students={formData.batchId ? batchStudentsForBilling : students.filter(student => !student.isDeleted)}
                         value={formData.studentId}
                         onChange={studentId => {
-                          setFormData(prev => ({ ...prev, studentId, sponsorId: '', assessmentRegistrationId: prev.assessmentRegistrationId && studentId ? prev.assessmentRegistrationId : '' }));
+                          if (formData.batchId) {
+                            handleBatchChange(formData.batchId, '', studentId);
+                          } else {
+                            setFormData(prev => ({ ...prev, studentId, sponsorId: '', assessmentRegistrationId: prev.assessmentRegistrationId && studentId ? prev.assessmentRegistrationId : '' }));
+                          }
                         }}
                         disabled={(!!formData.sponsorId && !formData.assessmentRegistrationId) || isReadOnly}
                       />

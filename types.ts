@@ -819,6 +819,7 @@ export interface Batch extends BaseEntity {
   sponsorId?: string;
   locationId?: string;
   studentIds: string[];
+  studentSponsors?: Record<string, string>;
   status: BatchStatus;
   startDate: string;
   endDate: string;

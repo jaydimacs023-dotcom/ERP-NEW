@@ -178,8 +178,11 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'auto'>('auto');
-  // Navigation section state
-  const [openSections, setOpenSections] = useState<{ financial: boolean; apOperations: boolean; apReports: boolean; ledgerAudit: boolean; operations: boolean; registries: boolean; purchases: boolean; inventory: boolean; administration: boolean }>({ financial: true, apOperations: true, apReports: true, ledgerAudit: true, operations: true, registries: true, purchases: true, inventory: true, administration: true });
+  // Navigation section state - accordion behavior (only one section can be open at a time)
+  const [openSection, setOpenSection] = useState<string | null>('financial');
+  const toggleSection = (sectionKey: string) => {
+    setOpenSection(prev => (prev === sectionKey ? null : sectionKey));
+  };
 
   // Password Reset State
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -1609,6 +1612,12 @@ export default function App() {
 
   // Helper to check if user can access specific tab
   const userCanAccess = (tab: string) => canAccess(currentUser?.role, tab as any);
+
+  useEffect(() => {
+    if (currentUser?.role === 'AR_SPECIALIST') {
+      setOpenSection(prev => (prev && prev.startsWith('ar-') ? prev : 'ar-billing'));
+    }
+  }, [currentUser?.role]);
 
   useEffect(() => {
     if (currentUser && activeTab === 'ledger' && !canAccess(currentUser.role, 'ledger')) {
@@ -3445,7 +3454,7 @@ export default function App() {
 
     return classification.classifiedEnrollments.map(enrollment => ({
       ...enrollment,
-      sponsorId: enrollment.sponsorId || sponsorId,
+      sponsorId: enrollment.sponsorId !== undefined ? enrollment.sponsorId : sponsorId,
       updatedAt: new Date().toISOString()
     }));
   };
@@ -3484,6 +3493,112 @@ export default function App() {
     await persistEnrollmentBillingUpdates(updates);
   };
 
+  const syncBatchEnrollments = async (batch: Batch) => {
+    if (!batch.id) return;
+    const studentIds = batch.studentIds || [];
+    const studentSponsors = batch.studentSponsors || {};
+    const defaultSponsorId = getBatchFundingSponsorId(batch);
+
+    const existingBatchEnrollments = enrollments.filter(e => e.batchId === batch.id && !e.isDeleted);
+    const existingStudentMap = new Map(existingBatchEnrollments.map(e => [e.studentId, e]));
+    const studentIdSet = new Set(studentIds);
+
+    const newEnrollmentsToCreate: Enrollment[] = [];
+    const enrollmentsToUpdate: Enrollment[] = [];
+    const enrollmentsToDelete: Enrollment[] = [];
+
+    // Removed students
+    for (const existing of existingBatchEnrollments) {
+      if (!studentIdSet.has(existing.studentId)) {
+        enrollmentsToDelete.push({ ...existing, isDeleted: true, deletedAt: new Date().toISOString() });
+      }
+    }
+
+    // New or updated students
+    for (const studentId of studentIds) {
+      const student = students.find(s => s.id === studentId);
+      const taggedSponsor = studentSponsors[studentId] !== undefined
+        ? (studentSponsors[studentId] || undefined)
+        : (defaultSponsorId || undefined);
+
+      const existing = existingStudentMap.get(studentId);
+      if (existing) {
+        const currentEffectiveSponsor = existing.sponsorId !== undefined ? (existing.sponsorId || undefined) : undefined;
+        if (currentEffectiveSponsor !== taggedSponsor) {
+          enrollmentsToUpdate.push({
+            ...existing,
+            sponsorId: taggedSponsor,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        const newEnrollment: Enrollment = {
+          id: generateUUID(),
+          orgId: currentOrgId,
+          studentId,
+          batchId: batch.id,
+          qualificationId: batch.qualificationId,
+          enrollmentCode: `ENR-${(batch.batchCode || batch.name || 'B').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6)}-${student?.uli?.slice(-4) || studentId.slice(0, 4)}`,
+          sponsorId: taggedSponsor,
+          billingType: 'BILLABLE',
+          billingStatus: 'UNBILLED',
+          enrollmentStatus: batch.status === BatchStatus.COMPLETED ? 'COMPLETED' : 'ACTIVE',
+          registrationDate: batch.startDate || new Date().toISOString().split('T')[0],
+          completionDate: batch.endDate || undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        newEnrollmentsToCreate.push(newEnrollment);
+      }
+    }
+
+    if (newEnrollmentsToCreate.length > 0 || enrollmentsToUpdate.length > 0 || enrollmentsToDelete.length > 0) {
+      setEnrollments(prev => {
+        let next = [...prev];
+        if (enrollmentsToDelete.length > 0) {
+          const deleteIds = new Set(enrollmentsToDelete.map(e => e.id));
+          next = next.filter(e => !deleteIds.has(e.id));
+        }
+        if (enrollmentsToUpdate.length > 0) {
+          const updateMap = new Map(enrollmentsToUpdate.map(e => [e.id, e]));
+          next = next.map(e => updateMap.get(e.id) || e);
+        }
+        if (newEnrollmentsToCreate.length > 0) {
+          next = [...next, ...newEnrollmentsToCreate];
+        }
+        return next;
+      });
+
+      for (const enr of newEnrollmentsToCreate) {
+        try {
+          await dataService.createEntity('enrollments', enr);
+        } catch (e) {
+          console.warn('[App] Failed to persist new batch enrollment:', enr.id, e);
+        }
+      }
+      for (const enr of enrollmentsToUpdate) {
+        try {
+          await dataService.updateEntity('enrollments', enr.id, {
+            sponsorId: enr.sponsorId,
+            updatedAt: enr.updatedAt
+          } as Partial<Enrollment>);
+        } catch (e) {
+          console.warn('[App] Failed to persist batch enrollment sponsor update:', enr.id, e);
+        }
+      }
+      for (const enr of enrollmentsToDelete) {
+        try {
+          await dataService.updateEntity('enrollments', enr.id, {
+            isDeleted: true,
+            deletedAt: enr.deletedAt
+          } as Partial<Enrollment>);
+        } catch (e) {
+          console.warn('[App] Failed to persist batch enrollment deletion:', enr.id, e);
+        }
+      }
+    }
+  };
+
   const handleAddBatch = async (batch: Batch) => {
     try {
       const batchWithOrg = { ...batch, orgId: currentOrgId };
@@ -3491,6 +3606,7 @@ export default function App() {
       const created = await dataService.createBatch(batchWithOrg);
       console.info('[App] Batch created successfully:', created);
       setBatches(prev => [...prev, created]);
+      await syncBatchEnrollments({ ...created, studentSponsors: batch.studentSponsors });
       await applyBatchBillingContractToEnrollments(created);
 
       // Audit: Batch created
@@ -3512,6 +3628,7 @@ export default function App() {
       const updated = await dataService.updateBatch(batch.id, batch);
       console.info('[App] Batch updated successfully:', updated);
       setBatches(prev => prev.map(b => b.id === batch.id ? updated : b));
+      await syncBatchEnrollments({ ...updated, studentSponsors: batch.studentSponsors });
       await applyBatchBillingContractToEnrollments(updated);
 
       // Audit: Batch updated
@@ -4694,7 +4811,7 @@ export default function App() {
       const draftEnrollment = {
         ...enrollment,
         orgId: currentOrgId,
-        sponsorId: getBatchFundingSponsorId(batch) || enrollment.sponsorId,
+        sponsorId: enrollment.sponsorId !== undefined ? (enrollment.sponsorId || undefined) : (getBatchFundingSponsorId(batch) || undefined),
         billingType: enrollment.billingType || 'BILLABLE'
       } as Enrollment;
       let enrollmentWithOrg = batch
@@ -6848,7 +6965,7 @@ export default function App() {
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
               <NavItem icon={<ListTodo size={18} />} label="Calendar & Tasks" active={activeTab === 'ar-calendar-tasks'} onClick={() => navigateTo('ar-calendar-tasks')} compact={!sidebarOpen} brandColor={brandColor} />
 
-              <NavSection label="Billing & Receivables" isOpen={openSections.registries} onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))} compact={!sidebarOpen}>
+              <NavSection label="Billing & Receivables" isOpen={openSection === 'ar-billing'} onToggle={() => toggleSection('ar-billing')} compact={!sidebarOpen}>
                 <NavItem icon={<UserPlus size={18} />} label="Register Learner" active={activeTab === 'students'} onClick={() => navigateTo('students')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Users size={18} />} label="Customer List" active={activeTab === 'customers'} onClick={() => navigateTo('customers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Invoice" active={activeTab === 'invoices'} onClick={() => navigateTo('invoices')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6856,26 +6973,26 @@ export default function App() {
                 <NavItem icon={<Wallet size={18} />} label="Payments and Applications" active={activeTab === 'payments'} onClick={() => navigateTo('payments')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
-              <NavSection label="Collections & Adjustments" isOpen={openSections.operations} onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))} compact={!sidebarOpen}>
+              <NavSection label="Collections & Adjustments" isOpen={openSection === 'ar-collections'} onToggle={() => toggleSection('ar-collections')} compact={!sidebarOpen}>
                 <NavItem icon={<Zap size={18} />} label="Write Offs" active={activeTab === 'write-off'} onClick={() => navigateTo('write-off')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<CreditCard size={18} />} label="Credit/Debit Memo" active={activeTab === 'credit-debit-memo'} onClick={() => navigateTo('credit-debit-memo')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<RefreshCw size={18} />} label="Reclassify" active={activeTab === 'reclassify'} onClick={() => navigateTo('reclassify')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Receipt size={18} />} label="Collection Receipt" active={activeTab === 'collection-receipt'} onClick={() => navigateTo('collection-receipt')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
-              <NavSection label="AR Reports" isOpen={openSections.inventory} onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))} compact={!sidebarOpen}>
+              <NavSection label="AR Reports" isOpen={openSection === 'ar-reports'} onToggle={() => toggleSection('ar-reports')} compact={!sidebarOpen}>
                 <NavItem icon={<BarChart2 size={18} />} label="Collection Report" active={activeTab === 'collection-report'} onClick={() => navigateTo('collection-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<PieChart size={18} />} label="Aging Report" active={activeTab === 'aging-report'} onClick={() => navigateTo('aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<FileText size={18} />} label="Statement (SOA)" active={activeTab === 'soa'} onClick={() => navigateTo('soa')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
-              <NavSection label="Ledgers & Audit" isOpen={openSections.financial} onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))} compact={!sidebarOpen}>
+              <NavSection label="Ledgers & Audit" isOpen={openSection === 'ar-ledgers'} onToggle={() => toggleSection('ar-ledgers')} compact={!sidebarOpen}>
                 <NavItem icon={<ClipboardCheck size={18} />} label="Journal Vouchers" active={activeTab === 'journal-vouchers'} onClick={() => navigateTo('journal-vouchers')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Journal Entries" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<BookText size={18} />} label="Customer Ledger" active={activeTab === 'customer-ledger'} onClick={() => navigateTo('customer-ledger')} compact={!sidebarOpen} brandColor={brandColor} />
               </NavSection>
 
-              <NavSection label="Inventory" isOpen={openSections.administration} onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))} compact={!sidebarOpen}>
+              <NavSection label="Inventory" isOpen={openSection === 'ar-inventory'} onToggle={() => toggleSection('ar-inventory')} compact={!sidebarOpen}>
                 <NavItem icon={<Package size={18} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => navigateTo('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<MapPin size={18} />} label="Warehouse Locations" active={activeTab === 'warehouse-locations'} onClick={() => navigateTo('warehouse-locations')} compact={!sidebarOpen} brandColor={brandColor} />
                 <NavItem icon={<Box size={18} />} label="Stock Items" active={activeTab === 'stock-items'} onClick={() => navigateTo('stock-items')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6899,8 +7016,8 @@ export default function App() {
           {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Finance"
-              isOpen={openSections.financial}
-              onToggle={() => setOpenSections(prev => ({ ...prev, financial: !prev.financial }))}
+              isOpen={openSection === 'financial'}
+              onToggle={() => toggleSection('financial')}
               compact={!sidebarOpen}
             >
               <NavItem icon={<LayoutDashboard size={18} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6923,8 +7040,8 @@ export default function App() {
           {isAP && (
             <NavSection
               label="Accounts Payable"
-              isOpen={openSections.apOperations}
-              onToggle={() => setOpenSections(prev => ({ ...prev, apOperations: !prev.apOperations }))}
+              isOpen={openSection === 'apOperations'}
+              onToggle={() => toggleSection('apOperations')}
               compact={!sidebarOpen}
             >
               {userCanAccess('payables') && <NavItem icon={<CreditCard size={18} />} label="Bills & Payments" active={activeTab === 'payables'} onClick={() => navigateTo('payables')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -6939,8 +7056,8 @@ export default function App() {
           {isFinance && currentUser.role !== 'AR_SPECIALIST' && !['AP_SPECIALIST', 'AP_CLERK', 'AP_SUPERVISOR'].includes(currentUser.role) && (
             <NavSection
               label="Ledger & Audit"
-              isOpen={openSections.ledgerAudit}
-              onToggle={() => setOpenSections(prev => ({ ...prev, ledgerAudit: !prev.ledgerAudit }))}
+              isOpen={openSection === 'ledgerAudit'}
+              onToggle={() => toggleSection('ledgerAudit')}
               compact={!sidebarOpen}
             >
               {userCanAccess('ledger') && <NavItem icon={<BookText size={18} />} label="Journal Entries" active={activeTab === 'ledger'} onClick={() => navigateTo('ledger')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -6953,8 +7070,8 @@ export default function App() {
           {isAP && userCanAccess('ap-aging-report') && (
             <NavSection
               label="AP Reports"
-              isOpen={openSections.apReports}
-              onToggle={() => setOpenSections(prev => ({ ...prev, apReports: !prev.apReports }))}
+              isOpen={openSection === 'apReports'}
+              onToggle={() => toggleSection('apReports')}
               compact={!sidebarOpen}
             >
               <NavItem icon={<BarChart2 size={18} />} label="AP AGING REPORT" active={activeTab === 'ap-aging-report'} onClick={() => navigateTo('ap-aging-report')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6964,8 +7081,8 @@ export default function App() {
           {isRegistrar && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Operations"
-              isOpen={openSections.operations}
-              onToggle={() => setOpenSections(prev => ({ ...prev, operations: !prev.operations }))}
+              isOpen={openSection === 'operations'}
+              onToggle={() => toggleSection('operations')}
               compact={!sidebarOpen}
             >
               <NavItem icon={<LayoutDashboard size={20} />} label="Registrar Dashboard" active={activeTab === 'dashboard'} onClick={() => navigateTo('dashboard')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -6984,8 +7101,8 @@ export default function App() {
           {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Registries"
-              isOpen={openSections.registries}
-              onToggle={() => setOpenSections(prev => ({ ...prev, registries: !prev.registries }))}
+              isOpen={openSection === 'registries'}
+              onToggle={() => toggleSection('registries')}
               compact={!sidebarOpen}
             >
               {userCanAccess('sponsors') && <NavItem icon={<Handshake size={20} />} label="Sponsors" active={activeTab === 'sponsors'} onClick={() => navigateTo('sponsors')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -6996,8 +7113,8 @@ export default function App() {
           {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Purchases"
-              isOpen={openSections.purchases}
-              onToggle={() => setOpenSections(prev => ({ ...prev, purchases: !prev.purchases }))}
+              isOpen={openSection === 'purchases'}
+              onToggle={() => toggleSection('purchases')}
               compact={!sidebarOpen}
             >
               {userCanAccess('po') && <NavItem icon={<ShoppingCart size={20} />} label="Purchase Orders" active={activeTab === 'po'} onClick={() => navigateTo('po')} compact={!sidebarOpen} brandColor={brandColor} />}
@@ -7010,8 +7127,8 @@ export default function App() {
           {isFinance && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Inventory"
-              isOpen={openSections.inventory}
-              onToggle={() => setOpenSections(prev => ({ ...prev, inventory: !prev.inventory }))}
+              isOpen={openSection === 'inventory'}
+              onToggle={() => toggleSection('inventory')}
               compact={!sidebarOpen}
             >
               <NavItem icon={<Package size={20} />} label="Stock Dashboard" active={activeTab === 'inventory'} onClick={() => navigateTo('inventory')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -7029,8 +7146,8 @@ export default function App() {
           {isAdmin && currentUser.role !== 'AR_SPECIALIST' && (
             <NavSection
               label="Administration"
-              isOpen={openSections.administration}
-              onToggle={() => setOpenSections(prev => ({ ...prev, administration: !prev.administration }))}
+              isOpen={openSection === 'administration'}
+              onToggle={() => toggleSection('administration')}
               compact={!sidebarOpen}
             >
               <NavItem icon={<Users size={20} />} label="Employees" active={activeTab === 'employees'} onClick={() => navigateTo('employees')} compact={!sidebarOpen} brandColor={brandColor} />
@@ -7395,7 +7512,7 @@ export default function App() {
           {activeTab === 'trainers' && <TrainersView organization={currentOrg} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} onAddTrainer={handleAddTrainer} onUpdateTrainer={handleUpdateTrainer} onDeleteTrainer={handleDeleteTrainer} />}
           {activeTab === 'qualifications' && <QualificationsView organization={currentOrg} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} onAddQualification={handleAddQualification} onUpdateQualification={handleUpdateQualification} onDeleteQualification={handleDeleteQualification} />}
           {activeTab === 'course-fees' && <CourseFeesView courseFees={courseFees.filter(f => f.orgId === currentOrgId && !f.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} accounts={filteredAccounts} currency={currentOrg?.currency || 'PHP'} onAddCourseFee={handleAddCourseFee} onUpdateCourseFee={handleUpdateCourseFee} onDeleteCourseFee={handleDeleteCourseFee} />}
-          {activeTab === 'batches' && <BatchesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
+          {activeTab === 'batches' && <BatchesView organization={currentOrg} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} trainers={trainers.filter(t => t.orgId === currentOrgId && !t.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} sponsors={sponsors.filter(s => s.orgId === currentOrgId && !s.isDeleted)} schedules={schedules.filter(s => s.orgId === currentOrgId && !s.isDeleted)} locations={locations.filter(l => l.orgId === currentOrgId && !l.isDeleted)} enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} onAddBatch={handleAddBatch} onUpdateBatch={handleUpdateBatch} onDeleteBatch={handleDeleteBatch} onNotify={handleNotify} />}
           {activeTab === 'transcripts' && <TranscriptRecordsView orgId={currentOrgId} currentUserId={currentUser?.id} batches={batches.filter(b => b.orgId === currentOrgId && !b.isDeleted)} enrollments={enrollments.filter(e => e.orgId === currentOrgId && !e.isDeleted)} students={students.filter(s => s.orgId === currentOrgId && !s.isDeleted)} qualifications={qualifications.filter(q => q.orgId === currentOrgId && !q.isDeleted)} brandColor={brandColor} onNotify={handleNotify} />}
           {activeTab === 'alumni-reports' && (
             <AlumniEmploymentView
@@ -7896,25 +8013,46 @@ interface NavSectionProps {
   children: React.ReactNode;
 }
 
-function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
+export function NavSection({ label, isOpen, onToggle, compact, children }: NavSectionProps) {
   return (
-    <div className="mb-8">
+    <div className="mb-6">
       <button
+        type="button"
         onClick={onToggle}
         title={compact ? label : undefined}
         aria-label={compact ? label : undefined}
-        className="w-full flex items-center justify-between mb-4 px-4 pb-3 border-b border-slate-200 group"
+        aria-expanded={isOpen}
+        className="w-full flex items-center justify-between mb-2 px-4 pb-3 border-b border-slate-200 group"
       >
         {!compact && (
           <p className="text-left text-[10px] text-slate-500 uppercase tracking-[0.3em] group-hover:text-brand transition-colors">
             {label}
           </p>
         )}
-        <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''} `}>
+        <span
+          className={`text-slate-500 transition-transform duration-300 ease-in-out ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        >
           ▼
         </span>
       </button>
-      {isOpen && <div className="space-y-1">{children}</div>}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+          isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!isOpen}
+      >
+        <div className="overflow-hidden">
+          <div
+            className={`space-y-1 pt-1 transition-transform duration-300 ease-in-out ${
+              isOpen ? 'translate-y-0' : '-translate-y-1'
+            }`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

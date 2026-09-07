@@ -8,8 +8,9 @@
 2. [Prerequisites](#2-prerequisites)
 3. [PART 1: Cloud ➔ Local (Cloning / Syncing Down)](#3-part-1-cloud--local-cloning--syncing-down)
 4. [PART 2: Local ➔ Cloud (Pushing Schema & Data Up)](#4-part-2-local--cloud-pushing-schema--data-up)
-5. [PART 3: Day-to-Day Local Development Commands](#5-part-3-day-to-day-local-development-commands)
-6. [PART 4: Common Errors & Troubleshooting](#6-part-4-common-errors--troubleshooting)
+5. [PART 3: Safe Parity Testing (Comparing Cloud vs Local without Data Loss)](#5-part-3-safe-parity-testing-comparing-cloud-vs-local-without-data-loss)
+6. [PART 4: Day-to-Day Local Development Commands](#6-part-4-day-to-day-local-development-commands)
+7. [PART 5: Common Errors & Troubleshooting](#7-part-5-common-errors--troubleshooting)
 
 ---
 
@@ -164,7 +165,130 @@ psql "postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-[region].pooler.supab
 
 ---
 
-## 5. PART 3: Day-to-Day Local Development Commands
+## 5. PART 3: Safe Parity Testing (Comparing Cloud vs Local without Data Loss)
+
+When your cloud database is in **production**, you must **never** run commands that could mutate, lock, or wipe live tables. The methods below are **100% read-only** and guaranteed safe for production.
+
+> [!IMPORTANT]
+> **Production Safety Golden Rules:**
+> 1. **DO NOT** run `npx supabase db push` when only inspecting or testing parity.
+> 2. **DO NOT** run `npx supabase db reset` against a linked remote project. (`db reset` is intended for local Docker only).
+> 3. **All commands in this section perform read-only catalog inspections and `SELECT` queries.** Cloud production data will not be modified or deleted.
+
+---
+
+### Method 1: CLI Migration History Check (Fastest)
+
+Check which migration files are applied on Cloud vs your Local machine:
+
+```powershell
+npx supabase migration list
+```
+
+**How to interpret the output:**
+- Both **LOCAL** and **REMOTE** columns will display migration timestamps and status.
+- If all timestamps have checkmarks / match on both sides, **your migration history is completely in sync**.
+- If REMOTE has entries missing locally, pull them down first before working.
+- If LOCAL has unapplied migrations, those are pending changes waiting to be deployed.
+
+---
+
+### Method 2: Schema Drift & DDL Diff (CLI Read-Only)
+
+Compare your local PostgreSQL schema against the linked Cloud database schema without applying anything:
+
+```powershell
+# Dry-run comparison: Prints the DDL differences directly to the terminal stdout
+npx supabase db diff --linked
+```
+
+You can also output the diff to a temporary file for detailed inspection:
+```powershell
+npx supabase db diff --linked > schema_diff_report.sql
+```
+
+**How to interpret the result:**
+- **No output / Empty file:** Schema is **100% identical** between Cloud and Local (all tables, columns, constraints, foreign keys, triggers, and RLS policies match).
+- **Shows SQL statements (`CREATE TABLE`, `ALTER TABLE`, etc.):** Indicates schema drift. Inspect the statements to see exactly what differs without any risk to cloud production data. Delete `schema_diff_report.sql` after review.
+
+---
+
+### Method 3: Structural Parity via SQL (Table & Column Counts)
+
+Run this read-only query in both **Cloud Studio SQL Editor** and **Local Studio SQL Editor** (`http://127.0.0.1:55433`):
+
+```sql
+-- Safe, read-only: Structural summary of public schema
+SELECT 
+    (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE') AS total_tables,
+    (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public') AS total_columns,
+    (SELECT count(*) FROM information_schema.table_constraints WHERE table_schema = 'public' AND constraint_type = 'PRIMARY KEY') AS total_primary_keys,
+    (SELECT count(*) FROM information_schema.table_constraints WHERE table_schema = 'public' AND constraint_type = 'FOREIGN KEY') AS total_foreign_keys,
+    (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS total_user_triggers,
+    (SELECT count(*) FROM pg_policy) AS total_rls_policies;
+```
+
+**Verification:** If all numbers match between Cloud and Local, your database structure, constraints, triggers, and RLS security policies are fully aligned.
+
+---
+
+### Method 4: Data Parity Check (Table-by-Table Row Count)
+
+To compare record counts across all tables between Cloud and Local without loading large datasets into memory, run this read-only script in both SQL Editors:
+
+```sql
+-- Safe, read-only: Exact row count for all public tables
+DO $$
+DECLARE
+    rec RECORD;
+    cnt BIGINT;
+BEGIN
+    CREATE TEMP TABLE IF NOT EXISTS temp_row_counts (
+        table_name TEXT,
+        row_count BIGINT
+    ) ON COMMIT DROP;
+    
+    FOR rec IN (
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+    ) LOOP
+        EXECUTE format('SELECT count(*) FROM public.%I', rec.table_name) INTO cnt;
+        INSERT INTO temp_row_counts VALUES (rec.table_name, cnt);
+    END LOOP;
+END $$;
+
+SELECT table_name, row_count 
+FROM temp_row_counts 
+ORDER BY table_name;
+```
+
+**Verification:**
+- Paste the results side-by-side or compare table rows (e.g. `users`, `organizations`, `chart_of_accounts`, `students`, `invoices`).
+- If you recently did a [PART 1 Sync Down](#3-part-1-cloud--local-cloning--syncing-down), the row counts should be identical.
+
+---
+
+### Method 5: Master Data Hash / Checksum Verification (Deep Data Integrity)
+
+For critical configuration or reference tables (e.g., `chart_of_accounts`, `roles`, `permissions`, `tax_types`), you can verify that the actual data values match byte-for-byte by calculating an MD5 hash:
+
+```sql
+-- Safe, read-only: Generates an MD5 fingerprint of table rows
+SELECT md5(string_agg(t.*::text, '' ORDER BY id)) AS table_fingerprint
+FROM (SELECT * FROM chart_of_accounts) t;
+```
+
+*(Repeat for any table by replacing `chart_of_accounts` with the target table name).*
+
+**Verification:**
+- Run the query on Cloud and Local.
+- If the resulting 32-character hash is identical (e.g., `d41d8cd98f00b204e9800998ecf8427e`), the rows, columns, and data values are **guaranteed to be identical**.
+
+---
+
+## 6. PART 4: Day-to-Day Local Development Commands
 
 | Task | Command |
 | :--- | :--- |
@@ -173,13 +297,15 @@ psql "postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-[region].pooler.supab
 | **Stop Local Supabase** | `npx supabase stop` |
 | **Stop and Delete Local DB** | `npx supabase stop --no-backup` |
 | **Rebuild DB from Migrations & Seed** | `npx supabase db reset` |
+| **Check Migration Sync Status** | `npx supabase migration list` |
+| **Preview Schema Diff (Read-Only)** | `npx supabase db diff --linked` |
 | **Create Empty Migration File** | `npx supabase migration new <name>` |
 | **Generate Schema Diff Migration** | `npx supabase db diff --linked -f <name>` |
 | **Deploy Migrations to Cloud** | `npx supabase db push` |
 
 ---
 
-## 6. PART 4: Common Errors & Troubleshooting
+## 7. PART 5: Common Errors & Troubleshooting
 
 ### Error 1: `ERROR: duplicate key value violates unique constraint "schema_migrations_pkey" (SQLSTATE 23505)`
 - **Cause:** Multiple migration files in `supabase/migrations/` share the same version prefix (e.g., `20260419_...`).
@@ -204,5 +330,6 @@ psql "postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-[region].pooler.supab
   AT_ERP_JWT_SECRET=AT-ERP-JWT-SECRET-KEY-2024-CHANGE-IN-PRODUCTION
   ```
   Then restart local Supabase (`npx supabase stop` then `npx supabase start`).
+
 
 

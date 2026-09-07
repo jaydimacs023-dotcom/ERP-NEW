@@ -708,7 +708,16 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
                     required
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.batchId || ''}
-                    onChange={e => setFormData({...formData, batchId: e.target.value, studentId: ''})}
+                    onChange={e => {
+                      const nextBatchId = e.target.value;
+                      const targetBatch = batches.find(b => b.id === nextBatchId);
+                      setFormData(prev => ({
+                        ...prev,
+                        batchId: nextBatchId,
+                        studentId: '',
+                        sponsorId: editingEnrollment ? prev.sponsorId : (targetBatch?.sponsorId || prev.sponsorId || '')
+                      }));
+                    }}
                     disabled={!!editingEnrollment}
                   >
                     <option value="">Select a batch...</option>
@@ -747,18 +756,18 @@ const EnrollmentsView: React.FC<EnrollmentsViewProps> = ({
 
                 {/* Sponsor Selection */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sponsor (Optional)</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Funding Source / Sponsor</label>
                   <select 
                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
                     value={formData.sponsorId || ''}
                     onChange={e => setFormData({...formData, sponsorId: e.target.value})}
                   >
-                    <option value="">Self-pay (No Sponsor)</option>
+                    <option value="">Private / Self-Paying Student</option>
                     {sponsors.filter(s => !s.isDeleted).map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>{s.name} ({s.code || (s.type === 'GOVERNMENT' ? 'TESDA' : 'Corporate')})</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 italic">Select a sponsor if this enrollment is sponsored. Leave blank for self-paying students.</p>
+                  <p className="text-xs text-gray-500 italic">Billing recipient: choose Private to bill the learner directly, or select a sponsor to bill the organization.</p>
                 </div>
 
                 {/* Enrollment Date and Code */}

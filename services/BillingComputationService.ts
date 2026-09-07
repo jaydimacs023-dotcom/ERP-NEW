@@ -102,23 +102,71 @@ export class BillingComputationService {
     return String(raw?.sponsorId || raw?.sponsor_id || '').trim();
   }
 
-  static getBatchCourseFeeFundingType(
+  static getEnrollmentSponsorId(enrollment?: Enrollment | null, batch?: Batch | null): string {
+    const raw = getRaw(enrollment);
+    const studentId = String(enrollment?.studentId || raw?.student_id || '').trim();
+
+    // 1. If batch has explicit studentSponsors mapping for this student
+    if (batch?.studentSponsors && studentId && batch.studentSponsors[studentId] !== undefined) {
+      return String(batch.studentSponsors[studentId] || '').trim();
+    }
+
+    // 2. If enrollment has explicit sponsorId field defined (including empty string for private)
+    if (enrollment?.sponsorId !== undefined) {
+      return String(enrollment.sponsorId || '').trim();
+    }
+    if (raw?.sponsor_id !== undefined) {
+      return String(raw.sponsor_id || '').trim();
+    }
+
+    // 3. Fallback to batch default sponsor
+    return batch ? this.getBatchSponsorId(batch) : '';
+  }
+
+  static getCourseFeeFundingTypeForSponsor(
     context: Pick<BillingComputationContext, 'sponsors'>,
-    batch?: Batch | null
+    sponsorId?: string | null
   ): CourseFee['fundingType'] {
+    const cleanId = String(sponsorId || '').trim();
+    if (!cleanId) return 'PRIVATE';
+    const sponsor = context.sponsors?.find(s => s.id === cleanId);
+    return sponsor?.courseFeeType === 'TESDA_SCHOLARSHIP' ? 'TESDA_SCHOLARSHIP' : 'SPONSORED';
+  }
+
+  static getBatchCourseFeeFundingType(
+    context: Pick<BillingComputationContext, 'sponsors'> & { enrollments?: Enrollment[] },
+    batch?: Batch | null,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
+  ): CourseFee['fundingType'] {
+    if (targetStudentId) {
+      const enrollment = context.enrollments?.find(
+        (e: any) => (e.batchId === batch?.id || e.batch_id === batch?.id) &&
+                    (e.studentId === targetStudentId || e.student_id === targetStudentId) &&
+                    !e.isDeleted
+      );
+      const studentSponsorId = this.getEnrollmentSponsorId(enrollment, batch);
+      return this.getCourseFeeFundingTypeForSponsor(context, studentSponsorId);
+    }
+    if (targetSponsorId !== undefined) {
+      return this.getCourseFeeFundingTypeForSponsor(context, targetSponsorId);
+    }
     const sponsorId = this.getBatchSponsorId(batch);
-    if (!sponsorId) return 'PRIVATE';
-    return context.sponsors?.find(sponsor => sponsor.id === sponsorId)?.courseFeeType === 'TESDA_SCHOLARSHIP'
-      ? 'TESDA_SCHOLARSHIP'
-      : 'SPONSORED';
+    return this.getCourseFeeFundingTypeForSponsor(context, sponsorId);
   }
 
   static getBatchBillableStudentLimit(batch?: Batch | null): number {
     return 0;
   }
 
-  static getValidEnrollments(context: BillingComputationContext, batchId: string): Enrollment[] {
-    return this.sortEnrollmentsForBatchBilling(
+  static getValidEnrollments(
+    context: BillingComputationContext,
+    batchId: string,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
+  ): Enrollment[] {
+    const batch = context.batches?.find(b => b.id === batchId);
+    const allValid = this.sortEnrollmentsForBatchBilling(
       (context.enrollments || []).filter(enrollment => {
         const raw = getRaw(enrollment);
         const status = this.getEnrollmentStatus(enrollment);
@@ -130,15 +178,41 @@ export class BillingComputationService {
           !NON_BILLABLE_STATUSES.has(status);
       })
     );
+
+    if (targetStudentId) {
+      return allValid.filter(e => {
+        const raw = getRaw(e);
+        return (e.studentId || raw?.student_id) === targetStudentId;
+      });
+    }
+
+    if (targetSponsorId !== undefined) {
+      const cleanSponsorId = String(targetSponsorId || '').trim();
+      return allValid.filter(e => {
+        const enrSponsorId = this.getEnrollmentSponsorId(e, batch);
+        if (cleanSponsorId) {
+          return enrSponsorId === cleanSponsorId;
+        }
+        return !enrSponsorId;
+      });
+    }
+
+    return allValid;
   }
 
   static classifyEnrollmentsByBatchCap(
     context: BillingComputationContext,
-    batchId: string
+    batchId: string,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
   ): EnrollmentClassificationResult {
     const batch = context.batches.find(row => row.id === batchId);
-    const sponsorId = this.getBatchSponsorId(batch);
-    const validEnrollments = this.getValidEnrollments(context, batchId);
+    const defaultBatchSponsorId = this.getBatchSponsorId(batch);
+    const activeSponsorId = targetSponsorId !== undefined
+      ? String(targetSponsorId || '').trim()
+      : defaultBatchSponsorId;
+
+    const validEnrollments = this.getValidEnrollments(context, batchId, targetSponsorId, targetStudentId);
     const billableCandidates = validEnrollments.filter(enrollment => {
       const billingType = this.getEnrollmentBillingType(enrollment);
       return !PROTECTED_FREE_TYPES.has(billingType);
@@ -147,17 +221,20 @@ export class BillingComputationService {
 
     const classifiedEnrollments = validEnrollments.map(enrollment => {
       const currentType = this.getEnrollmentBillingType(enrollment);
+      const enrSponsorId = this.getEnrollmentSponsorId(enrollment, batch);
+      const resolvedSponsorId = enrSponsorId || activeSponsorId || undefined;
+
       if (PROTECTED_FREE_TYPES.has(currentType)) {
         return {
           ...enrollment,
-          sponsorId: enrollment.sponsorId || sponsorId || undefined,
+          sponsorId: resolvedSponsorId,
           billingType: currentType
         };
       }
 
       return {
         ...enrollment,
-        sponsorId: sponsorId || enrollment.sponsorId,
+        sponsorId: resolvedSponsorId,
         billingType: 'BILLABLE' as EnrollmentBillingType
       };
     });
@@ -172,37 +249,118 @@ export class BillingComputationService {
       validEnrollmentCount: validEnrollments.length,
       manualFreeCount: validEnrollments.length - billableCandidates.length,
       limit: 0,
-      sponsorId
+      sponsorId: activeSponsorId
     };
   }
 
-  static getBillableQty(context: BillingComputationContext, batchId: string): number {
-    return this.classifyEnrollmentsByBatchCap(context, batchId).billableQty;
+  static getBillableQty(
+    context: BillingComputationContext,
+    batchId: string,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
+  ): number {
+    return this.classifyEnrollmentsByBatchCap(context, batchId, targetSponsorId, targetStudentId).billableQty;
   }
 
-  static getValidEnrolledQty(context: BillingComputationContext, batchId: string): number {
-    const enrollmentCount = this.getValidEnrollments(context, batchId).length;
-    if (enrollmentCount > 0) return enrollmentCount;
+  static getValidEnrolledQty(
+    context: BillingComputationContext,
+    batchId: string,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
+  ): number {
+    const matchingEnrollments = this.getValidEnrollments(context, batchId, targetSponsorId, targetStudentId);
+    if (matchingEnrollments.length > 0) return matchingEnrollments.length;
 
-    const batch = context.batches.find(row => row.id === batchId) as RawRecord | Batch | undefined;
-    const studentIds = Array.isArray((batch as RawRecord | undefined)?.student_ids)
-      ? (batch as RawRecord).student_ids
-      : batch?.studentIds;
-    return Array.isArray(studentIds) ? new Set(studentIds.filter(Boolean)).size : 0;
+    if (targetSponsorId === undefined && targetStudentId === undefined) {
+      const batch = context.batches.find(row => row.id === batchId) as RawRecord | Batch | undefined;
+      const studentIds = Array.isArray((batch as RawRecord | undefined)?.student_ids)
+        ? (batch as RawRecord).student_ids
+        : batch?.studentIds;
+      return Array.isArray(studentIds) ? new Set(studentIds.filter(Boolean)).size : 0;
+    }
+
+    return 0;
   }
 
-  static computeCourseFeeInvoice(context: BillingComputationContext, batchId: string): ComputedCourseFeeInvoice {
-    const classification = this.classifyEnrollmentsByBatchCap(context, batchId);
+  static getBatchFundingGroups(
+    context: BillingComputationContext,
+    batchId: string
+  ): Array<{
+    sponsorId: string | null;
+    sponsorName: string;
+    fundingType: CourseFee['fundingType'];
+    totalLearners: number;
+    unbilledLearners: number;
+    studentIds: string[];
+  }> {
+    const batch = context.batches?.find(b => b.id === batchId);
+    const valid = this.getValidEnrollments(context, batchId);
+    const groupMap = new Map<string, {
+      sponsorId: string | null;
+      sponsorName: string;
+      fundingType: CourseFee['fundingType'];
+      totalLearners: number;
+      unbilledLearners: number;
+      studentIds: string[];
+    }>();
+
+    for (const enrollment of valid) {
+      const sId = this.getEnrollmentSponsorId(enrollment, batch);
+      const key = sId || '__PRIVATE__';
+      if (!groupMap.has(key)) {
+        const sponsor = sId ? context.sponsors?.find(s => s.id === sId) : null;
+        const fundingType = this.getCourseFeeFundingTypeForSponsor(context, sId);
+        groupMap.set(key, {
+          sponsorId: sId || null,
+          sponsorName: sId ? (sponsor?.name || 'Sponsor') : 'Private / Self-Funded',
+          fundingType,
+          totalLearners: 0,
+          unbilledLearners: 0,
+          studentIds: []
+        });
+      }
+
+      const group = groupMap.get(key)!;
+      group.totalLearners += 1;
+      const raw = getRaw(enrollment);
+      const bStatus = String(enrollment.billingStatus || raw?.billing_status || 'UNBILLED').toUpperCase();
+      if (bStatus === 'UNBILLED') {
+        group.unbilledLearners += 1;
+      }
+      const stId = enrollment.studentId || raw?.student_id;
+      if (stId && !group.studentIds.includes(stId)) {
+        group.studentIds.push(stId);
+      }
+    }
+
+    return Array.from(groupMap.values());
+  }
+
+  static computeCourseFeeInvoice(
+    context: BillingComputationContext,
+    batchId: string,
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
+  ): ComputedCourseFeeInvoice {
+    const classification = this.classifyEnrollmentsByBatchCap(context, batchId, targetSponsorId, targetStudentId);
     const batch = classification.batch;
-    const enrolledQty = this.getValidEnrolledQty(context, batchId);
-    const fundingType = this.getBatchCourseFeeFundingType(context, batch);
-    const fees = (context.courseFees || []).filter(fee =>
+    const enrolledQty = classification.validEnrollmentCount > 0
+      ? classification.validEnrollmentCount
+      : this.getValidEnrolledQty(context, batchId, targetSponsorId, targetStudentId);
+    const fundingType = this.getBatchCourseFeeFundingType(context, batch, targetSponsorId, targetStudentId);
+    const activeQualificationFees = (context.courseFees || []).filter(fee =>
       !!batch &&
       fee.qualificationId === batch.qualificationId &&
-      fee.fundingType === fundingType &&
       fee.isActive &&
       !fee.isDeleted
-    ).sort((left, right) =>
+    );
+
+    let fees = activeQualificationFees.filter(fee => fee.fundingType === fundingType);
+    if (fees.length === 0 && fundingType === 'TESDA_SCHOLARSHIP') {
+      fees = activeQualificationFees.filter(fee => fee.fundingType === 'SPONSORED');
+    }
+
+    fees.sort((left, right) =>
       String(left.category || '').localeCompare(String(right.category || '')) ||
       left.feeName.localeCompare(right.feeName)
     );
@@ -242,11 +400,13 @@ export class BillingComputationService {
   static validateInvoiceLinesAgainstBatchCap(
     context: BillingComputationContext,
     batchId: string,
-    invoiceLines: InvoiceLine[]
+    invoiceLines: InvoiceLine[],
+    targetSponsorId?: string | null,
+    targetStudentId?: string | null
   ): InvoiceLineValidationResult {
-    const expectedQty = this.getValidEnrolledQty(context, batchId);
+    const expectedQty = this.getValidEnrolledQty(context, batchId, targetSponsorId, targetStudentId);
     const courseFeeIds = new Set(
-      this.computeCourseFeeInvoice(context, batchId).lines.map(line => line.courseFeeId).filter(Boolean)
+      this.computeCourseFeeInvoice(context, batchId, targetSponsorId, targetStudentId).lines.map(line => line.courseFeeId).filter(Boolean)
     );
     const mismatches = (invoiceLines || [])
       .filter(line => !!line.courseFeeId && (courseFeeIds.size === 0 || courseFeeIds.has(line.courseFeeId)))
@@ -274,8 +434,17 @@ export class BillingComputationService {
     const invoice = (context.invoices || []).find(row => row.id === invoiceId);
     if (!invoice) return { canRecalculate: false, reason: 'Invoice not found.' };
     if (!invoice.batchId) return { invoice, canRecalculate: false, reason: 'Invoice is not linked to a batch.' };
+    const targetSponsorId = invoice.sponsorId !== undefined ? invoice.sponsorId : undefined;
+    const targetStudentId = invoice.studentId || undefined;
+
     if (!this.isDraftInvoice(invoice)) {
-      const validation = this.validateInvoiceLinesAgainstBatchCap(context, invoice.batchId, invoice.lines || []);
+      const validation = this.validateInvoiceLinesAgainstBatchCap(
+        context,
+        invoice.batchId,
+        invoice.lines || [],
+        targetSponsorId,
+        targetStudentId
+      );
       return {
         invoice,
         canRecalculate: false,
@@ -284,7 +453,7 @@ export class BillingComputationService {
       };
     }
 
-    const computed = this.computeCourseFeeInvoice(context, invoice.batchId);
+    const computed = this.computeCourseFeeInvoice(context, invoice.batchId, targetSponsorId, targetStudentId);
     const subtotal = roundMoney(computed.lines.reduce((sum, line) => sum + toNumber(line.netAmount), 0));
     const vatAmount = roundMoney(computed.lines.reduce((sum, line) => sum + toNumber(line.vatAmount), 0));
     const grandTotal = roundMoney(subtotal + vatAmount);

@@ -313,7 +313,7 @@ export class SupabaseDataService implements IDataService {
         'enrollments', 'assessment_registrations', 'invoices', 'invoice_lines', 'tax_categories'
       ];
 
-      const fetchers = tablesToFetch.map(table => ['warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions', 'stock_adjustments'].includes(table)
+      const fetchers = tablesToFetch.map(table => (!this.isLocalSupabase() && ['warehouse_locations', 'stock_items', 'inventory_levels', 'inventory_transactions', 'stock_adjustments'].includes(table))
         ? () => (table === 'warehouse_locations'
           ? this.listWarehouseLocationsViaEdgeFunction()
           : table === 'stock_items'
@@ -2054,11 +2054,15 @@ export class SupabaseDataService implements IDataService {
     return Number(await response.json() || 0);
   }
 
-  async fetchBillingCourseFeeInvoice(batchId: string): Promise<any[]> {
+  async fetchBillingCourseFeeInvoice(batchId: string, sponsorId?: string): Promise<any[]> {
+    const payload: Record<string, any> = { p_batch_id: batchId };
+    if (sponsorId !== undefined) {
+      payload.p_sponsor_id = sponsorId || null;
+    }
     const response = await fetch(`${this.baseUrl}/rpc/billing_course_fee_invoice`, {
       method: 'POST',
       headers: await this.getHeaders(),
-      body: JSON.stringify({ p_batch_id: batchId })
+      body: JSON.stringify(payload)
     });
 
     if (response.ok) {
@@ -2068,14 +2072,14 @@ export class SupabaseDataService implements IDataService {
 
     const errorText = await response.text();
     console.warn(`[Supabase] billing_course_fee_invoice unavailable, using REST fallback: ${response.status} ${errorText}`);
-    return this.fetchBillingCourseFeeInvoiceViaRest(batchId);
+    return this.fetchBillingCourseFeeInvoiceViaRest(batchId, sponsorId);
   }
 
-  private async fetchBillingCourseFeeInvoiceViaRest(batchId: string): Promise<any[]> {
+  private async fetchBillingCourseFeeInvoiceViaRest(batchId: string, sponsorId?: string): Promise<any[]> {
     const headers = await this.getHeaders();
     const [batchResponse, enrollmentsResponse] = await Promise.all([
       fetch(`${this.baseUrl}/batches?id=eq.${batchId}&select=id,org_id,qualification_id,sponsor_id,student_ids`, { headers }),
-      fetch(`${this.baseUrl}/enrollments?batch_id=eq.${batchId}&select=id,batch_id,billing_type,enrollment_status,enrollment_date,created_at,is_deleted,deleted_at`, { headers })
+      fetch(`${this.baseUrl}/enrollments?batch_id=eq.${batchId}&select=id,batch_id,sponsor_id,student_id,billing_type,enrollment_status,enrollment_date,created_at,is_deleted,deleted_at`, { headers })
     ]);
 
     if (!batchResponse.ok) {
@@ -2092,10 +2096,18 @@ export class SupabaseDataService implements IDataService {
       return [];
     }
 
+    const targetSponsorId = sponsorId !== undefined ? (sponsorId || null) : (batch.sponsor_id || null);
     const enrollmentRows = await enrollmentsResponse.json();
     const validEnrollments = (Array.isArray(enrollmentRows) ? enrollmentRows : [])
       .filter(row => !row.is_deleted && !row.deleted_at)
       .filter(row => !['DROPPED', 'CANCELLED', 'CANCELED', 'INACTIVE', 'ARCHIVED'].includes(String(row.enrollment_status || '').toUpperCase()))
+      .filter(row => {
+        if (sponsorId !== undefined) {
+          const rowSponsorId = row.sponsor_id || (sponsorId ? null : batch.sponsor_id) || null;
+          return targetSponsorId ? rowSponsorId === targetSponsorId : !rowSponsorId;
+        }
+        return true;
+      })
       .sort((a, b) => {
         const left = String(a.enrollment_date || a.created_at || '');
         const right = String(b.enrollment_date || b.created_at || '');
@@ -2104,9 +2116,12 @@ export class SupabaseDataService implements IDataService {
         return String(a.id || '').localeCompare(String(b.id || ''));
       });
     const batchStudentIds = Array.isArray(batch.student_ids) ? batch.student_ids.filter(Boolean) : [];
-    const enrolledQty = validEnrollments.length > 0 ? validEnrollments.length : new Set(batchStudentIds).size;
+    const enrolledQty = validEnrollments.length > 0
+      ? validEnrollments.length
+      : (sponsorId === undefined ? new Set(batchStudentIds).size : 0);
     console.info('[Supabase] Billing fallback computed batch quantity:', {
       batchId,
+      targetSponsorId,
       enrollmentRows: Array.isArray(enrollmentRows) ? enrollmentRows.length : 0,
       validEnrollments: validEnrollments.length,
       batchStudentIds: batchStudentIds.length,
@@ -2114,9 +2129,9 @@ export class SupabaseDataService implements IDataService {
     });
 
     let fundingType = 'PRIVATE';
-    if (batch.sponsor_id) {
+    if (targetSponsorId) {
       const sponsorResponse = await fetch(
-        `${this.baseUrl}/sponsors?id=eq.${batch.sponsor_id}&select=course_fee_type`,
+        `${this.baseUrl}/sponsors?id=eq.${targetSponsorId}&select=course_fee_type`,
         { headers }
       );
       if (!sponsorResponse.ok) {
@@ -2999,8 +3014,34 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getAPMemosByOrg(orgId: string): Promise<any[]> {
-    const result = await this.apMemoRequest('list', { orgId });
-    return this.snakeToCamel(result.memos || []);
+    if (this.isLocalSupabase()) {
+      return this.getAPMemosViaRest(orgId);
+    }
+    try {
+      const result = await this.apMemoRequest('list', { orgId });
+      return this.snakeToCamel(result.memos || []);
+    } catch (err) {
+      console.warn('[Supabase] ap-memos-write edge function unavailable; using REST fallback.', err);
+      return this.getAPMemosViaRest(orgId);
+    }
+  }
+
+  private async getAPMemosViaRest(orgId: string): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/ap_memos?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`,
+        { headers: await this.getHeaders() }
+      );
+      if (!response.ok) {
+        console.warn(`[Supabase] REST query for ap_memos returned ${response.status}`);
+        return [];
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('[Supabase] Failed to fetch ap_memos via REST:', error);
+      return [];
+    }
   }
 
   async createAPMemo(memo: any): Promise<any> {
@@ -3060,8 +3101,34 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getAPReclassificationsByOrg(orgId: string): Promise<any[]> {
-    const result = await this.apReclassificationRequest('list', { orgId });
-    return this.snakeToCamel(result.reclassifications || []);
+    if (this.isLocalSupabase()) {
+      return this.getAPReclassificationsViaRest(orgId);
+    }
+    try {
+      const result = await this.apReclassificationRequest('list', { orgId });
+      return this.snakeToCamel(result.reclassifications || []);
+    } catch (err) {
+      console.warn('[Supabase] ap-reclassifications-write edge function unavailable; using REST fallback.', err);
+      return this.getAPReclassificationsViaRest(orgId);
+    }
+  }
+
+  private async getAPReclassificationsViaRest(orgId: string): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/ap_reclassifications?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`,
+        { headers: await this.getHeaders() }
+      );
+      if (!response.ok) {
+        console.warn(`[Supabase] REST query for ap_reclassifications returned ${response.status}`);
+        return [];
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('[Supabase] Failed to fetch ap_reclassifications via REST:', error);
+      return [];
+    }
   }
   async createAPReclassification(reclassification: any): Promise<any> {
     const result = await this.apReclassificationRequest('create', { orgId: reclassification.orgId, reclassification });
@@ -3088,8 +3155,34 @@ export class SupabaseDataService implements IDataService {
   }
 
   async getTimeExpensesByOrg(orgId: string): Promise<any[]> {
-    const result = await this.timeExpenseRequest('list', { orgId });
-    return this.snakeToCamel(result.expenses || []);
+    if (this.isLocalSupabase()) {
+      return this.getTimeExpensesViaRest(orgId);
+    }
+    try {
+      const result = await this.timeExpenseRequest('list', { orgId });
+      return this.snakeToCamel(result.expenses || []);
+    } catch (err) {
+      console.warn('[Supabase] time-expenses-write edge function unavailable; using REST fallback.', err);
+      return this.getTimeExpensesViaRest(orgId);
+    }
+  }
+
+  private async getTimeExpensesViaRest(orgId: string): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/time_expenses?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`,
+        { headers: await this.getHeaders() }
+      );
+      if (!response.ok) {
+        console.warn(`[Supabase] REST query for time_expenses returned ${response.status}`);
+        return [];
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('[Supabase] Failed to fetch time_expenses via REST:', error);
+      return [];
+    }
   }
 
   async createTimeExpense(expense: any): Promise<any> {
@@ -3097,17 +3190,116 @@ export class SupabaseDataService implements IDataService {
     if (!filtered.org_id) {
       throw new Error('An organization is required to create an expense.');
     }
-    const result = await this.timeExpenseRequest('create', { orgId: filtered.org_id, expense });
-    return this.snakeToCamel(result.expense);
+    if (this.isLocalSupabase()) {
+      return this.createTimeExpenseViaRest(expense, filtered.org_id);
+    }
+    try {
+      const result = await this.timeExpenseRequest('create', { orgId: filtered.org_id, expense });
+      return this.snakeToCamel(result.expense);
+    } catch (err) {
+      console.warn('[Supabase] time-expenses-write edge function unavailable; using REST insert fallback.', err);
+      return this.createTimeExpenseViaRest(expense, filtered.org_id);
+    }
+  }
+
+  private async createTimeExpenseViaRest(expense: any, orgId: string): Promise<any> {
+    const snake = this.camelToSnake(expense);
+    const quantity = Number(snake.quantity || 0);
+    const unitCost = Number(snake.unit_cost || 0);
+    const amount = Number(snake.amount) || Math.round(quantity * unitCost * 100) / 100;
+    const payload = this.filterToTableSchema('time_expenses', {
+      ...snake,
+      org_id: orgId,
+      quantity,
+      unit_cost: unitCost,
+      amount,
+      status: snake.status || 'open',
+    });
+
+    const response = await fetch(`${this.baseUrl}/time_expenses`, {
+      method: 'POST',
+      headers: {
+        ...(await this.getHeaders()),
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to create time expense: ${response.status} ${errText}`);
+    }
+
+    const rows = await response.json();
+    const inserted = Array.isArray(rows) ? rows[0] : rows;
+    return this.snakeToCamel(inserted);
   }
 
   async updateTimeExpense(id: string, updates: any): Promise<any> {
-    const result = await this.timeExpenseRequest('update', { id, updates });
-    return this.snakeToCamel(result.expense);
+    if (this.isLocalSupabase()) {
+      return this.updateTimeExpenseViaRest(id, updates);
+    }
+    try {
+      const result = await this.timeExpenseRequest('update', { id, updates });
+      return this.snakeToCamel(result.expense);
+    } catch (err) {
+      console.warn('[Supabase] time-expenses-write edge function unavailable; using REST update fallback.', err);
+      return this.updateTimeExpenseViaRest(id, updates);
+    }
+  }
+
+  private async updateTimeExpenseViaRest(id: string, updates: any): Promise<any> {
+    const snake = this.camelToSnake(updates);
+    if (snake.quantity !== undefined || snake.unit_cost !== undefined) {
+      const quantity = Number(snake.quantity);
+      const unitCost = Number(snake.unit_cost);
+      if (Number.isFinite(quantity) && Number.isFinite(unitCost)) {
+        snake.amount = Math.round(quantity * unitCost * 100) / 100;
+      }
+    }
+    const payload = this.filterToTableSchema('time_expenses', snake);
+
+    const response = await fetch(`${this.baseUrl}/time_expenses?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: {
+        ...(await this.getHeaders()),
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to update time expense: ${response.status} ${errText}`);
+    }
+
+    const rows = await response.json();
+    const updated = Array.isArray(rows) ? rows[0] : rows;
+    return this.snakeToCamel(updated);
   }
 
   async deleteTimeExpense(id: string): Promise<void> {
-    await this.timeExpenseRequest('delete', { id });
+    if (this.isLocalSupabase()) {
+      return this.deleteTimeExpenseViaRest(id);
+    }
+    try {
+      await this.timeExpenseRequest('delete', { id });
+    } catch (err) {
+      console.warn('[Supabase] time-expenses-write edge function unavailable; using REST delete fallback.', err);
+      return this.deleteTimeExpenseViaRest(id);
+    }
+  }
+
+  private async deleteTimeExpenseViaRest(id: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/time_expenses?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: await this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to delete time expense: ${response.status} ${errText}`);
+    }
   }
 
   private async timeExpenseRequest(action: string, payload: Record<string, any> = {}): Promise<any> {
@@ -3122,7 +3314,7 @@ export class SupabaseDataService implements IDataService {
       body: JSON.stringify({ action, ...payload }),
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Time expense request failed');
+    if (!response.ok) throw new Error(result.error || `Time expense request failed (${response.status})`);
     return result;
   }
 
@@ -3741,8 +3933,30 @@ export class SupabaseDataService implements IDataService {
   }
 
   private async listWarehouseLocationsViaEdgeFunction(orgId?: string): Promise<any[]> {
-    const result = await this.warehouseLocationRequest('list', orgId ? { orgId } : {});
-    return this.snakeToCamel(result.locations || []);
+    if (this.isLocalSupabase()) {
+      return this.listWarehouseLocationsViaRest(orgId);
+    }
+    try {
+      const result = await this.warehouseLocationRequest('list', orgId ? { orgId } : {});
+      return this.snakeToCamel(result.locations || []);
+    } catch (err) {
+      console.warn('[Supabase] warehouse-locations-write edge function unavailable; using REST fallback.', err);
+      return this.listWarehouseLocationsViaRest(orgId);
+    }
+  }
+
+  private async listWarehouseLocationsViaRest(orgId?: string): Promise<any[]> {
+    try {
+      const url = orgId
+        ? `${this.baseUrl}/warehouse_locations?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`
+        : `${this.baseUrl}/warehouse_locations?order=created_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch {
+      return [];
+    }
   }
 
   async createWarehouseLocation(location: any): Promise<any> {
@@ -3801,8 +4015,30 @@ export class SupabaseDataService implements IDataService {
   }
 
   private async listStockItemsViaEdgeFunction(orgId?: string): Promise<any[]> {
-    const result = await this.stockItemRequest('list', orgId ? { orgId } : {});
-    return this.snakeToCamel(result.items || []);
+    if (this.isLocalSupabase()) {
+      return this.listStockItemsViaRest(orgId);
+    }
+    try {
+      const result = await this.stockItemRequest('list', orgId ? { orgId } : {});
+      return this.snakeToCamel(result.items || []);
+    } catch (err) {
+      console.warn('[Supabase] stock-items-write edge function unavailable; using REST fallback.', err);
+      return this.listStockItemsViaRest(orgId);
+    }
+  }
+
+  private async listStockItemsViaRest(orgId?: string): Promise<any[]> {
+    try {
+      const url = orgId
+        ? `${this.baseUrl}/stock_items?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`
+        : `${this.baseUrl}/stock_items?order=created_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch {
+      return [];
+    }
   }
 
   async createStockItem(item: any): Promise<any> {
