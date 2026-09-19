@@ -3,6 +3,10 @@
  * AccounTech ERP Configuration
  * Robust environment detection to handle Vite, Node, and browser-only contexts.
  * Supports Runtime Overrides for instant switching between Mock and Cloud.
+/**
+ * AccounTech ERP Configuration
+ * Robust environment detection to handle Vite, Node, and browser-only contexts.
+ * Supports Runtime Overrides for instant switching between Mock and Cloud.
  */
 
 // Vite automatically exposes VITE_* env vars via import.meta.env
@@ -10,8 +14,12 @@ const env = import.meta.env;
 
 // Check for runtime override in browser
 const getRuntimeOverride = () => {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    return localStorage.getItem('AT_ERP_DATA_SOURCE'); // 'MOCK' | 'CLOUD'
+  try {
+    if (typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function') {
+      return window.localStorage.getItem('AT_ERP_DATA_SOURCE'); // 'MOCK' | 'CLOUD'
+    }
+  } catch {
+    // Ignore environments where localStorage is restricted
   }
   return null;
 };

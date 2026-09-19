@@ -58,6 +58,8 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TimeExpense['status']>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [claimantFilter, setClaimantFilter] = useState<string>('all');
   const [expenseAccountSearch, setExpenseAccountSearch] = useState('');
   const [showExpenseAccountOptions, setShowExpenseAccountOptions] = useState(false);
   const openRows = useMemo(() => rows.filter(row => row.status === 'open'), [rows]);
@@ -71,6 +73,25 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
   const selectedInputVat = Math.round((total - selectedExpenseTotal) * 100) / 100;
   const selectedClaimant = selectedRows[0]?.claimedBy;
   const selectedEmployeeId = selectedRows[0]?.employeeId;
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    rows.forEach(r => {
+      if (r.transactionDate && r.transactionDate.length >= 7) {
+        months.add(r.transactionDate.slice(0, 7));
+      }
+    });
+    return Array.from(months).sort().reverse();
+  }, [rows]);
+
+  const distinctClaimants = useMemo(() => {
+    const claimants = new Set<string>();
+    rows.forEach(r => {
+      if (r.claimedBy) claimants.add(r.claimedBy.trim());
+    });
+    return Array.from(claimants).sort();
+  }, [rows]);
+
   const expenseAccounts = useMemo(
     () => accounts
       .filter(account => !account.isHeader && account.isActive !== false && !account.isDeleted)
@@ -92,6 +113,8 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
     const query = searchTerm.trim().toLocaleLowerCase();
     return rows.filter(row => {
       const matchesStatus = statusFilter === 'all' || row.status === statusFilter;
+      const matchesMonth = monthFilter === 'all' || (row.transactionDate && row.transactionDate.startsWith(monthFilter));
+      const matchesClaimant = claimantFilter === 'all' || (row.claimedBy && row.claimedBy.trim() === claimantFilter);
       const matchesSearch = !query || [
         row.rfqCode, row.transactionDate, row.description,
         row.supplierName || vendors.find(vendor => vendor.id === row.supplierId)?.name,
@@ -103,9 +126,9 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         qualifications.find(qualification => qualification.id === row.qualificationId)?.name,
         row.status,
       ].some(value => String(value || '').toLocaleLowerCase().includes(query));
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesMonth && matchesClaimant && matchesSearch;
     });
-  }, [rows, searchTerm, statusFilter, accounts, taxCategories, qualifications, vendors]);
+  }, [rows, searchTerm, statusFilter, monthFilter, claimantFilter, accounts, taxCategories, qualifications, vendors]);
   const { currentPage, totalPages, pageStartIndex, pageEndIndex, paginatedRows, setCurrentPage } =
     usePaginatedRows(filteredRows, [searchTerm, statusFilter], 7);
 
@@ -231,6 +254,20 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
     } finally { setSaving(false); }
   };
 
+  const filteredOpenRows = useMemo(() => filteredRows.filter(row => row.status === 'open'), [filteredRows]);
+
+  const handleSelectAllFilteredOpen = () => {
+    if (!filteredOpenRows.length) return;
+    const firstClaimant = filteredOpenRows[0].claimedBy;
+    const sameClaimantRows = filteredOpenRows.filter(r => normalizeGroupValue(r.claimedBy) === normalizeGroupValue(firstClaimant));
+    if (sameClaimantRows.length < filteredOpenRows.length) {
+      onNotify('info', `Selected ${sameClaimantRows.length} open expenses for ${firstClaimant}. (One AP Bill can only consolidate for one employee).`);
+    } else {
+      onNotify('info', `Selected all ${sameClaimantRows.length} open expense(s).`);
+    }
+    setSelected(sameClaimantRows.map(r => r.id));
+  };
+
   const toggle = (row: TimeExpense) => {
     const hasDifferentEmployee = selectedEmployeeId && row.employeeId
       ? selectedEmployeeId !== row.employeeId
@@ -282,7 +319,9 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
         netPayable: total, paidAmount: 0, billDate: now.toISOString().slice(0, 10),
         dueDate: new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10),
         currency, status: 'for_approval', referenceDocument: selectedRows.map(row => row.rfqCode).join(', '),
-        expenseAllocations: selectedRows.map(row => ({
+        expenseAllocations: selectedRows.map((row, idx) => ({
+          lineNumber: idx + 1,
+          lineType: 'EXPENSE',
           expenseAccountId: row.expenseAccountId!,
           qualificationId: row.qualificationId,
           amount: calculateVatExclusiveCost(
@@ -290,6 +329,9 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
             Number(row.unitCost),
             taxCategories.find(category => category.id === row.taxCategoryId)
           ),
+          quantity: Number(row.quantity) || 1,
+          unitPrice: Number(row.unitCost) || 0,
+          taxCategoryId: row.taxCategoryId || '',
           description: `${row.rfqCode} — ${row.description}`,
           sourceExpenseId: row.id,
         })),
@@ -437,17 +479,40 @@ const TimeExpensesView: React.FC<Props> = ({ orgId, payables, vendors, accounts,
 
     <div onClick={openRowDetails} className="[&_tbody_tr]:cursor-pointer">
     <div className="overflow-hidden rounded-xl border border-brand-light bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row">
+      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center">
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17}/>
           <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search RFQ, description, supplier, claimant or account..." className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-brand"/>
         </label>
+        <select value={monthFilter} onChange={event => setMonthFilter(event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand">
+          <option value="all">All months</option>
+          {availableMonths.map(m => {
+            const [y, mon] = m.split('-');
+            const date = new Date(Number(y), Number(mon) - 1, 1);
+            const label = isNaN(date.getTime()) ? m : date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            return <option key={m} value={m}>{label}</option>;
+          })}
+        </select>
+        <select value={claimantFilter} onChange={event => setClaimantFilter(event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand">
+          <option value="all">All claimants</option>
+          {distinctClaimants.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand">
           <option value="all">All statuses</option>
           <option value="open">Open</option>
           <option value="released">On Hold</option>
           <option value="billed">Billed</option>
         </select>
+        {filteredOpenRows.length > 0 && (
+          <button
+            type="button"
+            onClick={handleSelectAllFilteredOpen}
+            className="px-3 py-2 text-xs font-bold rounded border border-brand/40 bg-brand/5 text-brand hover:bg-brand/10 transition-colors whitespace-nowrap"
+            title="Select all open expenses currently matching the month and claimant filters"
+          >
+            Select All Open ({filteredOpenRows.length})
+          </button>
+        )}
       </div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-brand text-xs uppercase tracking-wider text-white"><tr><th className="p-4"></th><th className="p-4">RFQ Code</th><th className="p-4">Transaction Date</th><th className="p-4">Description</th><th className="p-4">Supplier</th><th className="p-4">Tax Category</th><th className="p-4 text-right">Tax</th><th className="p-4">Claimed By</th><th className="p-4">Expense Account</th><th className="p-4 text-right">Amount</th><th className="p-4">Status</th><th className="p-4"></th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedRows.map(row => { const taxCategory = taxCategories.find(category => category.id === row.taxCategoryId); const taxAmount = isVatGoodsOrServices(taxCategory) ? calculateInclusiveVatAmount(Number(row.quantity), Number(row.unitCost), taxCategory) : calculateTaxAmount(Number(row.amount), taxCategory); const isOpen = row.status === 'open'; const isBilled = row.status === 'billed'; const isSelected = isOpen && selected.includes(row.id); return <tr key={row.id} data-row-id={row.id} className={isSelected ? 'bg-brand/5' : isOpen ? 'hover:bg-brand/5' : isBilled ? 'bg-blue-50/30' : 'bg-amber-50/30'}><td className="p-4"><input type="checkbox" disabled={!isOpen} checked={isSelected} onChange={() => toggle(row)} className="h-4 w-4 rounded border-slate-300 accent-[var(--brand)] disabled:opacity-40"/></td><td className="p-4 font-semibold text-brand">{row.rfqCode}</td><td className="p-4 text-slate-600">{row.transactionDate}</td><td className="p-4 text-slate-800">{row.description}</td><td className="p-4">{row.supplierName || vendors.find(v => v.id === row.supplierId)?.name || '—'}</td><td className="p-4"><span className="inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">{taxCategory ? `${taxCategory.code} · ${Number(taxCategory.rate).toLocaleString()}%` : '—'}</span></td><td className="p-4 text-right font-mono text-slate-700">{taxCategory ? `${currency} ${taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}</td><td className="p-4 text-slate-600">{row.claimedBy}</td><td className="p-4 text-slate-600">{(accounts.find(account => account.id === row.expenseAccountId) || expenseAccounts.find(account => account.id === row.expenseAccountId))?.name || '—'}</td><td className="p-4 text-right font-mono font-semibold">{currency} {Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOpen ? 'bg-amber-50 text-amber-700' : isBilled ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>{isOpen ? 'Open' : isBilled ? 'Billed' : 'On Hold'}</span></td><td className="p-4">{isOpen && <div className="flex items-center gap-3"><button onClick={() => openEditForm(row)} className="text-slate-400 hover:text-brand" aria-label={`Edit expense ${row.rfqCode}`}><Pencil size={16}/></button><button onClick={() => remove(row)} className="text-slate-400 hover:text-rose-600" aria-label={`Delete expense ${row.rfqCode}`}><Trash2 size={16}/></button></div>}</td></tr>; })}</tbody></table>{!filteredRows.length && <div className="p-12 text-center text-sm text-slate-500">{rows.length ? 'No expense records match the current filters.' : 'No expense records.'}</div>}</div>
       <PaginationControls currentPage={currentPage} totalPages={totalPages} totalItems={filteredRows.length} pageStartIndex={pageStartIndex} pageEndIndex={pageEndIndex} onPageChange={setCurrentPage} itemLabel="expenses"/>

@@ -51,20 +51,16 @@ export class SupabaseDataService implements IDataService {
   }
 
   // Helper method to get standard headers for Supabase requests.
-  // Reads default to anon for broad visibility, while selected writes can prefer
-  // the authenticated AT-ERP token when RLS depends on user claims.
-  private async getHeaders(preferUserToken: boolean = false): Promise<Record<string, string>> {
+  // Authenticated Supabase sessions are the default so PostgREST can enforce RLS.
+  private async getHeaders(preferUserToken: boolean = true): Promise<Record<string, string>> {
     const accessToken = preferUserToken ? await TokenManager.getAccessToken() : null;
     const headers: Record<string, string> = {
       'apikey': this.supabaseKey,
       'Content-Type': 'application/json',
     };
 
-    // The API key is sufficient for anonymous PostgREST access. Do not also
-    // put it in Authorization: newer publishable keys are not JWTs, and custom
-    // AT-ERP JWTs are only understood by our Edge Functions. A bearer header
-    // is added here only when a caller explicitly supplies a Supabase-compatible
-    // user token.
+    // Only callers that already have a Supabase-compatible user token may opt
+    // into Authorization. Never treat the publishable API key as a bearer JWT.
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -1059,6 +1055,7 @@ export class SupabaseDataService implements IDataService {
     console.debug('[Supabase] After camelToSnake():', snakeCaseUser);
 
     // Hash password BEFORE filtering (since password_hash is the valid column, not password)
+    const plainPasswordForAuth = snakeCaseUser.password;
     if (snakeCaseUser.password) {
       const plainPassword = snakeCaseUser.password;
       try {
@@ -1093,13 +1090,13 @@ export class SupabaseDataService implements IDataService {
 
     if (options?.preferUserToken) {
       try {
-        return await this.writeUserViaEdgeFunction('create_user', { user: filteredUser });
+        return await this.writeUserViaEdgeFunction('create_user', { user: filteredUser, password: plainPasswordForAuth });
       } catch (error) {
         if (this.isRecoverableUserWriteError(error)) {
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(
             `Admin user creation requires the deployed Supabase edge function 'users-write'. ${message}. ` +
-            `Deploy supabase/functions/users-write and set AT_ERP_JWT_SECRET to the same secret used by services/JWTService.ts.`
+            `Deploy supabase/functions/users-write with Supabase Auth validation enabled.`
           );
         }
         throw error;

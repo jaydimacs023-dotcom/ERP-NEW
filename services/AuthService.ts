@@ -126,6 +126,65 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<{ user: User; token: string; tokens: TokenPair } | null> {
+    if (config.useMockData || !this.supabaseUrl || !this.supabaseKey) {
+      return this.mockLogin(email, password);
+    }
+
+    try {
+      const authResponse = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { apikey: this.supabaseKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+      if (!authResponse.ok) return null;
+
+      const authData = await authResponse.json();
+      const authUid = authData?.user?.id;
+      const accessToken = authData?.access_token;
+      const refreshToken = authData?.refresh_token;
+      if (!authUid || !accessToken || !refreshToken) return null;
+
+      const columns = 'id,name,email,last_name,profile_photo,contact_number,address,role,org_id,student_id,trainer_id,is_active,locked_until';
+      const profileResponse = await fetch(
+        `${this.supabaseUrl}/rest/v1/users?auth_uid=eq.${encodeURIComponent(authUid)}&select=${columns}`,
+        { headers: { ...this.getHeaders(), Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!profileResponse.ok) return null;
+      const profiles = await profileResponse.json();
+      const profile = profiles?.[0];
+      if (!profile?.is_active) return null;
+      if (profile.locked_until && new Date(profile.locked_until).getTime() > Date.now()) return null;
+
+      const user: User = {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        lastName: profile.last_name,
+        profilePhoto: profile.profile_photo,
+        contactNumber: profile.contact_number,
+        address: profile.address,
+        role: profile.role,
+        orgId: profile.org_id,
+        studentId: profile.student_id,
+        trainerId: profile.trainer_id
+      };
+      const tokens: TokenPair = {
+        accessToken,
+        refreshToken,
+        expiresIn: Number(authData.expires_in || 3600),
+        refreshExpiresIn: 365 * 24 * 60 * 60,
+        tokenType: 'Bearer'
+      };
+      await TokenManager.setTokens(user, tokens);
+      return { user, token: accessToken, tokens };
+    } catch (error) {
+      console.error('[Auth] Supabase Auth login failed:', error);
+      return null;
+    }
+  }
+
+  /** Legacy table-password login retained temporarily for migration reference only. */
+  private async legacyLogin(email: string, password: string): Promise<{ user: User; token: string; tokens: TokenPair } | null> {
     // Handle Mock Login (for development/demo without Supabase)
     if (config.useMockData || !this.supabaseUrl || !this.supabaseKey) {
       console.info('[Auth] Using mock authentication (development mode)');

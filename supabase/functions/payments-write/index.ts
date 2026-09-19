@@ -1,17 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-type JwtPayload = {
-  sub: string;
-  orgId?: string;
-  org_id?: string;
-  role?: string;
-  exp?: number;
-};
+import { authenticateErpRequest } from "../_shared/erp-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const AT_ERP_JWT_SECRET = Deno.env.get("AT_ERP_JWT_SECRET") ?? "";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -20,61 +12,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
-
-function b64UrlToBytes(input: string): Uint8Array {
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob(padded);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return bytes;
-}
-
-function bytesToB64Url(bytes: Uint8Array): string {
-  let str = "";
-  bytes.forEach((b) => (str += String.fromCharCode(b)));
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function camelToSnakeKeys(value: any): any {
-  if (value === null || value === undefined) return value;
-  if (typeof value !== "object") return value;
-  if (Array.isArray(value)) return value.map((item) => camelToSnakeKeys(item));
-  if (value instanceof Date) return value;
-
-  const result: Record<string, any> = {};
-  for (const key of Object.keys(value)) {
-    const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-    result[snakeKey] = camelToSnakeKeys(value[key]);
-  }
-  return result;
-}
-
-async function verifyHs256Jwt(token: string, secret: string): Promise<JwtPayload | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const [headerB64, payloadB64, sigB64] = parts;
-    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
-    const expected = bytesToB64Url(signature);
-    if (expected !== sigB64) return null;
-
-    const payloadJson = new TextDecoder().decode(b64UrlToBytes(payloadB64));
-    const payload = JSON.parse(payloadJson) as JwtPayload;
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
 
 function json(status: number, data: any) {
   return new Response(JSON.stringify(data), {
@@ -108,26 +45,16 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => null);
   if (!body?.action) return json(400, { error: "Missing action" });
 
-  // For development: extract org_id from request body if JWT verification fails
-  // In production, use proper JWT tokens from Supabase Auth or custom auth service
-  let actorOrgId = body.orgId || body.org_id;
-  let actorUserId = 'system';  // Default system user for development
-
-  // Attempt JWT verification if credentials available
-  const auth = req.headers.get("Authorization") || "";
-  if (auth.startsWith("Bearer ") && AT_ERP_JWT_SECRET) {
-    const token = auth.slice(7);
-    const payload = await verifyHs256Jwt(token, AT_ERP_JWT_SECRET);
-    if (payload?.sub) {
-      actorUserId = payload.sub;
-      actorOrgId = payload.orgId || payload.org_id || actorOrgId;
-    }
+  const actor = await authenticateErpRequest(req, admin);
+  if (!actor) return json(401, { error: "Invalid, expired, or unlinked Supabase session" });
+  if (!["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "ACCOUNTANT", "AR_SPECIALIST", "TREASURY"].includes(actor.role)) {
+    return json(403, { error: "This role cannot manage AR payments" });
   }
-
-  // Validate org_id is present
-  if (!actorOrgId) {
-    return json(400, { error: "Missing org_id in request or token" });
-  }
+  const actorOrgId = actor.role === "SYSTEM_ADMIN"
+    ? String(body.orgId || body.org_id || body.payment?.orgId || body.payment?.org_id || "")
+    : actor.orgId;
+  const actorUserId = actor.id;
+  if (!actorOrgId) return json(403, { error: "Missing organization scope" });
 
   // Action 1: create payment (draft/posted)
   if (body.action === "create_payment") {

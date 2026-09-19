@@ -1,9 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateErpRequest } from "../_shared/erp-auth.ts";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const jwtSecret = Deno.env.get("AT_ERP_JWT_SECRET") ?? "";
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -13,27 +13,6 @@ const cors = {
 const reply = (status: number, body: any) => new Response(JSON.stringify(body), {
   status, headers: { ...cors, "Content-Type": "application/json" },
 });
-const decode = (value: string) => {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(base64 + "=".repeat((4 - base64.length % 4) % 4)), c => c.charCodeAt(0));
-};
-const encode = (bytes: Uint8Array) => {
-  let value = "";
-  bytes.forEach(byte => value += String.fromCharCode(byte));
-  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-};
-async function actorIdFrom(request: Request): Promise<string | null> {
-  try {
-    const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-    const [header, payload, signature, ...extra] = token.split(".");
-    if (!header || !payload || !signature || extra.length || !jwtSecret) return null;
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(jwtSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const signed = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${header}.${payload}`)));
-    if (encode(signed) !== signature) return null;
-    const claims = JSON.parse(new TextDecoder().decode(decode(payload)));
-    return claims.sub && (!claims.exp || Date.now() / 1000 <= claims.exp) ? claims.sub : null;
-  } catch { return null; }
-}
 const WRITE = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "ACCOUNTANT", "AP_SPECIALIST", "AP_SUPERVISOR", "AP_CLERK"]);
 const POST = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "ACCOUNTANT", "AP_SPECIALIST", "AP_SUPERVISOR"]);
 const VIEW = new Set([...WRITE, "PRESIDENT", "TREASURY", "AUDITOR"]);
@@ -55,11 +34,11 @@ const fields = (input: any) => ({
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (request.method !== "POST") return reply(405, { error: "Method not allowed" });
-  if (!url || !serviceKey || !jwtSecret) return reply(500, { error: "AP reclassification function is not configured" });
-  const actorId = await actorIdFrom(request);
-  if (!actorId) return reply(401, { error: "Invalid or expired application token" });
-  const { data: user } = await admin.from("users").select("id,org_id,role,is_active").eq("id", actorId).maybeSingle();
-  if (!user || user.is_active === false) return reply(403, { error: "The logged-in user is unavailable or inactive" });
+  if (!url || !serviceKey) return reply(500, { error: "AP reclassification function is not configured" });
+  const actor = await authenticateErpRequest(request, admin);
+  if (!actor) return reply(401, { error: "Invalid, expired, or unlinked Supabase session" });
+  const actorId = actor.id;
+  const user = { id: actor.id, org_id: actor.orgId, role: actor.role };
   const body = await request.json().catch(() => ({}));
   const role = String(user.role || "").toUpperCase();
   if (!VIEW.has(role)) return reply(403, { error: "This role cannot access AP reclassifications" });

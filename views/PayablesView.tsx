@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Vendor, Payable, PayableCategory, PayableStatus, InvoiceType, PaymentMethod,
   PayablePaymentMethod, WithholdingType, ChartOfAccount, JournalEntry, JournalLine, AccountClass, BankAccount, PurchaseOrder, Qualification, TaxCategoryEntry, TimeExpense, User
@@ -15,8 +15,64 @@ import {
   X, Plus, FileText, Edit, Trash2, CheckCircle, Clock,
   DollarSign, ChevronDown, RefreshCw, CreditCard,
   BookOpen, Landmark, Receipt, TrendingUp, ArrowRight,
-  Percent, Banknote, BarChart3, PieChart, Download, Printer, RotateCcw
+  Percent, Banknote, BarChart3, PieChart, Download, Printer, RotateCcw,
+  FileSpreadsheet, Scissors, GripVertical
 } from 'lucide-react';
+
+export interface APBillFormLine {
+  id?: string;
+  lineNumber: number;
+  lineType: 'EXPENSE' | 'ITEM' | 'DISCOUNT' | 'ADJUSTMENT';
+  expenseAccountId: string;
+  qualificationId?: string;
+  description: string;
+  taxCategoryId?: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  sourceExpenseId?: string;
+}
+
+const CurrencyLineInput: React.FC<{
+  value?: number;
+  disabled?: boolean;
+  onValueChange: (value: number) => void;
+}> = ({ value = 0, disabled, onValueChange }) => {
+  const formatValue = (amount: number) =>
+    new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
+  const [isFocused, setIsFocused] = useState(false);
+  const [draft, setDraft] = useState(formatValue(value));
+
+  useEffect(() => {
+    if (!isFocused) setDraft(formatValue(value));
+  }, [value, isFocused]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      disabled={disabled}
+      onFocus={event => {
+        setIsFocused(true);
+        setDraft(String(value ?? 0));
+        window.setTimeout(() => event.currentTarget.select(), 0);
+      }}
+      onChange={event => {
+        const nextDraft = event.target.value;
+        if (!/^-?[\d,]*\.?\d{0,2}$/.test(nextDraft)) return;
+        setDraft(nextDraft);
+        const parsed = Number(nextDraft.replace(/,/g, ''));
+        if (Number.isFinite(parsed)) onValueChange(parsed);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        setDraft(formatValue(value));
+      }}
+      className="w-full px-2 py-1 rounded text-right text-[13px] font-normal text-gray-700 disabled:opacity-60 disabled:cursor-not-allowed border border-gray-200 focus:border-brand outline-none"
+    />
+  );
+};
 
 interface PayablesViewProps {
   view?: 'bills' | 'aging';
@@ -35,6 +91,12 @@ interface PayablesViewProps {
   employees?: User[];
   taxCategories?: TaxCategoryEntry[];
   currentUserId?: string;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canApprove?: boolean;
+  canPay?: boolean;
+  canCancel?: boolean;
   onCreatePayable: (payable: Payable) => Payable | Promise<Payable>;
   onUpdatePayable: (id: string, updates: Partial<Payable>) => void;
   onDeletePayable: (id: string) => void | Promise<void>;
@@ -123,6 +185,12 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   employees = [],
   taxCategories = [],
   currentUserId,
+  canCreate = false,
+  canEdit = false,
+  canDelete = false,
+  canApprove = false,
+  canPay = false,
+  canCancel = false,
   onCreatePayable,
   onUpdatePayable,
   onDeletePayable,
@@ -410,27 +478,31 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // ============================================================================
   useEffect(() => {
     if (!formData.vendorId) {
-      setFormData(prev => ({
-        ...prev,
-        withholdingType: undefined,
-        appliedRatePercent: 0,
-        withholdingAmount: 0,
-      }));
+      setFormData(prev => {
+        if (!prev.withholdingType && !prev.appliedRatePercent && !prev.withholdingAmount) return prev;
+        return {
+          ...prev,
+          withholdingType: undefined,
+          appliedRatePercent: 0,
+          withholdingAmount: 0,
+        };
+      });
       return;
     }
 
     const setting = orgVendorTaxSettings.find((s: any) => s.vendorId === formData.vendorId && s.isActive);
     if (!setting) {
-      setFormData(prev => ({
-        ...prev,
-        withholdingType: undefined,
-        appliedRatePercent: 0,
-        withholdingAmount: 0,
-      }));
+      setFormData(prev => {
+        if (!prev.withholdingType && !prev.appliedRatePercent && !prev.withholdingAmount) return prev;
+        return {
+          ...prev,
+          withholdingType: undefined,
+          appliedRatePercent: 0,
+          withholdingAmount: 0,
+        };
+      });
       return;
     }
-
-    setFormData(prev => ({ ...prev, withholdingType: setting.withholdingType }));
 
     // Resolve rate from atcRates
     let rateRow: any | undefined = undefined;
@@ -443,7 +515,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     const rate = rateRow?.ratePercent ?? 0;
-    setFormData(prev => ({ ...prev, appliedRatePercent: rate }));
+    setFormData(prev => {
+      if (prev.withholdingType === setting.withholdingType && prev.appliedRatePercent === rate) return prev;
+      return { ...prev, withholdingType: setting.withholdingType, appliedRatePercent: rate };
+    });
   }, [formData.vendorId, orgVendorTaxSettings, atcRates]);
 
   // ============================================================================
@@ -457,11 +532,14 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     // For credit memos, net payable is negative
     const netPayable = Number((amount + inputVat - withholdingAmount).toFixed(2));
 
-    setFormData(prev => ({
-      ...prev,
-      withholdingAmount,
-      netPayable,
-    }));
+    setFormData(prev => {
+      if (prev.withholdingAmount === withholdingAmount && prev.netPayable === netPayable) return prev;
+      return {
+        ...prev,
+        withholdingAmount,
+        netPayable,
+      };
+    });
   }, [formData.amount, formData.appliedRatePercent, formData.inputVatAmount, formData.invoiceType]);
 
   // Auto-calculate due date based on vendor payment terms
@@ -789,6 +867,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const openPaymentModal = async (payable: Payable) => {
+    if (!canPay) {
+      onNotify('error', 'You do not have permission to pay AP bills.');
+      return;
+    }
     const payeeKey = getPayeeKey(payable);
     let vendorPayables = orgPayables.filter(candidate =>
       getPayeeKey(candidate) === payeeKey &&
@@ -902,6 +984,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreate) {
+      onNotify('error', 'You do not have permission to create AP bills.');
+      return;
+    }
 
     const isEmployeeReimbursement = formData.category === 'employee_reimbursements' && !!formData.expenseAllocations?.length;
     if (!formData.vendorId && !isEmployeeReimbursement) {
@@ -932,21 +1018,21 @@ const PayablesView: React.FC<PayablesViewProps> = ({
     }
 
     const selectedVendor = orgVendors.find(v => v.id === formData.vendorId);
-    if (!selectedVendor) {
+    if (!selectedVendor && !isEmployeeReimbursement) {
       onNotify('error', 'Selected vendor not found.');
       return;
     }
 
-    const apAccountId = formData.glAccountId || selectedVendor.apAccountId || apControlAccount?.id;
+    const apAccountId = formData.glAccountId || selectedVendor?.apAccountId || apControlAccount?.id;
 
     const newPayable: Payable = {
       id: `pay-${Date.now()}`,
       orgId,
-      vendorId: formData.vendorId!,
+      vendorId: formData.vendorId || undefined,
       payableNumber: nextPayableNumber,
-      category: 'other',
+      category: (formData.category || (isEmployeeReimbursement ? 'employee_reimbursements' : 'supplies')) as PayableCategory,
       qualificationId: formData.qualificationId,
-      description: formData.description || `Payable from ${selectedVendor.name}`,
+      description: formData.description || (selectedVendor ? `Payable from ${selectedVendor.name}` : `Reimbursement for ${selectedEmployee?.name || 'Employee'}`),
       amount: formData.amount!,
       billDate: formData.billDate!,
       dueDate: formData.dueDate!,
@@ -995,6 +1081,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) {
+      onNotify('error', 'You do not have permission to edit AP bills.');
+      return;
+    }
 
     if (!selectedPayable) return;
 
@@ -1060,6 +1150,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDelete) {
+      onNotify('error', 'You do not have permission to delete AP bills.');
+      return;
+    }
     const payable = [...serverPayables, ...orgPayables].find(p => p.id === id);
     if (payable?.status === 'paid') {
       onNotify('error', 'Cannot delete a paid payable.');
@@ -1108,6 +1202,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // POST TO GL HANDLER
   // ============================================================================
   const handleApprovePayable = async (payableToPost: Payable) => {
+    if (!canApprove) {
+      onNotify('error', 'You do not have permission to approve or post AP bills.');
+      return;
+    }
     const expenseAllocations = payableToPost.expenseAllocations || [];
     const allocatedTotal = expenseAllocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
     const invalidAllocation = expenseAllocations.find(allocation =>
@@ -1167,6 +1265,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   };
 
   const handleCancelPayable = async (payable: Payable) => {
+    if (!canCancel) {
+      onNotify('error', 'You do not have permission to cancel AP bills.');
+      return;
+    }
     if (!currentUserId) return onNotify('error', 'A signed-in user is required to cancel a bill.');
     const reason = window.prompt(`Reason for cancelling ${payable.payableNumber}:`)?.trim();
     if (!reason) return;
@@ -1188,6 +1290,10 @@ const PayablesView: React.FC<PayablesViewProps> = ({
   // PAYMENT HANDLER
   // ============================================================================
   const handleProcessPayment = async () => {
+    if (!canPay) {
+      onNotify('error', 'You do not have permission to pay AP bills.');
+      return;
+    }
     if (paymentPayables.length === 0 || isProcessingPayment) {
       onNotify('error', 'Cannot process payment.');
       return;
@@ -1510,7 +1616,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                           {payable.status !== 'paid' && payable.status !== 'cancelled' && (
                             <>
                               <button
-                                disabled={isPosted || payable.status === 'approved'}
+                                disabled={!canEdit || isPosted || payable.status === 'approved'}
                                 onClick={event => {
                                   event.stopPropagation();
                                   openEditModal(payable);
@@ -1521,7 +1627,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                                 <Edit size={16} />
                               </button>
                               <button
-                                disabled={isPosted || payable.status === 'approved'}
+                                disabled={!canDelete || isPosted || payable.status === 'approved'}
                                 onClick={event => {
                                   event.stopPropagation();
                                   setConfirmDelete(payable.id);
@@ -1531,7 +1637,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
                               >
                                 <Trash2 size={16} />
                               </button>
-                              {payable.status === 'for_approval' && (
+                              {canApprove && payable.status === 'for_approval' && (
                                 <button
                                   onClick={event => {
                                     event.stopPropagation();
@@ -1787,6 +1893,11 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           liabilityAccounts={liabilityAccounts}
           qualifications={qualifications}
           claimableEmployees={claimableEmployees}
+          taxCategories={taxCategories}
+          apControlAccount={apControlAccount}
+          withholdingTaxAccount={withholdingTaxAccount}
+          inputVatAccount={inputVatAccount}
+          currency={formData.currency || 'PHP'}
           onSubmit={showCreateModal ? handleCreate : handleUpdate}
           onClose={() => {
             setShowCreateModal(false);
@@ -1806,7 +1917,7 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           <h2 className="text-xl font-semibold text-gray-800 tracking-tight">{view === 'aging' ? 'AP AGING REPORT' : 'AP BILLS'}</h2>
           <p className="text-sm text-gray-500 font-normal italic">{view === 'aging' ? 'Review outstanding vendor balances by aging period.' : 'Manage vendor invoices and process payments.'}</p>
         </div>
-        {view === 'bills' && <div className="flex gap-3">
+        {view === 'bills' && canCreate && <div className="flex gap-3">
           <button
             onClick={() => { resetForm(); setShowCreateModal(true); }}
             className="flex items-center gap-2 px-6 py-2.5 bg-brand text-white rounded hover:bg-brand-hover transition-all shadow-brand/20 font-medium text-sm active:scale-95"
@@ -1869,7 +1980,9 @@ const PayablesView: React.FC<PayablesViewProps> = ({
           onCancel={() => { void handleCancelPayable(selectedPayable); }}
           onPostGL={() => { setShowViewModal(false); openPostGLModal(selectedPayable); }}
           canPost={!selectedPayable.journalEntryId && selectedPayable.status === 'for_approval'}
-          canPay={payablePaymentEligible(selectedPayable) && getPayableOutstanding(selectedPayable) > 0}
+          canApprove={canApprove}
+          canCancel={canCancel}
+          canPay={canPay && payablePaymentEligible(selectedPayable) && getPayableOutstanding(selectedPayable) > 0}
         />
       )}
 
@@ -2144,6 +2257,11 @@ interface PayableFormPageProps {
   liabilityAccounts: ChartOfAccount[];
   qualifications: Qualification[];
   claimableEmployees: User[];
+  taxCategories?: TaxCategoryEntry[];
+  apControlAccount?: ChartOfAccount;
+  withholdingTaxAccount?: ChartOfAccount;
+  inputVatAccount?: ChartOfAccount;
+  currency?: string;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   submitLabel: string;
@@ -2161,94 +2279,495 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
   liabilityAccounts,
   qualifications,
   claimableEmployees,
+  taxCategories = [],
+  apControlAccount,
+  withholdingTaxAccount,
+  inputVatAccount,
+  currency = 'PHP',
   onSubmit,
   onClose,
   submitLabel,
   isEdit = false,
   isSubmitting = false,
 }) => {
+  // Format currency helper
+  const formatCurrency = (val?: number) =>
+    (Number(val) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Initialize line items from formData.expenseAllocations or default single line
+  const [lines, setLines] = useState<APBillFormLine[]>(() => {
+    if (formData.expenseAllocations && formData.expenseAllocations.length > 0) {
+      return formData.expenseAllocations.map((alloc, idx) => ({
+        lineNumber: alloc.lineNumber ?? idx + 1,
+        lineType: (alloc.lineType as any) || 'EXPENSE',
+        qualificationId: alloc.qualificationId || formData.qualificationId || '',
+        expenseAccountId: alloc.expenseAccountId || formData.expenseAccountId || '',
+        description: alloc.description || '',
+        taxCategoryId: alloc.taxCategoryId || '',
+        quantity: alloc.quantity ?? 1,
+        unitPrice: alloc.unitPrice !== undefined ? alloc.unitPrice : Number(alloc.amount || 0),
+        amount: Number(alloc.amount || 0),
+        sourceExpenseId: alloc.sourceExpenseId,
+      }));
+    }
+    return [{
+      lineNumber: 1,
+      lineType: 'EXPENSE',
+      qualificationId: formData.qualificationId || (qualifications[0]?.id || ''),
+      expenseAccountId: formData.expenseAccountId || (expenseAccounts[0]?.id || ''),
+      description: formData.description || '',
+      taxCategoryId: '',
+      quantity: 1,
+      unitPrice: Number(formData.amount || 0),
+      amount: Number(formData.amount || 0),
+    }];
+  });
+
+  // Table Column Order & Drag/Resize State
+  const defaultLineColOrder = [
+    'lineNumber', 'lineType', 'qualificationId', 'expenseAccountId', 'description', 'taxCategoryId', 'quantity', 'unitPrice', 'amount', 'actions'
+  ];
+  const [lineColOrder, setLineColOrder] = useState<string[]>(defaultLineColOrder);
+  const [draggedLineColIdx, setDraggedLineColIdx] = useState<number | null>(null);
+  const [draggedLineIdx, setDraggedLineIdx] = useState<number | null>(null);
+  const [lineDropIdx, setLineDropIdx] = useState<number | null>(null);
+  const [lineColWidths, setLineColWidths] = useState<Record<string, number>>({});
+  const lineResizeRef = React.useRef<{ colKey: string; startX: number; startWidth: number } | null>(null);
+
+  // Synchronize lines with formData and recalculate tax & net totals
+  const recalculateAndSync = (
+    newLines: APBillFormLine[],
+    whtType = formData.withholdingType,
+    whtRate = formData.appliedRatePercent
+  ) => {
+    setLines(newLines);
+
+    let grossSubtotal = 0;
+    let totalVat = 0;
+
+    const allocations = newLines.map((line, idx) => {
+      const lineAmt = Number(line.amount || 0);
+      const isDiscount = line.lineType === 'DISCOUNT';
+
+      let lineVat = 0;
+      if (line.taxCategoryId && taxCategories.length > 0) {
+        const cat = taxCategories.find(c => c.id === line.taxCategoryId);
+        if (cat) {
+          const code = (cat.code || '').toUpperCase().replace(/[\s_-]+/g, '');
+          if (code === 'VATGOODS' || code === 'VATSERV' || cat.rate === 12) {
+            lineVat = Math.round((lineAmt - lineAmt / 1.12) * 100) / 100;
+          } else if (cat.rate && cat.rate > 0) {
+            const r = cat.rate > 1 ? cat.rate / 100 : cat.rate;
+            lineVat = cat.isInclusive
+              ? Math.round((lineAmt / (1 + r) * r) * 100) / 100
+              : Math.round(lineAmt * r * 100) / 100;
+          }
+        }
+      }
+
+      if (isDiscount) {
+        grossSubtotal -= Math.abs(lineAmt);
+      } else {
+        grossSubtotal += lineAmt;
+        totalVat += lineVat;
+      }
+
+      return {
+        lineNumber: idx + 1,
+        lineType: line.lineType,
+        expenseAccountId: line.expenseAccountId,
+        qualificationId: line.qualificationId,
+        description: line.description,
+        amount: Math.abs(lineAmt),
+        taxCategoryId: line.taxCategoryId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        sourceExpenseId: line.sourceExpenseId,
+      };
+    });
+
+    grossSubtotal = Math.round(grossSubtotal * 100) / 100;
+    totalVat = Math.round(totalVat * 100) / 100;
+
+    let whtAmount = 0;
+    if (whtType && whtRate && whtRate > 0) {
+      const taxBase = Math.max(0, grossSubtotal - totalVat);
+      whtAmount = Math.round(taxBase * (whtRate / 100) * 100) / 100;
+    }
+
+    const netPayable = Math.round((grossSubtotal - whtAmount) * 100) / 100;
+
+    setFormData(prev => ({
+      ...prev,
+      amount: grossSubtotal,
+      inputVatAmount: totalVat,
+      withholdingType: whtType,
+      appliedRatePercent: whtRate,
+      withholdingAmount: whtAmount,
+      netPayable: netPayable,
+      expenseAllocations: allocations,
+      expenseAccountId: newLines[0]?.expenseAccountId || prev.expenseAccountId,
+      qualificationId: newLines[0]?.qualificationId || prev.qualificationId,
+    }));
+  };
+
+  const handleAddLine = (type: 'EXPENSE' | 'DISCOUNT' = 'EXPENSE') => {
+    const newLine: APBillFormLine = {
+      lineNumber: lines.length + 1,
+      lineType: type,
+      qualificationId: formData.qualificationId || qualifications[0]?.id || '',
+      expenseAccountId: formData.expenseAccountId || expenseAccounts[0]?.id || '',
+      description: type === 'DISCOUNT' ? 'Vendor / Reimbursement Discount' : '',
+      taxCategoryId: '',
+      quantity: 1,
+      unitPrice: 0,
+      amount: 0,
+    };
+    recalculateAndSync([...lines, newLine]);
+  };
+
+  const handleRemoveLine = (idx: number) => {
+    if (lines.length <= 1) {
+      const resetLine: APBillFormLine = {
+        lineNumber: 1,
+        lineType: 'EXPENSE',
+        qualificationId: qualifications[0]?.id || '',
+        expenseAccountId: expenseAccounts[0]?.id || '',
+        description: '',
+        taxCategoryId: '',
+        quantity: 1,
+        unitPrice: 0,
+        amount: 0,
+      };
+      recalculateAndSync([resetLine]);
+      return;
+    }
+    const filtered = lines.filter((_, i) => i !== idx).map((l, i) => ({ ...l, lineNumber: i + 1 }));
+    recalculateAndSync(filtered);
+  };
+
+  const handleUpdateLine = (idx: number, field: keyof APBillFormLine, value: any) => {
+    const updated = lines.map((l, i) => {
+      if (i !== idx) return l;
+      const modified = { ...l, [field]: value };
+      if (field === 'quantity' || field === 'unitPrice') {
+        const qty = field === 'quantity' ? Number(value) : l.quantity;
+        const price = field === 'unitPrice' ? Number(value) : l.unitPrice;
+        modified.amount = Math.round(qty * price * 100) / 100;
+      }
+      return modified;
+    });
+    recalculateAndSync(updated);
+  };
+
+  const handleRowDrop = (targetIdx: number) => {
+    if (draggedLineIdx === null || draggedLineIdx === targetIdx) return;
+    const reordered = [...lines];
+    const [moved] = reordered.splice(draggedLineIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    const updated = reordered.map((l, i) => ({ ...l, lineNumber: i + 1 }));
+    recalculateAndSync(updated);
+    setDraggedLineIdx(null);
+    setLineDropIdx(null);
+  };
+
+  // Export line items to Excel (.xls)
+  const exportLineItemsToExcel = () => {
+    if (lines.length === 0) {
+      alert('No line items to export.');
+      return;
+    }
+    const columns = lineColOrder.map(colKey => {
+      switch (colKey) {
+        case 'lineNumber': return { label: '#', getter: (l: APBillFormLine) => l.lineNumber };
+        case 'lineType': return { label: 'Type', getter: (l: APBillFormLine) => l.lineType };
+        case 'qualificationId': return { label: 'Class', getter: (l: APBillFormLine) => qualifications.find(q => q.id === l.qualificationId)?.name || '-' };
+        case 'expenseAccountId': return { label: 'Expense Account', getter: (l: APBillFormLine) => expenseAccounts.find(a => a.id === l.expenseAccountId)?.name || '-' };
+        case 'description': return { label: 'Description', getter: (l: APBillFormLine) => l.description || '-' };
+        case 'taxCategoryId': return { label: 'Tax Category', getter: (l: APBillFormLine) => taxCategories.find(tc => tc.id === l.taxCategoryId)?.code || '-' };
+        case 'quantity': return { label: 'Qty', getter: (l: APBillFormLine) => l.quantity };
+        case 'unitPrice': return { label: 'Unit Price (₱)', getter: (l: APBillFormLine) => Number(l.unitPrice || 0).toFixed(2) };
+        case 'amount': return { label: 'Amount (₱)', getter: (l: APBillFormLine) => Number(l.amount || 0).toFixed(2) };
+        default: return null;
+      }
+    }).filter(Boolean) as { label: string; getter: (l: APBillFormLine) => any }[];
+
+    const headers = columns.map(c => c.label);
+    const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/><style>td{padding:6px 8px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:12px;}th{padding:6px 8px;border:1px solid #ccc;font-family:Inter,Open Sans,Segoe UI,Arial,sans-serif;font-size:12px;background:#059669;color:#fff;font-weight:700;}</style></head><body><table>';
+    html += '<tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
+    lines.forEach(line => {
+      html += '<tr>' + columns.map(c => `<td>${esc(c.getter(line))}</td>`).join('') + '</tr>';
+    });
+    html += '</table></body></html>';
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bill_LineItems_${formData.payableNumber || new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Live General Ledger Journal Entry Preview
+  const glJournalPreview = useMemo(() => {
+    type PreviewLine = {
+      key: string;
+      accountLabel: string;
+      description: string;
+      debit: number;
+      credit: number;
+      missing?: boolean;
+    };
+
+    const previewLines: PreviewLine[] = [];
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    // 1. Expense/Asset Accounts (Debit)
+    lines.forEach((line, idx) => {
+      const amt = Number(line.amount || 0);
+      if (amt <= 0 && line.lineType !== 'DISCOUNT') return;
+
+      const account = expenseAccounts.find(a => a.id === line.expenseAccountId);
+      const accountLabel = account ? `${account.code} - ${account.name}` : 'Expense Account (Unselected)';
+
+      let lineVat = 0;
+      if (line.taxCategoryId && taxCategories.length > 0) {
+        const cat = taxCategories.find(c => c.id === line.taxCategoryId);
+        if (cat) {
+          const code = (cat.code || '').toUpperCase().replace(/[\s_-]+/g, '');
+          if (code === 'VATGOODS' || code === 'VATSERV' || cat.rate === 12) {
+            lineVat = Math.round((amt - amt / 1.12) * 100) / 100;
+          }
+        }
+      }
+
+      const netExpense = Math.max(0, Math.round((amt - lineVat) * 100) / 100);
+
+      if (line.lineType === 'DISCOUNT') {
+        previewLines.push({
+          key: `discount-${idx}`,
+          accountLabel,
+          description: line.description || `Discount (Line #${line.lineNumber})`,
+          debit: 0,
+          credit: amt,
+          missing: !account,
+        });
+        totalCredit += amt;
+      } else {
+        previewLines.push({
+          key: `expense-${idx}`,
+          accountLabel,
+          description: line.description || `Bill Line #${line.lineNumber}`,
+          debit: netExpense,
+          credit: 0,
+          missing: !account,
+        });
+        totalDebit += netExpense;
+      }
+    });
+
+    // 2. Input VAT (Debit)
+    const vatAmt = Number(formData.inputVatAmount || 0);
+    if (vatAmt > 0) {
+      const vatAcct = inputVatAccount || accounts.find(a => a.name.toLowerCase().includes('input vat') || a.code?.startsWith('1170'));
+      previewLines.push({
+        key: 'input-vat',
+        accountLabel: vatAcct ? `${vatAcct.code} - ${vatAcct.name}` : '1170 - Input Tax / VAT',
+        description: 'Input VAT on purchase/bill',
+        debit: vatAmt,
+        credit: 0,
+        missing: !vatAcct,
+      });
+      totalDebit += vatAmt;
+    }
+
+    // 3. Withholding Tax Payable (Credit)
+    const whtAmt = Number(formData.withholdingAmount || 0);
+    if (whtAmt > 0) {
+      const whtAcct = withholdingTaxAccount || liabilityAccounts.find(a => a.name.toLowerCase().includes('withholding') || a.code?.startsWith('2150'));
+      previewLines.push({
+        key: 'wht-payable',
+        accountLabel: whtAcct ? `${whtAcct.code} - ${whtAcct.name}` : '2150 - Expanded Withholding Tax Payable',
+        description: `${formData.withholdingType || 'Expanded'} Withholding Tax`,
+        debit: 0,
+        credit: whtAmt,
+        missing: !whtAcct,
+      });
+      totalCredit += whtAmt;
+    }
+
+    // 4. Accounts Payable Control Account (Credit)
+    const netPayable = Number(formData.netPayable || Math.round((totalDebit - totalCredit) * 100) / 100);
+    if (netPayable > 0) {
+      const apAcct = apControlAccount || liabilityAccounts.find(a => a.code?.startsWith('2100') || a.name.toLowerCase().includes('accounts payable'));
+      previewLines.push({
+        key: 'ap-control',
+        accountLabel: apAcct ? `${apAcct.code} - ${apAcct.name}` : '2100 - Accounts Payable',
+        description: formData.claimedBy ? `AP Reimbursement - ${formData.claimedBy}` : 'Accounts Payable Liability',
+        debit: 0,
+        credit: netPayable,
+        missing: !apAcct,
+      });
+      totalCredit += netPayable;
+    }
+
+    totalDebit = Math.round(totalDebit * 100) / 100;
+    totalCredit = Math.round(totalCredit * 100) / 100;
+    const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    return {
+      lines: previewLines,
+      totalDebit,
+      totalCredit,
+      isBalanced,
+    };
+  }, [
+    lines,
+    formData.inputVatAmount,
+    formData.withholdingAmount,
+    formData.netPayable,
+    formData.withholdingType,
+    formData.claimedBy,
+    expenseAccounts,
+    accounts,
+    inputVatAccount,
+    withholdingTaxAccount,
+    apControlAccount,
+    liabilityAccounts,
+    taxCategories
+  ]);
+
+  // Column definitions for the interactive table
+  const lineColDefs: Record<string, { key: string; label: string; align: string; width: number }> = {
+    lineNumber: { key: 'lineNumber', label: '#', align: 'text-left', width: 45 },
+    lineType: { key: 'lineType', label: 'Type', align: 'text-left', width: 110 },
+    qualificationId: { key: 'qualificationId', label: 'Class', align: 'text-left', width: 140 },
+    expenseAccountId: { key: 'expenseAccountId', label: 'Expense / Asset Account *', align: 'text-left', width: 200 },
+    description: { key: 'description', label: 'Description', align: 'text-left', width: 220 },
+    taxCategoryId: { key: 'taxCategoryId', label: 'Tax Category', align: 'text-left', width: 140 },
+    quantity: { key: 'quantity', label: 'Qty', align: 'text-right', width: 75 },
+    unitPrice: { key: 'unitPrice', label: 'Unit Price (₱)', align: 'text-right', width: 110 },
+    amount: { key: 'amount', label: 'Amount (₱)', align: 'text-right', width: 110 },
+    actions: { key: 'actions', label: '', align: 'text-center', width: 45 },
+  };
+
+  const isReimbursement = formData.category === 'employee_reimbursements';
+
   return (
     <div className="w-full animate-in fade-in slide-in-from-right-2 duration-200">
       <div className="bg-white rounded-xl shadow-sm w-full overflow-hidden border border-gray-200">
+        {/* Top bar */}
         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-brand text-white rounded shadow-brand/20">
               <Calculator size={20} />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+              <p className="text-xs text-gray-500">
+                {isReimbursement ? 'Employee Reimbursement Bill' : 'Accounts Payable Vendor Bill'}
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-brand transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-brand transition-colors"
+          >
             <ArrowRight size={18} className="rotate-180" /> Back to bills
           </button>
         </div>
 
         <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-6">
-          {/* Invoice Type */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document Type</label>
-            <div className="flex gap-2">
-              {INVOICE_TYPES.map(type => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, invoiceType: type.value }))}
-                  className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${formData.invoiceType === type.value
-                    ? 'bg-brand text-white border-brand'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-brand-light'
+          {/* Header Row: Document Type & Category */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document Type</label>
+              <div className="flex gap-2">
+                {INVOICE_TYPES.map(type => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, invoiceType: type.value }))}
+                    className={`flex-1 py-2 px-3 text-xs font-semibold rounded border transition-all ${
+                      formData.invoiceType === type.value
+                        ? 'bg-brand text-white border-brand'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-brand-light'
                     }`}
-                >
-                  {type.label}
-                </button>
-              ))}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Category *</label>
+              <select
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+                value={formData.category || 'supplies'}
+                onChange={e => setFormData(prev => ({ ...prev, category: e.target.value as PayableCategory }))}
+              >
+                {PAYABLE_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Vendor and claimant */}
-          <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-              <Building size={12} /> Vendor {formData.category === 'employee_reimbursements' ? '(optional)' : '*'}
-            </label>
-            <select
-              required={formData.category !== 'employee_reimbursements'}
-              disabled={isEdit}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium appearance-none disabled:opacity-60"
-              value={formData.vendorId || ''}
-              onChange={e => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
-            >
-              <option value="">{formData.category === 'employee_reimbursements' ? 'No vendor — reimburse claimant' : 'Select Vendor...'}</option>
-              {vendors.filter(v => v.status !== 'blocked').map(v => (
-                <option key={v.id} value={v.id}>{v.name} {v.tin ? `(${v.tin})` : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Claimed By</label>
-            <select
-              required={!!formData.expenseAllocations?.length}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
-              value={formData.employeeId || ''}
-              onChange={e => {
-                const employee = claimableEmployees.find(item => item.id === e.target.value);
-                setFormData(prev => ({
-                  ...prev,
-                  employeeId: employee?.id || '',
-                  claimedBy: employee?.name || '',
-                }));
-              }}
-            >
-              <option value="">Select employee...</option>
-              {claimableEmployees.map(employee => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name} — {employee.role === 'ADMIN' ? 'Tenant Admin' : employee.role.replaceAll('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Header Row: Vendor & Claimant */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Building size={12} /> Vendor {isReimbursement ? '(optional for employee reimbursement)' : '*'}
+              </label>
+              <select
+                required={!isReimbursement}
+                disabled={isEdit}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium disabled:opacity-60"
+                value={formData.vendorId || ''}
+                onChange={e => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
+              >
+                <option value="">{isReimbursement ? 'No vendor — reimburse employee directly' : 'Select Vendor...'}</option>
+                {vendors.filter(v => v.status !== 'blocked').map(v => (
+                  <option key={v.id} value={v.id}>{v.name} {v.tin ? `(${v.tin})` : ''}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Claimed By / Employee {isReimbursement ? '*' : '(optional)'}
+              </label>
+              <select
+                required={isReimbursement}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+                value={formData.employeeId || ''}
+                onChange={e => {
+                  const employee = claimableEmployees.find(item => item.id === e.target.value);
+                  setFormData(prev => ({
+                    ...prev,
+                    employeeId: employee?.id || '',
+                    claimedBy: employee?.name || '',
+                  }));
+                }}
+              >
+                <option value="">Select employee...</option>
+                {claimableEmployees.map(employee => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.name} — {employee.role === 'ADMIN' ? 'Tenant Admin' : employee.role.replaceAll('_', ' ')}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Reference & Date Row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document # *</label>
               <input
@@ -2263,7 +2782,7 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-                <Calendar size={12} /> Invoice Date *
+                <Calendar size={12} /> Bill Date *
               </label>
               <input
                 type="date"
@@ -2285,260 +2804,545 @@ const PayableFormPage: React.FC<PayableFormPageProps> = ({
             </div>
           </div>
 
-          {/* Expense Account & Class */}
-          {!formData.expenseAllocations?.length && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-brand uppercase tracking-wide">Expense / Asset Account *</label>
-              <select
-                required={formData.invoiceType === 'standard'}
-                className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded outline-none focus:border-brand text-sm font-medium appearance-none"
-                value={formData.expenseAccountId || ''}
-                onChange={e => setFormData(prev => ({ ...prev, expenseAccountId: e.target.value }))}
-              >
-                <option value="">Select Expense or Asset Account...</option>
-                {expenseAccounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                ))}
-              </select>
+          {/* ================================================================ */}
+          {/* INTERACTIVE LINE ITEMS TABLE                                     */}
+          {/* ================================================================ */}
+          <div className="space-y-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="font-semibold text-gray-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                  <span>Line Items</span>
+                  {lines.length > 1 && (
+                    <span className="px-2 py-0.5 rounded-full bg-brand/10 text-brand text-xs font-bold">
+                      {lines.length} lines
+                    </span>
+                  )}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Configure line items, classes, and expense accounts. Drag headers to reorder columns or edges to resize.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={exportLineItemsToExcel}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 transition shadow-sm"
+                >
+                  <FileSpreadsheet size={15} /> Export Line Items
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddLine('EXPENSE')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-dashed border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition shadow-sm"
+                >
+                  <Plus size={15} /> Add Line
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddLine('DISCOUNT')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition shadow-sm"
+                >
+                  <Scissors size={15} /> Discount
+                </button>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Class *</label>
-              <select
-                required={!formData.expenseAllocations?.length}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium appearance-none"
-                value={formData.qualificationId || ''}
-                onChange={e => setFormData(prev => ({ ...prev, qualificationId: e.target.value }))}
-              >
-                <option value="">Select Class...</option>
-                {qualifications.map(qualification => (
-                  <option key={qualification.id} value={qualification.id}>
-                    {qualification.code} - {qualification.name}
-                  </option>
-                ))}
-              </select>
+
+            {taxCategories.length === 0 && (
+              <div className="p-2.5 text-amber-800 bg-amber-50 border border-amber-200 rounded text-xs">
+                ⚠️ No tax categories configured for this tenant. Lines will default to 0% VAT.
+              </div>
+            )}
+
+            <div className="border border-gray-200 rounded-lg overflow-x-auto shadow-sm">
+              <table className="w-full text-xs" style={{ fontFamily: 'var(--font-sans)' }}>
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {lineColOrder.map((colKey, idx) => {
+                      const col = lineColDefs[colKey];
+                      if (!col) return null;
+                      return (
+                        <th
+                          key={col.key}
+                          className={`px-3 py-2.5 ${col.align} relative select-none font-bold text-gray-600 uppercase text-[11px] tracking-wider ${
+                            draggedLineColIdx === idx ? 'bg-gray-200 border-dashed border-2 border-gray-400 opacity-50' : ''
+                          }`}
+                          style={lineColWidths[col.key] ? { width: lineColWidths[col.key], minWidth: lineColWidths[col.key] } : { minWidth: col.width, width: col.width }}
+                          draggable={col.key !== 'actions'}
+                          onDragStart={e => {
+                            if (col.key === 'actions') return;
+                            setDraggedLineColIdx(idx);
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onDragEnd={() => setDraggedLineColIdx(null)}
+                          onDragOver={e => {
+                            if (col.key === 'actions') return;
+                            e.preventDefault();
+                          }}
+                          onDrop={e => {
+                            if (col.key === 'actions' || draggedLineColIdx === null || draggedLineColIdx === idx) return;
+                            e.preventDefault();
+                            const newOrder = [...lineColOrder];
+                            const [draggedKey] = newOrder.splice(draggedLineColIdx, 1);
+                            newOrder.splice(idx, 0, draggedKey);
+                            setLineColOrder(newOrder);
+                            setDraggedLineColIdx(null);
+                          }}
+                          title={col.key !== 'actions' ? 'Drag to reorder column' : undefined}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span>{col.label}</span>
+                            {/* Resize handle */}
+                            {col.key !== 'actions' && (
+                              <div
+                                onMouseDown={e => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  const th = e.currentTarget.parentElement?.parentElement;
+                                  if (!th) return;
+                                  const startWidth = th.getBoundingClientRect().width;
+                                  lineResizeRef.current = { colKey: col.key, startX: e.clientX, startWidth };
+                                  const onMouseMove = (ev: MouseEvent) => {
+                                    if (!lineResizeRef.current) return;
+                                    const diff = ev.clientX - lineResizeRef.current.startX;
+                                    const newWidth = Math.max(40, lineResizeRef.current.startWidth + diff);
+                                    setLineColWidths(prev => ({ ...prev, [lineResizeRef.current!.colKey]: newWidth }));
+                                  };
+                                  const onMouseUp = () => {
+                                    lineResizeRef.current = null;
+                                    document.removeEventListener('mousemove', onMouseMove);
+                                    document.removeEventListener('mouseup', onMouseUp);
+                                    document.body.style.cursor = '';
+                                    document.body.style.userSelect = '';
+                                  };
+                                  document.addEventListener('mousemove', onMouseMove);
+                                  document.addEventListener('mouseup', onMouseUp);
+                                  document.body.style.cursor = 'col-resize';
+                                  document.body.style.userSelect = 'none';
+                                }}
+                                className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize hover:bg-brand transition-colors z-10"
+                                title="Drag to resize column"
+                                draggable={false}
+                              />
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {lines.map((line, idx) => {
+                    const isDragging = draggedLineIdx === idx;
+                    const isDropTarget = lineDropIdx === idx;
+                    return (
+                      <tr
+                        key={line.sourceExpenseId || idx}
+                        draggable
+                        onDragStart={e => {
+                          setDraggedLineIdx(idx);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={() => {
+                          setDraggedLineIdx(null);
+                          setLineDropIdx(null);
+                        }}
+                        onDragOver={e => {
+                          e.preventDefault();
+                          if (lineDropIdx !== idx) setLineDropIdx(idx);
+                        }}
+                        onDrop={e => {
+                          e.preventDefault();
+                          handleRowDrop(idx);
+                        }}
+                        className={`transition-colors ${
+                          isDragging ? 'opacity-40 bg-gray-100' : isDropTarget ? 'bg-brand/10 border-t-2 border-brand' : 'hover:bg-gray-50/80'
+                        } ${line.lineType === 'DISCOUNT' ? 'bg-rose-50/40' : ''}`}
+                      >
+                        {lineColOrder.map(colKey => {
+                          switch (colKey) {
+                            case 'lineNumber':
+                              return (
+                                <td
+                                  key={colKey}
+                                  className="px-2 py-2 text-center text-xs font-semibold text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                                  title="Drag to reorder row"
+                                >
+                                  <div className="flex items-center justify-center gap-1">
+                                    <GripVertical size={13} className="text-gray-400" />
+                                    <span>{line.lineNumber}</span>
+                                  </div>
+                                </td>
+                              );
+                            case 'lineType':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <select
+                                    value={line.lineType}
+                                    onChange={e => handleUpdateLine(idx, 'lineType', e.target.value)}
+                                    className={`w-full px-2 py-1 text-xs font-semibold rounded border outline-none ${
+                                      line.lineType === 'DISCOUNT'
+                                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                        : 'bg-white border-gray-200 text-gray-700'
+                                    }`}
+                                  >
+                                    <option value="EXPENSE">Expense</option>
+                                    <option value="ITEM">Item</option>
+                                    <option value="DISCOUNT">Discount</option>
+                                    <option value="ADJUSTMENT">Adjustment</option>
+                                  </select>
+                                </td>
+                              );
+                            case 'qualificationId':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <select
+                                    required
+                                    value={line.qualificationId || ''}
+                                    onChange={e => handleUpdateLine(idx, 'qualificationId', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-700 outline-none focus:border-brand"
+                                    aria-label={`Expense line ${idx + 1} class`}
+                                  >
+                                    <option value="">Select Class...</option>
+                                    {qualifications.map(q => (
+                                      <option key={q.id} value={q.id}>{q.code} - {q.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              );
+                            case 'expenseAccountId':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <select
+                                    required
+                                    value={line.expenseAccountId || ''}
+                                    onChange={e => handleUpdateLine(idx, 'expenseAccountId', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs rounded border border-brand-light bg-brand/5 text-gray-800 font-medium outline-none focus:border-brand"
+                                    aria-label={`Expense line ${idx + 1} account`}
+                                  >
+                                    <option value="">Select account...</option>
+                                    {expenseAccounts.map(a => (
+                                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              );
+                            case 'description':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Line description..."
+                                    value={line.description || ''}
+                                    onChange={e => handleUpdateLine(idx, 'description', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-700 outline-none focus:border-brand"
+                                    aria-label={`Expense line ${idx + 1} description`}
+                                  />
+                                </td>
+                              );
+                            case 'taxCategoryId':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <select
+                                    value={line.taxCategoryId || ''}
+                                    onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
+                                    className="w-full px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-700 outline-none focus:border-brand"
+                                  >
+                                    <option value="">None / 0%</option>
+                                    {taxCategories.map(tc => (
+                                      <option key={tc.id} value={tc.id}>{tc.code} ({tc.rate}%)</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              );
+                            case 'quantity':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="any"
+                                    value={line.quantity}
+                                    onChange={e => handleUpdateLine(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                    className="w-full px-2 py-1 text-right text-xs rounded border border-gray-200 bg-white text-gray-700 outline-none font-mono"
+                                  />
+                                </td>
+                              );
+                            case 'unitPrice':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <span className="text-xs font-normal text-gray-500">₱</span>
+                                    <CurrencyLineInput
+                                      value={line.unitPrice}
+                                      onValueChange={val => handleUpdateLine(idx, 'unitPrice', val)}
+                                    />
+                                  </div>
+                                </td>
+                              );
+                            case 'amount':
+                              return (
+                                <td key={colKey} className="px-2 py-2">
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <span className="text-xs font-normal text-gray-500">₱</span>
+                                    <CurrencyLineInput
+                                      value={line.amount}
+                                      onValueChange={val => handleUpdateLine(idx, 'amount', val)}
+                                    />
+                                  </div>
+                                </td>
+                              );
+                            case 'actions':
+                              return (
+                                <td key={colKey} className="px-2 py-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveLine(idx)}
+                                    className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                    title="Delete line"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                              );
+                            default:
+                              return null;
+                          }
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-          )}
 
-          {!!formData.expenseAllocations?.length && (
-            <div className="space-y-3 rounded-xl border border-brand-light bg-brand/5 p-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-brand">Consolidated expense lines</p>
-                <p className="text-xs text-gray-500">Each line keeps its own expense account and class, and can be adjusted before approval.</p>
+          {/* ================================================================ */}
+          {/* FINANCIAL SUMMARY & GL JOURNAL ENTRY PREVIEW                     */}
+          {/* ================================================================ */}
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6 pt-2">
+            {/* Left Column: Form notes, tax settings, summary breakdown */}
+            <div className="space-y-4">
+              {/* Description & Reference Document */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Bill Description / Memo
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Brief description of the bill..."
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
+                    value={formData.description || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Reference Document
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Vendor Invoice #, OR #, etc."
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
+                    value={formData.referenceDocument || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, referenceDocument: e.target.value }))}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                {formData.expenseAllocations.map((allocation, index) => (
-                  <div key={allocation.sourceExpenseId || index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 md:grid-cols-[1fr_1.25fr_1.1fr_8rem]">
-                    <input
-                      value={allocation.description || ''}
-                      onChange={e => setFormData(previous => ({
-                        ...previous,
-                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
-                          lineIndex === index ? { ...line, description: e.target.value } : line
-                        ),
-                      }))}
-                      className="rounded border border-gray-200 px-3 py-2 text-sm"
-                      aria-label={`Expense line ${index + 1} description`}
-                    />
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Internal Notes</label>
+                <input
+                  type="text"
+                  placeholder="Additional notes for accounting or approvals..."
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
+                  value={formData.notes || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                />
+              </div>
+
+              {/* Withholding Tax Controls */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-700 flex items-center gap-1.5">
+                    <Percent size={14} className="text-brand" /> Withholding Tax Settings (BIR Form 2307 / 2306)
+                  </p>
+                  <span className="text-[11px] text-gray-500 font-medium">Auto-deducted from gross payable</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-gray-500 uppercase">Withholding Type</label>
                     <select
-                      required
-                      value={allocation.expenseAccountId}
-                      onChange={e => setFormData(previous => ({
-                        ...previous,
-                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
-                          lineIndex === index ? { ...line, expenseAccountId: e.target.value } : line
-                        ),
-                      }))}
-                      className="rounded border border-brand-light bg-brand/5 px-3 py-2 text-sm font-medium"
-                      aria-label={`Expense line ${index + 1} account`}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none text-xs"
+                      value={formData.withholdingType || ''}
+                      onChange={e => recalculateAndSync(lines, (e.target.value || undefined) as WithholdingType | undefined, formData.appliedRatePercent)}
                     >
-                      <option value="">Select expense account</option>
-                      {expenseAccounts.map(account => <option key={account.id} value={account.id}>{account.code} - {account.name}</option>)}
+                      <option value="">None</option>
+                      <option value="EXPANDED">Expanded (2307)</option>
+                      <option value="FINAL">Final (2306)</option>
                     </select>
-                    <select
-                      required
-                      value={allocation.qualificationId || ''}
-                      onChange={e => setFormData(previous => ({
-                        ...previous,
-                        expenseAllocations: previous.expenseAllocations?.map((line, lineIndex) =>
-                          lineIndex === index ? { ...line, qualificationId: e.target.value } : line
-                        ),
-                      }))}
-                      className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium"
-                      aria-label={`Expense line ${index + 1} class`}
-                    >
-                      <option value="">Select class</option>
-                      {qualifications.map(qualification => (
-                        <option key={qualification.id} value={qualification.id}>{qualification.code} - {qualification.name}</option>
-                      ))}
-                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-gray-500 uppercase">Rate (%)</label>
                     <input
-                      required
                       type="number"
-                      min="0.01"
                       step="0.01"
-                      value={allocation.amount}
-                      onChange={e => {
-                        const amount = Number(e.target.value);
-                        setFormData(previous => {
-                          const expenseAllocations = previous.expenseAllocations?.map((line, lineIndex) =>
-                            lineIndex === index ? { ...line, amount } : line
-                          ) || [];
-                          const total = expenseAllocations.reduce((sum, line) => sum + Number(line.amount || 0), 0);
-                          return { ...previous, expenseAllocations, amount: total, netPayable: total };
-                        });
-                      }}
-                      className="rounded border border-gray-200 px-3 py-2 text-right font-mono text-sm"
-                      aria-label={`Expense line ${index + 1} amount`}
+                      min="0"
+                      max="100"
+                      disabled={!formData.withholdingType}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded outline-none font-mono text-xs disabled:opacity-50"
+                      value={formData.appliedRatePercent || ''}
+                      onChange={e => recalculateAndSync(lines, formData.withholdingType, parseFloat(e.target.value) || 0)}
                     />
                   </div>
-                ))}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-gray-500 uppercase">WHT Amount</label>
+                    <input
+                      type="text"
+                      readOnly
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded outline-none font-mono text-xs font-semibold text-gray-700 cursor-not-allowed"
+                      value={`₱${formatCurrency(formData.withholdingAmount)}`}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Description */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</label>
-            <input
-              type="text"
-              placeholder="Brief description of the invoice..."
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
-              value={formData.description || ''}
-              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-            />
+              {/* Status (Edit mode) */}
+              {isEdit && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</label>
+                  <select
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium"
+                    value={formData.status || 'for_approval'}
+                    onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as PayableStatus }))}
+                  >
+                    {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                      <option key={value} value={value}>{config.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: GL Journal Entry Preview & Totals Card */}
+            <div className="space-y-4">
+              {/* Financial Totals Card */}
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-gray-500 border-b pb-2">
+                  Financial Summary
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Gross Subtotal:</span>
+                    <span className="font-mono font-semibold text-gray-800">
+                      ₱{formatCurrency(formData.amount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Input VAT ({formData.inputVatAmount ? 'Creditable' : '0%'}):</span>
+                    <span className="font-mono font-semibold text-gray-800">
+                      ₱{formatCurrency(formData.inputVatAmount)}
+                    </span>
+                  </div>
+                  {Number(formData.withholdingAmount || 0) > 0 && (
+                    <div className="flex justify-between items-center text-rose-600">
+                      <span>Less: Withholding Tax:</span>
+                      <span className="font-mono font-semibold">
+                        -₱{formatCurrency(formData.withholdingAmount)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t text-sm font-bold">
+                    <span className="text-brand">Net Payable:</span>
+                    <span className="font-mono text-base font-black text-brand">
+                      ₱{formatCurrency(formData.netPayable || formData.amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* GL Journal Entry Preview Card */}
+              <aside className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={16} className="text-brand" />
+                    <h4 className="text-xs font-black uppercase tracking-wide text-gray-700">GL Journal Preview</h4>
+                  </div>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase border ${
+                    glJournalPreview.isBalanced
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
+                    {glJournalPreview.isBalanced ? 'Balanced' : 'Unbalanced'}
+                  </span>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_75px_75px] gap-2 pb-1.5 text-[10px] font-black uppercase text-brand border-b">
+                    <div>GL Account</div>
+                    <div className="text-right">Debit</div>
+                    <div className="text-right">Credit</div>
+                  </div>
+
+                  <div className="divide-y divide-gray-100 text-xs">
+                    {glJournalPreview.lines.length === 0 ? (
+                      <div className="py-4 text-center text-gray-400 text-xs">
+                        Add line items to preview GL journal entry.
+                      </div>
+                    ) : (
+                      glJournalPreview.lines.map(line => (
+                        <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_75px_75px] gap-2 py-2 text-[11px]">
+                          <div className="min-w-0 pr-1">
+                            <p className={`font-semibold truncate ${line.missing ? 'text-amber-700' : 'text-gray-800'}`} title={line.accountLabel}>
+                              {line.accountLabel}
+                            </p>
+                            <p className="text-[10px] text-gray-400 truncate" title={line.description}>{line.description}</p>
+                          </div>
+                          <div className="text-right font-mono font-medium text-gray-800">
+                            {line.debit > 0 ? `₱${formatCurrency(line.debit)}` : '—'}
+                          </div>
+                          <div className="text-right font-mono font-medium text-gray-800">
+                            {line.credit > 0 ? `₱${formatCurrency(line.credit)}` : '—'}
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {glJournalPreview.lines.length > 0 && (
+                      <div className="grid grid-cols-[minmax(0,1fr)_75px_75px] gap-2 pt-2.5 font-bold text-xs text-brand border-t-2">
+                        <div>Total</div>
+                        <div className="text-right font-mono">₱{formatCurrency(glJournalPreview.totalDebit)}</div>
+                        <div className="text-right font-mono">₱{formatCurrency(glJournalPreview.totalCredit)}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded border border-emerald-100 bg-emerald-50/60 p-2.5 text-[11px] text-emerald-900 space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-emerald-800 text-[10px]">Accrual Summary</p>
+                    <p className="truncate"><span className="text-emerald-700 font-medium">Payee:</span> {formData.claimedBy || (vendors.find(v => v.id === formData.vendorId)?.name || 'Direct Reimbursement')}</p>
+                    <p className="font-semibold text-emerald-700">
+                      {glJournalPreview.isBalanced ? '✓ Total Debits = Total Credits' : '⚠ Debits and Credits do not match'}
+                    </p>
+                  </div>
+                </div>
+              </aside>
+            </div>
           </div>
-
-          {/* Amount & VAT */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gross Amount *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                readOnly={!!formData.expenseAllocations?.length}
-                className={`w-full px-4 py-2.5 border border-gray-200 rounded outline-none font-mono text-sm ${formData.expenseAllocations?.length ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50'}`}
-                value={formData.amount || ''}
-                onChange={e => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Input VAT</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none font-mono text-sm"
-                value={formData.inputVatAmount || ''}
-                onChange={e => setFormData(prev => ({ ...prev, inputVatAmount: parseFloat(e.target.value) || 0 }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-brand uppercase tracking-wide">Withholding Type</label>
-              <select
-                className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded outline-none text-sm appearance-none"
-                value={formData.withholdingType || ''}
-                onChange={e => setFormData(prev => ({ ...prev, withholdingType: (e.target.value || undefined) as WithholdingType | undefined }))}
-              >
-                <option value="">None</option>
-                <option value="EXPANDED">Expanded (2307)</option>
-                <option value="FINAL">Final (2306)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Withholding Details */}
-          {formData.withholdingType && (
-            <div className="grid grid-cols-3 gap-4 bg-brand/10 p-4 rounded border border-brand-light">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  max="1"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded outline-none font-mono text-sm"
-                  value={formData.appliedRatePercent || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, appliedRatePercent: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">WHT Amount</label>
-                <input
-                  type="text"
-                  readOnly
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded outline-none font-mono text-sm"
-                  value={(formData.withholdingAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-brand uppercase tracking-wide">Net Payable</label>
-                <input
-                  type="text"
-                  readOnly
-                  className="w-full px-4 py-2.5 bg-brand/10 border border-brand-light rounded outline-none font-mono text-sm font-bold text-brand"
-                  value={(formData.netPayable || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Reference Document & Notes */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Reference Document</label>
-              <input
-                type="text"
-                placeholder="Vendor Invoice #, OR #, etc."
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
-                value={formData.referenceDocument || ''}
-                onChange={e => setFormData(prev => ({ ...prev, referenceDocument: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</label>
-              <input
-                type="text"
-                placeholder="Additional notes..."
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none text-sm"
-                value={formData.notes || ''}
-                onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Status (Edit mode) */}
-          {isEdit && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</label>
-              <select
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-brand text-sm font-medium appearance-none"
-                value={formData.status || 'for_approval'}
-                onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as PayableStatus }))}
-              >
-                {Object.entries(STATUS_CONFIG).map(([value, config]) => (
-                  <option key={value} value={value}>{config.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* Action Buttons */}
-          <div className="pt-4 flex justify-end gap-2">
+          <div className="pt-4 border-t flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100 rounded transition-colors"
+              className="px-5 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-100 rounded transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
+              className="px-6 py-2.5 bg-brand text-white rounded text-sm font-semibold shadow-brand/20 active:scale-95 transition-all hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
             >
               {isSubmitting ? 'Saving…' : submitLabel}
             </button>
@@ -2566,6 +3370,8 @@ interface PayableDetailModalProps {
   onPostGL: () => void;
   canPost: boolean;
   canPay: boolean;
+  canApprove: boolean;
+  canCancel: boolean;
 }
 
 const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
@@ -2582,6 +3388,8 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
   onPostGL,
   canPost,
   canPay,
+  canApprove,
+  canCancel,
 }) => {
   const statusConfig = STATUS_CONFIG[payable.status];
   const expenseAccount = accounts.find(a => a.id === payable.expenseAccountId);
@@ -2742,7 +3550,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
             >
               Close
             </button>
-            {canPost && (
+            {canPost && canApprove && (
               <button
                 onClick={onPostGL}
                 className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors flex items-center justify-center gap-2"
@@ -2750,7 +3558,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
                 <BookOpen size={16} /> Post to GL
               </button>
             )}
-            {payable.status === 'for_approval' && !canPost && (
+            {canApprove && payable.status === 'for_approval' && !canPost && (
               <button
                 onClick={onApprove}
                 className="flex-1 py-3 bg-brand text-white rounded text-sm font-bold hover:bg-brand-hover transition-colors flex items-center justify-center gap-2"
@@ -2766,7 +3574,7 @@ const PayableDetailModal: React.FC<PayableDetailModalProps> = ({
                 <Landmark size={16} /> Pay
               </button>
             )}
-            {(payable.status === 'for_approval' || (payable.status === 'approved' && !(payable.paidAmount || 0))) && (
+            {canCancel && (payable.status === 'for_approval' || (payable.status === 'approved' && !(payable.paidAmount || 0))) && (
               <button
                 onClick={onCancel}
                 className="flex-1 py-3 border border-rose-200 text-rose-700 rounded text-sm font-bold hover:bg-rose-50 transition-colors"

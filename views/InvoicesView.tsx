@@ -257,8 +257,9 @@ const getCourseFeeDescription = (fee?: CourseFee | null): string =>
 const CurrencyLineInput: React.FC<{
   value?: number;
   disabled?: boolean;
+  ariaLabel?: string;
   onValueChange: (value: number) => void;
-}> = ({ value = 0, disabled, onValueChange }) => {
+}> = ({ value = 0, disabled, ariaLabel, onValueChange }) => {
   const formatValue = (amount: number) =>
     new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
   const [isFocused, setIsFocused] = useState(false);
@@ -270,6 +271,7 @@ const CurrencyLineInput: React.FC<{
 
   return (
     <input
+      aria-label={ariaLabel}
       type="text"
       inputMode="decimal"
       value={draft}
@@ -1414,8 +1416,16 @@ const brandColor = organization?.primaryColor || '#059669';
       const cat = localTaxCats.find(c => c.id === line.taxCategoryId);
       if (cat) {
         vatAmount = extractVat(base, cat);
-        netAmount = Math.round((base - vatAmount) * 100) / 100;
-        grossAmount = base;
+        const code = String(cat.code || '').toUpperCase();
+        const isPrescribedInclusiveVat = /^(VATGOODS|VATSERV)$/.test(code);
+        const isInclusive = isPrescribedInclusiveVat || Boolean(cat.isInclusive);
+        if (isInclusive) {
+          netAmount = Math.round((base - vatAmount) * 100) / 100;
+          grossAmount = base;
+        } else {
+          netAmount = base;
+          grossAmount = Math.round((base + vatAmount) * 100) / 100;
+        }
       }
     }
     return { netAmount, vatAmount, grossAmount };
@@ -3862,6 +3872,7 @@ const brandColor = organization?.primaryColor || '#059669';
                   {!isNonInvoicePayment && <div className="min-w-0 lg:col-span-4">
                     <label className="text-xs font-medium text-gray-500">Select Batch</label>
                     <select
+                      aria-label="Select Batch"
                       value={formData.batchId}
                       onChange={e => handleBatchChange(e.target.value)}
                       disabled={isReadOnly}
@@ -4409,6 +4420,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                   case 'taxCategoryId':
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <select
+                                        aria-label={`Tax Category line ${idx + 1}`}
                                         value={line.taxCategoryId || ''}
                                         onChange={e => handleUpdateLine(idx, 'taxCategoryId', e.target.value)}
                                         disabled={isReadOnly}
@@ -4425,6 +4437,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                   case 'quantity':
                                     return <td key={colKey} className="px-3 py-2" style={lineColWidths[colKey] ? { width: lineColWidths[colKey], minWidth: lineColWidths[colKey] } : undefined}>
                                       <input
+                                        aria-label={`Quantity line ${idx + 1}`}
                                         type="number"
                                         min="0"
                                         value={line.quantity}
@@ -4439,6 +4452,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                       <div className="flex items-center gap-1 justify-end">
                                         <span className="text-[13px] font-normal text-gray-500">₱</span>
                                         <CurrencyLineInput
+                                          ariaLabel={`Unit Price line ${idx + 1}`}
                                           value={line.unitPrice}
                                           onValueChange={value => handleUpdateLine(idx, 'unitPrice', value)}
                                           disabled={isReadOnly}
@@ -4450,6 +4464,7 @@ const brandColor = organization?.primaryColor || '#059669';
                                       <div className="flex items-center gap-1 justify-end">
                                         <span className="text-[13px] font-normal text-gray-500">₱</span>
                                         <CurrencyLineInput
+                                          ariaLabel={`Amount line ${idx + 1}`}
                                           value={line.amount}
                                           onValueChange={value => handleUpdateLine(idx, 'amount', value)}
                                           disabled={isReadOnly}

@@ -11,6 +11,7 @@
 
 import { User } from '../types';
 import { JWTService, TokenPair, TokenValidationResult } from './JWTService';
+import { config } from '../config/app';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -169,6 +170,17 @@ class TokenManagerClass {
     }
 
     // Verify access token is still valid
+    if (!config.useMockData) {
+      const response = await fetch(`${config.supabase.url}/auth/v1/user`, {
+        headers: {
+          apikey: config.supabase.anonKey,
+          Authorization: `Bearer ${this.session.accessToken}`
+        }
+      }).catch(() => null);
+      if (response?.ok) return true;
+      return await this.refreshTokens();
+    }
+
     const validation = await JWTService.verifyToken(this.session.accessToken);
     
     if (validation.valid) {
@@ -188,9 +200,18 @@ class TokenManagerClass {
    */
   async logout(): Promise<void> {
     if (this.session) {
-      // Revoke tokens on server
-      await JWTService.revokeToken(this.session.accessToken);
-      await JWTService.revokeToken(this.session.refreshToken);
+      if (config.useMockData) {
+        await JWTService.revokeToken(this.session.accessToken);
+        await JWTService.revokeToken(this.session.refreshToken);
+      } else {
+        await fetch(`${config.supabase.url}/auth/v1/logout`, {
+          method: 'POST',
+          headers: {
+            apikey: config.supabase.anonKey,
+            Authorization: `Bearer ${this.session.accessToken}`
+          }
+        }).catch(() => undefined);
+      }
     }
 
     this.clearSession();
@@ -227,7 +248,9 @@ class TokenManagerClass {
       return { valid: false, expired: false, error: 'No session' };
     }
 
-    return await JWTService.verifyToken(this.session.accessToken);
+    if (config.useMockData) return await JWTService.verifyToken(this.session.accessToken);
+    const valid = await this.isAuthenticated();
+    return { valid, expired: !valid, error: valid ? undefined : 'Invalid Supabase session' };
   }
 
   /**
@@ -328,6 +351,29 @@ class TokenManagerClass {
     this.notifyListeners();
 
     try {
+      if (!config.useMockData) {
+        const response = await fetch(`${config.supabase.url}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { apikey: config.supabase.anonKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: this.session.refreshToken })
+        });
+        if (!response.ok) {
+          this.clearSession();
+          return false;
+        }
+        const payload = await response.json();
+        this.session = {
+          ...this.session,
+          accessToken: payload.access_token,
+          refreshToken: payload.refresh_token,
+          expiresAt: Date.now() + (Number(payload.expires_in || 3600) * 1000),
+          refreshExpiresAt: Date.now() + (365 * 24 * 60 * 60 * 1000)
+        };
+        this.saveSession();
+        this.scheduleRefresh();
+        return true;
+      }
+
       const result = await JWTService.refreshTokens(this.session.refreshToken);
 
       if (result.success && result.tokens) {

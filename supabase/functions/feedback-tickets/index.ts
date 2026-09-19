@@ -1,22 +1,9 @@
+// deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-type JwtPayload = {
-  sub: string;
-  role?: string;
-  appRole?: string;
-  app_role?: string;
-  orgId?: string;
-  org_id?: string;
-  exp?: number;
-};
+import { authenticateErpRequest, type ErpActor } from "../_shared/erp-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const AT_ERP_JWT_SECRET =
-  Deno.env.get("AT_ERP_JWT_SECRET") ??
-  (SUPABASE_URL.startsWith("http://127.0.0.1:") || SUPABASE_URL.startsWith("http://localhost:")
-    ? "AT-ERP-JWT-SECRET-KEY-2024-CHANGE-IN-PRODUCTION"
-    : "");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -42,54 +29,6 @@ function json(status: number, data: any) {
   });
 }
 
-function b64UrlToBytes(input: string): Uint8Array {
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob(padded);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return bytes;
-}
-
-function bytesToB64Url(bytes: Uint8Array): string {
-  let str = "";
-  bytes.forEach((b) => (str += String.fromCharCode(b)));
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function verifyHs256Jwt(token: string, secret: string): Promise<JwtPayload | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const [headerB64, payloadB64, sigB64] = parts;
-    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
-    if (bytesToB64Url(signature) !== sigB64) return null;
-
-    const payloadJson = new TextDecoder().decode(b64UrlToBytes(payloadB64));
-    const payload = JSON.parse(payloadJson) as JwtPayload;
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function getActorRole(payload: JwtPayload): string {
-  return String(payload.appRole || payload.app_role || payload.role || "").toUpperCase();
-}
-
-function getActorOrgId(payload: JwtPayload): string {
-  return String(payload.orgId || payload.org_id || "");
-}
-
 function camelToSnake(obj: any): any {
   if (obj === null || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(camelToSnake);
@@ -112,10 +51,9 @@ function snakeToCamel(obj: any): any {
   return result;
 }
 
-function pickTicketInsert(ticket: any, payload: JwtPayload) {
-  const role = getActorRole(payload);
-  const isSystemAdmin = role === "SYSTEM_ADMIN";
-  const actorOrgId = getActorOrgId(payload);
+function pickTicketInsert(ticket: any, actor: ErpActor) {
+  const isSystemAdmin = actor.role === "SYSTEM_ADMIN";
+  const actorOrgId = actor.orgId;
   const requestedOrgId = String(ticket?.orgId || ticket?.org_id || actorOrgId || "");
   const orgId = isSystemAdmin ? requestedOrgId : actorOrgId;
 
@@ -132,17 +70,17 @@ function pickTicketInsert(ticket: any, payload: JwtPayload) {
     screenshot_name: ticket.screenshotName || ticket.screenshot_name || null,
     status: "OPEN",
     priority: ticket.priority || "MEDIUM",
-    created_by: payload.sub,
+    created_by: actor.id,
     created_by_name: ticket.createdByName || ticket.created_by_name || "User",
-    created_by_role: role,
+    created_by_role: actor.role,
   };
 }
 
-function pickTicketUpdate(updates: any, payload: JwtPayload) {
+function pickTicketUpdate(updates: any, actor: ErpActor) {
   return {
     status: updates.status,
     admin_notes: updates.adminNotes ?? updates.admin_notes,
-    assigned_to: payload.sub,
+    assigned_to: actor.id,
     resolved_at: updates.resolvedAt ?? updates.resolved_at ?? null,
     updated_at: new Date().toISOString(),
   };
@@ -157,20 +95,13 @@ Deno.serve(async (req) => {
     return json(405, { error: "Method not allowed" });
   }
 
-  if (!AT_ERP_JWT_SECRET) {
-    return json(500, { error: "AT_ERP_JWT_SECRET is not configured for feedback-tickets" });
+  const actor = await authenticateErpRequest(req, admin);
+  if (!actor) {
+    return json(401, { error: "Invalid, expired, or unlinked Supabase session" });
   }
 
-  const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  const payload = token ? await verifyHs256Jwt(token, AT_ERP_JWT_SECRET) : null;
-  if (!payload) {
-    return json(401, { error: "Invalid or expired application token" });
-  }
-
-  const role = getActorRole(payload);
-  const isSystemAdmin = role === "SYSTEM_ADMIN";
-  const actorOrgId = getActorOrgId(payload);
+  const isSystemAdmin = actor.role === "SYSTEM_ADMIN";
+  const actorOrgId = actor.orgId;
   const body = await req.json().catch(() => ({}));
 
   try {
@@ -183,7 +114,7 @@ Deno.serve(async (req) => {
 
       if (!isSystemAdmin) {
         if (!actorOrgId) return json(403, { error: "Missing organization scope" });
-        query = query.eq("org_id", actorOrgId).eq("created_by", payload.sub);
+        query = query.eq("org_id", actorOrgId).eq("created_by", actor.id);
       }
 
       const { data, error } = await query;
@@ -192,7 +123,7 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "create") {
-      const insert = pickTicketInsert(body.ticket || {}, payload);
+      const insert = pickTicketInsert(body.ticket || {}, actor);
       if (!insert.title || !insert.description) {
         return json(400, { error: "Title and description are required" });
       }
@@ -215,7 +146,7 @@ Deno.serve(async (req) => {
       const id = String(body.id || "");
       if (!id) return json(400, { error: "Ticket id is required" });
 
-      const update = camelToSnake(pickTicketUpdate(body.updates || {}, payload));
+      const update = camelToSnake(pickTicketUpdate(body.updates || {}, actor));
       const { data, error } = await admin
         .from("feedback_tickets")
         .update(update)

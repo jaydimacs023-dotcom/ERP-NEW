@@ -1,19 +1,14 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-type Claims = {
-  sub: string;
-  role?: string;
-  appRole?: string;
-  app_role?: string;
-  orgId?: string;
-  org_id?: string;
-  exp?: number;
-};
+import { authenticateErpRequest, type ErpActor } from "../_shared/erp-auth.ts";
 
 const url = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const appSecret = Deno.env.get("AT_ERP_JWT_SECRET") ?? "";
+
+if (!url || !serviceKey) {
+  throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+}
+
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -28,50 +23,9 @@ function response(status: number, body: any) {
   });
 }
 
-function decodePart(value: string): Uint8Array {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(base64 + "=".repeat((4 - base64.length % 4) % 4)), c => c.charCodeAt(0));
-}
-
-function encodePart(value: Uint8Array): string {
-  let binary = "";
-  value.forEach(byte => binary += String.fromCharCode(byte));
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function authenticate(request: Request): Promise<Claims | null> {
-  try {
-    const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const [header, payload, signature, ...extra] = token.split(".");
-    if (!header || !payload || !signature || extra.length || !appSecret) return null;
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(appSecret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-    );
-    const signed = new Uint8Array(await crypto.subtle.sign(
-      "HMAC", key, new TextEncoder().encode(`${header}.${payload}`),
-    ));
-    if (encodePart(signed) !== signature) return null;
-    const claims = JSON.parse(new TextDecoder().decode(decodePart(payload))) as Claims;
-    if (!claims.sub || (claims.exp && claims.exp < Date.now() / 1000)) return null;
-    return claims;
-  } catch {
-    return null;
-  }
-}
-
-function actorOrg(claims: Claims): string {
-  return String(claims.orgId || claims.org_id || "");
-}
-
-function requestedOrg(claims: Claims, body: any): string {
-  const own = actorOrg(claims);
-  const role = String(claims.appRole || claims.app_role || claims.role || "").toUpperCase();
-  return role === "SYSTEM_ADMIN" ? String(body.orgId || own) : own;
-}
-
-function actorRole(claims: Claims): string {
-  return String(claims.appRole || claims.app_role || claims.role || "").toUpperCase();
+function requestedOrg(actor: ErpActor, body: any): string {
+  if (actor.role !== "SYSTEM_ADMIN") return actor.orgId;
+  return String(body.orgId || body.org_id || actor.orgId || "");
 }
 
 const READ_ROLES = new Set(["SYSTEM_ADMIN", "ADMIN", "FINANCE_MANAGER", "AR_SPECIALIST", "AP_SPECIALIST", "AP_SUPERVISOR", "AUDITOR"]);
@@ -126,13 +80,13 @@ async function validateClassReferences(orgId: string, values: any): Promise<stri
 Deno.serve(async request => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });
-  const actor = await authenticate(request);
-  if (!actor) return response(401, { error: "Invalid or expired application token" });
+  const actor = await authenticateErpRequest(request, admin);
+  if (!actor) return response(401, { error: "Invalid, expired, or unlinked Supabase session" });
   const body = await request.json().catch(() => ({}));
   const orgId = requestedOrg(actor, body);
   if (!orgId) return response(403, { error: "Missing organization scope" });
-  if (!READ_ROLES.has(actorRole(actor))) return response(403, { error: "Inventory accounting access is not permitted" });
-  if (["save_class", "post_opening"].includes(String(body.action || "")) && !WRITE_ROLES.has(actorRole(actor))) {
+  if (!READ_ROLES.has(actor.role)) return response(403, { error: "Inventory accounting access is not permitted" });
+  if (["save_class", "post_opening"].includes(String(body.action || "")) && !WRITE_ROLES.has(actor.role)) {
     return response(403, { error: "Inventory accounting changes are not permitted for this role" });
   }
 
@@ -163,7 +117,7 @@ Deno.serve(async request => {
       p_document_number: document.documentNumber,
       p_posting_date: document.postingDate,
       p_remarks: document.remarks || null,
-      p_actor_id: actor.sub,
+      p_actor_id: actor.id,
       p_lines: document.lines || [],
     });
     return error ? response(400, { error: error.message, code: error.code }) : response(200, { result: data });

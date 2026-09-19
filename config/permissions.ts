@@ -110,6 +110,7 @@ export type ModuleTab =
   | 'users'
   | 'audit'
   | 'enrollments'
+  | 'assessment-registrations'
   | 'course-fees'
   // System Admin
   | 'maintenance'
@@ -255,6 +256,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ModuleTab[]> = {
   REGISTRAR: [
     'dashboard',
     'students', 'trainers', 'qualifications', 'batches', 'transcripts', 'locations', 'schedules', 'alumni-reports',
+    'enrollments', 'assessment-registrations',
     'sponsors', // For scholarship management
     'feedback'
   ],
@@ -278,7 +280,7 @@ export const MODULE_GROUPS = {
   PAYROLL_BUDGET: ['payroll', 'budgets'] as ModuleTab[],
   REGISTRIES: ['sponsors', 'vendors', 'items', 'assets'] as ModuleTab[],
   INVENTORY: ['inventory', 'warehouse-locations', 'stock-items', 'inventory-classes', 'opening-inventory', 'stock-levels', 'stock-adjustments', 'reorder-points', 'inventory-transactions'] as ModuleTab[],
-  OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports'] as ModuleTab[],
+  OPERATIONS: ['students', 'trainers', 'qualifications', 'batches', 'locations', 'schedules', 'alumni-reports', 'enrollments', 'assessment-registrations'] as ModuleTab[],
   ADMIN: ['employees', 'employee-directory', 'coa', 'periods', 'branding', 'subscription', 'payment-history', 'users', 'audit', 'feedback'] as ModuleTab[],
   SYSTEM_ADMIN: ['maintenance', 'backup-restore', 'tenant-mgmt', 'schema', 'payment-monitoring', 'feedback'] as ModuleTab[],
   PORTALS: ['student-portal', 'trainer-portal', 'feedback'] as ModuleTab[],
@@ -428,6 +430,9 @@ export type ActionPermission = 'view' | 'create' | 'edit' | 'delete' | 'approve'
 const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPermission[]>>>> = {
   AR_SPECIALIST: {
     'students': ['view', 'create'],
+    'invoices': ['view', 'create', 'edit', 'post', 'void'],
+    'non-invoice-payments': ['view', 'create', 'edit', 'post', 'void'],
+    'payments': ['view', 'create', 'edit', 'post', 'void'],
   },
   PRESIDENT: {
     'ap-reclassifications': ['view'],
@@ -464,11 +469,23 @@ const ROLE_ACTIONS: Partial<Record<UserRole, Partial<Record<ModuleTab, ActionPer
     'ledger': ['view'],
     'ap-journal-vouchers': ['view'],
     'reports': ['view'],
+    'payables': ['view', 'create', 'edit'],
   },
   AP_SUPERVISOR: {
     'ledger': ['view'],
     'ap-journal-vouchers': ['view'],
     'reports': ['view'],
+    'payables': ['view', 'create', 'edit', 'delete', 'approve', 'post', 'void'],
+  },
+  REGISTRAR: {
+    'students': ['view', 'create', 'edit'],
+    'trainers': ['view', 'create', 'edit'],
+    'qualifications': ['view'],
+    'batches': ['view', 'create', 'edit'],
+    'enrollments': ['view', 'create', 'edit'],
+    'assessment-registrations': ['view', 'create', 'edit'],
+    'transcripts': ['view', 'create', 'edit'],
+    'sponsors': ['view'],
   }
 };
 
