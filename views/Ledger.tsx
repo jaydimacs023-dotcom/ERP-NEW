@@ -215,9 +215,15 @@ const Ledger: React.FC<LedgerProps> = ({
 
   const serverOrderBy = useMemo<PageOrder[]>(() => {
     if (sortConfig.direction === 'none') {
-      return [{ column: 'date', ascending: false }];
+      return [
+        { column: 'date', ascending: false },
+        { column: 'created_at', ascending: false }
+      ];
     }
-    return [{ column: serverSortColumn, ascending: sortConfig.direction === 'asc' }];
+    return [
+      { column: serverSortColumn, ascending: sortConfig.direction === 'asc' },
+      { column: 'created_at', ascending: false }
+    ];
   }, [serverSortColumn, sortConfig.direction]);
 
   useEffect(() => {
@@ -408,12 +414,16 @@ const Ledger: React.FC<LedgerProps> = ({
     () => sortedEntries.slice(pageStartIndex, pageStartIndex + JOURNAL_ENTRIES_PER_PAGE),
     [sortedEntries, pageStartIndex]
   );
-  const liveServerEntries = useMemo(
-    () => serverEntries.map(serverEntry =>
+  const liveServerEntries = useMemo(() => {
+    const knownServerIds = new Set(serverEntries.map(e => e.id));
+    const localNewEntries = currentPage === 1
+      ? entries.filter(e => !knownServerIds.has(e.id) && (statusFilter === 'ALL' || e.status === statusFilter))
+      : [];
+    const mappedServer = serverEntries.map(serverEntry =>
       entries.find(entry => entry.id === serverEntry.id) || serverEntry
-    ),
-    [serverEntries, entries]
-  );
+    );
+    return [...localNewEntries, ...mappedServer].slice(0, JOURNAL_ENTRIES_PER_PAGE);
+  }, [serverEntries, entries, currentPage, statusFilter]);
   const paginatedEntries = useFallbackRows ? fallbackPaginatedEntries : liveServerEntries;
 
   const serverEntryTotals = useMemo(() => {
@@ -1145,10 +1155,15 @@ const Ledger: React.FC<LedgerProps> = ({
           hasExistingReversal={reversedOriginalIds.has(selectedEntry.id)}
           onClose={() => setSelectedEntry(null)}
           onApprove={onApproveJournal}
-          onPost={() => onPostEntry?.(
-            selectedEntry,
-            lines.filter(line => line.journalEntryId === selectedEntry.id)
-          )}
+          onPost={async () => {
+            if (onPostEntry && selectedEntry) {
+              await onPostEntry(
+                selectedEntry,
+                lines.filter(line => line.journalEntryId === selectedEntry.id)
+              );
+              setRefreshKey(k => k + 1);
+            }
+          }}
           onReverse={onReverseJournal}
           currentUser={currentUser}
         />

@@ -1,177 +1,102 @@
-# Supabase CLI
+# AT-ERP (AccountTech Enterprise Resource Planning)
 
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=develop)](https://coveralls.io/github/supabase/cli?branch=develop) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
+A modern, multi-tenant enterprise ERP platform engineered specifically for educational and vocational training institutions (supporting TESDA training programs, academic schools, and hybrid models). Built with React 18, TypeScript, Vite, and Supabase PostgreSQL.
 
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
+---
 
-This repository contains all the functionality for Supabase CLI.
+## 🌟 Core Modules & Capabilities
 
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
+- **Financial Core & General Ledger**: Double-entry journal entries, real-time trial balance, income statement, balance sheet, accounting period closing controls (`OPEN`, `SOFT_CLOSE`, `HARD_CLOSE`, `LOCKED`), and multi-currency support.
+- **Accounts Receivable (AR)**: Student & corporate sponsor billing, course fee schedules, automated invoice generation, payment applications, bank deposits, and automated aging reports.
+- **Accounts Payable (AP)**: Vendor management, purchase orders, goods receipts, 3-way matching, bill processing, check printing, and disbursement vouchers.
+- **Inventory & Warehouse Operations**: Multi-location warehouse tracking, stock levels, adjustments, reorder points, valuation, and automatic GL journal entry integration.
+- **Training & Registrar Operations**: Qualifications/courses, batch management, student admissions, enrollment workflows, attendance tracking, and assessment registrations.
+- **Student & Trainer Portals**: Self-service student portal (profile, independent document uploads for TOR/Birth Certificate, grades, statement of accounts) and trainer schedule management.
+- **Payroll & Statutory Compliance**: Philippine statutory deductions (BIR, SSS, PhilHealth, Pag-IBIG), 13th-month pay, attendance, and leave tracking.
+- **Multi-Tenant SaaS Administration**: Tenant provisioning, institution modes (`TRAINING`, `ACADEMIC`, `HYBRID`), subscription management, role-based access control (RBAC), and forensic audit logs.
 
-## Getting started
+---
 
-### Install the CLI
+## 🛠️ Technology Stack
 
-Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
+- **Frontend**: React 18 (SPA), TypeScript, Vite, Tailwind CSS, Lucide React, Recharts
+- **Persistence & Backend**: Supabase PostgreSQL, Supabase Edge Functions (Deno/TypeScript)
+- **Security & Authorization**: Supabase Auth (GoTrue) sessions, 100% PostgreSQL Row-Level Security (RLS) across all tenant tables, and role/permission matrix
+- **Testing**: Vitest, React Testing Library, jsdom
 
-```bash
-npm i supabase --save-dev
-```
+---
 
-When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
+## 🚀 Getting Started
 
-```
-NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
+### Prerequisites
+- Node.js 18+ and npm
+- Docker Desktop (for local Supabase development)
+- Supabase CLI (`npx supabase`)
 
-> **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+### Installation & Environment Setup
 
-<details>
-  <summary><b>macOS</b></summary>
+1. **Clone the repository and install dependencies**:
+   ```bash
+   git clone <repository-url>
+   cd ERP-NEW
+   npm install
+   ```
 
-  Available via [Homebrew](https://brew.sh). To install:
+2. **Configure environment variables**:
+   Create a `.env.local` for local development or `.env.production.local` for cloud staging:
+   ```env
+   VITE_APP_ENV=local
+   VITE_SUPABASE_URL=http://127.0.0.1:54321
+   VITE_SUPABASE_ANON_KEY=<your-anon-key>
+   VITE_API_URL=http://127.0.0.1:54321
+   VITE_STORAGE_BUCKET=attachments
+   ```
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+3. **Start Local Supabase (Docker)**:
+   ```bash
+   npx supabase start
+   ```
 
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
+4. **Start Vite Dev Server**:
+   ```bash
+   npm run dev
+   ```
 
-  ```sh
-  brew upgrade supabase
-  ```
-</details>
+---
 
-<details>
-  <summary><b>Windows</b></summary>
+## 🧪 Testing & Production Build
 
-  Available via [Scoop](https://scoop.sh). To install:
-
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
-
-  To upgrade:
-
-  ```powershell
-  scoop update supabase
-  ```
-</details>
-
-<details>
-  <summary><b>Linux</b></summary>
-
-  Available via [Homebrew](https://brew.sh) and Linux packages.
-
-  #### via Homebrew
-
-  To install:
-
-  ```sh
-  brew install supabase/tap/supabase
-  ```
-
-  To upgrade:
-
-  ```sh
-  brew upgrade supabase
-  ```
-
-  #### via Linux packages
-
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
-
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
-
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
-
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
-
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
-</details>
-
-<details>
-  <summary><b>Other Platforms</b></summary>
-
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
-
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
-
-  Add a symlink to the binary in `$PATH` for easier access:
-
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
-
-  This works on other non-standard Linux distros.
-</details>
-
-<details>
-  <summary><b>Community Maintained Packages</b></summary>
-
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
-
+- **Run all tests**:
   ```bash
-  pkgx install supabase
+  npm test
+  ```
+- **Run specific test file**:
+  ```bash
+  npm test -- tests/AuthService.test.ts --run
+  ```
+- **Build production bundle**:
+  ```bash
+  npm run build
+  ```
+- **Build for Cloud Production**:
+  ```bash
+  npm run build -- --mode production
   ```
 
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
-</details>
+---
 
-### Run the CLI
+## 📚 Documentation
 
-```bash
-supabase bootstrap
-```
+All comprehensive project guides, architecture specifications, database schemas, and roadmaps are consolidated in the [**`docs/`**](file:///e:/laragon/www/ERP-NEW/docs/README.md) directory:
 
-Or using npx:
-
-```bash
-npx supabase bootstrap
-```
-
-The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
-
-## Docs
-
-Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
-
-## Breaking changes
-
-We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
-
-However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
-
-## Developing
-
-To run from source:
-
-```sh
-# Go >= 1.22
-go run . help
-```
+- [**Documentation Hub & Index**](file:///e:/laragon/www/ERP-NEW/docs/README.md)
+- [System Architecture](file:///e:/laragon/www/ERP-NEW/docs/architecture.md)
+- [Database Schema & Migrations](file:///e:/laragon/www/ERP-NEW/docs/database.md)
+- [Business & Accounting Rules](file:///e:/laragon/www/ERP-NEW/docs/business-rules.md)
+- [Standardized Chart of Accounts](file:///e:/laragon/www/ERP-NEW/docs/chart-of-accounts.md)
+- [Role & Module Access Matrix](file:///e:/laragon/www/ERP-NEW/docs/role-module-access.md)
+- [UI/UX Design System](file:///e:/laragon/www/ERP-NEW/docs/design-system.md)
+- [Supabase Sync & Migration Manual](file:///e:/laragon/www/ERP-NEW/docs/supabase-sync-guide.md)
+- [Student Document Upload Architecture](file:///e:/laragon/www/ERP-NEW/docs/student-document-upload.md)
+- [Forensic System Audit Report](file:///e:/laragon/www/ERP-NEW/docs/system-audit-report.md)
+- [Project Roadmaps & Trackers](file:///e:/laragon/www/ERP-NEW/docs/roadmaps/)

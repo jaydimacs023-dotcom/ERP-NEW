@@ -8,8 +8,8 @@ The system is organized around a central application controller, typed domain mo
 ## Runtime Stack
 - Frontend: React 18, TypeScript, Vite, Tailwind CSS, lucide-react, Recharts.
 - Tests: Vitest, jsdom, React Testing Library.
-- Persistence: Supabase Postgres through REST, RPC, and Edge Functions.
-- Auth/session: custom `AuthService`, `JWTService`, and `TokenManager`, backed by rows in the `users` table and JWTs stored client-side.
+- Persistence: Supabase Postgres through REST, RPC, and Edge Functions, enforced with PostgreSQL Row-Level Security (RLS).
+- Auth/session: Standard Supabase Auth sessions (`auth.users`), synchronized with `public.users` via `auth_uid`, supported by `AuthService` and client-side session storage.
 
 ## Application Entry
 - `index.html` loads the Vite bundle.

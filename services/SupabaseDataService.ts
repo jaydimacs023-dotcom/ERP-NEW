@@ -5156,11 +5156,16 @@ export class SupabaseDataService implements IDataService {
         snakeEntry
       );
 
-      // Convert empty strings to null for UUID columns
-      if (payload.period_id === '') payload.period_id = null;
+      // Convert empty strings or non-UUID values to null for UUID columns
+      if (payload.period_id === '' || (payload.period_id && !this.isUuid(payload.period_id))) payload.period_id = null;
       if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
+      if (payload.created_by === '' || (payload.created_by && !this.isUuid(payload.created_by))) payload.created_by = null;
+      if (payload.approved_by === '' || (payload.approved_by && !this.isUuid(payload.approved_by))) payload.approved_by = null;
+      if (payload.deposit_id === '' || (payload.deposit_id && !this.isUuid(payload.deposit_id))) payload.deposit_id = null;
+      if (payload.original_entry_id === '' || (payload.original_entry_id && !this.isUuid(payload.original_entry_id))) payload.original_entry_id = null;
       // Normalize app-specific statuses/types to DB constraints
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
+      if (payload.source_type === 'NON_INVOICE_PAYMENT') payload.source_type = 'INVOICE';
 
       delete payload.id;
       const url = `${this.baseUrl}/journal_entries`;
@@ -5192,11 +5197,16 @@ export class SupabaseDataService implements IDataService {
         snakeUpdates
       );
 
-      // Convert empty strings to null for UUID columns
-      if (payload.period_id === '') payload.period_id = null;
+      // Convert empty strings or non-UUID values to null for UUID columns
+      if (payload.period_id === '' || (payload.period_id && !this.isUuid(payload.period_id))) payload.period_id = null;
       if (payload.source_ref === '' || (payload.source_ref && !this.isUuid(payload.source_ref))) payload.source_ref = null;
+      if (payload.created_by === '' || (payload.created_by && !this.isUuid(payload.created_by))) payload.created_by = null;
+      if (payload.approved_by === '' || (payload.approved_by && !this.isUuid(payload.approved_by))) payload.approved_by = null;
+      if (payload.deposit_id === '' || (payload.deposit_id && !this.isUuid(payload.deposit_id))) payload.deposit_id = null;
+      if (payload.original_entry_id === '' || (payload.original_entry_id && !this.isUuid(payload.original_entry_id))) payload.original_entry_id = null;
       // Normalize app-specific statuses/types to DB constraints
       if (payload.source_type === 'JOURNAL') payload.source_type = 'MANUAL';
+      if (payload.source_type === 'NON_INVOICE_PAYMENT') payload.source_type = 'INVOICE';
 
       const url = `${this.baseUrl}/journal_entries?id=eq.${id}`;
       let response: Response;
@@ -5531,10 +5541,11 @@ export class SupabaseDataService implements IDataService {
       // Define only the columns that exist in the actual database table
       // Supabase bulk insert requires all objects to have the same keys (PGRST102 error)
       const allKeys = [
-        'org_id', 'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
+        'journal_entry_id', 'account_id', 'debit', 'credit', 'memo', 'description',
         'contact_id', 'contact_type', 'batch_id', 'item_id', 'asset_id', 'is_cleared',
-        'goods_receipt_id', 'goods_receipt_line_id', 'purchase_order_id', 'purchase_order_line_id'
+        'classification_code', 'tax_category_id'
       ];
+      const uuidKeys = ['journal_entry_id', 'account_id', 'contact_id', 'batch_id', 'item_id', 'asset_id', 'tax_category_id'];
 
       const payloads = lines.map(line => {
         const payload = this.camelToSnake(line);
@@ -5543,6 +5554,9 @@ export class SupabaseDataService implements IDataService {
         const normalizedPayload: any = {};
         for (const key of allKeys) {
           normalizedPayload[key] = (payload[key] !== undefined && payload[key] !== '') ? payload[key] : null;
+          if (uuidKeys.includes(key) && normalizedPayload[key] && !this.isUuid(normalizedPayload[key])) {
+            normalizedPayload[key] = null;
+          }
         }
         return normalizedPayload;
       });

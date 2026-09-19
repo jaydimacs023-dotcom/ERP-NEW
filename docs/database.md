@@ -16,6 +16,9 @@ Application code uses camelCase TypeScript models and persists to snake_case tab
 Active migration files:
 - `20260524_add_organization_institution_type.sql`: adds `organizations.institution_type`, defaults existing rows to `TRAINING`, enforces `TRAINING | ACADEMIC | HYBRID`, and indexes the field.
 - `20260524_performance_indexes.sql`: adds indexes for common org-scoped, status, date, customer, vendor, journal, audit, AP, AR, and procurement queries.
+- `20260919110930_use_auth_uid_for_erp_rls.sql`: bridges `auth.uid()` to `public.users.auth_uid` and introduces `private.erp_org_id()` for clean tenant isolation.
+- `20260919131000_sync_auth_users_and_identities.sql`: syncs `auth.users`, handles missing GoTrue tokens, and establishes `auth.identities`.
+- `20260919140000_enable_comprehensive_rls.sql`: enables 100% Row-Level Security (RLS) across all 70 public tables with granular tenant-isolation policies.
 
 Disabled migration files document intended or previously staged features:
 - AR invoice line accounting fields, invoice number control, posted invoice locking.

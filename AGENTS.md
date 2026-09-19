@@ -63,6 +63,7 @@ The active application entry path is `index.tsx` -> `App.tsx`. `App.tsx` owns au
 - Period closing supports AP, AR, GL, soft close, hard close, and lock states.
 
 ## Documentation
-- `architecture.md` describes app structure, routing/controllers, services, models, views, and runtime flow.
-- `database.md` describes schema, migrations, functions, relationships, and persistence behavior.
-- `business-rules.md` captures implemented workflows and state rules.
+- `docs/README.md` is the centralized index for all architecture, domain, operational, and roadmap documentation.
+- `docs/architecture.md` describes app structure, routing/controllers, services, models, views, and runtime flow.
+- `docs/database.md` describes schema, migrations, functions, relationships, and persistence behavior.
+- `docs/business-rules.md` captures implemented workflows and state rules.
