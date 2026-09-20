@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Batch, BatchTranscriptRecord, Enrollment, Qualification, Student, TranscriptRecord } from '../types';
 import { DataServiceFactory } from '../services/DataServiceFactory';
+import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
 
 interface TranscriptRecordsViewProps {
   orgId: string;
@@ -40,10 +41,10 @@ const formatBytes = (bytes: number) => bytes < 1024 * 1024
 const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
   orgId,
   currentUserId,
-  batches,
-  enrollments,
-  students,
-  qualifications,
+  batches = [],
+  enrollments = [],
+  students = [],
+  qualifications = [],
   brandColor,
   onNotify
 }) => {
@@ -69,21 +70,44 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
 
   useEffect(() => {
     let active = true;
+    if (!orgId) {
+      setRecords([]);
+      setBatchRecords([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
-    Promise.all([
+    Promise.allSettled([
       dataService.getTranscriptRecords(orgId),
       dataService.getBatchTranscriptRecords(orgId)
     ])
-      .then(([learnerRows, batchRows]) => {
+      .then(([learnerResult, batchResult]) => {
         if (!active) return;
+        const learnerRows = learnerResult.status === 'fulfilled' ? learnerResult.value : [];
+        const batchRows = batchResult.status === 'fulfilled' ? batchResult.value : [];
+
+        if (learnerResult.status === 'rejected') {
+          console.warn('[TranscriptRecordsView] Failed to load learner transcripts:', learnerResult.reason);
+        }
+        if (batchResult.status === 'rejected') {
+          console.warn('[TranscriptRecordsView] Failed to load batch transcripts:', batchResult.reason);
+        }
+        if (learnerResult.status === 'rejected' && batchResult.status === 'rejected') {
+          onNotify('error', 'Unable to load transcript records.');
+        }
+
         setRecords(learnerRows);
         setBatchRecords(batchRows);
       })
       .catch(error => {
-        console.error(error);
+        console.error('[TranscriptRecordsView] Unexpected error loading transcripts:', error);
         if (active) onNotify('error', 'Unable to load transcript records.');
       })
-      .finally(() => active && setIsLoading(false));
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
     return () => { active = false; };
   }, [dataService, onNotify, orgId]);
 
@@ -95,7 +119,7 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
     || (record.batchId === enrollment.batchId && record.studentId === enrollment.studentId)
   );
   const allBatchEnrollments = useMemo(() => {
-    const persistedEnrollments = enrollments
+    const persistedEnrollments = (enrollments || [])
       .filter(enrollment => enrollment.batchId === selectedBatchId && !enrollment.isDeleted);
     const persistedStudentIds = new Set(persistedEnrollments.map(enrollment => enrollment.studentId));
     const batchMemberFallbacks: Enrollment[] = (selectedBatch?.studentIds || [])
@@ -113,9 +137,11 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
 
     return [...persistedEnrollments, ...batchMemberFallbacks]
       .sort((left, right) => {
-        const leftStudent = students.find(item => item.id === left.studentId);
-        const rightStudent = students.find(item => item.id === right.studentId);
-        return `${leftStudent?.lastName} ${leftStudent?.firstName}`.localeCompare(`${rightStudent?.lastName} ${rightStudent?.firstName}`);
+        const leftStudent = (students || []).find(item => item.id === left.studentId);
+        const rightStudent = (students || []).find(item => item.id === right.studentId);
+        const leftName = `${leftStudent?.lastName || ''} ${leftStudent?.firstName || ''}`.trim();
+        const rightName = `${rightStudent?.lastName || ''} ${rightStudent?.firstName || ''}`.trim();
+        return leftName.localeCompare(rightName);
       });
   }, [enrollments, orgId, selectedBatch, selectedBatchId, students]);
 
@@ -134,6 +160,15 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
         ].some(value => String(value || '').toLowerCase().includes(term));
       });
   }, [allBatchEnrollments, search, students]);
+
+  const {
+    currentPage,
+    totalPages,
+    pageStartIndex,
+    pageEndIndex,
+    paginatedRows: paginatedEnrollments,
+    setCurrentPage,
+  } = usePaginatedRows(batchEnrollments, [selectedBatchId, search], 7);
 
   const selectedStudent = students.find(student => student.id === selectedEnrollment?.studentId);
   const selectedRecord = selectedEnrollment ? recordForEnrollment(selectedEnrollment) : undefined;
@@ -366,7 +401,7 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
                     </div>
                   </td>
                 </tr>
-              ) : batchEnrollments.map(enrollment => {
+              ) : paginatedEnrollments.map(enrollment => {
                 const student = students.find(item => item.id === enrollment.studentId);
                 const record = recordForEnrollment(enrollment);
                 const isCompleted = enrollment.enrollmentStatus === 'COMPLETED' || selectedBatch?.status === 'COMPLETED';
@@ -422,6 +457,16 @@ const TranscriptRecordsView: React.FC<TranscriptRecordsViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={batchEnrollments.length}
+          pageStartIndex={pageStartIndex}
+          pageEndIndex={pageEndIndex}
+          onPageChange={setCurrentPage}
+          itemLabel="learners"
+        />
       </section>
 
       {selectedEnrollment && (

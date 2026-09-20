@@ -319,8 +319,8 @@ export class SupabaseDataService implements IDataService {
               : table === 'inventory_transactions'
                 ? this.inventoryAccountingRequest<any[]>('list_transactions')
             : this.listStockAdjustmentsViaEdgeFunction()).catch(error => {
-          console.error(`[Supabase] Failed to load ${table} through Edge Function:`, error);
-          return [];
+          console.warn(`[Supabase] Failed to load ${table} through Edge Function, falling back to REST:`, error);
+          return this.fetchFromSupabase(table);
         })
         : () => this.fetchFromSupabase(table));
 
@@ -392,7 +392,13 @@ export class SupabaseDataService implements IDataService {
         payrollRuns: this.snakeToCamel(payrollRuns as any) || [],
         payrollLines: this.snakeToCamel(payrollLines as any) || [],
         auditLogs: this.snakeToCamel(auditLogs as any) || [],
-        purchaseOrders: this.snakeToCamel(purchaseOrders as any) || [],
+        purchaseOrders: (this.snakeToCamel(purchaseOrders as any) || []).map((po: any) => ({
+          ...po,
+          date: po.date || po.orderDate || '',
+          reference: po.reference || po.poNumber || '',
+          memo: po.memo || po.notes || '',
+          lines: Array.isArray(po.lines) ? po.lines : [],
+        })),
         paymentHistories: this.snakeToCamel(paymentHistories as any) || [],
         payments: this.snakeToCamel(payments as any) || [],
         paymentApplications: this.snakeToCamel(paymentApplications as any) || [],
@@ -636,7 +642,7 @@ export class SupabaseDataService implements IDataService {
    * Raw INSERT to Supabase - with schema filtering and conversion
    * Converts camelCase to snake_case, filters to valid columns, and returns camelCase result
    */
-  private async insertToSupabaseRaw<T>(table: string, data: any, preferUserToken: boolean = false): Promise<T> {
+  private async insertToSupabaseRaw<T>(table: string, data: any, preferUserToken: boolean = true): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
       console.warn(`[Supabase] Missing credentials for table '${table}', falling back`);
       throw new Error(`Supabase not configured for ${table}`);
@@ -709,7 +715,7 @@ export class SupabaseDataService implements IDataService {
     table: string,
     id: string,
     data: any,
-    preferUserToken: boolean = false,
+    preferUserToken: boolean = true,
     requireReturnedRow: boolean = false
   ): Promise<T> {
     if (!this.supabaseUrl || !this.supabaseKey) {
@@ -2230,7 +2236,17 @@ export class SupabaseDataService implements IDataService {
 
     if (table === 'inventory_transactions') {
       const orgId = String(options.filters?.find(filter => filter.column === 'org_id')?.value || '');
-      let rows = await this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
+      let rows: any[] = [];
+      if (this.isLocalSupabase()) {
+        rows = await this.listInventoryTransactionsViaRest(orgId);
+      } else {
+        try {
+          rows = await this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
+        } catch (err) {
+          console.warn('[Supabase] inventory-accounting edge function unavailable; using REST fallback in fetchPage.', err);
+          rows = await this.listInventoryTransactionsViaRest(orgId);
+        }
+      }
       for (const filter of options.filters || []) {
         if (filter.column === 'org_id') continue;
         const camelColumn = filter.column.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
@@ -2273,15 +2289,44 @@ export class SupabaseDataService implements IDataService {
       };
     }
 
+    let pageOptions = { ...options };
+    if (table === 'purchase_orders') {
+      pageOptions = {
+        ...pageOptions,
+        columns: pageOptions.columns
+          ? pageOptions.columns
+              .split(',')
+              .map(c => c.trim())
+              .filter(c => !['lines', 'is_deleted', 'deleted_at', 'deleted_by'].includes(c))
+              .map(c => c === 'date' ? 'order_date' : c === 'reference' ? 'po_number' : c === 'memo' ? 'notes' : c)
+              .join(',')
+          : 'id,org_id,vendor_id,po_number,order_date,expected_delivery_date,status,total_amount,notes,gl_entry_number,created_at,approved_by,approved_at',
+        filters: (pageOptions.filters || [])
+          .filter(f => !['is_deleted', 'deleted_at', 'deleted_by'].includes(f.column))
+          .map(f => ({
+            ...f,
+            column: f.column === 'date' ? 'order_date' : f.column === 'reference' ? 'po_number' : f.column === 'memo' ? 'notes' : f.column
+          })),
+        orderBy: (pageOptions.orderBy || []).map(o => ({
+          ...o,
+          column: o.column === 'date' ? 'order_date' : o.column === 'reference' ? 'po_number' : o.column === 'memo' ? 'notes' : o.column
+        })),
+        search: pageOptions.search ? {
+          ...pageOptions.search,
+          columns: pageOptions.search.columns.map(c => c === 'reference' ? 'po_number' : c === 'memo' ? 'notes' : c === 'date' ? 'order_date' : c)
+        } : undefined,
+      };
+    }
+
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     const url = new URL(`${this.baseUrl}/${table}`);
 
-    url.searchParams.set('select', options.columns || '*');
+    url.searchParams.set('select', pageOptions.columns || '*');
     url.searchParams.set('offset', String(from));
     url.searchParams.set('limit', String(pageSize));
 
-    for (const filter of options.filters || []) {
+    for (const filter of pageOptions.filters || []) {
       const operator = filter.operator || 'eq';
       let value: string;
       if (operator === 'in') {
@@ -2296,17 +2341,17 @@ export class SupabaseDataService implements IDataService {
       url.searchParams.set(filter.column, `${operator}.${value}`);
     }
 
-    const searchTerm = options.search?.term?.trim();
-    if (searchTerm && options.search?.columns.length) {
+    const searchTerm = pageOptions.search?.term?.trim();
+    if (searchTerm && pageOptions.search?.columns.length) {
       const escapedTerm = searchTerm.replace(/[%*_]/g, '\\$&');
-      const clauses = options.search.columns.map(column => `${column}.ilike.*${escapedTerm}*`);
+      const clauses = pageOptions.search.columns.map(column => `${column}.ilike.*${escapedTerm}*`);
       url.searchParams.set('or', `(${clauses.join(',')})`);
     }
 
-    if (options.orderBy?.length) {
+    if (pageOptions.orderBy?.length) {
       url.searchParams.set(
         'order',
-        options.orderBy
+        pageOptions.orderBy
           .map(order => {
             const direction = order.ascending === false ? 'desc' : 'asc';
             const nulls = order.nullsFirst === undefined ? '' : `.${order.nullsFirst ? 'nullsfirst' : 'nullslast'}`;
@@ -2318,7 +2363,7 @@ export class SupabaseDataService implements IDataService {
 
     const response = await fetch(url.toString(), {
       headers: {
-        ...(await this.getHeaders(table === 'warehouse_locations')),
+        ...(await this.getHeaders()),
         Prefer: 'count=exact',
         Range: `${from}-${to}`,
       },
@@ -2333,8 +2378,19 @@ export class SupabaseDataService implements IDataService {
     const contentRange = response.headers.get('content-range') || '';
     const total = Number(contentRange.split('/')[1] || rows.length || 0);
 
+    let mappedRows = this.snakeToCamel(rows) as any[];
+    if (table === 'purchase_orders') {
+      mappedRows = mappedRows.map((r: any) => ({
+        ...r,
+        date: r.date || r.orderDate || '',
+        reference: r.reference || r.poNumber || '',
+        memo: r.memo || r.notes || '',
+        lines: r.lines || [],
+      }));
+    }
+
     return {
-      rows: this.snakeToCamel(rows) as T[],
+      rows: mappedRows as T[],
       total,
       page,
       pageSize,
@@ -2824,40 +2880,92 @@ export class SupabaseDataService implements IDataService {
     });
   }
 
-  async getTranscriptRecords(orgId: string): Promise<TranscriptRecord[]> {
-    const token = await this.getAuthToken();
-    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
-    url.searchParams.set('action', 'list');
-    url.searchParams.set('orgId', orgId);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        apikey: this.supabaseKey,
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: '{}'
-    });
-    if (!response.ok) {
-      throw new Error(`Unable to load transcript records (${response.status}): ${await response.text()}`);
+  private async getTranscriptRecordsViaRest(orgId: string): Promise<TranscriptRecord[]> {
+    if (!orgId) return [];
+    try {
+      const url = `${this.baseUrl}/transcript_records?org_id=eq.${encodeURIComponent(orgId)}&order=uploaded_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) {
+        console.warn(`[Supabase] transcript_records REST fetch failed: ${response.status} - ${await response.text()}`);
+        return [];
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []) as TranscriptRecord[];
+    } catch (error) {
+      console.error('[Supabase] Error fetching transcript records via REST:', error);
+      return [];
     }
-    const result = await response.json();
-    return this.snakeToCamel(result.records || []) as TranscriptRecord[];
+  }
+
+  private async getBatchTranscriptRecordsViaRest(orgId: string): Promise<BatchTranscriptRecord[]> {
+    if (!orgId) return [];
+    try {
+      const url = `${this.baseUrl}/batch_transcript_records?org_id=eq.${encodeURIComponent(orgId)}&order=uploaded_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) {
+        console.warn(`[Supabase] batch_transcript_records REST fetch failed: ${response.status} - ${await response.text()}`);
+        return [];
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []) as BatchTranscriptRecord[];
+    } catch (error) {
+      console.error('[Supabase] Error fetching batch transcript records via REST:', error);
+      return [];
+    }
+  }
+
+  async getTranscriptRecords(orgId: string): Promise<TranscriptRecord[]> {
+    if (!orgId) return [];
+    if (this.isLocalSupabase()) {
+      return this.getTranscriptRecordsViaRest(orgId);
+    }
+    try {
+      const token = await this.getAuthToken();
+      const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+      url.searchParams.set('action', 'list');
+      url.searchParams.set('orgId', orgId);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          apikey: this.supabaseKey,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: '{}'
+      });
+      if (!response.ok) {
+        throw new Error(`Unable to load transcript records (${response.status}): ${await response.text()}`);
+      }
+      const result = await response.json();
+      return this.snakeToCamel(result.records || []) as TranscriptRecord[];
+    } catch (err) {
+      console.warn('[Supabase] transcripts edge function unavailable for list; using REST fallback.', err);
+      return this.getTranscriptRecordsViaRest(orgId);
+    }
   }
 
   async getBatchTranscriptRecords(orgId: string): Promise<BatchTranscriptRecord[]> {
-    const token = await this.getAuthToken();
-    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
-    url.searchParams.set('action', 'list');
-    url.searchParams.set('orgId', orgId);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: '{}'
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Unable to load batch transcript records.');
-    return this.snakeToCamel(result.batchRecords || []) as BatchTranscriptRecord[];
+    if (!orgId) return [];
+    if (this.isLocalSupabase()) {
+      return this.getBatchTranscriptRecordsViaRest(orgId);
+    }
+    try {
+      const token = await this.getAuthToken();
+      const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+      url.searchParams.set('action', 'list');
+      url.searchParams.set('orgId', orgId);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Unable to load batch transcript records.');
+      return this.snakeToCamel(result.batchRecords || []) as BatchTranscriptRecord[];
+    } catch (err) {
+      console.warn('[Supabase] transcripts edge function unavailable for batch list; using REST fallback.', err);
+      return this.getBatchTranscriptRecordsViaRest(orgId);
+    }
   }
 
   async uploadTranscriptPdf(input: {
@@ -2900,23 +3008,36 @@ export class SupabaseDataService implements IDataService {
   }
 
   async downloadTranscriptPdf(objectPath: string): Promise<Blob> {
-    const token = await this.getAuthToken();
-    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
-    url.searchParams.set('action', 'download');
-    url.searchParams.set('orgId', objectPath.split('/')[0] || '');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        apikey: this.supabaseKey,
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ objectPath })
-    });
-    if (!response.ok) {
-      throw new Error(`Unable to download transcript (${response.status}): ${await response.text()}`);
+    const orgId = objectPath.split('/')[0] || '';
+    if (!this.isLocalSupabase()) {
+      try {
+        const token = await this.getAuthToken();
+        const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+        url.searchParams.set('action', 'download');
+        url.searchParams.set('orgId', orgId);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            apikey: this.supabaseKey,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ objectPath })
+        });
+        if (response.ok) {
+          return await response.blob();
+        }
+      } catch (err) {
+        console.warn('[Supabase] downloadTranscriptPdf via edge function failed; trying storage REST download.', err);
+      }
     }
-    return response.blob();
+    const headers = await this.getHeaders();
+    const storageUrl = `${this.supabaseUrl}/storage/v1/object/authenticated/transcripts/${encodeURI(objectPath)}`;
+    const storageRes = await fetch(storageUrl, { headers });
+    if (!storageRes.ok) {
+      throw new Error(`Unable to download transcript: ${storageRes.status} - ${await storageRes.text()}`);
+    }
+    return storageRes.blob();
   }
 
   async uploadBatchTranscriptPdf(input: { orgId: string; batchId: string; file: File }): Promise<BatchTranscriptRecord> {
@@ -2941,17 +3062,31 @@ export class SupabaseDataService implements IDataService {
   }
 
   async downloadBatchTranscriptPdf(objectPath: string, orgId: string): Promise<Blob> {
-    const token = await this.getAuthToken();
-    const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
-    url.searchParams.set('action', 'download');
-    url.searchParams.set('orgId', orgId);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ objectPath, recordType: 'batch' })
-    });
-    if (!response.ok) throw new Error(`Unable to download batch transcript (${response.status}): ${await response.text()}`);
-    return response.blob();
+    if (!this.isLocalSupabase()) {
+      try {
+        const token = await this.getAuthToken();
+        const url = new URL(`${this.supabaseUrl}/functions/v1/transcripts`);
+        url.searchParams.set('action', 'download');
+        url.searchParams.set('orgId', orgId);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { apikey: this.supabaseKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objectPath, recordType: 'batch' })
+        });
+        if (response.ok) {
+          return await response.blob();
+        }
+      } catch (err) {
+        console.warn('[Supabase] downloadBatchTranscriptPdf via edge function failed; trying storage REST download.', err);
+      }
+    }
+    const headers = await this.getHeaders();
+    const storageUrl = `${this.supabaseUrl}/storage/v1/object/authenticated/transcripts/${encodeURI(objectPath)}`;
+    const storageRes = await fetch(storageUrl, { headers });
+    if (!storageRes.ok) {
+      throw new Error(`Unable to download batch transcript: ${storageRes.status} - ${await storageRes.text()}`);
+    }
+    return storageRes.blob();
   }
 
   private async payableRpc<T>(functionName: string, body: Record<string, unknown>): Promise<T> {
@@ -4258,9 +4393,31 @@ export class SupabaseDataService implements IDataService {
     }
   }
 
+  private async listInventoryTransactionsViaRest(orgId?: string): Promise<any[]> {
+    try {
+      const url = orgId
+        ? `${this.baseUrl}/inventory_transactions?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`
+        : `${this.baseUrl}/inventory_transactions?order=created_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch {
+      return [];
+    }
+  }
+
   async getInventoryTransactionsByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getInventoryTransactionsByOrg called with orgId:', orgId);
-    return this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
+    if (this.isLocalSupabase()) {
+      return this.listInventoryTransactionsViaRest(orgId);
+    }
+    try {
+      return await this.inventoryAccountingRequest<any[]>('list_transactions', { orgId });
+    } catch (err) {
+      console.warn('[Supabase] inventory-accounting edge function unavailable; using REST fallback for transactions.', err);
+      return this.listInventoryTransactionsViaRest(orgId);
+    }
   }
 
   async getInventoryTransactionById(id: string): Promise<any | null> {
@@ -4321,14 +4478,66 @@ export class SupabaseDataService implements IDataService {
     return result;
   }
 
+  private async listStockAdjustmentsViaRest(orgId?: string): Promise<any[]> {
+    try {
+      const url = orgId
+        ? `${this.baseUrl}/stock_adjustments?org_id=eq.${encodeURIComponent(orgId)}&order=created_at.desc`
+        : `${this.baseUrl}/stock_adjustments?order=created_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const rows = await response.json();
+      return (Array.isArray(rows) ? rows : []).map((row: any) => this.normalizeStockAdjustment(row));
+    } catch {
+      return [];
+    }
+  }
+
   private async listStockAdjustmentsViaEdgeFunction(orgId?: string): Promise<any[]> {
-    const result = await this.stockAdjustmentRequest('list', orgId ? { orgId } : {});
-    return (result.adjustments || []).map((row: any) => this.normalizeStockAdjustment(row));
+    if (this.isLocalSupabase()) {
+      return this.listStockAdjustmentsViaRest(orgId);
+    }
+    try {
+      const result = await this.stockAdjustmentRequest('list', orgId ? { orgId } : {});
+      return (result.adjustments || []).map((row: any) => this.normalizeStockAdjustment(row));
+    } catch (err) {
+      console.warn('[Supabase] stock-adjustments-write edge function unavailable; using REST fallback.', err);
+      return this.listStockAdjustmentsViaRest(orgId);
+    }
+  }
+
+  private async listInventoryLevelsViaRest(orgId?: string): Promise<any[]> {
+    try {
+      const url = orgId
+        ? `${this.baseUrl}/inventory_levels?org_id=eq.${encodeURIComponent(orgId)}&is_deleted=eq.false&order=updated_at.desc`
+        : `${this.baseUrl}/inventory_levels?is_deleted=eq.false&order=updated_at.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) {
+        const fallbackUrl = orgId
+          ? `${this.baseUrl}/inventory_levels?org_id=eq.${encodeURIComponent(orgId)}&is_deleted=eq.false`
+          : `${this.baseUrl}/inventory_levels?is_deleted=eq.false`;
+        const fbResp = await fetch(fallbackUrl, { headers: await this.getHeaders() });
+        if (!fbResp.ok) return [];
+        const rows = await fbResp.json();
+        return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+      }
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []);
+    } catch {
+      return [];
+    }
   }
 
   private async listInventoryLevelsViaEdgeFunction(orgId?: string): Promise<any[]> {
-    const result = await this.stockAdjustmentRequest('list_levels', orgId ? { orgId } : {});
-    return this.snakeToCamel(result.levels || []);
+    if (this.isLocalSupabase()) {
+      return this.listInventoryLevelsViaRest(orgId);
+    }
+    try {
+      const result = await this.stockAdjustmentRequest('list_levels', orgId ? { orgId } : {});
+      return this.snakeToCamel(result.levels || []);
+    } catch (err) {
+      console.warn('[Supabase] stock-adjustments-write edge function unavailable; using REST fallback.', err);
+      return this.listInventoryLevelsViaRest(orgId);
+    }
   }
 
   private async inventoryAccountingRequest<T>(
@@ -4352,21 +4561,124 @@ export class SupabaseDataService implements IDataService {
     return this.snakeToCamel(body.result) as T;
   }
 
+  private async getInventoryClassesViaRest(orgId: string): Promise<InventoryClass[]> {
+    try {
+      const url = `${this.baseUrl}/inventory_classes?org_id=eq.${encodeURIComponent(orgId)}&order=code.asc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const rows = await response.json();
+      return this.snakeToCamel(Array.isArray(rows) ? rows : []) as InventoryClass[];
+    } catch (error) {
+      console.error('[Supabase] Error fetching inventory classes via REST:', error);
+      return [];
+    }
+  }
+
   async getInventoryClasses(orgId: string): Promise<InventoryClass[]> {
-    return this.inventoryAccountingRequest<InventoryClass[]>('list_classes', { orgId });
+    if (this.isLocalSupabase()) {
+      return this.getInventoryClassesViaRest(orgId);
+    }
+    try {
+      return await this.inventoryAccountingRequest<InventoryClass[]>('list_classes', { orgId });
+    } catch (err) {
+      console.warn('[Supabase] inventory-accounting edge function unavailable; using REST fallback for inventory classes.', err);
+      return this.getInventoryClassesViaRest(orgId);
+    }
+  }
+
+  private async saveInventoryClassViaRest(
+    inventoryClass: Partial<InventoryClass> & { orgId: string }
+  ): Promise<InventoryClass> {
+    const payload = this.camelToSnake(inventoryClass);
+    payload.updated_at = new Date().toISOString();
+    const headers = { ...(await this.getHeaders()), 'Prefer': 'return=representation' };
+
+    if (inventoryClass.id) {
+      const url = `${this.baseUrl}/inventory_classes?id=eq.${encodeURIComponent(inventoryClass.id)}`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update inventory class via REST: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data) as InventoryClass;
+    } else {
+      delete payload.id;
+      const url = `${this.baseUrl}/inventory_classes`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create inventory class via REST: ${response.status} - ${errorText}`);
+      }
+      const data = await response.json();
+      return this.snakeToCamel(Array.isArray(data) ? data[0] : data) as InventoryClass;
+    }
   }
 
   async saveInventoryClass(
     inventoryClass: Partial<InventoryClass> & { orgId: string }
   ): Promise<InventoryClass> {
-    return this.inventoryAccountingRequest<InventoryClass>('save_class', {
-      orgId: inventoryClass.orgId,
-      inventoryClass,
-    });
+    try {
+      return await this.inventoryAccountingRequest<InventoryClass>('save_class', {
+        orgId: inventoryClass.orgId,
+        inventoryClass,
+      });
+    } catch (err) {
+      console.warn('[Supabase] inventory-accounting edge function unavailable; using REST fallback for save_class.', err);
+      return this.saveInventoryClassViaRest(inventoryClass);
+    }
+  }
+
+  private async getOpeningInventoryViaRest(orgId: string): Promise<OpeningInventoryDocument[]> {
+    try {
+      const url = `${this.baseUrl}/opening_inventory_headers?org_id=eq.${encodeURIComponent(orgId)}&order=posting_date.desc`;
+      const response = await fetch(url, { headers: await this.getHeaders() });
+      if (!response.ok) return [];
+      const headers = await response.json();
+      const docs = Array.isArray(headers) ? headers : [];
+
+      if (docs.length > 0) {
+        const headerIds = docs.map(d => d.id);
+        const linesUrl = `${this.baseUrl}/opening_inventory_lines?header_id=in.(${headerIds.join(',')})`;
+        const linesResp = await fetch(linesUrl, { headers: await this.getHeaders() });
+        const lines = linesResp.ok ? await linesResp.json() : [];
+        const linesByHeader = new Map<string, any[]>();
+        for (const line of (Array.isArray(lines) ? lines : [])) {
+          const list = linesByHeader.get(line.header_id) || [];
+          list.push(line);
+          linesByHeader.set(line.header_id, list);
+        }
+        return docs.map(d => ({
+          ...this.snakeToCamel(d),
+          lines: this.snakeToCamel(linesByHeader.get(d.id) || [])
+        })) as OpeningInventoryDocument[];
+      }
+
+      return this.snakeToCamel(docs) as OpeningInventoryDocument[];
+    } catch (error) {
+      console.error('[Supabase] Error fetching opening inventory via REST:', error);
+      return [];
+    }
   }
 
   async getOpeningInventory(orgId: string): Promise<OpeningInventoryDocument[]> {
-    return this.inventoryAccountingRequest<OpeningInventoryDocument[]>('list_opening', { orgId });
+    if (this.isLocalSupabase()) {
+      return this.getOpeningInventoryViaRest(orgId);
+    }
+    try {
+      return await this.inventoryAccountingRequest<OpeningInventoryDocument[]>('list_opening', { orgId });
+    } catch (err) {
+      console.warn('[Supabase] inventory-accounting edge function unavailable; using REST fallback for opening inventory.', err);
+      return this.getOpeningInventoryViaRest(orgId);
+    }
   }
 
   async postOpeningInventory(
@@ -5845,11 +6157,36 @@ export class SupabaseDataService implements IDataService {
   // PURCHASE ORDER CRUD
   // ============================================================================
 
+  private normalizePurchaseOrderFromDb(po: any): any {
+    if (!po) return po;
+    const camel = this.snakeToCamel(po);
+    return {
+      ...camel,
+      date: camel.orderDate || camel.date || '',
+      reference: camel.poNumber || camel.reference || '',
+      memo: camel.notes || camel.memo || '',
+      lines: Array.isArray(camel.lines) ? camel.lines : [],
+    };
+  }
+
   async createPurchaseOrder(order: any): Promise<any> {
     console.debug('[Supabase] createPurchaseOrder called with:', order);
     try {
-      const payload = this.camelToSnake(order);
-      delete payload.id;
+      const payload: any = {
+        org_id: order.orgId,
+        vendor_id: order.vendorId,
+        po_number: order.reference || order.poNumber || `PO-${Date.now()}`,
+        order_date: order.date || order.orderDate || new Date().toISOString().slice(0, 10),
+        status: order.status || 'DRAFT',
+        total_amount: Number(order.totalAmount || 0),
+        notes: order.memo || order.notes || null,
+      };
+      if (order.expectedDeliveryDate) payload.expected_delivery_date = order.expectedDeliveryDate;
+      if (order.glEntryNumber) payload.gl_entry_number = order.glEntryNumber;
+      if (order.approvedBy) payload.approved_by = order.approvedBy;
+      if (order.approvedAt) payload.approved_at = order.approvedAt;
+      if (order.createdBy) payload.created_by = order.createdBy;
+
       const url = `${this.baseUrl}/purchase_orders`;
       const response = await fetch(url, {
         method: 'POST',
@@ -5861,7 +6198,36 @@ export class SupabaseDataService implements IDataService {
         throw new Error(`Failed to create purchase order: ${response.status} - ${errorText}`);
       }
       const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+      const createdPO = Array.isArray(data) ? data[0] : data;
+      const normalizedPO = this.normalizePurchaseOrderFromDb(createdPO);
+
+      if (Array.isArray(order.lines) && order.lines.length > 0 && normalizedPO?.id) {
+        try {
+          const itemPayloads = order.lines
+            .filter((l: any) => l.itemId)
+            .map((l: any) => ({
+              po_id: normalizedPO.id,
+              item_id: l.itemId,
+              quantity: Number(l.qty ?? l.quantity ?? 1),
+              unit_price: Number(l.unitPrice ?? 0),
+              received_quantity: Number(l.receivedQuantity ?? 0)
+            }));
+          if (itemPayloads.length > 0) {
+            await fetch(`${this.baseUrl}/purchase_order_items`, {
+              method: 'POST',
+              headers: { ...(await this.getHeaders()), 'Prefer': 'return=minimal' },
+              body: JSON.stringify(itemPayloads)
+            });
+          }
+        } catch (itemErr) {
+          console.warn('[Supabase] Failed to save purchase order items:', itemErr);
+        }
+      }
+
+      return {
+        ...normalizedPO,
+        lines: order.lines || []
+      };
     } catch (error) {
       console.error('[Supabase] Error creating purchase order:', error);
       throw error;
@@ -5871,7 +6237,19 @@ export class SupabaseDataService implements IDataService {
   async updatePurchaseOrder(id: string, updates: any): Promise<any> {
     console.debug('[Supabase] updatePurchaseOrder called with id:', id, 'updates:', updates);
     try {
-      const payload = this.camelToSnake(updates);
+      const payload: any = {};
+      if (updates.vendorId !== undefined) payload.vendor_id = updates.vendorId;
+      if (updates.reference !== undefined || updates.poNumber !== undefined) payload.po_number = updates.reference ?? updates.poNumber;
+      if (updates.date !== undefined || updates.orderDate !== undefined) payload.order_date = updates.date ?? updates.orderDate;
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.totalAmount !== undefined) payload.total_amount = Number(updates.totalAmount);
+      if (updates.memo !== undefined || updates.notes !== undefined) payload.notes = updates.memo ?? updates.notes;
+      if (updates.expectedDeliveryDate !== undefined) payload.expected_delivery_date = updates.expectedDeliveryDate;
+      if (updates.glEntryNumber !== undefined) payload.gl_entry_number = updates.glEntryNumber;
+      if (updates.approvedBy !== undefined) payload.approved_by = updates.approvedBy;
+      if (updates.approvedAt !== undefined) payload.approved_at = updates.approvedAt;
+      payload.updated_at = new Date().toISOString();
+
       const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
       const response = await fetch(url, {
         method: 'PATCH',
@@ -5883,7 +6261,8 @@ export class SupabaseDataService implements IDataService {
         throw new Error(`Failed to update purchase order: ${response.status} - ${errorText}`);
       }
       const data = await response.json();
-      return Array.isArray(data) ? this.snakeToCamel(data[0]) : this.snakeToCamel(data);
+      const updatedPO = Array.isArray(data) ? data[0] : data;
+      return this.normalizePurchaseOrderFromDb(updatedPO);
     } catch (error) {
       console.error('[Supabase] Error updating purchase order:', error);
       throw error;
@@ -5895,11 +6274,13 @@ export class SupabaseDataService implements IDataService {
     try {
       const url = `${this.baseUrl}/purchase_orders?id=eq.${id}`;
       const response = await fetch(url, {
-        method: 'PATCH',
-        headers: (await this.getHeaders()),
-        body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString() })
+        method: 'DELETE',
+        headers: await this.getHeaders()
       });
-      if (!response.ok) throw new Error('Failed to delete purchase order');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete purchase order: ${response.status} - ${errorText}`);
+      }
     } catch (error) {
       console.error('[Supabase] Error deleting purchase order:', error);
       throw error;
@@ -5909,11 +6290,11 @@ export class SupabaseDataService implements IDataService {
   async getPurchaseOrdersByOrg(orgId: string): Promise<any[]> {
     console.debug('[Supabase] getPurchaseOrdersByOrg called with orgId:', orgId);
     try {
-      const url = `${this.baseUrl}/purchase_orders?org_id=eq.${orgId}&is_deleted=eq.false&order=created_at.desc`;
+      const url = `${this.baseUrl}/purchase_orders?org_id=eq.${orgId}&order=created_at.desc`;
       const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return [];
       const data = await response.json();
-      return Array.isArray(data) ? data.map(d => this.snakeToCamel(d)) : [];
+      return Array.isArray(data) ? data.map(d => this.normalizePurchaseOrderFromDb(d)) : [];
     } catch (error) {
       console.error('[Supabase] Error fetching purchase orders:', error);
       return [];
@@ -5927,7 +6308,7 @@ export class SupabaseDataService implements IDataService {
       const response = await fetch(url, { headers: (await this.getHeaders()) });
       if (!response.ok) return null;
       const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? this.snakeToCamel(data[0]) : null;
+      return Array.isArray(data) && data.length > 0 ? this.normalizePurchaseOrderFromDb(data[0]) : null;
     } catch (error) {
       console.error('[Supabase] Error fetching purchase order:', error);
       return null;

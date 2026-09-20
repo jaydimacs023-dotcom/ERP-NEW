@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, Vendor, NonStockItem } from '../types';
 import ModalPortal from '../components/ModalPortal';
 import PaginationControls, { usePaginatedRows } from '../components/PaginationControls';
@@ -41,7 +41,7 @@ const getTodayDateValue = () => {
 };
 
 const PAGE_SIZE = 10;
-const PURCHASE_ORDER_COLUMNS = 'id,org_id,vendor_id,date,reference,gl_entry_number,status,lines,total_amount,memo,created_at,approved_by,approved_at,is_deleted,deleted_at,deleted_by';
+const PURCHASE_ORDER_COLUMNS = 'id,org_id,vendor_id,order_date,po_number,gl_entry_number,status,total_amount,notes,created_at,approved_by,approved_at';
 const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
 const dateEndIso = (date: string) => `${date}T23:59:59.999Z`;
 
@@ -88,7 +88,6 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
     if (orgId) {
       filters.push({ column: 'org_id', operator: 'eq', value: orgId });
     }
-    filters.push({ column: 'is_deleted', operator: 'eq', value: false });
     if (statusFilter !== 'ALL') {
       filters.push({ column: 'status', operator: 'eq', value: statusFilter });
     }
@@ -98,19 +97,18 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
 
     const todayValue = getTodayDateValue();
     if (dateFilterMode === 'TODAY') {
-      filters.push({ column: 'date', operator: 'gte', value: dateStartIso(todayValue) });
-      filters.push({ column: 'date', operator: 'lte', value: dateEndIso(todayValue) });
+      filters.push({ column: 'order_date', operator: 'eq', value: todayValue });
     } else if (dateFilterMode === 'THIS_MONTH') {
-      filters.push({ column: 'date', operator: 'gte', value: `${todayValue.slice(0, 7)}-01` });
+      filters.push({ column: 'order_date', operator: 'gte', value: `${todayValue.slice(0, 7)}-01` });
       const end = new Date(`${todayValue.slice(0, 7)}-01T00:00:00.000Z`);
       end.setUTCMonth(end.getUTCMonth() + 1);
-      filters.push({ column: 'date', operator: 'lt', value: end.toISOString().slice(0, 10) });
+      filters.push({ column: 'order_date', operator: 'lt', value: end.toISOString().slice(0, 10) });
     } else if (dateFilterMode === 'CUSTOM') {
       if (dateFrom) {
-        filters.push({ column: 'date', operator: 'gte', value: dateFrom });
+        filters.push({ column: 'order_date', operator: 'gte', value: dateFrom });
       }
       if (dateTo) {
-        filters.push({ column: 'date', operator: 'lte', value: dateTo });
+        filters.push({ column: 'order_date', operator: 'lte', value: dateTo });
       }
     }
 
@@ -131,15 +129,22 @@ const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
       filters: poFilters,
       search: debouncedSearchTerm.trim()
         ? {
-          columns: ['reference', 'gl_entry_number', 'memo'],
+          columns: ['po_number', 'gl_entry_number', 'notes'],
           term: debouncedSearchTerm
         }
         : undefined,
-      orderBy: [{ column: 'date', ascending: false }, { column: 'created_at', ascending: false }]
+      orderBy: [{ column: 'order_date', ascending: false }, { column: 'created_at', ascending: false }]
     })
       .then(result => {
         if (!isActive) return;
-        setServerPOs(result.rows);
+        const normalized = result.rows.map((row: any) => ({
+          ...row,
+          date: row.date || row.orderDate || '',
+          reference: row.reference || row.poNumber || '',
+          memo: row.memo || row.notes || '',
+          lines: row.lines || [],
+        }));
+        setServerPOs(normalized);
         setServerTotal(result.total);
         setServerTotalPages(result.totalPages);
       })

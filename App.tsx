@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Organization, User, Student, Qualification, Trainer, Batch, Sponsor, NonStockItem, Vendor, FixedAsset, BankAccount, Location, TrainerSchedule, Employee, PayrollRun, PayrollLine, JournalEntry, JournalLine, AuditLog, Budget, BudgetLine, AccountClass, TransactionSummary, ChartOfAccount, PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus, PaymentHistory, Payable, AccountingPeriod, CheckVoucher, EFTBatch, GoodsReceipt, GoodsReceiptLine, BankReconciliation, WarehouseLocation, StockItem, InventoryClass, InventoryLevel, InventoryTransaction, StockAdjustment, ReorderPoint, RecurringBill, RecurringBillHistory, RevenueSchedule, RevenueRecognitionEntry, ItemGroup, CourseFee, Enrollment, AssessmentRegistration, Invoice, InvoiceLine, Payment, PaymentApplication, BankDeposit, StudentLedger, RecurringInvoice, RecurringInvoiceHistory, AlumniEmploymentReport, TaxCategoryEntry, FeedbackTicket
 } from './types';
@@ -173,6 +173,15 @@ export default function App() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
+  const currentOrgIdRef = useRef(currentOrgId);
+  useEffect(() => {
+    currentOrgIdRef.current = currentOrgId;
+  }, [currentOrgId]);
+
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -736,10 +745,10 @@ export default function App() {
     invoiceGlSequenceRef.current[key] = Math.max(invoiceGlSequenceRef.current[key] || 0, seq);
   };
   // Data Loading Logic
-  useEffect(() => {
-    async function loadData() {
-      try {
-        console.log("📊 App: Starting data load...");
+  const loadData = useCallback(async (explicitUser?: User | null) => {
+    try {
+      setIsLoading(true);
+      console.log("📊 App: Starting data load...");
         console.log("🔧 Config:", { useMockData: config.useMockData, supabaseConfigured: !!(config.supabase?.url && config.supabase?.anonKey) });
 
         const service = DataServiceFactory.getService();
@@ -791,9 +800,26 @@ export default function App() {
           return next;
         });
 
+        // Determine target organization context for initial GL sequence sync
+        const activeUser = explicitUser !== undefined ? explicitUser : (currentUserRef.current || authService.getSession()?.user);
+        let targetOrgId = activeUser?.orgId || currentOrgIdRef.current;
+        if (activeUser?.role === 'SYSTEM_ADMIN') {
+          if (currentOrgIdRef.current && data.organizations.some(o => o.id === currentOrgIdRef.current && !o.isDeleted)) {
+            targetOrgId = currentOrgIdRef.current;
+          } else if (activeUser.orgId && data.organizations.some(o => o.id === activeUser.orgId && !o.isDeleted)) {
+            targetOrgId = activeUser.orgId;
+          } else if (data.organizations.length > 0) {
+            targetOrgId = data.organizations[0].id;
+          }
+        } else if (data.organizations.length > 0 && (!targetOrgId || !data.organizations.some(o => o.id === targetOrgId && !o.isDeleted))) {
+          targetOrgId = data.organizations[0].id;
+        }
+
         // Seed the per-org GL sequence from loaded data before backfilling.
-        syncGlSequenceForOrg(currentOrgId, normalizedEntries);
-        syncInvoiceGlSequenceForOrg(currentOrgId, normalizedEntries);
+        if (targetOrgId) {
+          syncGlSequenceForOrg(targetOrgId, normalizedEntries);
+          syncInvoiceGlSequenceForOrg(targetOrgId, normalizedEntries);
+        }
 
         // Assign sequential numbers to any entries that still lack a valid
         // GL reference (either column missing or reference not matching pattern).
@@ -1460,17 +1486,16 @@ export default function App() {
         setCourseFees(data.courseFees || []);
         setTaxCategories(data.taxCategories || []);
         if (data.organizations.length > 0) {
-          // Get the restored session to check user's orgId
-          const restoredSession = authService.getSession();
-          const restoredUser = restoredSession?.user;
-          const userOrgId = restoredUser?.orgId;
+          // Get the active session/user to check user's orgId
+          const activeUser = explicitUser !== undefined ? explicitUser : (currentUserRef.current || authService.getSession()?.user);
+          const userOrgId = activeUser?.orgId;
           const userOrgExists = data.organizations.some(o => o.id === userOrgId && !o.isDeleted);
-          const isSystemAdmin = restoredUser?.role === 'SYSTEM_ADMIN';
+          const isSystemAdmin = activeUser?.role === 'SYSTEM_ADMIN';
 
-          console.log('[App] Organization selection:', { userOrgId, userOrgExists, isSystemAdmin, user: restoredUser?.email });
+          console.log('[App] Organization selection:', { userOrgId, userOrgExists, isSystemAdmin, user: activeUser?.email });
 
           // Validate: User must have an organization OR be a SYSTEM_ADMIN
-          if (restoredUser && !userOrgExists && !isSystemAdmin) {
+          if (activeUser && !userOrgExists && !isSystemAdmin) {
             console.error('[App] ❌ Validation failed: User has no valid organization and is not SYSTEM_ADMIN');
             authService.logout();
             setCurrentUser(null);
@@ -1485,10 +1510,16 @@ export default function App() {
             setCurrentOrgId(userOrgId);
             console.log('[App] ✅ Set organization from user record:', userOrgId);
           } else if (isSystemAdmin && data.organizations.length > 0) {
-            // SYSTEM_ADMIN: use first available organization
-            setCurrentOrgId(data.organizations[0].id);
-            console.log('[App] SYSTEM_ADMIN: Set organization to first available:', data.organizations[0].id);
-          } else if (data.organizations.length > 0 && !restoredUser) {
+            // SYSTEM_ADMIN: keep existing valid currentOrgId, otherwise userOrgId, otherwise first available
+            setCurrentOrgId(prev => {
+              if (prev && data.organizations.some(o => o.id === prev && !o.isDeleted)) {
+                return prev;
+              }
+              if (userOrgId && userOrgExists) return userOrgId;
+              return data.organizations[0].id;
+            });
+            console.log('[App] SYSTEM_ADMIN: Set organization');
+          } else if (data.organizations.length > 0 && !activeUser) {
             // No user logged in: use first organization for initial context
             setCurrentOrgId(data.organizations[0].id);
             console.log('[App] No logged-in user: Set organization to first available:', data.organizations[0].id);
@@ -1501,9 +1532,13 @@ export default function App() {
         console.log("🏁 Setting isLoading to false");
         setIsLoading(false);
       }
-    }
+    },
+    []
+  );
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   // Fetch Accounting Periods when organization changes
   useEffect(() => {
@@ -1659,10 +1694,10 @@ export default function App() {
     addNotification(type, message);
   };
 
-  const handleLogin = (user: User) => {
+  const handleLogin = async (user: User) => {
     const isSystemAdmin = user.role === 'SYSTEM_ADMIN';
     const org = organizations.find(o => o.id === user.orgId && !o.isDeleted);
-    const userHasOrg = !!org;
+    const userHasOrg = !!user.orgId;
 
     if (!userHasOrg && !isSystemAdmin) {
       handleNotify('error', 'Access Denied: User must belong to an organization to login. Contact your system administrator.');
@@ -1681,7 +1716,7 @@ export default function App() {
     setSuspensionBanner(null);
     setCurrentUser(user);
     const loginOrgId = user.orgId
-      || (isSystemAdmin ? organizations.find(organization => !organization.isDeleted)?.id || '' : '');
+      || (isSystemAdmin ? (organizations.find(organization => !organization.isDeleted)?.id || '') : '');
     setCurrentOrgId(loginOrgId);
     // Store session for persistence
     const session = { user, token: btoa(JSON.stringify({ userId: user.id, email: user.email, iat: Date.now() })) };
@@ -1693,6 +1728,9 @@ export default function App() {
 
     // Set default tab based on role
     setActiveTab(getDefaultTab(user.role));
+
+    // Reload all data using the authenticated JWT session
+    await loadData(user);
   };
 
   // helper to produce the next sequential GL reference (legacy GL00000001 style)
@@ -3010,6 +3048,7 @@ export default function App() {
 
       handleNotify('success', `Welcome! Organization "${org.name}" registered successfully`);
       console.info('[App] Registration complete');
+      await loadData(savedAdmin);
     } catch (error) {
       console.error('[App] Error during registration:', error);
       handleNotify('error', 'Registration failed. Falling back to memory storage.');
@@ -7221,6 +7260,29 @@ export default function App() {
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] ml-4">{showJournalForm ? 'new journal entry' : activeTab.replace('-', ' ')}</h2>
+            {isSysAdmin && organizations.length > 0 && (
+              <div className="flex items-center gap-2 ml-4 pl-4 border-l border-slate-200">
+                <Building2 size={16} className="text-slate-400 shrink-0" />
+                <label htmlFor="sysadmin-org-select" className="sr-only">Active Organization</label>
+                <select
+                  id="sysadmin-org-select"
+                  value={currentOrgId}
+                  onChange={(e) => {
+                    const newOrgId = e.target.value;
+                    setCurrentOrgId(newOrgId);
+                    console.info('[App] SYSTEM_ADMIN switched organization to:', newOrgId);
+                  }}
+                  className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand hover:border-slate-300 transition-all cursor-pointer max-w-[280px] truncate"
+                  title="Switch Active Organization (System Admin)"
+                >
+                  {organizations.filter(o => !o.isDeleted).map(org => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
